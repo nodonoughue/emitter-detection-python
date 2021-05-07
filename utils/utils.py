@@ -73,7 +73,7 @@ def make_taper(taper_len: int, taper_type: str):
 
     # Some constants/utilities for the window functions
 
-    switcher = {'uniform': lambda x: np.ones(shape=(x, 1)),
+    switcher = {'uniform': lambda x: np.ones(shape=(x, )),
                 'cosine': lambda x: np.sin(np.pi/(2*x)) * np.cos(np.pi * (np.arange(x)-(x-1)/2)/x),
                 'hann': np.hanning,  # Note: it's actually a Hann window, but commonly mis-referred to as Hanning
                 'hamming': np.hamming,
@@ -240,3 +240,20 @@ def make_pdfs(msmt_function, msmts, pdftype='MVN', covariance=1):
         raise KeyError('Unrecognized PDF type setting: ''{}'''.format(pdftype))
 
     return pdfs
+
+
+def print_elapsed(t_elapsed):
+    """
+    Print the elapsed time, provided in seconds.
+
+    Nicholas O'Donoughue
+    6 May 2021
+
+    :param t_elapsed: elapsed time, in seconds
+    """
+
+    hrs_elapsed = np.floor(t_elapsed/3600)
+    mins_elapsed = np.floor((t_elapsed - 3600 * hrs_elapsed) / 60)
+    secs_elapsed = t_elapsed - hrs_elapsed*3600 - mins_elapsed * 60
+
+    print('Elapsed Time: {} hrs, {} min, {} sec'.format(hrs_elapsed, mins_elapsed, secs_elapsed))

@@ -48,10 +48,10 @@ def make_all_figures(close_figs=False, force_recalc=True):
     fig7 = make_figure_7(prefix, rng, colors, force_recalc)
     fig8 = make_figure_8(prefix)
     fig10 = make_figure_10(prefix, rng, colors, force_recalc)
-    fig12 = make_figure_12(prefix, force_recalc)
-    fig14 = make_figure_14(prefix, force_recalc)
-    fig15b = make_figure_15b(prefix, force_recalc)
-    fig16 = make_figure_16(prefix, force_recalc)
+    fig12 = make_figure_12(prefix)
+    fig14 = make_figure_14(prefix)
+    fig15b = make_figure_15b(prefix)
+    fig16 = make_figure_16(prefix)
 
     figs = [fig1, fig3, fig5, fig6b, fig7, fig8, fig10, fig12, fig14, fig15b, fig16]
 
@@ -99,7 +99,7 @@ def make_figure_1(prefix=None):
     plt.plot(np.array([1, 1])*x0*th_mult, [0, 1], linestyle=':', label='True Emitter Bearing')
     plt.xlabel(r'$\phi$ [degrees]')
     plt.ylabel('Antenna Gain')
-    plt.legend(loc='upper left') # TODO: Reduce font size
+    plt.legend(loc='upper left', prop={'size': 6})  # Manually reduce font size so legend is less obtrusive
     
     if prefix is not None:
         plt.savefig(prefix + 'fig1.png')
@@ -119,6 +119,7 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
+    :param colors: colormap
     :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation    
     :return: figure handle
     """
@@ -232,6 +233,7 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
+    :param colors: colormap
     :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation
     :return: figure handle
     """
@@ -262,7 +264,7 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100], dtype=int)  # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-10, stop=20.1, step=1)  # signal to noise ratio
-    num_mc =  10000  # number of monte carlo trials at each parameter setting
+    num_mc = 10000  # number of monte carlo trials at each parameter setting
 
     # Set up output scripts
     out_shp = (np.size(num_samples_vec), np.size(snr_db_vec))
@@ -298,7 +300,7 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
 
             # CRLB
             crlb_psi[idx_num_samples, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot,
-                                                                        psi, psi_true))
+                                                                                  psi, psi_true))
 
     # Generate figure
     fig5 = plt.figure()
@@ -353,7 +355,9 @@ def make_figure_6b(prefix=None):
     plt.polar(phi, np.absolute(gain_pattern_one))
     plt.polar(phi, np.absolute(gain_pattern_two))
     plt.polar(phi, gain_omni, linestyle='--')
-    # TODO: Remove axes
+
+    # TODO: Remove angle labels
+    plt.gca().set_yticklabels([])
 
     plt.text(1.1, .25, 'Reference', fontsize=10)
     plt.text(1.5, 1, 'Horizontal Adcock', fontsize=10)
@@ -505,8 +509,9 @@ def make_figure_8(prefix=None):
     np.place(fd_desc[:-1], fd[1:] > fd[:-1], np.Inf)
     idx = np.argmin(np.absolute(fd_desc), axis=None)
     plt.text(idx+1, f0-.8*np.max(fd, axis=None), r'$\tau$', fontsize=12)
-    # plt.plot(idx*[1, 1], f0+np.array([np.min(fd, axis=None), 0]), color='k', linestyle='--')
-    # TODO: Draw dotted line from bottom of graph to x axis at point tau
+    plt.vlines(idx, 0, f0, linestyles='dashed')
+
+    plt.ylim([f0+np.min(fd)-.2, f0+np.max(fd)+.2])
 
     if prefix is not None:
         plt.savefig(prefix + 'fig8b.png')
@@ -599,11 +604,12 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
                 psi_est[idx_mc] = aoa.doppler.compute_df(r[:, idx_mc], x[:, idx_mc], ts, f, ant_radius, fr, psi_res,
                                                          -np.pi, np.pi)
             
-            rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2, axis=None)/this_num_mc)
+            rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2, axis=None)
+                                                         / this_num_mc)
 
             # CRLB
-            crlb_psi[idx_num_samples, idx_snr] = aoa.doppler.crlb(snr_db, num_samples, signal_amp, ts, f, ant_radius, fr,
-                                                        psi_true)
+            crlb_psi[idx_num_samples, idx_snr] = aoa.doppler.crlb(snr_db, num_samples, signal_amp, ts, f, ant_radius,
+                                                                  fr, psi_true)
         
     print('\tdone.')
 
@@ -753,7 +759,7 @@ def make_figure_15b(prefix=None, force_recalc=True):
     return fig15b
 
 
-def make_figure_16(prefix=None, force_recalc=True):
+def make_figure_16(prefix=None):
     """
     Figure 16, Monopulse Error
 
@@ -763,12 +769,8 @@ def make_figure_16(prefix=None, force_recalc=True):
     26 March 2021
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation
     :return: figure handle
     """
-
-    if not force_recalc:
-        return plt.figure()
 
     th_bw = 4
     th = np.arange(start=-th_bw/2, step=.1, stop=th_bw/2+.1)

@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 
 def compute_array_factor(v_fun, h, psi):
@@ -23,13 +24,13 @@ def compute_array_factor(v_fun, h, psi):
     """
 
     # Normalize the beamformer and make it a column vector
-    h = np.flatten(h)/np.max(np.fabs(h))
+    h = np.reshape(h, newshape=(np.size(h), 1))/np.max(np.abs(h))
 
     # Generate the steering vectors
-    vv = v_fun(psi)  # should be numel(psi) x N
+    vv = v_fun(psi)  # should be N x numel(psi)
 
     # Compute the inner product
-    return vv.H.dot(h)
+    return np.conjugate(vv.T).dot(h)
 
 
 def compute_array_factor_ula(d_lam, num_elements, psi, psi_0=np.pi / 2, el_pattern=lambda x: 1):
@@ -51,14 +52,16 @@ def compute_array_factor_ula(d_lam, num_elements, psi, psi_0=np.pi / 2, el_patte
     :return af: Array output at each steering angle
     """
     
-    # Build the Array Pattern
-    af = np.fabs(np.sin(num_elements * np.pi * d_lam * (np.sin(psi) - np.sin(psi_0))) /
-                 (num_elements * (np.sin(np.pi * d_lam * (np.sin(psi) - np.sin(psi_0))))))
+    # Build the Array Pattern -- ignore runtime warnings, we're going to handle divide by zero cases in a few lines
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        af = np.fabs(np.sin(num_elements * np.pi * d_lam * (np.sin(psi) - np.sin(psi_0))) /
+                     (num_elements * (np.sin(np.pi * d_lam * (np.sin(psi) - np.sin(psi_0))))))
 
     # Look for grating lobes
     epsilon = 1e-6
-    mask = np.less(np.fabs(np.mod(d_lam*(np.sin(psi)-np.sin(psi_0)) + .5, 1) - .5) < epsilon)
-    np.putmask(a=af, mask=mask, values=1)
+    mask = np.less(np.fabs(np.mod(d_lam*(np.sin(psi)-np.sin(psi_0)) + .5, 1) - .5), epsilon)
+    np.putmask(af, mask=mask, values=1)
 
     # Apply the element pattern
     el = el_pattern(psi)
@@ -83,11 +86,13 @@ def make_steering_vector(d_lam, num_elements):
                    size N x numel(psi)
     """
 
+    element_idx_vec = np.expand_dims(np.arange(num_elements), axis=1)  # Make it 2D, elements along first dim
+
     def steer(psi):
-        return np.exp(1j * 2 * np.pi * d_lam * np.arange(num_elements) * np.sin(psi.T)).T
+        return np.exp(1j * 2 * np.pi * d_lam * element_idx_vec * np.expand_dims(np.sin(psi), axis=0))
 
     def steer_grad(psi):
-        return (1j * 2 * np.pi * d_lam * np.arange(num_elements) * np.cos(psi.T)).H * steer(psi)
+        return (-1j * 2 * np.pi * d_lam * element_idx_vec * np.expand_dims(np.cos(psi), axis=0)) * steer(psi)
 
     return steer, steer_grad
 

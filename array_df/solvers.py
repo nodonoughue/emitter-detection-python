@@ -16,7 +16,7 @@ def beamscan(x, v, psi_max=np.pi/2, num_points=101):
     :param v: Steering vector function that returns N point steering vector for each input (in radians).
     :param psi_max: Maximum steering angle (radians)
     :param num_points: Number of steering angles to compute
-    :return p: Power image (1 x N_pts) in linear units
+    :return p: Power image (1 x N_pimts) in linear units
     :return psi_vec: Vector of scan angles computed (in radians)
     """
 
@@ -24,15 +24,15 @@ def beamscan(x, v, psi_max=np.pi/2, num_points=101):
     psi_vec = np.linspace(start=-1, stop=1, num=num_points) * psi_max
 
     # Parse inputs
-    n, m = np.shape(x)
+    num_array_elements, num_samples = np.shape(x)
 
     # Generate steering vectors
-    steering_vectors = v(psi_vec)/np.sqrt(m)  # N x N_pts
+    steering_vectors = v(psi_vec)/np.sqrt(num_samples)  # num_array_elements x num_points
 
-    # Steer each of the M data samples
+    # Steer each of the num_samples data samples
     # - take the magnitude squared
     # - compute the mean across M snapshots
-    p = np.sum(np.fabs(x.H.dot(steering_vectors))**2, axis=0)/n  # 1 x N_pts
+    p = np.ravel(np.sum(np.abs(np.conjugate(x).T.dot(steering_vectors))**2, axis=0)/num_array_elements)
 
     return p, psi_vec
 
@@ -64,14 +64,14 @@ def beamscan_mvdr(x, v, psi_max=np.pi/2, num_points=101):
     covariance = np.cov(x)
 
     # Pre-compute covariance matrix inverses
-    c_pinv = np.pinv(covariance)
+    c_pinv = np.linalg.pinv(covariance)
 
     # Steer each of the M data samples
-    p = np.zeros((1, num_points))
+    p = np.zeros(shape=(num_points, ))
     for idx_psi in np.arange(num_points):
-        this_v = v(psi_vec(idx_psi))/np.sqrt(n)  # N x 1
+        this_v = v(psi_vec[idx_psi])/np.sqrt(n)  # N x 1
 
-        p[idx_psi] = 1/np.fabs(this_v.H.dot(c_pinv).dot(this_v))
+        p[idx_psi] = 1/np.abs(np.conjugate(this_v).T.dot(c_pinv).dot(this_v))
 
     return p, psi_vec
 
@@ -108,14 +108,9 @@ def music(x, steer, num_sig_dims=0, max_psi=np.pi / 2, num_points=101):
     # Perform Eigendecomposition of the covariance matrix
     lam, eig_vec = np.linalg.eig(covariance)
 
-    # Sort the eigenvalues
-    idx_sort = np.argsort(np.fabs(lam))
-    eig_vec_sort = eig_vec[:, idx_sort]
-    lam_sort = lam[idx_sort]
-
     # Isolate Noise Subspace
     if num_sig_dims != 0:
-        eig_vec_noise = eig_vec_sort[:, num_sig_dims + 1:]
+        eig_vec_noise = eig_vec[:, num_sig_dims + 1:]
     else:
         # We need to estimate D first
 
@@ -124,20 +119,20 @@ def music(x, steer, num_sig_dims=0, max_psi=np.pi / 2, num_points=101):
 
         # Set a threshold of 2x the noise level; and find the eigenvalue that
         # first cuts above it
-        num_sig_dims = np.argwhere(lam_sort >= 2 * noise)[-1]
+        num_sig_dims = np.argwhere(lam >= 2 * noise)[-1]
 
-        eig_vec_noise = eig_vec_sort[:, num_sig_dims + 1:]
+        eig_vec_noise = eig_vec[:, num_sig_dims + 1:]
 
     # MUSIC Projection
-    proj = eig_vec_noise.dot(eig_vec_noise.H)
+    proj = eig_vec_noise.dot(np.conjugate(eig_vec_noise).T)
 
     # Generate steering vectors
     psi_vec = np.linspace(start=-1, stop=1, num=num_points) * max_psi
 
-    p = np.zeros((1, num_points))
+    p = np.zeros(shape=(num_points, ))
     for idx_pt in np.arange(num_points):
-        vv = steer(psi_vec(idx_pt)) / np.sqrt(n)
-        q = vv.H.dot(proj).dot(vv)
-        p[idx_pt] = 1/np.fabs(q)
+        vv = steer(psi_vec[idx_pt]) / np.sqrt(n)
+        q = np.conjugate(vv).T.dot(proj).dot(vv)
+        p[idx_pt] = 1/np.abs(q)
 
     return p, psi_vec
