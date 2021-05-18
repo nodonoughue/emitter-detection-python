@@ -101,6 +101,8 @@ def music(x, steer, num_sig_dims=0, max_psi=np.pi / 2, num_points=101):
     :return psi_vec: Vector of scan angles computed (in radians)
     """
 
+    # TODO: Double check.  The second MC simulation showed a loss w.r.t. CRB and beamscan.
+
     # Compute the sample covariance matrix
     n, m = np.shape(x)
     covariance = np.cov(x)
