@@ -45,6 +45,9 @@ def compute_cep50(covariance):
         out_shape = (1,)
         num_matrices = 1
 
+        # Add a third dimension to covariance, so that the for loop has a (singleton) dimension to loop across
+        covariance = np.expand_dims(covariance, axis=2)
+
     cep = np.zeros(shape=out_shape)
     for idx_matrix in np.arange(num_matrices):
         this_covariance = covariance[:, :, idx_matrix]
@@ -192,7 +195,7 @@ def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
     lam_min = lam[idx_sort[0]]
 
     # Compute the rotation angle
-    rot_angle = np.arcatan2(v_max[1], v_max[0])
+    rot_angle = np.arctan2(v_max[1], v_max[0])
     rot_angle = np.mod(rot_angle+np.pi, 2*np.pi) - np.pi  # ensure angle is on interval [-pi,pi]
 
     # Lookup scale factor from confidence interval
@@ -217,8 +220,8 @@ def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
     ellipse_y = b * np.sin(th)         # Minor axis coordinates
 
     # Rotate the ellipse to standard reference frame
-    rot_matrix = np.array([[np.cos(rot_angle), np.sin(rot_angle)], [-np.sin(rot_angle), np.cos(rot_angle)]])
-    xx = np.matmul(rot_matrix, np.cat(ellipse_x, ellipse_y, axis=1).T)  # Store as a 2 x N matrix of positions
+    rot_matrix = np.array([[np.cos(rot_angle), -np.sin(rot_angle)], [np.sin(rot_angle), np.cos(rot_angle)]])
+    xx = np.matmul(rot_matrix, np.vstack((ellipse_x, ellipse_y)))  # Store as a 2 x N matrix of positions
 
     # Apply bias; so the ellipse is centered on the input x
-    return x+xx
+    return np.expand_dims(x, axis=1) + xx
