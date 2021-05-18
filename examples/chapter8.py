@@ -24,8 +24,8 @@ def run_all_examples(generate_data=True):
     if generate_data:
         generate_ex1_data(rng)
 
-    fig1 = example1()
-    fig2 = example2()
+    fig1 = example1(rng)
+    fig2 = example2(rng)
 
     return [fig1, fig2]
 
