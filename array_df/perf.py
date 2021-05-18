@@ -27,15 +27,20 @@ def crlb_det(covariance, noise_power, psi_vec, num_snapshots, v, v_dot):
     # Construct the QR Decomposition of the vector subspace V, and use it to form the projection matrix orthogonal
     # to the subspace spanned by V
     q, r = np.linalg.qr(steer)
-    proj = q.dot(q.T)                    # N x N
+    proj = q.dot(np.conjugate(q).T)                    # N x N
     proj_ortho = np.eye(N=np.shape(proj)[0]) - proj      # N x N
     h = np.conjugate(steer_gradient).T.dot(proj_ortho).dot(steer_gradient)       # D x D, equation 8.77
 
-    # CRLB
+    # Build spectral matrix from linear SNR
+    xi = covariance / noise_power                     # D x D
+
+    # Scaled CRLB, use an if/else to handle scalar cases separately
     if np.size(covariance) > 1:
-        return (noise_power / (2 * num_snapshots)) * np.linalg.pinv(np.real(covariance.dot(h.H)))  # D x D, eq 8.84
+        c = np.linalg.pinv(np.real(xi*h.T))
     else:
-        return (noise_power / (2 * num_snapshots)) / (np.real(covariance*(np.conjugate(h))))  # scalar, eq 8.84
+        c = 1/np.real(xi*h)
+
+    return c / (2 * num_snapshots)
 
 
 def crlb_stochastic(covariance, noise_power, psi_vec, num_snapshots, v, v_dot):
@@ -65,20 +70,16 @@ def crlb_stochastic(covariance, noise_power, psi_vec, num_snapshots, v, v_dot):
     # Construct the QR Decomposition of the vector subspace V, and use it to form the projection matrix orthogonal
     # to the subspace spanned by V
     q, r = np.linalg.qr(steer)
-    proj = q.dot(q.T)  # N x N
+    proj = q.dot(np.conjugate(q).T)  # N x N
     proj_ortho = np.eye(N=num_elements) - proj  # N x N
     h = np.conjugate(steer_gradient).T.dot(proj_ortho).dot(steer_gradient)  # D x D, equation 8.77
 
     # Build the spectral matrix from linear SNR
-    if num_sources == 1:
-        a = np.sum(np.abs(steer)**2) * covariance / noise_power
-        b = covariance * a / (1 + a)
-
-        # CRLB, eq 8.75 (modified for scalar inputs)
-        return noise_power / (2 * num_snapshots) * np.linalg.pinv(np.real(b*h))  # D x D
+    a = np.conjugate(r).T.dot(r).dot(covariance) / noise_power
+    if num_sources > 1:
+        b = np.linalg.lstsq(np.eye(N=num_sources) + a, covariance).dot(a)
     else:
-        a = np.conjugate(steer).T.dot(steer).dot(covariance) / noise_power  # V'V*Cs/noise_power
-        b = np.transpose(np.linalg.lstsq(np.transpose(np.eye(N=num_sources) + a), covariance)).dot(a)
+        b = covariance * a / (1+a)
 
-        # CRLB, ex 8.75
-        return (noise_power / (2 * num_snapshots)) * np.linalg.pinv(np.real(b*h.T))        # D x D
+    # CRLB, ex 8.75
+    return (noise_power / (2 * num_snapshots)) * np.linalg.pinv(np.real(b*h.T))        # D x D

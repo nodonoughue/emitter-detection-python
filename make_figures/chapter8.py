@@ -243,8 +243,8 @@ def make_figure_6(prefix=None):
     plt.plot(u1*np.array([1, 1]), [-20, 0], linestyle='--', color='black')
     plt.plot(u2*np.array([1, 1]), [-20, 0], linestyle='--', color='black')
 
-    # TODO: Fix annotation
-    plt.annotate(s='', xy=(u1, -10), xytext=(u2, -10), arrowprops=dict(arrowstyle='<->'))
+    # Annotate the beamwidth
+    plt.annotate(s='', xy=(u1, -16.5), xytext=(u2, -16.5), arrowprops=dict(arrowstyle='<->', color='k'))
     plt.text(-.02, -18, r'$\delta_u$', fontsize=11)
 
     plt.ylabel('Array Factor [linear]')
@@ -484,7 +484,7 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
     crlb_rmse_deg = np.sqrt(crlb_psi)*180/np.pi
     crlb_rmse_deg_stoch = np.sqrt(crlb_psi_stoch)*180/np.pi
 
-    num_monte_carlo = 50
+    num_monte_carlo = 1000
     s = np.exp(1j*rng.uniform(low=0, high=2*np.pi, size=(1, num_samples, num_monte_carlo)))
     x0 = np.expand_dims(v(psi), axis=2) * s
     n = np.sqrt(1/2)*(rng.standard_normal(size=(num_elements, num_samples, num_monte_carlo))

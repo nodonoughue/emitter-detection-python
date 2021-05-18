@@ -330,7 +330,7 @@ def example2(rng=None):
     crlb_rmse_deg_stoch = np.sqrt(crlb_psi_stoch) * 180/np.pi
     
     # Compute MC Experiment
-    num_monte_carlo = 50
+    num_monte_carlo = 1000
     sig = np.sqrt(1/2)*(rng.standard_normal(size=(num_samples, num_monte_carlo))
                         + 1j * rng.standard_normal(size=(num_samples, num_monte_carlo)))
     noise = np.sqrt(1/2)*(rng.standard_normal(size=(num_elements, num_samples, num_monte_carlo))
@@ -345,10 +345,9 @@ def example2(rng=None):
     
     for idxR, thisR in enumerate(range_vec_m):
         print('.', end='')  # Use the end command to suppress a newline
-        this_signal = sig*np.sqrt(db_to_lin(snr_db[idxR]))
-    
-        this_rx_signal = np.expand_dims(v(psi), axis=2) * np.reshape(this_signal, (1, num_samples, num_monte_carlo)) \
-                         + noise
+
+        this_signal = np.reshape(sig*np.sqrt(db_to_lin(snr_db[idxR])), (1, num_samples, num_monte_carlo))
+        this_rx_signal = np.expand_dims(v(psi), axis=2) * this_signal + noise
     
         this_err_beamscan = np.zeros(shape=(num_monte_carlo, ))
         this_err_mvdr = np.zeros(shape=(num_monte_carlo, ))

@@ -72,14 +72,14 @@ def make_taper(taper_len: int, taper_type: str):
     """
 
     # Some constants/utilities for the window functions
-
+    idx_centered = lambda x: np.arange(x) - (x-1)/2
     switcher = {'uniform': lambda x: np.ones(shape=(x, )),
                 'cosine': lambda x: np.sin(np.pi/(2*x)) * np.cos(np.pi * (np.arange(x)-(x-1)/2)/x),
-                'hann': np.hanning,  # Note: it's actually a Hann window, but commonly mis-referred to as Hanning
-                'hamming': np.hamming,
-                'bartlett': np.bartlett,
-                'blackman-harris': np.blackman,
-                'blackman': np.blackman}
+                'hann': lambda x: np.cos(np.pi*idx_centered(x)/x)**2,
+                'hamming': lambda x: .54 + .46*np.cos(2*np.pi*idx_centered(x)/x),
+                'blackman-harris': lambda x: .42 + .5*np.cos(2*np.pi*idx_centered(x)/x)
+                                                 + .08*np.cos(4*np.pi*idx_centered(x)/x)
+                }
 
     # Generate the window
     taper_type = taper_type.lower()
