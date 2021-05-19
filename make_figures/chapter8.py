@@ -388,7 +388,7 @@ def make_figure_9(prefix=None, rng=None):
     # Add noise
     snr_db = 10
     snr = db_to_lin(snr_db)
-    n = np.sqrt(1./(snr*2))*(rng.standard_normal(size=np.shape(x1)) + 1j * rng.standard_normal(size=np.shape(x1)))
+    n = np.sqrt(1/(snr*2))*(rng.standard_normal(size=np.shape(x1)) + 1j * rng.standard_normal(size=np.shape(x1)))
     x = x1 + x2 + n
     
     # Generate Beamscan images
@@ -412,7 +412,7 @@ def make_figure_9(prefix=None, rng=None):
         plt.savefig(prefix + 'fig9.svg')
     
     pwr_vec_music, _ = array_df.solvers.music(x, v, 2, np.pi/2, 1001)
-    pwr_vec_music = pwr_vec_music/np.max(np.abs(pwr_vec_music))
+    pwr_vec_music = pwr_vec_music/np.amax(np.abs(pwr_vec_music))
     plt.plot(np.sin(psi_vec), lin_to_db(np.abs(pwr_vec_music)), label='MUSIC')
     plt.legend()
 

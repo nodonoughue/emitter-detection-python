@@ -1,5 +1,5 @@
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 def beamscan(x, v, psi_max=np.pi/2, num_points=101):
     """
@@ -105,27 +105,37 @@ def music(x, steer, num_sig_dims=0, max_psi=np.pi / 2, num_points=101):
 
     # Compute the sample covariance matrix
     n, m = np.shape(x)
-    covariance = np.cov(x)
+    # covariance = np.cov(x, bias=True)
+    covariance = np.zeros((n, n), dtype=complex)
+    for idx in np.arange(m):
+        this_x = np.expand_dims(x[:, idx], axis=1)
+        tmp = this_x @ np.conjugate(this_x.T)
+        covariance += tmp/m
 
     # Perform Eigendecomposition of the covariance matrix
     lam, eig_vec = np.linalg.eig(covariance)
 
+    # Sort the eigenvectors and eigenvectors
+    idx_sort = np.flip(np.argsort(np.abs(lam)))  # np.argsort operates in ascending order, reverse it
+    # lam_sort = np.take_along_axis(lam, idx_sort, axis=0)
+    eig_vec_sort = np.take_along_axis(eig_vec, np.expand_dims(idx_sort, axis=0), axis=1)
+
     # Isolate Noise Subspace
     if num_sig_dims != 0:
-        eig_vec_noise = eig_vec[:, num_sig_dims + 1:]
+        eig_vec_noise = eig_vec_sort[:, num_sig_dims:]
     else:
         # We need to estimate D first
 
         # Assume that the noise power is given by the smallest eigenvalue
-        noise = np.min(lam)
+        noise = lam[idx_sort[-1]]
 
         # Set a threshold of 2x the noise level; and find the eigenvalue that
         # first cuts above it
         num_sig_dims = np.argwhere(lam >= 2 * noise)[-1]
 
-        eig_vec_noise = eig_vec[:, num_sig_dims + 1:]
+        eig_vec_noise = eig_vec_sort[:, num_sig_dims:]
 
-    # MUSIC Projection
+    # Noise Subspace Projection
     proj = eig_vec_noise.dot(np.conjugate(eig_vec_noise).T)
 
     # Generate steering vectors
@@ -133,8 +143,11 @@ def music(x, steer, num_sig_dims=0, max_psi=np.pi / 2, num_points=101):
 
     p = np.zeros(shape=(num_points, ))
     for idx_pt in np.arange(num_points):
+        # Project the steering vector onto the noise subspace
         vv = steer(psi_vec[idx_pt]) / np.sqrt(n)
         q = np.conjugate(vv).T.dot(proj).dot(vv)
+
+        # Invert the power
         p[idx_pt] = 1/np.abs(q)
 
     return p, psi_vec
