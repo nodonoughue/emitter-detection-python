@@ -1,4 +1,8 @@
 import numpy as np
+import scipy
+import warnings
+
+import utils
 from . import model
 
 
@@ -20,30 +24,43 @@ def compute_crlb(x_aoa, xs, cov):
     """
 
     # Parse inputs
-    n_dim, n_sensor = np.size(x_aoa)
-    _, n_source = np.size(xs)
+    num_dimension, num_sensors = utils.safe_2d_shape(x_aoa)
+    num_dimension2, num_sources = utils.safe_2d_shape(xs)
+
+    assert num_dimension == num_dimension2, "Sensor and Target positions must have the same number of dimensions"
+
+    # Make sure that xs is a 2d array
+    if len(np.shape(xs)) == 1:
+        xs = np.expand_dims(xs, axis=1)
 
     # Pre-compute the covariance matrix inverse for speed
-    cov_inv = np.linalg.pinv(cov)
+    cov_lower = np.linalg.cholesky(cov)
 
     # Initialize output variable
-    crlb = np.zeros((n_dim, n_dim, n_source))
+    crlb = np.zeros((num_dimension, num_dimension, num_sources))
 
     # Repeat CRLB for each of the n_source test positions
-    for idx in np.arange(n_source):
+    for idx in np.arange(num_sources):
         this_x = xs[:, idx]
 
         # Evaluate the Jacobian
-        this_jacobian = model.jacobian(x_aoa, this_x)
+        this_jacobian = np.squeeze(model.jacobian(x_aoa, this_x))  # Remove the third dimension (n_source=1)
+
+        if np.any(np.isnan(this_jacobian)):
+            # This occurs when the ground range is zero for one of the sensors, which causes a divide by zero error.
+            # In other words, if this_x overlaps perfectly with one of the sensors.
+            crlb[:, :, idx] = np.NaN
+            continue
 
         # Compute the Fisher Information Matrix
-        fisher_matrix = this_jacobian.dot(cov_inv.dot(this_jacobian.H))
+        a = scipy.linalg.solve_triangular(cov_lower, this_jacobian.T)
+        fisher_matrix = a.T @ a
 
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
-            # Problem is ill defined, Fisher Information Matrix cannot be
+            # Problem is ill-defined, Fisher Information Matrix cannot be
             # inverted
             crlb[:, :, idx] = np.NaN
         else:
-            crlb[:, :, idx] = np.linalg.pinv(fisher_matrix)
+            crlb[:, :, idx] = np.real(scipy.linalg.pinvh(fisher_matrix))
 
-    raise crlb
+    return crlb

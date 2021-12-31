@@ -5,7 +5,7 @@ import numpy as np
 from itertools import combinations
 
 
-def max_likelihood(x_fdoa, psi, cov, x_ctr, search_size, epsilon=None):
+def max_likelihood(x_sensor, psi, cov, x_ctr, search_size, epsilon=None):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -17,7 +17,7 @@ def max_likelihood(x_fdoa, psi, cov, x_ctr, search_size, epsilon=None):
     Nicholas O'Donoughue
     22 February 2021
     
-    :param x_fdoa: Sensor positions [m]
+    :param x_sensor: Sensor positions [m]
     :param psi: AOA measurement vector [rad]
     :param cov: Measurement error covariance matrix
     :param x_ctr: Center of search grid [m]
@@ -30,15 +30,15 @@ def max_likelihood(x_fdoa, psi, cov, x_ctr, search_size, epsilon=None):
 
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_fdoa, psi, cov, x)
+        return model.log_likelihood(x_sensor, psi, cov, x)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_soln(ell, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon)
 
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, psi, cov, x_init, alpha=None, beta=None, epsilon=None, max_num_iterations=None,
+def gradient_descent(x_sensor, psi, cov, x_init, alpha=0.3, beta=0.8, epsilon=10, max_num_iterations=1e3,
                      force_full_calc=False, plot_progress=False):
     """
     Computes the gradient descent solution for FDOA processing.
@@ -58,7 +58,7 @@ def gradient_descent(x_sensor, psi, cov, x_init, alpha=None, beta=None, epsilon=
     :param max_num_iterations: Maximum number of iterations to perform
     :param force_full_calc: Boolean flag to force all iterations (up to max_num_iterations) to be computed, regardless
                             of convergence (DEFAULT = False)
-    :param plot_progress: Boolean flag dictacting whether to plot intermediate solutions as they are derived
+    :param plot_progress: Boolean flag that dictates whether to plot intermediate solutions as they are derived
                           (DEFAULT = False).
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
@@ -72,13 +72,13 @@ def gradient_descent(x_sensor, psi, cov, x_init, alpha=None, beta=None, epsilon=
         return model.jacobian(x_sensor, this_x)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_soln(y, jacobian, cov, x_init, alpha, beta, epsilon, max_num_iterations, force_full_calc,
-                                plot_progress)
+    x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, alpha, beta, epsilon, max_num_iterations, force_full_calc,
+                                  plot_progress)
 
     return x, x_full
 
 
-def least_square(x_sensor, psi, cov, x_init, epsilon=None, max_num_iterations=None, force_full_calc=False,
+def least_square(x_sensor, psi, cov, x_init, epsilon=10, max_num_iterations=1e3, force_full_calc=False,
                  plot_progress=False):
     """
     Computes the least square solution for FDOA processing.
@@ -96,7 +96,7 @@ def least_square(x_sensor, psi, cov, x_init, epsilon=None, max_num_iterations=No
     :param max_num_iterations: Maximum number of iterations to perform
     :param force_full_calc: Boolean flag to force all iterations (up to max_num_iterations) to be computed, regardless
                             of convergence (DEFAULT = False)
-    :param plot_progress: Boolean flag dictacting whether to plot intermediate solutions as they are derived
+    :param plot_progress: Boolean flag that dictates whether to plot intermediate solutions as they are derived
                           (DEFAULT = False).
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
@@ -110,12 +110,12 @@ def least_square(x_sensor, psi, cov, x_init, epsilon=None, max_num_iterations=No
         return model.jacobian(x_sensor, this_x)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_soln(y, jacobian, cov, x_init, epsilon, max_num_iterations, force_full_calc, plot_progress)
+    x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, epsilon, max_num_iterations, force_full_calc, plot_progress)
 
     return x, x_full
 
 
-def bestfix(x_sensor, psi, cov, x_ctr, search_size, epsilon, pdftype=None):
+def bestfix(x_sensor, psi, cov, x_ctr, search_size, epsilon, pdf_type=None):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
     a series of coordinates, and returning the index of the maximum.
@@ -141,17 +141,17 @@ def bestfix(x_sensor, psi, cov, x_ctr, search_size, epsilon, pdftype=None):
     :param x_ctr: Center of search grid [m]
     :param search_size: 2-D vector of search grid sizes [m]
     :param epsilon: Desired resolution of search grid [m]
-    :param pdftype: String indicating the type of distribution to use. See +utils/makePDFs.m for options.
+    :param pdf_type: String indicating the type of distribution to use. See +utils/makePDFs.m for options.
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions
     """
 
     # Generate the PDF
-    def msmt(x):
+    def measurement(x):
         return model.measurement(x_sensor, x)
 
-    pdfs = utils.make_pdfs(msmt, psi, pdftype, cov)
+    pdfs = utils.make_pdfs(measurement, psi, pdf_type, cov)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.bestfix(pdfs, x_ctr, search_size, epsilon)
@@ -175,11 +175,11 @@ def angle_bisector(x_sensor, psi):
     
     :param x_sensor: N x 2 matrix of sensor positions
     :param psi: N x 1 vector of AOA measurements (radians)
-    :return x_est: 1 x 2 vector of estimated source position 
+    :return x_est: 2 x 1 vector of estimated source position
     """
 
     # Parse Inputs
-    num_sensors, num_dim = np.shape(psi)
+    num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
 
     if num_dim != 2:
         raise TypeError("Angle Bisector Solution only works in x/y space.")
@@ -188,20 +188,21 @@ def angle_bisector(x_sensor, psi):
     if num_sensors <= 15:
         # Get all possible sets of 3 sensors
         sensor_sets = combinations(np.arange(num_sensors), 3)
+        num_sets = np.math.factorial(num_sensors) / (np.math.factorial(3)*np.math.factorial(num_sensors-3))
     else:
         # If there are more than ~15 rows, nchoosek returns an extremely large
         # set.
         #
         # Instead, just make sequential groups of three
         sensor_sets = [(i, i+1, i+2) for i in np.arange(num_sensors-2)]
+        num_sets = len(sensor_sets)
 
     # Loop over sets -- adding each estimate to x_est
-    x_est = np.zeros((2, 1))
-    num_sets = len(sensor_sets)
+    x_est = np.zeros((2, ))
 
     for sensor_set in sensor_sets:
         this_x = x_sensor[:, sensor_set]  # 2 x 3 array
-        this_psi = psi[sensor_set]  # 3 x 1 array
+        this_psi = psi[sensor_set, ]  # 3 x 1 array
 
         # Find vertices
         v0 = utils.geo.find_intersect(this_x[:, 0], this_psi[0], this_x[:, 1], this_psi[1])
@@ -229,10 +230,10 @@ def angle_bisector(x_sensor, psi):
         # Find the intersection
         this_cntr = utils.geo.find_intersect(v0, th_bi0, v1, th_bi1)
 
-        # Divide each entry by num_sets to compute the average in-line.
-        x_est += this_cntr/num_sets
+        # Accumulate the estimates, we'll divide by num_sets later to make it an average.
+        x_est += this_cntr
 
-    return x_est
+    return x_est/num_sets
 
 
 def centroid(x_sensor, psi):
@@ -250,11 +251,11 @@ def centroid(x_sensor, psi):
 
     :param x_sensor: 2 x N matrix of sensor positions
     :param psi: N x 1 vector of AOA measurements (radians)
-    :return x_est: 1 x 2 vector of estimated source position
+    :return x_est: 2 x 1 vector of estimated source position
     """
 
     # Parse Inputs
-    num_sensors, num_dim = np.shape(psi)
+    num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
 
     if num_dim != 2:
         raise TypeError("Angle Bisector Solution only works in x/y space.")
@@ -263,20 +264,21 @@ def centroid(x_sensor, psi):
     if num_sensors <= 15:
         # Get all possible sets of 3 sensors
         sensor_sets = combinations(np.arange(num_sensors), 3)
+        num_sets = np.math.factorial(num_sensors) / (np.math.factorial(3)*np.math.factorial(num_sensors-3))
     else:
         # If there are more than ~15 rows, nchoosek returns an extremely large
         # set.
         #
         # Instead, just make sequential groups of three
         sensor_sets = [(i, i + 1, i + 2) for i in np.arange(num_sensors - 2)]
+        num_sets = len(sensor_sets)
 
     # Loop over sets -- adding each estimate to x_est
-    x_est = np.zeros((2, 1))
-    num_sets = len(sensor_sets)
+    x_est = np.zeros(shape=(2, ))
 
     for sensor_set in sensor_sets:
         this_x = x_sensor[:, sensor_set]  # 2 x 3 array
-        this_psi = psi[sensor_set]  # 3 x 1 array
+        this_psi = psi[sensor_set, ]  # 3 x 1 array
 
         # Find vertices
         v0 = utils.geo.find_intersect(this_x[:, 0], this_psi[0], this_x[:, 1], this_psi[1])
@@ -286,7 +288,7 @@ def centroid(x_sensor, psi):
         # Find Centroid by averaging the three vertices
         this_cntr = (v0 + v1 + v2) / 3
 
-        # Divide each entry by num_sets to compute the average in-line.
-        x_est += this_cntr/num_sets
+        # Accumulate the estimates, we'll divide by num_sets later to make it an average.
+        x_est += this_cntr
 
-    return x_est
+    return x_est/num_sets

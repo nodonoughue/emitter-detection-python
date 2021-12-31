@@ -1,21 +1,24 @@
 import numpy as np
+import scipy
 import matplotlib.pyplot as plt
 
+import utils
 
-def ls_soln(msmt, jacobian, covariance, x_init, epsilon=1e-6, max_num_iterations=10e3, force_full_calc=False, 
-            plot_progress=False):
+
+def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iterations=10e3, force_full_calc=False,
+              plot_progress=False):
     """
-    Computes the least square solution for TDOA processing.
+    Computes the least square solution for geolocation processing.
     
     Ported from MATLAB Code.
     
     Nicholas O'Donoughue
     14 January 2021
     
-    :param msmt: Measurement vector function handle (accepts n_dim vector of source position estimate, responds with 
+    :param zeta: Measurement vector function handle (accepts n_dim vector of source position estimate, responds with
                  error between received and modeled data vector)
     :param jacobian: Jacobian matrix function handle (accepts n_dim vector of source position estimate, and responds 
-                     with n_dim x n_sensor Jacobian matrix
+                     with n_dim x n_sensor Jacobian matrix)
     :param covariance: Measurement error covariance matrix
     :param x_init: Initial estimate of source position
     :param epsilon: Desired position error tolerance (stopping condition)
@@ -30,14 +33,14 @@ def ls_soln(msmt, jacobian, covariance, x_init, epsilon=1e-6, max_num_iterations
     n_dims = np.size(x_init)
 
     # Initialize loop
-    current_iteration = 1
+    current_iteration = 0
     error = np.inf
     x_full = np.zeros(shape=(n_dims, max_num_iterations))
     x_prev = x_init
-    x_full[:, 0] = x_prev
+    x_full[:, current_iteration] = x_prev
 
-    # Compute the pseudoinverse
-    covariance_pinv = np.linalg.pinv(covariance)
+    # Find the lower triangular cholesky decomposition of the covariance matrix
+    covariance_lower = np.linalg.cholesky(covariance)
 
     # Initialize Plotting
     if plot_progress:
@@ -47,22 +50,33 @@ def ls_soln(msmt, jacobian, covariance, x_init, epsilon=1e-6, max_num_iterations
         plt.yscale('log')
 
     # Divergence Detection
-    num_expanding_iters = 0
-    max_num_expanding_iters = 10
+    num_expanding_iterations = 0
+    max_num_expanding_iterations = 10
     prev_error = np.inf
 
     # Loop until either the desired tolerance is achieved or the maximum number of iterations have occurred
-    while current_iteration < max_num_iterations and (force_full_calc or error >= epsilon):
+    while current_iteration < (max_num_iterations-1) and (force_full_calc or error >= epsilon):
         current_iteration += 1
 
         # Evaluate Residual and Jacobian Matrix
-        y_i = msmt(x_prev)
-        jacobian_i = jacobian(x_prev)
+        y_i = zeta(x_prev)
+        jacobian_i = np.squeeze(jacobian(x_prev))  # Use the squeeze command to drop the third dim (n_source = 1)
 
-        # Compute delta_x^(i), according to 13.18
-        j_c = np.inner(jacobian_i, covariance_pinv)
-        j_c_j = np.inner(j_c, jacobian_i.H)
-        delta_x = np.inner(np.linalg.lstsq(j_c_j, j_c), y_i)
+        # Compute delta_x^(i), according to 10.20
+        # Using Cholesky decomposition:
+        #    C = L@L', we solved for L outside the loop
+        # [J @ C^{-1} @ J.T]^{-1} @ J @ C^{-1} @ y is
+        # rewritten
+        # [ a.T @ a ] ^{-1} @ a.T @ b
+        # where a and b are solved via forward substitution
+        # from the lower triangular matrix L
+        #   L @ a = J.T
+        #   L @ b = y
+        a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T)
+        b = scipy.linalg.solve_triangular(covariance_lower, y_i)
+        # Then, we solve the system
+        #  (a.T @ a) @ delta_x = a.T @ b
+        delta_x, _, _, _ = np.linalg.lstsq(a.T @ a, a.T @ b, rcond=None)
 
         # Update predicted location
         x_full[:, current_iteration] = x_prev + delta_x
@@ -76,10 +90,10 @@ def ls_soln(msmt, jacobian, covariance, x_init, epsilon=1e-6, max_num_iterations
 
         # Check for divergence
         if error <= prev_error:
-            num_expanding_iters = 0
+            num_expanding_iterations = 0
         else:
-            num_expanding_iters += 1
-            if num_expanding_iters >= max_num_expanding_iters:
+            num_expanding_iterations += 1
+            if num_expanding_iterations >= max_num_expanding_iterations:
                 # Divergence detected
                 x_full[:, current_iteration:] = np.nan
                 break
@@ -88,15 +102,15 @@ def ls_soln(msmt, jacobian, covariance, x_init, epsilon=1e-6, max_num_iterations
 
     # Bookkeeping
     if not force_full_calc:
-        x_full = x_full[:, :current_iteration]
+        x_full[:, current_iteration+1:] = x_full[:, :current_iteration]
 
     x = x_full[:, -1]
 
     return x, x_full
 
 
-def gd_soln(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6, max_num_iterations=10e3, 
-            force_full_calc=False, plot_progress=False):
+def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6, max_num_iterations=10e3,
+              force_full_calc=False, plot_progress=False):
     """
     Computes the gradient descent solution for localization given the provided measurement and Jacobian function 
     handles, and measurement error covariance.
@@ -125,19 +139,20 @@ def gd_soln(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6,
     n_dims = np.size(x_init)
         
     # Initialize loop
-    current_iteration = 1
+    current_iteration = 0
     error = np.inf
     x_full = np.zeros(shape=(n_dims, max_num_iterations))
     x_prev = x_init
-    x_full[:, 0] = x_prev
+    x_full[:, current_iteration] = x_prev
     
     # Pre-compute covariance matrix inverses
-    covariance_pinv = np.linalg.pinv(covariance)
-    
+    covariance_lower = np.linalg.cholesky(covariance)
+
     # Cost Function for Gradient Descent
     def cost_fxn(z):
         this_y = y(z)
-        return np.inner(np.inner(this_y.H, covariance_pinv*this_y))
+        l_inv_y = scipy.linalg.solve_triangular(covariance_lower, this_y)
+        return np.conj(l_inv_y.T) @ l_inv_y
     
     # Initialize Plotting
     if plot_progress:
@@ -148,23 +163,27 @@ def gd_soln(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6,
         
         plt.xlabel(ax_set[1], 'x')
         plt.ylabel(ax_set[1], 'y')
-    
+    else:
+        ax_set = None  # This removes a 'variable possibly unset' warning
+
     # Divergence Detection
-    num_expanding_iters = 0
-    max_num_expanding_iters = 5
+    num_expanding_iterations = 0
+    max_num_expanding_iterations = 5
     prev_error = np.inf
     
     # Loop until either the desired tolerance is achieved or the maximum
     # number of iterations have occurred
-    while current_iteration < max_num_iterations and (force_full_calc or error >= epsilon):
+    while current_iteration < (max_num_iterations-1) and (force_full_calc or error >= epsilon):
         current_iteration += 1
     
         # Evaluate Residual and Jacobian Matrix
         y_i = y(x_prev)
-        jacobian_i = jacobian(x_prev)
+        jacobian_i = np.squeeze(jacobian(x_prev))  # Use squeeze to remove third dimension (n_source=1)
         
         # Compute Gradient and Cost function
-        grad = -2*np.inner(np.inner(jacobian_i, covariance_pinv), y_i)
+        a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T)
+        b = scipy.linalg.solve_triangular(covariance_lower, y_i)
+        grad = -2 * a.T @ b
         
         # Descent direction is the negative of the gradient
         del_x = -grad/np.linalg.norm(grad)
@@ -185,10 +204,10 @@ def gd_soln(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6,
         
         # Check for divergence
         if error <= prev_error:
-            num_expanding_iters = 0
+            num_expanding_iterations = 0
         else:
-            num_expanding_iters += 1
-            if num_expanding_iters >= max_num_expanding_iters:
+            num_expanding_iterations += 1
+            if num_expanding_iterations >= max_num_expanding_iterations:
                 # Divergence detected
                 x_full[:, current_iteration:] = np.NaN
                 break
@@ -197,14 +216,14 @@ def gd_soln(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6,
 
     # Bookkeeping
     if not force_full_calc:
-        x_full = x_full[:, :current_iteration]
+        x_full[:, current_iteration+1:] = x_full[:, :current_iteration]
 
     x = x_full[:, -1]
 
     return x, x_full
         
 
-def backtracking_line_search(f, x, grad, del_x, alpha, beta):
+def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
     """
     # Performs backtracking line search according to algorithm 9.2 of
     # Stephen Boyd's, Convex Optimization
@@ -218,15 +237,15 @@ def backtracking_line_search(f, x, grad, del_x, alpha, beta):
     :param x: Current estimate of x
     :param grad: Gradient of f at x
     :param del_x: Descent direction
-    :param alpha: Constant between 0 and 0.5
-    :param beta: Constant between 0 and 1
+    :param alpha: Constant between 0 and 0.5 (default=0.3)
+    :param beta: Constant between 0 and 1 (default=0.8)
     :return t: Optimal step size for the current estimate x.
     """
 
     # Initialize the search parameters and direction
     t = 1
     starting_val = f(x)
-    slope = np.inner(grad.H, del_x)
+    slope = np.inner(np.conjugate(grad.T), del_x)
     
     # Make sure the starting value is large enough
     while f(x+t*del_x) < starting_val+alpha*t*slope:
@@ -239,7 +258,7 @@ def backtracking_line_search(f, x, grad, del_x, alpha, beta):
     return t
 
 
-def ml_soln(ell, x_ctr, search_size, epsilon):
+def ml_solver(ell, x_ctr, search_size, epsilon):
     """
     Execute ML estimation through brute force computational methods.
 
@@ -258,38 +277,15 @@ def ml_soln(ell, x_ctr, search_size, epsilon):
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
     """
 
-    n_dim = np.size(x_ctr)
-
-    if n_dim < 1 or n_dim > 3:
-        raise AttributeError('Number of spatial dimensions must be between 1 and 3')
-
-    if np.size(search_size) == 1:
-        search_size = search_size*np.ones_like(x_ctr)
-
-    # Initialize search space
-    xx = x_ctr[0] + np.arange(start=-search_size[0], step=epsilon, stop=search_size[0]+epsilon)
-    if n_dim > 1:
-        yy = x_ctr[1] + np.arange(start=-search_size[1], step=epsilon, stop=search_size[1]+epsilon)
-        if n_dim > 2:
-            zz = x_ctr[2] + np.arange(start=-search_size[2], step=epsilon, stop=search_size[2]+epsilon)
-
-            xx_full, yy_full, zz_full = np.mgrid(xx, yy, zz)
-            x_set = np.concatenate((xx_full.flatten(), yy_full.flatten(), zz_full.flatten()), axis=1).T
-            x_grid = (xx, yy, zz)
-        else:
-            xx_full, yy_full = np.mgrid(xx, yy)
-            x_set = np.concatenate((xx_full.flatten(), yy_full.flatten()), axis=1).T
-            x_grid = (xx, yy)
-    else:
-        x_set = xx.flatten().T
-        x_grid = xx
+    # Set up the search space
+    x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
 
     # Evaluate the likelihood function at each coordinate in the search space
-    likelihood = ell(x_set)
+    likelihood = np.asarray([ell(this_x) for this_x in x_set])
 
     # Find the peak
     idx_pk = np.argmax(likelihood.flatten())
-    x_est = x_set[:, idx_pk]
+    x_est = x_set[idx_pk]
 
     return x_est, likelihood, x_grid
 
@@ -318,37 +314,17 @@ def bestfix(pdfs, x_ctr, search_size, epsilon):
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
     """
 
-    n_dim = np.size(x_ctr)
+    # Set up the search space
+    x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
 
-    if n_dim < 1 or n_dim > 3:
-        raise AttributeError('Number of spatial dimensions must be between 1 and 3')
+    # Apply each PDF to all input coordinates and then multiply across PDFs
+    result = np.asarray([np.prod(np.asarray([this_pdf(this_x) for this_pdf in pdfs])) for this_x in x_set])
 
-    if np.size(search_size) == 1:
-        search_size = search_size * np.ones_like(x_ctr)
-
-    # Initialize search space
-    xx = x_ctr[0] + np.arange(start=-search_size[0], step=epsilon, stop=search_size[0] + epsilon)
-    if n_dim > 1:
-        yy = x_ctr[1] + np.arange(start=-search_size[1], step=epsilon, stop=search_size[1] + epsilon)
-        if n_dim > 2:
-            zz = x_ctr[2] + np.arange(start=-search_size[2], step=epsilon, stop=search_size[2] + epsilon)
-
-            xx_full, yy_full, zz_full = np.mgrid(xx, yy, zz)
-            x_set = np.concatenate((xx_full.flatten(), yy_full.flatten(), zz_full.flatten()), axis=1).T
-            x_grid = (xx, yy, zz)
-        else:
-            xx_full, yy_full = np.mgrid(xx, yy)
-            x_set = np.concatenate((xx_full.flatten(), yy_full.flatten()), axis=1).T
-            x_grid = (xx, yy)
-    else:
-        x_set = xx.flatten().T
-        x_grid = xx
-
-    # Apply each PDF to all input coordinates and then mutliply across PDFs
-    result = np.prod(np.vstack([this_pdf(x_set).flatten() for this_pdf in pdfs]), axis=1)
+    # Reshape
+    result = np.reshape(result, out_shape)
 
     # Find the highest scoring position
     idx_pk = np.argmax(result.flatten())
-    x_est = x_set[:, idx_pk]
+    x_est = x_set[idx_pk]
 
     return x_est, result, x_grid
