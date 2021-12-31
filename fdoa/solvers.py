@@ -28,7 +28,7 @@ def max_likelihood(x_fdoa, v_fdoa, rho_dot, cov, x_ctr, search_size, epsilon=Non
         return model.log_likelihood(x_fdoa, v_fdoa, rho_dot, cov, x, ref_idx)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_soln(ell, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon)
 
     return x_est, likelihood, x_grid
 
@@ -69,8 +69,8 @@ def gradient_descent(x_fdoa, v_fdoa, rho_dot, cov, x_init, alpha=None, beta=None
         return model.jacobian(x_fdoa, v_fdoa, this_x, ref_idx=ref_idx)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_soln(y, jacobian, cov, x_init, alpha, beta, epsilon, max_num_iterations, force_full_calc,
-                                plot_progress)
+    x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, alpha, beta, epsilon, max_num_iterations, force_full_calc,
+                                  plot_progress)
 
     return x, x_full
 
@@ -109,7 +109,7 @@ def least_square(x0, v0, rho_dot, cov, x_init, epsilon=None, max_num_iterations=
         return model.jacobian(x0, v0, this_x, ref_idx=ref_idx)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_soln(y, jacobian, cov, x_init, epsilon, max_num_iterations, force_full_calc, plot_progress)
+    x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, epsilon, max_num_iterations, force_full_calc, plot_progress)
 
     return x, x_full
 

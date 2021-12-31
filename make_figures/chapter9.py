@@ -1,7 +1,7 @@
 """
 Draw Figures - Chapter 9
 
-This script generates all of the figures that appear in Chapter 8 of the textbook.
+This script generates all the figures that appear in Chapter 9 of the textbook.
 
 Ported from MATLAB Code
 
@@ -22,7 +22,6 @@ def make_all_figures(close_figs=False):
 
     :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
-    :force_recalc: If set to False, will skip any figures that are time consuming to generate.
     :return: List of figure handles
     """
 

@@ -31,7 +31,7 @@ def max_likelihood(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_ctr, search_size,
         return model.log_likelihood(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x, tdoa_ref_idx, fdoa_ref_idx)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_soln(ell, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon)
 
     return x_est, likelihood, x_grid
 
@@ -76,8 +76,8 @@ def gradient_descent(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_init, alpha, be
         return model.jacobian(x_aoa, x_tdoa, x_fdoa, v_fdoa, this_x, tdoa_ref_idx, fdoa_ref_idx)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_soln(y, jacobian, cov, x_init, alpha, beta, epsilon, max_num_iterations, force_full_calc,
-                                plot_progress)
+    x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, alpha, beta, epsilon, max_num_iterations, force_full_calc,
+                                  plot_progress)
 
     return x, x_full
 
@@ -119,7 +119,7 @@ def least_square(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_init, epsilon=None,
         return model.jacobian(x_aoa, x_tdoa, x_fdoa, v_fdoa, this_x, tdoa_ref_idx, fdoa_ref_idx)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_soln(y, jacobian, cov, x_init, epsilon, max_num_iterations, force_full_calc, plot_progress)
+    x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, epsilon, max_num_iterations, force_full_calc, plot_progress)
 
     return x, x_full
 

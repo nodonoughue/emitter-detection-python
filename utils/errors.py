@@ -62,6 +62,9 @@ def compute_cep50(covariance):
         lam_min = np.min(lam)
         lam_max = np.max(lam)
 
+        # Check the eigenvalues; they should not be complex or negative
+        assert not (np.iscomplex(lam_max) or np.iscomplex(lam_min)), 'Complex eigenvalue encountered; check for errors.'
+
         # Ratio of dominant to secondary eigenvalues
         ratio = np.sqrt(lam_min/lam_max)
 

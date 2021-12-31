@@ -5,7 +5,7 @@ from utils import errors
 
 def run_all_examples():
     """
-    Run all chapter 8 examples and return a list of figure handles
+    Run all chapter 9 examples and return a list of figure handles
 
     :return figs: list of figure handles
     """

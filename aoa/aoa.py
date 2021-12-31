@@ -1,5 +1,5 @@
 import numpy as np
-from utils import sinc_deriv
+from utils import sinc_derivative
 
 
 def make_gain_functions(type, d_lam, psi_0):
@@ -42,7 +42,7 @@ def make_gain_functions(type, d_lam, psi_0):
         return np.abs(np.sinc((psi-psi_0)*d_lam/np.pi))  # sinc includes implicit pi
 
     def g_dot_rect(psi):
-        return sinc_deriv((psi-psi_0)*d_lam)*d_lam
+        return sinc_derivative((psi - psi_0) * d_lam) * d_lam
 
     switcher = {'omni': (g_omni, g_dot_omni),
                 'adcock': (g_adcock, g_dot_adcock),

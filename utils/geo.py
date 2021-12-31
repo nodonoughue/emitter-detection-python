@@ -34,7 +34,7 @@ def calc_range(x1, x2):
     x2 = np.reshape(x2, (num_dims, 1, num_x2))
 
     # Compute the Euclidean Norm
-    return np.linalg.norm((x1-x2)**2, axis=0)
+    return np.squeeze(np.linalg.norm((x1-x2)**2, axis=0))
 
 
 def calc_range_diff(x0, x1, x2):
@@ -208,8 +208,8 @@ def find_intersect(x0, psi0, x1, psi1):
     m0 = np.sin(psi0)/np.cos(psi0)
     m1 = np.sin(psi1)/np.cos(psi1)
 
-    b0 = x0(2) - m0*x0(1)
-    b1 = x1(2) - m1*x1(1)
+    b0 = x0[1] - m0*x0[0]
+    b1 = x1[1] - m1*x1[0]
 
     if (np.isinf(m0) and np.isinf(m1)) or np.fabs(m0-m1) < 1e-12:
         # They're parallel, effectively
@@ -217,7 +217,7 @@ def find_intersect(x0, psi0, x1, psi1):
         return x0
 
     # Check Boundary Cases
-    x = np.zeros_like(x0)
+    x = np.zeros(shape=(2,), dtype=float)
     if np.abs(np.cos(psi0)) < 1e-10:
         # First LOB is parallel to y axis; x is fixed
         x[0] = x0[0]
@@ -234,5 +234,3 @@ def find_intersect(x0, psi0, x1, psi1):
         x[1] = m1*x[0] + b1
 
     return x
-
-
