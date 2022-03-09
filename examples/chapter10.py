@@ -35,7 +35,8 @@ def _mc_iteration(args):
     """
 
     # Generate a random measurement
-    psi = args['psi_act'] + args['covar_lower'] @ np.random.standard_normal(size=(args['num_sensors'], ))
+    rng = args['rng']
+    psi = args['psi_act'] + args['covar_lower'] @ rng.standard_normal(size=(args['num_sensors'], ))
 
     # Generate solutions
     res_ml, _, _ = triang.solvers.max_likelihood(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
@@ -177,7 +178,8 @@ def example1(rng=None, cmap=None):
             'covar_psi': covar_psi,
             'covar_lower': covar_lower,
             'epsilon': epsilon,
-            'num_iterations': num_iterations}
+            'num_iterations': num_iterations,
+            'rng': rng}
 
     iterations_per_marker = 1
     markers_per_row = 40
@@ -292,7 +294,7 @@ def example1(rng=None, cmap=None):
     
     plt.xlabel('Iteration Number')
     plt.ylabel('$CEP_{50}$ [km]')
-    plt.legend(loc='upper right');
+    plt.legend(loc='upper right')
     plt.xlim([1, 150])
     plt.ylim([1, 50])
 
@@ -411,5 +413,5 @@ def example3():
     plt.ylabel('y [km]')
     plt.title('Triangulation CRLB RMSE [km]')
     plt.legend(loc='upper right')
-    
+
     return fig

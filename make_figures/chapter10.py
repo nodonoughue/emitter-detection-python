@@ -44,11 +44,11 @@ def make_all_figures(close_figs=False, force_recalc=False):
     fig2 = make_figure_2(prefix, cmap)
     fig3 = make_figure_3(prefix)
     fig4 = make_figure_4(prefix)
-    fig5 = make_figure_5(prefix, rng, force_recalc)
+    fig5a, fig5b = make_figure_5(prefix, rng, force_recalc)
     fig6 = make_figure_6(prefix)
     fig7 = make_figure_7(prefix)
 
-    figs = [fig1, fig2, fig3, fig4, fig5, fig6, fig7]
+    figs = [fig1, fig2, fig3, fig4, fig5a, fig5b, fig6, fig7]
 
     if close_figs:
         for fig in figs:
