@@ -1,7 +1,7 @@
 """
 Draw Figures - Chapter 7
 
-This script generates all of the figures that appear in Chapter 7 of the textbook.
+This script generates all the figures that appear in Chapter 7 of the textbook.
 
 Ported from MATLAB Code
 
@@ -24,7 +24,7 @@ def make_all_figures(close_figs=False, force_recalc=True):
 
     :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
-    :force_recalc: If set to False, will skip any figures that are time consuming to generate.
+    :force_recalc: If set to False, will skip any figures that are time-consuming to generate.
     :return: List of figure handles
     """
 
@@ -120,7 +120,7 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: colormap
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation    
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 
@@ -152,7 +152,7 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
     
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100])  # Number of temporal samples at each antenna test point
-    snr_db_vec = np.arange(start=-20, step=2, stop=20)  # signal to noise ratio
+    snr_db_vec = np.arange(start=-20, step=2, stop=20)  # signal-to-noise ratio
     num_mc = 10000  # number of monte carlo trials at each parameter setting
     
     # Set up output scripts
@@ -234,7 +234,7 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: colormap
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 
@@ -263,7 +263,7 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
 
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100], dtype=int)  # Number of temporal samples at each antenna test point
-    snr_db_vec = np.arange(start=-10, stop=20.1, step=1)  # signal to noise ratio
+    snr_db_vec = np.arange(start=-10, stop=20.1, step=1)  # signal-to-noise ratio
     num_mc = 10000  # number of monte carlo trials at each parameter setting
 
     # Set up output scripts
@@ -382,7 +382,7 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: colormap
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 
@@ -403,7 +403,7 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
 
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100], dtype=int)  # Number of temporal samples at each antenna test point
-    snr_db_vec = np.arange(start=-10, step=.2, stop=20)  # signal to noise ratio
+    snr_db_vec = np.arange(start=-10, step=.2, stop=20)  # signal-to-noise ratio
     num_mc = 10000  # number of monte carlo trials at each parameter setting
 
     # Set up output scripts
@@ -532,7 +532,7 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: colormap
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 
@@ -561,7 +561,7 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
 
     # Set up the parameter sweep
     num_samples_vec = np.array([10, 100, 1000], dtype=int)  # Number of temporal samples at each antenna test point
-    snr_db_vec = np.arange(start=-10, step=2, stop=30.1)  # signal to noise ratio
+    snr_db_vec = np.arange(start=-10, step=2, stop=30.1)  # signal-to-noise ratio
     num_mc = 10000  # number of monte carlo trials at each parameter setting
 
     # Set up output scripts
@@ -651,7 +651,7 @@ def make_figure_12(prefix=None, force_recalc=True):
     26 March 2021
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 
@@ -694,7 +694,7 @@ def make_figure_14(prefix=None, force_recalc=True):
     26 March 2021
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 
@@ -723,7 +723,7 @@ def make_figure_15b(prefix=None, force_recalc=True):
     26 March 2021
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 
