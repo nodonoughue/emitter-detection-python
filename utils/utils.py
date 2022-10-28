@@ -110,6 +110,11 @@ def parse_reference_sensor(ref_idx, num_sensors):
     :return ref_idx_vec:
     """
 
+    # Debug info
+    # print('Parsing reference sensor...')
+    # print('\tref_idx: {}'.format(ref_idx))
+    # print('\tnum_sensors: {}'.format(num_sensors))
+
     if ref_idx is None:
         # Default behavior is to use the last sensor as a common reference
         test_idx_vec = np.asarray([i for i in np.arange(num_sensors - 1)])
@@ -164,12 +169,12 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
     """
 
     # Determine the sizes
-    n_sensor = np.shape(cov, axis=0)
-    shp_test = np.size(test_idx_vec)
-    shp_ref = np.size(ref_idx_vec)
-    n_pair_out = np.fmax(shp_test, shp_ref)
+    n_sensor = np.size(cov, axis=0)
+    n_test = np.size(test_idx_vec)
+    n_ref = np.size(ref_idx_vec)
+    n_pair_out = np.fmax(n_test, n_ref)
 
-    if 1 < shp_test != shp_ref > 1:
+    if 1 < n_test != n_ref > 1:
         raise TypeError("Error calling covariance matrix resample.  "
                         "Reference and test vectors must have the same shape.")
 
@@ -201,8 +206,10 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
 
     # Step through reference sensors
     for idx_row in np.arange(n_pair_out):
-        a_i = test_idx_vec[idx_row % shp_test]
-        b_i = ref_idx_vec[idx_row % shp_ref]
+        a_i = test_idx_vec[idx_row % n_test]
+        b_i = ref_idx_vec[idx_row % n_ref]
+
+        # print('\tRow: {}, a_i: {}, b_i: {}'.format(idx_row, a_i, b_i))
 
         if test_weights:
             a_i_wt = test_weights[idx_row % shp_test_wt]
@@ -211,8 +218,10 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
             b_i_wt = ref_weights[idx_row % shp_ref_wt]
 
         for idx_col in np.arange(n_pair_out):
-            a_j = test_idx_vec[idx_col % shp_test]
-            b_j = ref_idx_vec[idx_col % shp_ref]
+            a_j = test_idx_vec[idx_col % n_test]
+            b_j = ref_idx_vec[idx_col % n_ref]
+
+            # print('\tCol: {}, a_j: {}, b_j: {}'.format(idx_col, a_j, b_j))
 
             if test_weights:
                 a_j_wt = test_weights[idx_col % shp_test_wt]

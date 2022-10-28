@@ -34,7 +34,7 @@ def calc_range(x1, x2):
     x2 = np.reshape(x2, (num_dims, 1, num_x2))
 
     # Compute the Euclidean Norm
-    return np.squeeze(np.linalg.norm((x1-x2)**2, axis=0))
+    return np.squeeze(np.linalg.norm(x1-x2, axis=0))
 
 
 def calc_range_diff(x0, x1, x2):
@@ -64,7 +64,7 @@ def calc_range_diff(x0, x1, x2):
     r2 = calc_range(x0, x2)  # 1xM2
 
     # Take the difference, with appropriate dimension reshaping
-    return r1.T - r2
+    return r1 - r2.T
 
 
 def calc_doppler(x1, v1, x2, v2, f):
@@ -82,7 +82,7 @@ def calc_doppler(x1, v1, x2, v2, f):
     :param x2: Position vector of num_sensors sensors (num_dims x num_sensors), in m
     :param v2: Velocity vector of num_sensors sensors (num_dims x num_sensors), in m/s
     :param f: Carrier frequency, in Hertz
-    :return fd: Doppler shift for each source, sensor pair (num_sources x num_sensors), in Hertz
+    :return fd: Doppler shifts for each source, sensor pair (num_sources x num_sensors), in Hertz
     """
     # Reshape inputs
     num_dims, num_sources = np.shape(x1)
@@ -219,13 +219,13 @@ def find_intersect(x0, psi0, x1, psi1):
     # Check Boundary Cases
     x = np.zeros(shape=(2,), dtype=float)
     if np.abs(np.cos(psi0)) < 1e-10:
-        # First LOB is parallel to y axis; x is fixed
+        # First LOB is parallel to y-axis; x is fixed
         x[0] = x0[0]
 
         # Use slope/intercept definition of second LOB to solve for y
         x[1] = m1 * x[0] + b1
     elif np.abs(np.cos(psi1)) < 1e-10:
-        # Same issue, but with the second LOB being parallel to y axis
+        # Same issue, but with the second LOB being parallel to y-axis
         x[0] = x1[0]
         x[1] = m0 * x[0] + b0
     else:

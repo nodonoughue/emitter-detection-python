@@ -69,7 +69,7 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
         # rewritten
         # [ a.T @ a ] ^{-1} @ a.T @ b
         # where a and b are solved via forward substitution
-        # from the lower triangular matrix L
+        # from the lower triangular matrix L.
         #   L @ a = J.T
         #   L @ b = y
         a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T)

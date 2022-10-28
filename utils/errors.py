@@ -29,6 +29,8 @@ def compute_cep50(covariance):
     :return cep: Radius of the corresponding CEP_50 circle
     """
 
+    # print('Computing CEP50...')
+
     # Parse input dimensions
     in_shape = np.shape(covariance)
     if np.size(in_shape) < 2:
@@ -52,13 +54,17 @@ def compute_cep50(covariance):
     for idx_matrix in np.arange(num_matrices):
         this_covariance = covariance[:, :, idx_matrix]
 
+        # print('cov: {}'.format(this_covariance))
+
         # If any of the CEP elements are NaN or INF, then mark the CEP as INF
         if not np.all(np.isfinite(this_covariance)):
             cep[idx_matrix] = np.inf
+            print('\tpoorly formed (NaN or INF values encountered), skipping...')
             continue
 
         # Eigenvector analysis to identify independent components of error
         lam, _ = np.linalg.eig(this_covariance)
+        # print('\tEigenvalues: {}'.format(lam))
         lam_min = np.min(lam)
         lam_max = np.max(lam)
 
