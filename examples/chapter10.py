@@ -27,35 +27,6 @@ def run_all_examples():
     return [fig1, fig2, fig3]
 
 
-def _mc_iteration(args):
-    """
-
-    :param args:
-    :return:
-    """
-
-    # Generate a random measurement
-    rng = args['rng']
-    psi = args['psi_act'] + args['covar_lower'] @ rng.standard_normal(size=(args['num_sensors'], ))
-
-    # Generate solutions
-    res_ml, _, _ = triang.solvers.max_likelihood(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
-                                                 x_ctr=args['x_init'], search_size=args['x_extent'],
-                                                 epsilon=args['epsilon'])
-    res_bf, _, _ = triang.solvers.bestfix(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
-                                          x_ctr=args['x_init'], search_size=args['x_extent'], epsilon=args['epsilon'])
-    res_centroid = triang.solvers.centroid(x_sensor=args['x_sensor'], psi=psi)
-    res_incenter = triang.solvers.angle_bisector(x_sensor=args['x_sensor'], psi=psi)
-    _, res_ls = triang.solvers.least_square(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
-                                            x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                            force_full_calc=True)
-    _, res_gd = triang.solvers.gradient_descent(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
-                                                x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                                force_full_calc=True)
-
-    return {'ml': res_ml, 'bf': res_bf, 'centroid': res_centroid, 'incenter': res_incenter, 'ls': res_ls, 'gd': res_gd}
-
-
 def example1(rng=None, cmap=None):
     """
     Executes Example 10.1 and generates two figures
@@ -299,6 +270,56 @@ def example1(rng=None, cmap=None):
     plt.ylim([1, 50])
 
     return fig_geo, fig_err
+
+
+def _mc_iteration(args):
+    """
+    Executes a single iteration of the Monte Carlo simulation in Example 10.1.
+
+    :param args: Dictionary of arguments for monte carlo simulation in Example 10.1. Fields are:
+                rng: random number generator
+                psi_act: true angle of arrival (radians)
+                covar_psi: measurement error covariance matrix
+                covar_lower: lower triangular Cholesky decomposition of the measurement error covariance matrix
+                num_sensors: number of AOA sensors
+                x_sensor: position of AOA sensors
+                x_init: initial solution guess (also used as center of search grid for ML and Bestfix)
+                x_extent: search grid extent
+                epsilon: search grid spacing (also used as stopping condition for LS and GD)
+                num_iterations: maximum number of iterations for GD and LS solvers
+    :return estimates: Dictionary with estimated target position using several algorithms.  Fields are:
+                ml: Maximum Likelihood solution
+                bf: Bestfix solution
+                centroid: Geometric centroid solution
+                incenter: Geometric incenter solution
+                gd: Gradient Descent solution
+                ls: Least Square solution
+
+
+    Nicholas O'Donoughue
+    18 March 2022
+    """
+
+    # Generate a random measurement
+    rng = args['rng']
+    psi = args['psi_act'] + args['covar_lower'] @ rng.standard_normal(size=(args['num_sensors'], ))
+
+    # Generate solutions
+    res_ml, _, _ = triang.solvers.max_likelihood(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
+                                                 x_ctr=args['x_init'], search_size=args['x_extent'],
+                                                 epsilon=args['epsilon'])
+    res_bf, _, _ = triang.solvers.bestfix(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
+                                          x_ctr=args['x_init'], search_size=args['x_extent'], epsilon=args['epsilon'])
+    res_centroid = triang.solvers.centroid(x_sensor=args['x_sensor'], psi=psi)
+    res_incenter = triang.solvers.angle_bisector(x_sensor=args['x_sensor'], psi=psi)
+    _, res_ls = triang.solvers.least_square(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
+                                            x_init=args['x_init'], max_num_iterations=args['num_iterations'],
+                                            force_full_calc=True)
+    _, res_gd = triang.solvers.gradient_descent(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
+                                                x_init=args['x_init'], max_num_iterations=args['num_iterations'],
+                                                force_full_calc=True)
+
+    return {'ml': res_ml, 'bf': res_bf, 'centroid': res_centroid, 'incenter': res_incenter, 'ls': res_ls, 'gd': res_gd}
 
 
 def example2():
