@@ -465,7 +465,7 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing):
            + ' increase the max allowed.'
 
     # Make a set of axes, one for each dimension, that are centered on x_ctr
-    dims = [x + x_max * np.linspace(start=-x_max, stop=x_max*(1+n)/n, num=n) for (x, x_max, n)
+    dims = [x + np.linspace(start=-x_max, stop=x_max*(1+n)/n, num=n) for (x, x_max, n)
             in zip(x_ctr, max_offset, n_elements)]
 
     # Use meshgrid expansion; each element of x_grid is now a full n_dim dimensioned grid

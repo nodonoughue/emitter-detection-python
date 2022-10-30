@@ -284,7 +284,7 @@ def ml_solver(ell, x_ctr, search_size, epsilon):
     likelihood = np.asarray([ell(this_x) for this_x in x_set])
 
     # Find the peak
-    idx_pk = np.argmax(likelihood.flatten())
+    idx_pk = likelihood.argmax()
     x_est = x_set[idx_pk]
 
     return x_est, likelihood, x_grid
@@ -324,7 +324,7 @@ def bestfix(pdfs, x_ctr, search_size, epsilon):
     result = np.reshape(result, out_shape)
 
     # Find the highest scoring position
-    idx_pk = np.argmax(result.flatten())
+    idx_pk = result.argmax()
     x_est = x_set[idx_pk]
 
     return x_est, result, x_grid
