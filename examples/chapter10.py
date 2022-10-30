@@ -118,7 +118,7 @@ def example1(rng=None, cmap=None):
     plt.scatter(x_source[0], x_source[1], marker='^', label='Transmitter')
 
     # Iterative Methods
-    epsilon = .5
+    epsilon = .5  # km
     num_mc_trials = 1000
     num_iterations = 50
 

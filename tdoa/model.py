@@ -3,7 +3,7 @@ from utils import unit_conversions, geo
 import utils
 
 
-def measurement(x_tdoa, x_source, ref_idx=None):
+def measurement(x_sensor, x_source, ref_idx=None):
     """
     Computes TDOA measurements and converts to range difference of arrival (by compensating for the speed of light).
 
@@ -12,15 +12,15 @@ def measurement(x_tdoa, x_source, ref_idx=None):
     Nicholas O'Donoughue
     11 March 2021
 
-    :param x_tdoa: nDim x nTDOA array of TDOA sensor positions
+    :param x_sensor: nDim x nTDOA array of TDOA sensor positions
     :param x_source: nDim x n_source array of source positions
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :return rdoa: nAoa + nTDOA + nFDOA - 2 x n_source array of range difference of arrival measurements
     """
 
     # Construct component measurements
-    n_dim1, n_sensor = np.shape(x_tdoa)
-    n_dim2, n_source = np.shape(x_source)
+    n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_source = utils.safe_2d_shape(x_source)
 
     if n_dim1 != n_dim2:
         raise TypeError('First dimension of all inputs must match')
@@ -29,16 +29,17 @@ def measurement(x_tdoa, x_source, ref_idx=None):
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
 
     # Compute range from each source to each sensor
-    dx = np.reshape(x_source, (n_dim1, 1, n_source)) - x_tdoa
-    r = np.reshape(np.sqrt(np.sum(np.fabs(dx)**2, axis=0)), n_sensor, n_source)  # n_sensor x n_source
+    # dx = np.reshape(x_source, (n_dim1, 1, n_source)) - x_sensor
+    # r = np.reshape(np.sqrt(np.sum(np.fabs(dx)**2, axis=0)), (n_sensor, n_source))  # n_sensor x n_source
+    r = utils.geo.calc_range(x_sensor, x_source)
 
     # Compute range difference for each pair of sensors
-    rdoa = r[test_idx_vec, :] - r[ref_idx_vec, :]
+    rdoa = r[test_idx_vec] - r[ref_idx_vec]
 
     return rdoa
 
 
-def jacobian(x_tdoa, x_source, ref_idx=None):
+def jacobian(x_sensor, x_source, ref_idx=None):
     """
     # Returns the Jacobian matrix for a set of TDOA measurements.
 
@@ -47,15 +48,15 @@ def jacobian(x_tdoa, x_source, ref_idx=None):
     Nicholas O'Donoughue
     11 March 2021
 
-    :param x_tdoa: nDim x nTDOA array of TDOA sensor positions
+    :param x_sensor: nDim x nTDOA array of TDOA sensor positions
     :param x_source: nDim x n_source array of source positions
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :return: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
     """
 
     # Parse inputs
-    n_dim1, n_sensor = np.shape(x_tdoa)
-    n_dim2, n_source = np.shape(x_source)
+    n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_source = utils.safe_2d_shape(x_source)
 
     if n_dim1 != n_dim2:
         raise TypeError('Input variables must match along first dimension.')
@@ -65,12 +66,12 @@ def jacobian(x_tdoa, x_source, ref_idx=None):
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
 
     # Compute the Offset Vectors
-    dx = np.reshape(x_source, (n_dim, 1, n_source)) - x_tdoa
-    r = np.reshape(np.sqrt(np.sum(np.fabs(dx) ** 2, axis=0)), n_sensor, n_source)  # n_sensor x n_source
+    dx = np.reshape(x_source, (n_dim, 1, n_source)) - np.reshape(x_sensor, (n_dim, n_sensor, 1))
+    r = np.reshape(np.sqrt(np.sum(np.abs(dx) ** 2, axis=0)), (1, n_sensor, n_source))  # n_sensor x n_source
 
     # Remove any zero-range samples; replace with epsilon (a very-small value), to avoid a divide
     # by zero error
-    mask = np.fabs(r < 1e-10)
+    mask = np.abs(r < 1e-10)
     r[mask] = 1e-10
 
     # Compute the Jacobians
@@ -78,7 +79,7 @@ def jacobian(x_tdoa, x_source, ref_idx=None):
     return np.squeeze(j)
 
 
-def log_likelihood(x_tdoa, rho, cov, x_source, ref_idx=None):
+def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False):
     """
     Computes the Log Likelihood for TDOA sensor measurement, given the received range difference measurement vector
     rho, covariance matrix cov, and set of candidate source positions x_source.
@@ -88,32 +89,38 @@ def log_likelihood(x_tdoa, rho, cov, x_source, ref_idx=None):
     Nicholas O'Donoughue
     11 March 2021
 
-    :param x_tdoa: nDim x nTDOA array of TDOA sensor positions
+    :param x_sensor: nDim x nTDOA array of TDOA sensor positions
     :param rho: Combined TDOA measurement vector (range difference)
     :param cov: measurement error covariance matrix
     :param x_source: Candidate source positions
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
+    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
-    n_dim, n_source_pos = np.shape(x_source)
+    n_dim, n_source_pos = utils.safe_2d_shape(x_source)
     ell = np.zeros((n_source_pos, 1))
 
+    # Make sure the source pos is a matrix, rather than simply a vector
+    if n_source_pos == 1:
+        x_source = x_source[:, np.newaxis]
+
     # Parse the TDOA sensor pairs
-    _, n_tdoa = np.shape(x_tdoa)
+    _, n_tdoa = utils.safe_2d_shape(x_sensor)
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_tdoa)
 
     # Resample the covariance matrices
-    cov_resample = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+    if do_resample:
+        cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
 
     # Pre-compute covariance matrix inverse
-    cov_inv = np.linalg.pinv(cov_resample)
+    cov_inv = np.linalg.inv(cov)
 
     for idx_source in np.arange(n_source_pos):
         x_i = x_source[:, idx_source]
 
         # Generate the ideal measurement matrix for this position
-        rho_dot = measurement(x_tdoa, x_i, ref_idx)
+        rho_dot = measurement(x_sensor, x_i, ref_idx)
 
         # Evaluate the measurement error
         err = (rho_dot - rho)
@@ -124,7 +131,7 @@ def log_likelihood(x_tdoa, rho, cov, x_source, ref_idx=None):
     return ell
 
 
-def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None):
+def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=False):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each
     dimension.  For each point, compute the TDOA solution for each sensor
@@ -142,6 +149,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None):
     :param x_max: nDim x 1 (or scalar) vector of maximum offset from origin for plotting
     :param num_pts: Number of test points along each dimension
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
+    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
     :return epsilon: 2-D plot of FDOA error
     :return x_vec:
     :return y_vec:
@@ -156,8 +164,10 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None):
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
 
     # Resample the covariance matrix
-    cov_resample = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
-    cov_inv = np.linalg.pinv(cov_resample)
+    if do_resample:
+        cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+
+    cov_inv = np.linalg.pinv(cov)
 
     # Set up test points
     xx_vec = x_max.flatten() * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))
@@ -231,7 +241,7 @@ def toa_error_cross_corr(snr, bandwidth, pulse_len, bandwidth_rms=None):
     return 1/(8*np.pi*a)
 
 
-def draw_isochrone(x1, x2, rdiff, num_pts, max_ortho):
+def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
     """
     Finds the isochrone with the stated range difference from points x1
     and x2.  Generates an arc with 2*numPts-1 points, that spans up to
@@ -244,7 +254,7 @@ def draw_isochrone(x1, x2, rdiff, num_pts, max_ortho):
 
     :param x1: Position of first sensor (Ndim x 1) [m]
     :param x2: Position of second sensor (Ndim x 1) [m]
-    :param rdiff: Desired range difference [m]
+    :param range_diff: Desired range difference [m]
     :param num_pts: Number of points to compute
     :param max_ortho: Maximum offset from line of sight between x1 and x2 [m]
     :return x_iso: First dimension of isochrone [m]
@@ -258,9 +268,8 @@ def draw_isochrone(x1, x2, rdiff, num_pts, max_ortho):
     r = geo.calc_range(x1, x2)
     u = (x2-x1)/r
     v = rot_mat.dot(u)
-    
-    x_proj = np.horzcat(u, v)
-    
+    x_proj = np.array([u, v])
+
     # Position of reference points in uv-space
     x1uv = np.zeros(shape=(2, 1))
     x2uv = np.array((r, 0))
@@ -268,34 +277,43 @@ def draw_isochrone(x1, x2, rdiff, num_pts, max_ortho):
     # Initialize isochrone positions in uv-space
     vv = np.linspace(0, max_ortho, num_pts)
     uu = np.zeros(np.shape(vv))
-    uu[0] = (r-rdiff)/2
-    xuv = np.vertcat(uu, vv)
-    
+    uu[0] = (r - range_diff) / 2
+    xuv = np.array([uu, vv])
+
     # Integrate over points, search for isochrone position
     max_iter = 10000
-    
+    max_err = r/1000  # isochrone position error should be .1% or less
+
     for i in np.arange(num_pts):
-        if i > 0:
-            xuv[0, i] = xuv[0, i-1]  # Initialize u position with previous value
+        if i == 0:
+            # Ignore the first index; it's done
+            continue
 
         # Initialize the search for the u position
+        xuv[0, i] = xuv[0, i-1]  # Initialize the u-dimension with the estimate for the previous step
         offset = r
         num_iter = 1
         
-        while offset > r/10000 and num_iter <= max_iter:
+        while abs(offset) > max_err and num_iter <= max_iter:
             num_iter += 1
-            
-            rdiff0 = geo.calc_range_diff(xuv[:, i], x1uv, x2uv)
-            offset = rdiff0-rdiff
-            
-            xuv[0, i] = xuv[0, i] + offset
+
+            # Compute the current range difference
+            this_rng_diff = geo.calc_range_diff(xuv[:, i], x2uv, x1uv)
+
+            # Offset is the difference between the current and desired
+            # range difference
+            offset = range_diff - this_rng_diff
+
+            # Apply the offset directly to the u-dimension and repeat
+            xuv[0, i] = xuv[0, i] - offset/2
 
     # Isochrone is symmetric about u axis
     # Flip the u axis, flip and negate v
-    xuv = np.horzcat(np.fliplr(np.vertcat(xuv[0, 1:], -xuv[1, 1:])), xuv)
-    
+    xuv_mirror = [np.flipud(xuv[0, 1:]), -np.flipud(xuv[1, 1:])]
+    xuv = np.concatenate((xuv_mirror, xuv), axis=1)
+
     # Convert to x/y space and re-center at origin
-    iso = x_proj.dot(xuv) + x1
+    iso = x_proj.dot(xuv) + x1[:, np.newaxis]
     x_iso = iso[0, :]
     y_iso = iso[1, :]
 
