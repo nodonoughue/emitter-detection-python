@@ -24,9 +24,15 @@ def max_likelihood(x_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx
     :return x_grid: Candidate source positions
     """
 
+    # Resample the covariance matrix
+    if do_resample:
+        # Do it here, instead of passing on to model.log_likelihood, in order to avoid repeatedly resampling
+        # the same covariance matrix for every test point.
+        cov = utils.resample_covariance_matrix(cov, ref_idx)
+
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_sensor, rho, cov, x, ref_idx, do_resample)
+        return model.log_likelihood(x_sensor, rho, cov, x, ref_idx, do_resample=False)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon)
@@ -70,9 +76,7 @@ def gradient_descent(x_sensor, rho, cov, x_init, alpha=None, beta=None, epsilon=
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
 
     if do_resample:
-        _, num_sensors = utils.safe_2d_shape(x_sensor)
-        test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
-        cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+        cov = utils.resample_covariance_matrix(cov, ref_idx)
 
     # Call generic Gradient Descent solver
     x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, alpha, beta, epsilon, max_num_iterations, force_full_calc,
@@ -115,9 +119,7 @@ def least_square(x_sensor, rho, cov, x_init, epsilon=None, max_num_iterations=No
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
 
     if do_resample:
-        _, num_sensors = utils.safe_2d_shape(x_sensor)
-        test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
-        cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+        cov = utils.resample_covariance_matrix(cov, ref_idx)
 
     # Call the generic Least Square solver
     x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, epsilon, max_num_iterations, force_full_calc, plot_progress)
@@ -165,10 +167,7 @@ def bestfix(x_sensor, rho, cov, x_ctr, search_size, epsilon, ref_idx=None, pdf_t
 
     # Resample the covariance matrix
     if do_resample:
-        _, num_sensors = utils.safe_2d_shape(x_sensor)
-        test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
-
-        cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+        cov = utils.resample_covariance_matrix(cov, ref_idx)
 
     pdfs = utils.make_pdfs(measurement, rho, pdf_type, cov)
 
@@ -213,15 +212,13 @@ def chan_ho(x_sensor, rho, cov, ref_idx=None, do_resample=False):
         sort_idx = sort_idx.append(ref_idx)
         x_sensor = x_sensor[sort_idx, :]
 
-        # Note: We don't need to rearrange rho, since it is the range
-        # difference measurements. We don't need to rearrange cov, since
+        # Note: We don't need to rearrange cov, since
         # the following code block will handle its resampling to account
         # for the test and reference indices.
 
     # Resample the covariance matrix
     if do_resample:
-        test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
-        cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+        cov = utils.resample_covariance_matrix(cov, ref_idx)
 
     # Stage 1: Initial Position Estimate
     # Compute system matrix overline(A) according to 11.23

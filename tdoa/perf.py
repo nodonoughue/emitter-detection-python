@@ -3,7 +3,7 @@ import utils
 from . import model
 
 
-def compute_crlb(x_tdoa, xs, cov, ref_idx=None, do_resample=True):
+def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True):
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_tdoa (Ndim x N).
@@ -13,8 +13,8 @@ def compute_crlb(x_tdoa, xs, cov, ref_idx=None, do_resample=True):
     Nicholas O'Donoughue
     21 February 2021
 
-    :param x_tdoa: (Ndim x N) array of TDOA sensor positions
-    :param xs: (Ndim x M) array of source positions over which to calculate CRLB
+    :param x_sensor: (Ndim x N) array of TDOA sensor positions
+    :param x_source: (Ndim x M) array of source positions over which to calculate CRLB
     :param cov: Covariance matrix for range rate estimates at the N FDOA sensors [(m/s)^2]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
@@ -22,12 +22,12 @@ def compute_crlb(x_tdoa, xs, cov, ref_idx=None, do_resample=True):
     """
 
     # Parse inputs
-    n_dim, n_sensor = np.shape(x_tdoa)
-    _, n_source = utils.safe_2d_shape(xs)
+    n_dim, n_sensor = np.shape(x_sensor)
+    _, n_source = utils.safe_2d_shape(x_source)
 
     # Make sure that xs is 2D
     if n_source == 1:
-        xs = xs[:, np.newaxis]
+        x_source = x_source[:, np.newaxis]
 
     # Resample the covariance matrix
     if do_resample:
@@ -43,10 +43,10 @@ def compute_crlb(x_tdoa, xs, cov, ref_idx=None, do_resample=True):
 
     # Repeat CRLB for each of the n_source test positions
     for idx in np.arange(n_source):
-        this_x = xs[:, idx]
+        this_x = x_source[:, idx]
 
         # Evaluate the Jacobian
-        this_jacobian = model.jacobian(x_tdoa, this_x, ref_idx)
+        this_jacobian = model.jacobian(x_sensor, this_x, ref_idx)
 
         # Compute the Fisher Information Matrix
         fisher_matrix = this_jacobian.dot(cov_inv.dot(np.conj(np.transpose(this_jacobian))))
