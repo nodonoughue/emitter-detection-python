@@ -4,11 +4,11 @@ from utils.unit_conversions import db_to_lin
 from . import model
 
 
-def compute_crlb(x_fdoa, v_fdoa, xs, cov, ref_idx=None):
+def compute_crlb(x_sensor, v_sensor, x_source, cov, ref_idx=None, do_resample=True):
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_fdoa (Ndim x N) with velocity v_fdoa.
-    C is an Nx1 vector of FOA variances at each of the N sensors, and ref_idx
+    C is a Nx1 vector of FOA variances at each of the N sensors, and ref_idx
     defines the reference sensor(s) used for FDOA.
 
     Ported from MATLAB Code
@@ -16,37 +16,51 @@ def compute_crlb(x_fdoa, v_fdoa, xs, cov, ref_idx=None):
     Nicholas O'Donoughue
     21 February 2021
 
-    :param x_fdoa: (Ndim x N) array of FDOA sensor positions
-    :param v_fdoa: (Ndim x N) array of FDOA sensor velocities
-    :param xs: (Ndim x M) array of source positions over which to calculate CRLB
+    :param x_sensor: (Ndim x N) array of FDOA sensor positions
+    :param v_sensor: (Ndim x N) array of FDOA sensor velocities
+    :param x_source: (Ndim x M) array of source positions over which to calculate CRLB
     :param cov: Covariance matrix for range rate estimates at the N FDOA sensors [(m/s)^2]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return crlb: Lower bound on the error covariance matrix for an unbiased FDOA estimator (Ndim x Ndim)
     """
 
+    # TODO: Profile and speed up
+
     # Parse inputs
-    n_dim, n_sensor = np.size(x_fdoa)
-    _, n_source = np.size(xs)
+    n_dim, n_sensor = np.shape(x_sensor)
+    _, n_source = utils.safe_2d_shape(x_source)
+
+    # Make sure that xs is 2D
+    if n_source == 1:
+        x_source = x_source[:, np.newaxis]
 
     # Resample the covariance matrix
-    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
-
-    # Resample the covariance matrix
-    cov_resample = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
-    cov_inv = np.linalg.pinv(cov_resample)
+    if do_resample:
+        # Resample the covariance matrix
+        test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
+        cov_resample = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+        cov_inv = np.linalg.inv(cov_resample)
+    else:
+        cov_inv = np.linalg.inv(cov)
 
     # Initialize output variable
     crlb = np.zeros((n_dim, n_dim, n_source))
 
     # Repeat CRLB for each of the n_source test positions
     for idx in np.arange(n_source):
-        this_x = xs[:, idx]
+        this_x = x_source[:, idx]
 
-        # Evaluate the Jacobian
-        this_jacobian = model.jacobian(x_fdoa, v_fdoa, this_x, ref_idx)
+        # Evaluate the Jacobian - n_dim x n_dim x n_source
+        this_jacobian = model.jacobian(x_sensor=x_sensor, v_sensor=v_sensor,
+                                       x_source=this_x, v_source=None,
+                                       ref_idx=ref_idx)
+
+        # Squeeze the jacobian -- the third dimension is singleton, and doesn't matter here
+        this_jacobian = np.squeeze(this_jacobian)
 
         # Compute the Fisher Information Matrix
-        fisher_matrix = this_jacobian.dot(cov_inv.dot(this_jacobian.H))
+        fisher_matrix = this_jacobian.dot(cov_inv.dot(np.conjugate(this_jacobian).T))
 
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
             # Problem is ill defined, Fisher Information Matrix cannot be

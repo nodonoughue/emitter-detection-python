@@ -3,7 +3,7 @@ import utils
 import matplotlib.pyplot as plt
 
 
-def measurement(x_sensor, v_sensor, x_source, ref_idx=None):
+def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     """
     # Computed range rate difference measurements, using the
     # final sensor as a common reference for all FDOA measurements.
@@ -14,31 +14,45 @@ def measurement(x_sensor, v_sensor, x_source, ref_idx=None):
     21 January 2021
 
     :param x_sensor: nDim x nSensor array of sensor positions
-    :param v_sensor: nDim x nSensor array of sensor velocities
     :param x_source: nDim x n_source array of source positions
+    :param v_sensor: nDim x nSensor array of sensor velocities
+    :param v_source: nDim x n_source array of source velocities
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :return rrdoa: nSensor -1 x n_source array of RRDOA measurements
     """
 
     # Parse inputs
-    n_dim1, n_sensor1 = np.shape(x_sensor)
-    n_dim2, n_sensor2 = np.shape(v_sensor)
-    n_dim3, n_source = np.shape(x_source)
+    if v_sensor is None and v_source is None:
+        raise ValueError('At least one of either v_sensor or v_source must be defined to use FDOA.')
+    elif v_sensor is None:
+        v_sensor = np.zeros_like(x_sensor)
+    elif v_source is None:
+        v_source = np.zeros_like(x_source)
 
-    if n_dim1 != n_dim2 or n_sensor1 != n_sensor2:
-        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
-    
-    if n_dim1 != n_dim3:
+    n_dim1, n_sensor1 = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_sensor2 = utils.safe_2d_shape(v_sensor)
+    n_dim3, n_source1 = utils.safe_2d_shape(x_source)
+    n_dim4, n_source2 = utils.safe_2d_shape(v_source)
+
+    if n_dim1 != n_dim2 or n_dim1 != n_dim3 or n_dim1 != n_dim4:
         raise TypeError('First dimension of all inputs must match')
-    
+
+    if not utils.is_broadcastable(x_sensor, v_sensor):
+        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
+
+    if not utils.is_broadcastable(x_source, v_source):
+        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
+
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor1)
     
     # Compute distance from each source position to each sensor
-    dx = np.reshape(x_source, (n_dim1, 1, n_source)) - np.reshape(x_sensor, (n_dim1, n_sensor1, 1))
+    dx = np.reshape(x_source, (n_dim1, 1, n_source1)) - np.reshape(x_sensor, (n_dim1, n_sensor1, 1))
     r = np.sqrt(np.sum(dx**2, axis=0))  # 1 x nSensor x n_source
     
     # Compute range rate from range and velocity
-    rr = np.reshape(np.sum(v_sensor*dx/r, axis=0), (n_sensor1, n_source))  # nSensor x n_source
+    # TODO: Check sign on dv; is this right?
+    dv = np.reshape(v_sensor, (n_dim1, n_sensor2, 1)) - np.reshape(v_source, (n_dim1, 1, n_source2))
+    rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor2, n_source2))  # nSensor x n_source
     
     # Apply reference sensors to compute range rate difference for each sensor
     # pair
@@ -47,7 +61,7 @@ def measurement(x_sensor, v_sensor, x_source, ref_idx=None):
     return rrdoa
 
 
-def jacobian(x_sensor, v_sensor, x_source, ref_idx=None):
+def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     """
     # Returns the Jacobian matrix for FDOA of a source at x_source
     # (n_dim x n_source) from sensors at x_sensor (n_dim x n_sensor) with velocity
@@ -59,39 +73,62 @@ def jacobian(x_sensor, v_sensor, x_source, ref_idx=None):
     21 January 2021
 
     :param x_sensor: n_dim x n_sensor vector of sensor positions
-    :param v_sensor: n_dim x n_sensor vector of sensor velocities
     :param x_source: n_dim x n_source vector of source positions
+    :param v_sensor: n_dim x n_sensor vector of sensor velocities
+    :param v_source: n_dim x n_source vector of source velocities
     :param ref_idx: Scalar index of reference sensor, or n_dim x nPair matrix of sensor pairings
     :return j: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
     """
 
     # Parse inputs
-    n_dim1, n_sensor = np.shape(x_sensor)
-    n_dim2, n_source = np.shape(x_source)
-    
-    if n_dim1 != n_dim2:
-        raise TypeError('Input variables must match along first dimension.')
+    if v_sensor is None and v_source is None:
+        raise ValueError('At least one of either v_sensor or v_source must be defined to use FDOA.')
+    elif v_sensor is None:
+        v_sensor = np.zeros_like(x_sensor)
+    elif v_source is None:
+        v_source = np.zeros_like(x_source)
+
+    n_dim1, n_sensor1 = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_sensor2 = utils.safe_2d_shape(v_sensor)
+    n_dim3, n_source1 = utils.safe_2d_shape(x_source)
+    n_dim4, n_source2 = utils.safe_2d_shape(v_source)
+
+    if n_dim1 != n_dim2 or n_dim1 != n_dim3 or n_dim1 != n_dim4:
+        raise TypeError('First dimension of all inputs must match')
+
+    if not utils.is_broadcastable(x_sensor, v_sensor):
+        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
+
+    if not utils.is_broadcastable(x_source, v_source):
+        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
 
     n_dim = n_dim1
 
-    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor1)
 
     # Compute the Offset Vectors
-    dx = x_sensor - np.reshape(x_source, (n_dim, 1, n_source))  # n_dim x n_sensor x n_source
-    rn = np.sqrt(np.sum(dx**2, axis=0))  # Euclidean norm for each offset vector
-    dx_norm = dx / np.sqrt(np.sum(dx**2, axis=0))
-    px = np.reshape(dx_norm, (n_dim, 1, n_sensor, n_source)) * np.reshape(dx_norm, (1, n_dim, n_sensor, n_source))
-    # n_dim x n_dim x n_sensor
+    dx = x_sensor[:, :, np.newaxis] - np.reshape(x_source, (n_dim, 1, n_source1))  # n_dim x n_sensor x n_source
+    rn = np.reshape(np.sqrt(np.sum(dx**2, axis=0)), (1, n_sensor1, n_source1))  # Euclidean norm for each offset vector
+    dx_norm = dx / rn  # n_dim x n_sensor x n_source
+    px = np.reshape(dx_norm, (n_dim, 1, n_sensor1, n_source1)) * np.reshape(dx_norm, (1, n_dim, n_sensor1, n_source1))
+    # n_dim x n_dim x n_sensor x n_source
     
     # Compute the gradient of R_n
-    nabla_rn = np.squeeze(np.sum((np.eye(n_dim) - px) * np.reshape(v_sensor/rn, (1, n_dim, n_sensor)), axis=1))
-    # n_dim x n_sensor x n_source
-    
+    # TODO: Check dv; correct sign? correct usage in nabla_rn?
+    dv = v_sensor[:, :, np.newaxis] - np.reshape(v_source, (n_dim, 1, n_source2))  # n_dim x n_sensor x n_source
+    dv_norm = dv/rn  # n_dim x n_sensor x n_source
+    # Iterate the matmul over the number of sensors and sources
+    nabla_rn = np.asarray([[np.dot(np.eye(n_dim) - px[:, :, idx_sen, idx_src],
+                                   dv_norm[:, idx_sen, idx_src])
+                            for idx_src in np.arange(n_source2)] for idx_sen in np.arange(n_sensor2)])
+    # Rearrange the axes to match expectation (n_dim x n_sensor x n_source)
+    nabla_rn = np.moveaxis(nabla_rn, source=2, destination=0)
+
     # Take the reference of each w.r.t. to the N-th
     return nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :]  # n_dim x nPair x n_source
 
 
-def log_likelihood(x_fdoa, v_fdoa, rho_dot, cov, x_source, ref_idx=None):
+def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=None, ref_idx=None, do_resample=False):
     """
     # Computes the Log Likelihood for FDOA sensor measurement, given the
     # received measurement vector rho_dot, covariance matrix C,
@@ -102,42 +139,57 @@ def log_likelihood(x_fdoa, v_fdoa, rho_dot, cov, x_source, ref_idx=None):
     Nicholas O'Donoughue
     21 January 2021
 
-    :param x_fdoa: Sensor positions [m]
-    :param v_fdoa: Sensor velocities [m/s]
+    :param x_sensor: Sensor positions [m]
     :param rho_dot: FDOA measurement vector
     :param cov: FDOA measurement error covariance matrix
     :param x_source: Candidate source positions
+    :param v_sensor: Sensor velocities [m/s]
+    :param v_source: n_dim x n_source vector of source velocities
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
+    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
     # Parse inputs
-    n_dim, n_source_pos = np.shape(x_fdoa)
-    ell = np.zeros(n_source_pos, 1)
+    n_dim, n_sensors = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_source_pos = utils.safe_2d_shape(x_source)
+    assert n_dim == n_dim2, 'Input dimension mismatch.'
 
-    _, num_sensors = np.shape(x_fdoa)
-    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
+    # Handle vector input
+    if n_source_pos == 1 and len(x_source.shape) == 1:
+        # x_source is a vector; 2D indexing below will fail.
+        # Let's add a newaxis
+        x_source = x_source[:, np.newaxis]
 
     # Resample the covariance matrix
-    cov_resample = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
-    cov_inv = np.linalg.pinv(cov_resample)
-    
+    if do_resample:
+        cov = utils.resample_covariance_matrix(cov, ref_idx)
+
+    # Pre-invert the covariance matrix; to avoid repeatedly redoing the same work in the
+    # for loop over source positions
+    cov_inv = np.linalg.pinv(cov)
+
+    # Initialize output
+    ell = np.zeros((n_source_pos, ))
+
     for idx_source in np.arange(n_source_pos):
         x_i = x_source[:, idx_source]
         
         # Generate the ideal measurement matrix for this position
-        r_dot = measurement(x_fdoa, v_fdoa, x_i, ref_idx)
+        r_dot = measurement(x_sensor=x_sensor, x_source=x_i,
+                            v_sensor=v_sensor, v_source=v_source,
+                            ref_idx=ref_idx)
         
         # Evaluate the measurement error
         err = (rho_dot - r_dot)
         
         # Compute the scaled log likelihood
-        ell[idx_source] = -err.dot(cov_inv).dot(err)
+        ell[idx_source] = -np.squeeze(err.T @ cov_inv @ err)
 
     return ell
 
 
-def error(x_sensor, v_sensor, cov, x_source, x_max, num_pts, ref_idx=None):
+def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None, ref_idx=None, do_resample=False):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each
     dimension.  For each point, compute the FDOA solution for each sensor
@@ -150,12 +202,14 @@ def error(x_sensor, v_sensor, cov, x_source, x_max, num_pts, ref_idx=None):
     21 January 2021
 
     :param x_sensor: nDim x N matrix of sensor positions
-    :param v_sensor: nDim x N matrix of sensor velocities
     :param cov: N x N covariance matrix
     :param x_source: nDim x 1 matrix of true emitter position
     :param x_max: nDim x 1 (or scalar) vector of maximum offset from origin for plotting
     :param num_pts: Number of test points along each dimension
+    :param v_sensor: nDim x N matrix of sensor velocities
+    :param v_source: nDim x 1 matrix of true emitter velocity
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
+    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
     :return epsilon: 2-D plot of FDOA error
     :return x_vec:
     :return y_vec:
@@ -164,36 +218,32 @@ def error(x_sensor, v_sensor, cov, x_source, x_max, num_pts, ref_idx=None):
     # Compute the True FDOA measurement
     # Compute true range rate difference measurements default condition is to
     # use the final sensor as the reference for all difference measurements.
-    rr = measurement(x_sensor, v_sensor, x_source, ref_idx)
-
-    _, num_sensors = np.shape(x_sensor)
-    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
+    rr = measurement(x_sensor=x_sensor, x_source=x_source,
+                     v_sensor=v_sensor, v_source=v_source,
+                     ref_idx=ref_idx)
 
     # Resample the covariance matrix
-    cov_resample = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
-    cov_inv = np.linalg.pinv(cov_resample)
+    if do_resample:
+        cov = utils.resample_covariance_matrix(cov, ref_idx)
+
+    # Pre-invert the covariance matrix, to avoid repeatedly doing the same calculation
+    cov_inv = np.linalg.pinv(cov)
 
     # Set up test points
-    xx_vec = x_max.flatten() * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))
-    x_vec = xx_vec[0, :]
-    y_vec = xx_vec[1, :]
-    xx, yy = np.mgrid(x_vec, y_vec)
-    x_plot = np.vstack(xx.flatten(), yy.flatten()).T  # 2 x numPts^2
-    
-    epsilon = np.zeros_like(xx)
-    for idx_pt in np.arange(np.size(xx)):
-        x_i = x_plot[:, idx_pt]
-        
-        # Evaluate the measurement at x_i
-        rr_i = measurement(x_sensor, v_sensor, x_i, ref_idx)
-        
-        # Compute the measurement error
-        err = rr-rr_i
-        
-        # Evaluate the scaled log likelihood
-        epsilon[idx_pt] = err.H.dot(cov_inv).dot(err)
+    grid_res = 2*x_max / (num_pts-1)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0., 0.), max_offset=x_max, grid_spacing=grid_res)
+    x_vec = x_grid[0][0, :]
+    y_vec = x_grid[1][:, 0]
 
-    return epsilon
+    rr_list = measurement(x_sensor=x_sensor, x_source=x_set.T,
+                          v_sensor=v_sensor, v_source=v_source,
+                          ref_idx=ref_idx)
+
+    err = rr - rr_list
+
+    epsilon_list = [np.conjugate(this_err).T @  cov_inv @ this_err for this_err in err.T]
+
+    return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
 
 
 def draw_isodop(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
@@ -221,32 +271,75 @@ def draw_isodop(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
     # Set frequency to 3e8, so that c/f_0 is unity, and output of utils.dopDiff
     # is velocity difference [m/s]
     f_0 = 3.0e8
-    
+
     # Set up test points
-    xx_vec = max_ortho.flatten() * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))
-    x_vec = xx_vec[0, :]
-    y_vec = xx_vec[1, :]
-    xx, yy = np.mgrid(x_vec, y_vec)
-    x_plot = np.vstack(xx.flatten(), yy.flatten()).T  # 2 x numPts^2
-    
-    df_plot = utils.geo.calc_doppler_diff(x_plot, np.array([0, 0]).T, x1, v1, x2, v2, f_0)  # numPts^2 x (N-1)
+    grid_spacing = 2 * max_ortho / (num_pts - 1)  # Compute grid density
+    x_set, x_grid, n_elements = utils.make_nd_grid(x_ctr=(0., 0.),
+                                                   max_offset=max_ortho,
+                                                   grid_spacing=grid_spacing)
+
+    df_plot = utils.geo.calc_doppler_diff(x_set.T, np.zeros_like(x_set).T, x1, v1, x2, v2, f_0)
+
+    # Generate Levels
+    if np.size(vdiff) > 1:
+        # Multiple velocity differences were specified, they have to be in ascending order to be used in contour command
+        sort_idx = np.argsort(vdiff)
+        unsort_idx = np.argsort(sort_idx)   # Indices to unsort
+        level_set = vdiff[sort_idx]
+        multiple_outputs = True
+    elif np.isscalar(vdiff):
+        # We only care about the contour level at vdiff; but pyplot.contour won't let us
+        # draw just one.
+        unsort_idx = int(1)  # The only level we want to output
+        level_set = np.array([np.amin(df_plot), vdiff, np.amax(df_plot)])
+        multiple_outputs = False
+    else:
+        # If vdiff is an array, with only one element, we get a deprecation warning if we treat it like a scalar.
+        # First, let's reshape it to make sure it's a vector, then index the first element when constructing our
+        # level set
+        vdiff = np.reshape(vdiff, (1,))
+        unsort_idx = int(1)  # The only level we want to output
+        level_set = np.array([np.amin(df_plot), vdiff[0], np.amax(df_plot)])
+        multiple_outputs = False
 
     # Compute contour
     fig00 = plt.figure()
-    contour_set = plt.contour(x_vec, y_vec, np.reshape(df_plot, (num_pts, num_pts)), [vdiff, vdiff])
+    contour_set = plt.contour(x_grid[0], x_grid[1], np.reshape(df_plot, np.shape(x_grid[0])), levels=level_set)
 
     # Close the figure generated
     plt.close(fig00)
 
     # Extract the desired coordinates
-    contour_data = contour_set.allSegs[0]
+    x_iso = []
+    y_iso = []
+    for this_contour in contour_set.allsegs:
+        # Each contour level is a list of contour regions
+        this_x_iso = np.zeros(shape=(0, ))
+        this_y_iso = []
 
-    x_iso = contour_data[:, 0]
-    y_iso = contour_data[:, 1]
-    
-    # Filter points out of bounds
-    out_of_bounds = abs(x_iso) > max_ortho | abs(y_iso) > max_ortho
-    x_iso = x_iso(~out_of_bounds)
-    y_iso = y_iso(~out_of_bounds)
+        for this_region in this_contour:
+            # Grab the x/y coordinates for this region
+            this_x = this_region[:, 0]
+            this_y = this_region[:, 1]
+
+            # Remove any that are out of bounds
+            out_of_bounds = np.fmax(np.abs(this_x), np.abs(this_y)) > max_ortho
+
+            this_x_iso = np.append(this_x_iso, np.append(this_x[~out_of_bounds], np.nan))
+            this_y_iso = np.append(this_y_iso, np.append(this_y[~out_of_bounds], np.nan))
+
+        # Add to the list of isodoppler contours; remove the leading nan (for simplicity)
+        x_iso.append(this_x_iso)
+        y_iso.append(this_y_iso)
+
+    # Unsort the levels
+    if multiple_outputs:
+        # The output is a list of x_iso and y_iso entries
+        x_iso = [x_iso[idx] for idx in unsort_idx]
+        y_iso = [y_iso[idx] for idx in unsort_idx]
+    else:
+        # idx is a scalar, use it directly, no need for list comprehension
+        x_iso = x_iso[unsort_idx]
+        y_iso = y_iso[unsort_idx]
 
     return x_iso, y_iso
