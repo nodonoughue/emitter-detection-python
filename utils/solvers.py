@@ -72,14 +72,14 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
         # from the lower triangular matrix L.
         #   L @ a = J.T
         #   L @ b = y
-        a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T)
-        b = scipy.linalg.solve_triangular(covariance_lower, y_i)
+        a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
+        b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
         # Then, we solve the system
         #  (a.T @ a) @ delta_x = a.T @ b
         delta_x, _, _, _ = np.linalg.lstsq(a.T @ a, a.T @ b, rcond=None)
 
         # Update predicted location
-        x_full[:, current_iteration] = x_prev + delta_x
+        x_full[:, current_iteration] = x_prev + np.squeeze(delta_x)
 
         # Update variables
         x_prev = x_full[:, current_iteration]
@@ -151,7 +151,7 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
     # Cost Function for Gradient Descent
     def cost_fxn(z):
         this_y = y(z)
-        l_inv_y = scipy.linalg.solve_triangular(covariance_lower, this_y)
+        l_inv_y = scipy.linalg.solve_triangular(covariance_lower, this_y, lower=True)
         return np.conj(l_inv_y.T) @ l_inv_y
     
     # Initialize Plotting
@@ -181,12 +181,12 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use squeeze to remove third dimension (n_source=1)
         
         # Compute Gradient and Cost function
-        a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T)
-        b = scipy.linalg.solve_triangular(covariance_lower, y_i)
+        a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
+        b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
         grad = -2 * a.T @ b
         
         # Descent direction is the negative of the gradient
-        del_x = -grad/np.linalg.norm(grad)
+        del_x = -np.squeeze(grad/np.linalg.norm(grad))
         
         # Compute the step size
         t = backtracking_line_search(cost_fxn, x_prev, grad, del_x, alpha, beta)
@@ -244,9 +244,12 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
 
     # Initialize the search parameters and direction
     t = 1
-    starting_val = f(x)
-    slope = np.inner(np.conjugate(grad.T), del_x)
-    
+    starting_val = np.squeeze(f(x))
+    slope = np.squeeze(np.conjugate(grad.T) @ del_x)
+
+    # Make sure that x, del_x are arrays (not matrices)
+    del_x = np.squeeze(del_x)
+    x = np.squeeze(x)
     # Make sure the starting value is large enough
     while f(x+t*del_x) < starting_val+alpha*t*slope:
         t = 2*t
