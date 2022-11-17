@@ -118,7 +118,7 @@ def parse_reference_sensor(ref_idx, num_sensors):
     if ref_idx is None:
         # Default behavior is to use the last sensor as a common reference
         test_idx_vec = np.asarray([i for i in np.arange(num_sensors - 1)])
-        ref_idx_vec = np.array([num_sensors - 1])
+        ref_idx_vec = (num_sensors - 1) * np.ones_like(test_idx_vec)
 
     elif ref_idx == 'full':
         # Generate all possible sensor pairs
@@ -127,9 +127,12 @@ def parse_reference_sensor(ref_idx, num_sensors):
         ref_idx_vec = np.asarray([x[1] for x in perm])
 
     elif np.isscalar(ref_idx):
+        # Check for error condition
+        assert ref_idx < num_sensors, 'Bad reference index; unable to parse.'
+
         # Scalar reference index, use all other sensors as test sensors
         test_idx_vec = np.asarray([i for i in np.arange(num_sensors) if i != ref_idx])
-        ref_idx_vec = ref_idx
+        ref_idx_vec = ref_idx * np.ones_like(test_idx_vec)
     else:
         # Pair of vectors; first row is test sensors, second is reference
         test_idx_vec = ref_idx[0, :]
@@ -168,24 +171,30 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
     :return:
     """
 
-    # Determine the sizes
+    # Parse Inputs
     n_sensor = np.size(cov, axis=0)
-    n_test = np.size(test_idx_vec)
-    n_ref = np.size(ref_idx_vec)
-    n_pair_out = np.fmax(n_test, n_ref)
-
-    if 1 < n_test != n_ref > 1:
-        raise TypeError("Error calling covariance matrix resample.  "
-                        "Reference and test vectors must have the same shape.")
-
-    if np.any(test_idx_vec > n_sensor) or np.any(ref_idx_vec > n_sensor):
-        raise TypeError("Error calling covariance matrix resample.  "
-                        "Indices exceed the dimensions of the covariance matrix.")
+    if test_idx_vec is None:
+        # Default behavior, if not specified, is to use the final sensor as the reference
+        test_idx_vec = n_sensor - 1
 
     # Parse reference and test index vector
     if ref_idx_vec is None:
         # Only one was provided; it must be fed to parse_reference_sensor to generate the matched pair of vectors
         test_idx_vec, ref_idx_vec = parse_reference_sensor(test_idx_vec, n_sensor)
+
+    # Determine output size
+    n_test = np.size(test_idx_vec)
+    n_ref = np.size(ref_idx_vec)
+    n_pair_out = np.fmax(n_test, n_ref)
+
+    # Error Checking
+    if 1 < n_test != n_ref > 1:
+        raise TypeError("Error calling covariance matrix resample.  "
+                        "Reference and test vectors must have the same shape.")
+
+    if np.any(test_idx_vec >= n_sensor) or np.any(ref_idx_vec >= n_sensor):
+        raise TypeError("Error calling covariance matrix resample.  "
+                        "Indices exceed the dimensions of the covariance matrix.")
 
     # Parse sensor weights
     shp_test_wt = 1
@@ -346,7 +355,8 @@ def make_pdfs(measurement_function, measurements, pdf_type='MVN', covariance=1):
         pdf_type = 'mvn'
 
     if pdf_type.lower() == 'mvn' or pdf_type.lower() == 'normal':
-        pdfs = [lambda x: stats.multivariate_normal.pdf(measurement_function(x), mean=measurements, cov=covariance)]
+        rv = stats.multivariate_normal(mean=measurements, cov=covariance)  # frozen MVN representation
+        pdfs = [lambda x: rv.pdf(measurement_function(x))]
     else:
         raise KeyError('Unrecognized PDF type setting: ''{}'''.format(pdf_type))
 
@@ -409,20 +419,18 @@ def safe_2d_shape(x: np.array) -> np.array:
     :return dim2: length of second dimension
     """
 
-    if x.ndim > 2:
-        # 3D array, drop anything after the second dimension
-        dim1, dim2, _ = np.shape(x)
+    # Wrap x in an array, in case its a scalar or list
+    x = np.asarray(x)
 
-    elif x.ndim > 1:
-        # 2D array
-        dim1, dim2 = np.shape(x)
+    # Initialize output dimensions
+    dims_out = [1, 1]  # The default, for empty dimensions, is 1
 
-    else:
-        # 1D array
-        dim1 = np.size(x)
-        dim2 = 1
+    # Attempt to overwrite default with the actual size, for defined dimensions
+    dims = np.shape(x)
+    for idx_dim in np.arange(np.amin([2, len(dims)])):
+        dims_out[idx_dim] = dims[idx_dim]
 
-    return dim1, dim2
+    return dims_out
 
 
 def make_nd_grid(x_ctr, max_offset, grid_spacing):
@@ -475,3 +483,29 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing):
     x_set = np.asarray([x.flatten() for x in x_grid]).T
 
     return x_set, x_grid, n_elements
+
+
+def is_broadcastable(a, b):
+    """
+    Determine if two inputs are broadcastable. In other words, check all common dimensions, and
+    ensure that they are either equal or of length 1.
+
+    14 November 2022
+    Nicholas O'Donoughue
+
+    :param a: first input array
+    :param b: second input array
+    :return result:  Boolean (true is a and b are broadcastable)
+    """
+
+    while len(np.shape(a)) > len(np.shape(b)):
+        b = b[:, np.newaxis]
+
+    while len(np.shape(b)) > len(np.shape(a)):
+        a = a[:, np.newaxis]
+
+    try:
+        np.broadcast_arrays(a, b)
+        return True
+    except:
+        return False
