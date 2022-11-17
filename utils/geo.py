@@ -1,6 +1,7 @@
 import warnings
 import numpy as np
 from . import constants
+from . import utils
 
 
 def calc_range(x1, x2):
@@ -84,20 +85,29 @@ def calc_doppler(x1, v1, x2, v2, f):
     :param f: Carrier frequency, in Hertz
     :return fd: Doppler shifts for each source, sensor pair (num_sources x num_sensors), in Hertz
     """
-    # Reshape inputs
-    num_dims, num_sources = np.shape(x1)
-    num_dims2, num_sensors = np.shape(x2)
 
-    if num_dims != num_dims2 or np.shape(x1) != np.shape(v1) or np.shape(x2) != np.shape(v2):
+    # Reshape inputs
+    num_dims, num_sources = utils.safe_2d_shape(x1)
+    _, num_sources2 = utils.safe_2d_shape(v1)
+    num_dims2, num_sensors = utils.safe_2d_shape(x2)
+    _, num_sensors2 = utils.safe_2d_shape(v2)
+
+    if num_dims != num_dims2 or \
+            (not utils.is_broadcastable(x1, v1)) or \
+            (not utils.is_broadcastable(x2, v2)):
         raise TypeError('Input dimensions do not match.')
 
     x1 = np.reshape(x1.T, (num_sources, 1, num_dims))
-    v1 = np.reshape(v1.T, (num_sources, 1, num_dims))
+    v1 = np.reshape(v1.T, (num_sources2, 1, num_dims))
     x2 = np.reshape(x2.T, (1, num_sensors, num_dims))
-    v2 = np.reshape(v2.T, (1, num_sensors, num_dims))
+    v2 = np.reshape(v2.T, (1, num_sensors2, num_dims))
 
     # Unit vector from x1 to x2
-    u12 = (x2-x1)/np.linalg.norm(x2-x1, axis=2)
+    # Note: I'm not sure why, but just dividing dx/dist broadcasts the dimensions weirdly.  Using the np.newaxis ensures
+    # that dist has the same shape as dx, to avoid the broadcasting bug.
+    dx = x2-x1
+    dist = np.linalg.norm(dx, axis=2)
+    u12 = dx / dist[:, :, np.newaxis]
     u21 = -u12
 
     # x1 velocity towards x2
