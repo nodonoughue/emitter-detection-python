@@ -61,7 +61,7 @@ def example1(rng=np.random.default_rng()):
     covar_lower = np.linalg.cholesky(covar_rho)
 
     # Initialize Transmitter Position
-    th = rng.uniform(low=0, high=1)*2*np.pi
+    th = rng.random()*2*np.pi
     x_source = 5*baseline*np.array([np.cos(th), np.sin(th)],)
 
     # Compute Range
@@ -80,6 +80,8 @@ def example1(rng=np.random.default_rng()):
     beta = .8
     epsilon = 100  # [m] desired iterative search stopping condition
     grid_res = int(500)  # [m] desired grid search resolution
+    x_init = 2 * baseline * np.array([np.cos(th + np.pi / 6), np.sin(th + np.pi / 6)])  # km
+    x_extent = 5 * baseline
 
     out_shp = (2, num_mc_trials)
     out_iterative_shp = (2, num_iterations, num_mc_trials)
@@ -91,9 +93,6 @@ def example1(rng=np.random.default_rng()):
 
     print('Performing Monte Carlo simulation for TDOA performance...')
     t_start = time.perf_counter()
-
-    x_init = 2*baseline*np.array([np.cos(th+np.pi/6), np.sin(th+np.pi/6)])  # km
-    x_extent = 5*baseline
 
     args = {'rho_act': rho_actual,
             'num_measurements': num_sensors-1,
@@ -290,9 +289,6 @@ def _mc_iteration(args):
 
     # Generate a random measurement
     rng = args['rng']
-    # print('Running MC iteration...')
-    # print('args: {}'.format(args))
-
     rho = args['rho_act'] + args['covar_lower'] @ rng.standard_normal(size=(args['num_measurements'], ))
 
     # Generate solutions
