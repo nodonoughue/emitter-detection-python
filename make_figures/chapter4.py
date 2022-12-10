@@ -109,8 +109,8 @@ def make_figure_1a(prefix=None):
 
     # Save figure
     if prefix is not None:
-        plt.savefig(prefix + 'fig1a.svg')
-        plt.savefig(prefix + 'fig1a.png')
+        fig1a.savefig(prefix + 'fig1a.svg')
+        fig1a.savefig(prefix + 'fig1a.png')
 
     return fig1a
 
@@ -190,8 +190,8 @@ def make_figure_1b(prefix=None, rng=None):
 
     # Save figure
     if prefix is not None:
-        plt.savefig(prefix + 'fig1b.svg')
-        plt.savefig(prefix + 'fig1b.png')
+        fig1b.savefig(prefix + 'fig1b.svg')
+        fig1b.savefig(prefix + 'fig1b.png')
 
     return fig1b
 
@@ -268,8 +268,8 @@ def make_figure_2a(prefix=None, rng=None):
 
     # Save figure
     if prefix is not None:
-        plt.savefig(prefix + 'fig2a.svg')
-        plt.savefig(prefix + 'fig2a.png')
+        fig2a.savefig(prefix + 'fig2a.svg')
+        fig2a.savefig(prefix + 'fig2a.png')
 
     return fig2a
 
@@ -360,8 +360,8 @@ def make_figure_2b(prefix=None, rng=None):
 
     # Save figure
     if prefix is not None:
-        plt.savefig(prefix + 'fig2b.svg')
-        plt.savefig(prefix + 'fig2b.png')
+        fig2b.savefig(prefix + 'fig2b.svg')
+        fig2b.savefig(prefix + 'fig2b.png')
 
     return fig2b
 
@@ -395,8 +395,8 @@ def make_figure_3(prefix=None):
 
     # Save figure
     if prefix is not None:
-        plt.savefig(prefix + 'fig3.svg')
-        plt.savefig(prefix + 'fig3.png')
+        fig3.savefig(prefix + 'fig3.svg')
+        fig3.savefig(prefix + 'fig3.png')
 
     return fig3
 
@@ -442,8 +442,8 @@ def make_figure_5(prefix=None, colors=None):
 
     # Save figure
     if prefix is not None:
-        plt.savefig(prefix + 'fig5.svg')
-        plt.savefig(prefix + 'fig5.png')
+        fig5.savefig(prefix + 'fig5.svg')
+        fig5.savefig(prefix + 'fig5.png')
 
     return fig5
 
@@ -565,8 +565,8 @@ def make_figure_6(prefix=None, rng=None, colors=None):
 
     # Save figure
     if prefix is not None:
-        plt.savefig(prefix + 'fig6.svg')
-        plt.savefig(prefix + 'fig6.png')
+        fig6.savefig(prefix + 'fig6.svg')
+        fig6.savefig(prefix + 'fig6.png')
 
     return fig6
 
@@ -589,8 +589,8 @@ def make_figure_7(prefix=None):
 
     # Save figure
     if prefix is not None:
-        plt.savefig(prefix + 'fig7.svg')
-        plt.savefig(prefix + 'fig7.png')
+        fig7.savefig(prefix + 'fig7.svg')
+        fig7.savefig(prefix + 'fig7.png')
 
     return fig7
 
@@ -614,7 +614,7 @@ def make_figure_8(prefix=None, colors=None):
 
     # Save figure
     if prefix is not None:
-        plt.savefig(prefix + 'fig8.svg')
-        plt.savefig(prefix + 'fig8.png')
+        fig8.savefig(prefix + 'fig8.svg')
+        fig8.savefig(prefix + 'fig8.png')
 
     return fig8

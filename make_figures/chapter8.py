@@ -98,8 +98,8 @@ def make_figure_3(prefix=None):
     plt.ylabel('Array Factor [linear]')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig3.png')
-        plt.savefig(prefix + 'fig3.svg')
+        fig3.savefig(prefix + 'fig3.png')
+        fig3.savefig(prefix + 'fig3.svg')
 
     return fig3
 
@@ -144,8 +144,8 @@ def make_figure_4(prefix=None):
     plt.plot([.425, .1], [.5, .6], color='black', label=None)
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig4.png')
-        plt.savefig(prefix + 'fig4.svg')
+        fig4.savefig(prefix + 'fig4.png')
+        fig4.savefig(prefix + 'fig4.svg')
 
     return fig4
 
@@ -193,8 +193,8 @@ def make_figure_5(prefix=None):
     plt.plot([.425, .1], [.5, .6], color='black', label=None)
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig5.png')
-        plt.savefig(prefix + 'fig5.svg')
+        fig5.savefig(prefix + 'fig5.png')
+        fig5.savefig(prefix + 'fig5.svg')
 
     return fig
 
@@ -252,8 +252,8 @@ def make_figure_6(prefix=None):
     plt.ylim([-20, 0])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig6.png')
-        plt.savefig(prefix + 'fig6.svg')
+        fig6.savefig(prefix + 'fig6.png')
+        fig6.savefig(prefix + 'fig6.svg')
 
     return fig
 
@@ -289,8 +289,8 @@ def make_figure_7a(prefix=None):
     plt.legend(loc='upper right')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig7a.png')
-        plt.savefig(prefix + 'fig7a.svg')
+        fig7a.savefig(prefix + 'fig7a.png')
+        fig7a.savefig(prefix + 'fig7a.svg')
 
     return fig7a
 
@@ -337,8 +337,8 @@ def make_figure_7b(prefix=None):
     plt.legend(loc='upper right')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig7b.png')
-        plt.savefig(prefix + 'fig7b.svg')
+        fig7b.savefig(prefix + 'fig7b.png')
+        fig7b.savefig(prefix + 'fig7b.svg')
 
     return fig7b
 
@@ -408,8 +408,8 @@ def make_figure_9(prefix=None, rng=None):
     plt.legend(loc='upper right')
     
     if prefix is not None:
-        plt.savefig(prefix + 'fig9.png')
-        plt.savefig(prefix + 'fig9.svg')
+        fig9.savefig(prefix + 'fig9.png')
+        fig9.savefig(prefix + 'fig9.svg')
     
     pwr_vec_music, _ = array_df.solvers.music(x, v, 2, np.pi/2, 1001)
     pwr_vec_music = pwr_vec_music/np.amax(np.abs(pwr_vec_music))
@@ -417,8 +417,8 @@ def make_figure_9(prefix=None, rng=None):
     plt.legend()
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig11.png')
-        plt.savefig(prefix + 'fig11.svg')
+        fig11.savefig(prefix + 'fig11.png')
+        fig11.savefig(prefix + 'fig11.svg')
 
     return fig
     
@@ -439,8 +439,8 @@ def make_figure_10(prefix=None):
     fig10 = chapter8.example1()
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig10.png')
-        plt.savefig(prefix + 'fig10.svg')
+        fig10.savefig(prefix + 'fig10.png')
+        fig10.savefig(prefix + 'fig10.svg')
 
     return fig10
 
@@ -544,8 +544,8 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
     plt.ylabel('RMSE [deg]')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig12.png')
-        plt.savefig(prefix + 'fig12.svg')
+        fig12.savefig(prefix + 'fig12.png')
+        fig12.savefig(prefix + 'fig12.svg')
 
     return fig
 
@@ -574,7 +574,7 @@ def make_figure_13(prefix=None, rng=None, force_recalc=True):
     fig13 = chapter8.example2(rng)
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig13.png')
-        plt.savefig(prefix + 'fig13.svg')
+        fig13.savefig(prefix + 'fig13.png')
+        fig13.savefig(prefix + 'fig13.svg')
 
     return fig13

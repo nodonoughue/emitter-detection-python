@@ -121,8 +121,9 @@ def make_figure_1(prefix=None):
     plt.axis('off')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig1.png')
         plt.savefig(prefix + 'fig1.svg')
+        fig1.savefig(prefix + 'fig1.png')
+        fig1.savefig(prefix + 'fig1.svg')
 
     return fig1
 

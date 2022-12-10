@@ -102,8 +102,8 @@ def make_figure_1(prefix=None):
     plt.legend(loc='upper left', prop={'size': 6})  # Manually reduce font size so legend is less obtrusive
     
     if prefix is not None:
-        plt.savefig(prefix + 'fig1.png')
-        plt.savefig(prefix + 'fig1.svg')
+        fig1.savefig(prefix + 'fig1.png')
+        fig1.savefig(prefix + 'fig1.svg')
     
     return fig1
 
@@ -216,8 +216,8 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
     plt.text(2, 1.4, 'M=100', fontsize=10)
     
     if prefix is not None:
-        plt.savefig(prefix + 'fig3.png')
-        plt.savefig(prefix + 'fig3.svg')
+        fig3.savefig(prefix + 'fig3.png')
+        fig3.savefig(prefix + 'fig3.svg')
 
     return fig3
 
@@ -326,8 +326,8 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
     plt.text(7, .5, 'M=100', fontsize=10)
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig5.svg')
-        plt.savefig(prefix + 'fig5.png')
+        fig5.savefig(prefix + 'fig5.svg')
+        fig5.savefig(prefix + 'fig5.png')
 
     return fig5
 
@@ -356,16 +356,15 @@ def make_figure_6b(prefix=None):
     plt.polar(phi, np.absolute(gain_pattern_two))
     plt.polar(phi, gain_omni, linestyle='--')
 
-    # TODO: Remove angle labels
-    plt.gca().set_yticklabels([])
+    plt.axis('off')
 
     plt.text(1.1, .25, 'Reference', fontsize=10)
     plt.text(1.5, 1, 'Horizontal Adcock', fontsize=10)
     plt.text(0, 2.1, 'Vertical Adcock', fontsize=10)
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig6b.png')
-        plt.savefig(prefix + 'fig6b.svg')
+        fig6b.savefig(prefix + 'fig6b.png')
+        fig6b.savefig(prefix + 'fig6b.svg')
 
     return fig6b
 
@@ -472,8 +471,8 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
     plt.text(10, 2.5, 'M=100', fontsize=10)
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig7.png')
-        plt.savefig(prefix + 'fig7.svg')
+        fig7.savefig(prefix + 'fig7.png')
+        fig7.savefig(prefix + 'fig7.svg')
 
     return fig7
 
@@ -514,8 +513,8 @@ def make_figure_8(prefix=None):
     plt.ylim([f0+np.min(fd)-.2, f0+np.max(fd)+.2])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig8b.png')
-        plt.savefig(prefix + 'fig8b.svg')
+        fig8b.savefig(prefix + 'fig8b.png')
+        fig8b.savefig(prefix + 'fig8b.svg')
 
     return fig8b
 
@@ -635,8 +634,8 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
     plt.text(5, .5, 'M=1,000', fontsize=10)
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig10.svg')
-        plt.savefig(prefix + 'fig10.png')
+        fig10.savefig(prefix + 'fig10.svg')
+        fig10.savefig(prefix + 'fig10.png')
 
     return fig10
 
@@ -678,8 +677,8 @@ def make_figure_12(prefix=None, force_recalc=True):
     plt.legend(loc='lower left')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig12.svg')
-        plt.savefig(prefix + 'fig12.png')
+        fig12.savefig(prefix + 'fig12.svg')
+        fig12.savefig(prefix + 'fig12.png')
 
     return fig12
 
@@ -707,8 +706,8 @@ def make_figure_14(prefix=None, force_recalc=True):
     chapter7.example4(fig14)
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig14.svg')
-        plt.savefig(prefix + 'fig14.png')
+        fig14.savefig(prefix + 'fig14.svg')
+        fig14.savefig(prefix + 'fig14.png')
 
     return fig14
 
@@ -753,8 +752,8 @@ def make_figure_15b(prefix=None, force_recalc=True):
     plt.ylim([-1, 1])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig15b.svg')
-        plt.savefig(prefix + 'fig15b.png')
+        fig15b.savefig(prefix + 'fig15b.svg')
+        fig15b.savefig(prefix + 'fig15b.png')
 
     return fig15b
 
@@ -791,7 +790,7 @@ def make_figure_16(prefix=None):
     plt.ylim([0, .5])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig16.svg')
-        plt.savefig(prefix + 'fig16.png')
+        fig16.savefig(prefix + 'fig16.svg')
+        fig16.savefig(prefix + 'fig16.png')
 
     return fig16

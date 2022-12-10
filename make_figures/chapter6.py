@@ -107,8 +107,8 @@ def make_figure_1(prefix=None):
 
     # Save figure
     if prefix is not None:
-        plt.savefig(prefix + 'fig1.svg')
-        plt.savefig(prefix + 'fig1.png')
+        fig1.savefig(prefix + 'fig1.svg')
+        fig1.savefig(prefix + 'fig1.png')
 
     return fig1
 
@@ -157,8 +157,8 @@ def make_figure_2(prefix=None):
     plt.legend(loc='lower left')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig2.svg')
-        plt.savefig(prefix + 'fig2.png')
+        fig2.savefig(prefix + 'fig2.svg')
+        fig2.savefig(prefix + 'fig2.png')
 
     return fig2
 
@@ -200,8 +200,8 @@ def make_figure_3(prefix=None):
     plt.ylabel(r'Parameter ($\theta$)')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig3.svg')
-        plt.savefig(prefix + 'fig3.png')
+        fig3.savefig(prefix + 'fig3.svg')
+        fig3.savefig(prefix + 'fig3.png')
 
     return fig3
 
@@ -257,7 +257,7 @@ def make_figure_4(prefix=None):
     plt.ylim([-.2, 1.8])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig4.svg')
-        plt.savefig(prefix + 'fig4.png')
+        fig4.savefig(prefix + 'fig4.svg')
+        fig4.savefig(prefix + 'fig4.png')
 
     return fig4

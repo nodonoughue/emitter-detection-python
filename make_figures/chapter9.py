@@ -94,8 +94,8 @@ def make_figure_1(prefix=None):
     plt.legend(loc='upper left')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig1.png')
-        plt.savefig(prefix + 'fig1.svg')
+        fig1.savefig(prefix + 'fig1.png')
+        fig1.savefig(prefix + 'fig1.svg')
 
     return fig1
 
@@ -116,8 +116,8 @@ def make_figure_2(prefix=None):
     fig2 = chapter9.example1()
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig2.png')
-        plt.savefig(prefix + 'fig2.svg')
+        fig2.savefig(prefix + 'fig2.png')
+        fig2.savefig(prefix + 'fig2.svg')
 
     return fig2
 
@@ -164,8 +164,8 @@ def make_figure_3(prefix=None):
     plt.legend(loc='upper left')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig3.png')
-        plt.savefig(prefix + 'fig3.svg')
+        fig3.savefig(prefix + 'fig3.png')
+        fig3.savefig(prefix + 'fig3.svg')
 
     return fig3
 
@@ -186,7 +186,7 @@ def make_figure_4(prefix=None):
     fig4 = chapter9.example2()
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig4.png')
-        plt.savefig(prefix + 'fig4.svg')
+        fig4.savefig(prefix + 'fig4.png')
+        fig4.savefig(prefix + 'fig4.svg')
 
     return fig4

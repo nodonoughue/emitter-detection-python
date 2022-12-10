@@ -137,8 +137,8 @@ def make_figure_1(prefix=None, cmap=None):
     plt.xlim([-1, 2])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig1.png')
-        plt.savefig(prefix + 'fig1.svg')
+        fig1.savefig(prefix + 'fig1.png')
+        fig1.savefig(prefix + 'fig1.svg')
 
     return fig1
 
@@ -226,8 +226,8 @@ def make_figure_2(prefix=None, cmap=None):
     plt.xlim([-1, 2])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig2.png')
-        plt.savefig(prefix + 'fig2.svg')
+        fig2.savefig(prefix + 'fig2.png')
+        fig2.savefig(prefix + 'fig2.svg')
 
     return fig2
 
@@ -297,8 +297,8 @@ def make_figure_3(prefix=None):
                      linewidth=.5, label=None)
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig3.png')
-        plt.savefig(prefix + 'fig3.svg')
+        fig3.savefig(prefix + 'fig3.png')
+        fig3.savefig(prefix + 'fig3.svg')
 
     return fig3
 
@@ -362,8 +362,8 @@ def make_figure_4(prefix=None):
     plt.ylim([-.5, 10.5])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig4.png')
-        plt.savefig(prefix + 'fig4.svg')
+        fig4.savefig(prefix + 'fig4.png')
+        fig4.savefig(prefix + 'fig4.svg')
 
     return fig4
 
@@ -394,12 +394,12 @@ def make_figure_5(prefix=None, rng=None, force_recalc=True):
 
     if prefix is not None:
         plt.figure(fig5a)
-        plt.savefig(prefix + 'fig5a.png')
-        plt.savefig(prefix + 'fig5a.svg')
+        fig5a.savefig(prefix + 'fig5a.png')
+        fig5a.savefig(prefix + 'fig5a.svg')
 
         plt.figure(fig5b)
-        plt.savefig(prefix + 'fig5b.png')
-        plt.savefig(prefix + 'fig5b.svg')
+        fig5b.savefig(prefix + 'fig5b.png')
+        fig5b.savefig(prefix + 'fig5b.svg')
 
     return fig5a, fig5b
 
@@ -420,8 +420,8 @@ def make_figure_6(prefix=None):
     fig6 = chapter10.example2()
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig6.png')
-        plt.savefig(prefix + 'fig6.svg')
+        fig6.savefig(prefix + 'fig6.png')
+        fig6.savefig(prefix + 'fig6.svg')
 
     return fig6
 
@@ -442,7 +442,7 @@ def make_figure_7(prefix=None):
     fig7 = chapter10.example3()
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig7.png')
-        plt.savefig(prefix + 'fig7.svg')
+        fig7.savefig(prefix + 'fig7.png')
+        fig7.savefig(prefix + 'fig7.svg')
 
     return fig7

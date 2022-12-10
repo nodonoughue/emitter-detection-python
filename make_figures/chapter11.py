@@ -199,13 +199,11 @@ def make_figure_1(prefix=None):
     plt.legend(loc='lower right')
 
     if prefix is not None:
-        plt.figure(fig1a)
-        plt.savefig(prefix + 'fig1a.png')
-        plt.savefig(prefix + 'fig1a.svg')
+        fig1a.savefig(prefix + 'fig1a.png')
+        fig1a.savefig(prefix + 'fig1a.svg')
 
-        plt.figure(fig1b)
-        plt.savefig(prefix + 'fig1b.png')
-        plt.savefig(prefix + 'fig1b.svg')
+        fig1b.savefig(prefix + 'fig1b.png')
+        fig1b.savefig(prefix + 'fig1b.svg')
         
     return fig1a, fig1b
 
@@ -260,8 +258,8 @@ def make_figure_2(prefix=None):
     plt.ylim([-1.5, 1.5])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig2.png')
-        plt.savefig(prefix + 'fig2.svg')
+        fig2.savefig(prefix + 'fig2.png')
+        fig2.savefig(prefix + 'fig2.svg')
 
     return fig2
 
@@ -314,8 +312,8 @@ def make_figure_3(prefix=None, rng=np.random):
     plt.xlim([1, signal_len])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig3.png')
-        plt.savefig(prefix + 'fig3.svg')
+        fig3.savefig(prefix + 'fig3.png')
+        fig3.savefig(prefix + 'fig3.svg')
 
     return fig3
 
@@ -396,8 +394,8 @@ def make_figure_4(prefix=None, rng=np.random.default_rng()):
         ax.set_xticklabels([])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig4.png')
-        plt.savefig(prefix + 'fig4.svg')
+        fig4.savefig(prefix + 'fig4.png')
+        fig4.savefig(prefix + 'fig4.svg')
 
     return fig4
 
@@ -453,8 +451,8 @@ def make_figure_5(prefix=None):
 
     # Save Output
     if prefix is not None:
-        plt.savefig(prefix + "fig5.svg")
-        plt.savefig(prefix + "fig5.png")
+        fig5.savefig(prefix + "fig5.svg")
+        fig5.savefig(prefix + "fig5.png")
 
     return fig5
 
@@ -518,10 +516,6 @@ def make_figure_6(prefix=None):
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
 
-    if prefix is not None:
-        plt.savefig(prefix + 'fig6a.svg')
-        plt.savefig(prefix + 'fig6a.png')
-
     # Figure 6b, Impact of fourth sensor on CRLB
 
     # Add a sensor at the origin
@@ -553,8 +547,11 @@ def make_figure_6(prefix=None):
     plt.ylabel('Down-range [km]')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig6b.svg')
-        plt.savefig(prefix + 'fig6b.png')
+        fig6a.savefig(prefix + 'fig6a.svg')
+        fig6a.savefig(prefix + 'fig6a.png')
+
+        fig6b.savefig(prefix + 'fig6b.svg')
+        fig6b.savefig(prefix + 'fig6b.png')
 
     return fig6a, fig6b
 
@@ -576,24 +573,24 @@ def make_figure_7_8(prefix=None, rng=np.random.default_rng(), force_recalc=False
     :return: figure handle
     """
 
-    if force_recalc:
-        print('Executing Example 11.1 (figures 11.7 and 11.8)...')
-        fig7a, fig7b, fig8 = chapter11.example1(rng)
-
-        if prefix is not None:
-            fig7a.savefig(prefix + 'fig7a.svg')
-            fig7a.savefig(prefix + 'fig7a.png')
-
-            fig7b.savefig(prefix + 'fig7b.svg')
-            fig7b.savefig(prefix + 'fig7b.png')
-
-            fig8.savefig(prefix + 'fig8.svg')
-            fig8.savefig(prefix + 'fig8.png')
-
-        return fig7a, fig7b, fig8
-
-    else:
+    if not force_recalc:
+        print('Skipping Example 11.1 (figures 11.7 and 11.8)...')
         return None, None, None
+
+    print('Executing Example 11.1 (figures 11.7 and 11.8)...')
+    fig7a, fig7b, fig8 = chapter11.example1(rng)
+
+    if prefix is not None:
+        fig7a.savefig(prefix + 'fig7a.svg')
+        fig7a.savefig(prefix + 'fig7a.png')
+
+        fig7b.savefig(prefix + 'fig7b.svg')
+        fig7b.savefig(prefix + 'fig7b.png')
+
+        fig8.savefig(prefix + 'fig8.svg')
+        fig8.savefig(prefix + 'fig8.png')
+
+    return fig7a, fig7b, fig8
 
 
 def make_figure_9(prefix=None):
@@ -668,8 +665,8 @@ def make_figure_9(prefix=None):
     ax.set_yticklabels([])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig9.svg')
-        plt.savefig(prefix + 'fig9.png')
+        fig9.savefig(prefix + 'fig9.svg')
+        fig9.savefig(prefix + 'fig9.png')
 
     return fig9
 
@@ -760,7 +757,7 @@ def make_figure_10(prefix=None):
     ax.set_yticklabels([])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig10.svg')
-        plt.savefig(prefix + 'fig10.png')
+        fig10.savefig(prefix + 'fig10.svg')
+        fig10.savefig(prefix + 'fig10.png')
 
     return fig10
