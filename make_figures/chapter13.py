@@ -179,7 +179,7 @@ def make_figure_2(prefix=None):
     fdoa_ref_idx = num_sensors - 1
 
     x_source = np.array([2., 4.]) * std_baseline
-    transmit_freq = 1e9
+    transmit_freq = 10e9
 
     # Calculate the Hybrid Error using each covariance error setting
     x_max = 50e3
