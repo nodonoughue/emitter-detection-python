@@ -82,28 +82,28 @@ def calc_zenith_loss(freq_hz, alt_start_m=0, zenith_angle_deg=0):
     :return zenith_loss_w: Cumulative loss due to water vapor [dB]
     """
 
-    # Add a new first dimension to all the inputs (if they're not scalar)
+    # Add a new trailing dimension, to allow for array operations in this function; we'll sum over and remove the
+    # new dimension before returning the result
     if np.size(freq_hz) > 1:
-        freq_hz = np.expand_dims(freq_hz, axis=0)
+        freq_hz = freq_hz[:, np.newaxis]
 
     if np.size(alt_start_m) > 1:
-        alt_start_m = np.expand_dims(alt_start_m, axis=0)
+        alt_start_m = alt_start_m[:, np.newaxis]
 
     if np.size(zenith_angle_deg) > 1:
-        zenith_angle_deg = np.expand_dims(zenith_angle_deg, axis=0)
+        zenith_angle_deg = zenith_angle_deg[:, np.newaxis]
 
     # Make Altitude Layers
     # From ITU-R P.676-11(12/2017), layers should be set at exponential intervals
     num_layers = 922  # Used for ceiling of 100 km
     layer_delta = .0001*np.exp(np.arange(num_layers)/100)  # Layer thicknesses [km], eq 21
-    layer_delta = np.reshape(layer_delta, (num_layers, 1))
     layer_top = np.cumsum(layer_delta)  # [km]
     layer_bottom = layer_top - layer_delta  # [km]
     layer_mid = (layer_top+layer_bottom)/2
     
     # Drop layers below alt_start
     alt_start_km = alt_start_m / 1e3
-    layer_mask = layer_top >= min(alt_start_km)
+    layer_mask = layer_top >= np.amin(alt_start_km)
     layer_bottom = layer_bottom[layer_mask]
     layer_mid = layer_mid[layer_mask]
     layer_top = layer_top[layer_mask]
@@ -112,11 +112,11 @@ def calc_zenith_loss(freq_hz, alt_start_m=0, zenith_angle_deg=0):
     atmosphere = reference.get_standard_atmosphere(layer_mid*1e3)
     
     # Compute loss coefficient for each band
-    ao, aw = get_gas_loss_coeff(freq_hz, atmosphere.P, atmosphere.e, atmosphere.T)
+    ao, aw = get_gas_loss_coeff(freq_hz, atmosphere.press, atmosphere.water_vapor_press, atmosphere.temp)
     
     # Account for off-nadir paths and partial layers
     el_angle_deg = 90 - zenith_angle_deg
-    layer_delta_eff = geo.compute_slant_range(max(layer_bottom, alt_start_km), layer_top, el_angle_deg, True)
+    layer_delta_eff = geo.compute_slant_range(np.maximum(layer_bottom, alt_start_km), layer_top, el_angle_deg, True)
     np.place(layer_delta_eff, layer_top <= alt_start_km, 0)  # Set all layers below alt_start_km to zero
     
     # Zenith Loss by Layer (loss to pass through each layer)
@@ -125,8 +125,8 @@ def calc_zenith_loss(freq_hz, alt_start_m=0, zenith_angle_deg=0):
     
     # Cumulative Zenith Loss
     # Loss from ground to the bottom of each layer
-    zenith_loss_o = np.squeeze(np.sum(zenith_loss_by_layer_oxygen, axis=0))
-    zenith_loss_w = np.squeeze(np.sum(zenith_loss_by_layer_water, axis=0))
+    zenith_loss_o = np.sum(zenith_loss_by_layer_oxygen, axis=-1)
+    zenith_loss_w = np.sum(zenith_loss_by_layer_water, axis=-1)
     zenith_loss = zenith_loss_o + zenith_loss_w
 
     return zenith_loss, zenith_loss_o, zenith_loss_w
@@ -150,18 +150,19 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     :return: Loss coefficient [dB/km] caused by rain.
     """
 
-    # Add a new first dimension to all the inputs (if they're not scalar)
+    # TODO: This is the pythonic way to compare things with different sizes...go through code and use this approach
+    # Add a new dimension to all the inputs (if they're not scalar) for array operations
     if np.size(freq_hz) > 1:
-        freq_hz = np.expand_dims(freq_hz, axis=0)
+        freq_hz = freq_hz[..., np.newaxis]
 
     if np.size(pol_angle_rad) > 1:
-        pol_angle_rad = np.expand_dims(pol_angle_rad, axis=0)
+        pol_angle_rad = pol_angle_rad[..., np.newaxis]
 
     if np.size(el_angle_rad) > 1:
-        el_angle_rad = np.expand_dims(el_angle_rad, axis=0)
+        el_angle_rad = el_angle_rad[..., np.newaxis]
 
     if np.size(rainfall_rate) > 1:
-        rainfall_rate = np.expand_dims(rainfall_rate, axis=0)
+        rainfall_rate = rainfall_rate[..., np.newaxis]
 
     # Coeffs for kh
     a = np.array([-5.3398, -0.35351, -0.23789, -0.94158])
@@ -169,9 +170,9 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     c = np.array([1.13098, 0.454, 0.15354, 0.16817])
     m = -0.18961
     ck = 0.71147
-    
-    log_kh = np.squeeze(np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=0)
-                        + m * np.log10(freq_hz / 1e9) + ck)
+
+    log_kh = np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True) \
+                + (m * np.log10(freq_hz / 1e9) + ck)
     kh = 10**log_kh
     
     # Coeffs for kv
@@ -180,9 +181,10 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     c = np.array([0.81061, 0.51059, 0.11899, 0.27195])
     m = -0.16398
     ck = 0.63297
-    
-    log_kv = np.squeeze(np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=0)
-                        + m * np.log10(freq_hz / 1e9) + ck)
+
+    # Sum across the coefficient array and squeeze out that dimension
+    log_kv = np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True) + \
+               (m * np.log10(freq_hz / 1e9) + ck)
     kv = 10**log_kv
     
     # Coeffs for ah
@@ -191,19 +193,21 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     c = np.array([-0.55187, 0.19822, 0.13164, 1.47828, 3.43990])
     m = 0.67849
     ca = -1.95537
-    
-    ah = np.squeeze(np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=0)
-                    + m * np.log10(freq_hz / 1e9) + ca)
-    
+
+    # Sum across the coefficient array and squeeze out that dimension
+    ah = np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True) \
+         + (m * np.log10(freq_hz / 1e9) + ca)
+
     # Coeffs for av
     a = np.array([-0.07771, 0.56727, -0.20238, -48.2991, 48.5833])
     b = np.array([2.33840, 0.95545, 1.14520, 0.791669, 0.791459])
     c = np.array([-0.76284, 0.54039, 0.26809, 0.116226, 0.116479])
     m = -0.053739
     ca = 0.83433
-    
-    av = np.squeeze(np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=0)
-                    + m * np.log10(freq_hz / 1e9) + ca)
+
+    # Sum across the coefficient array and squeeze out that dimension
+    av = np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True) \
+         + (m * np.log10(freq_hz / 1e9) + ca)
     
     # Account for Polarization and Elevation Angles
     k = .5*(kh + kv + (kh-kv) * np.cos(el_angle_rad) ** 2 * np.cos(2 * pol_angle_rad))
@@ -265,18 +269,18 @@ def get_gas_loss_coeff(freq_hz, press, water_vapor_press, temp):
     :return coeff_water: Gas loss coefficient due to water vapor [dB/km]
     """
     
-    # Determine largest dimension in use
+    # Add a new dimension, so that we can do array operations on it
     if np.size(freq_hz) > 1:
-        freq_hz = np.expand_dims(freq_hz, axis=0)
+        freq_hz = freq_hz[..., np.newaxis]
 
     if np.size(press) > 1:
-        press = np.expand_dims(press, axis=0)
+        press = press[..., np.newaxis]
 
     if np.size(water_vapor_press) > 1:
-        water_vapor_press = np.expand_dims(water_vapor_press, axis=0)
+        water_vapor_press = water_vapor_press[..., np.newaxis]
 
     if np.size(temp) > 1:
-        temp = np.expand_dims(temp, axis=0)
+        temp = temp[..., np.newaxis]
     
     # Read in the spectroscopic tables (Tables 1 and 2 of Annex 1)
     # All table data will be Nx1 for the N spectroscopic lines of
@@ -292,42 +296,44 @@ def get_gas_loss_coeff(freq_hz, press, water_vapor_press, temp):
                                  + (1.4e-12 * press * th ** 1.5) / (1 + 1.9e-5 * f0 ** 1.5))
     
     # Compute the strength of the i-th water/o2 vapor line (eq 3)
-    line_strength_oxygen = np.expand_dims((ref_ox[:, 1] * 1e-7 * press * th ** 3) * np.exp(ref_ox[:, 2] * (1 - th)),
-                                          axis=1)
-    line_strength_water = np.expand_dims((ref_water[:, 1] * 1e-1 * water_vapor_press * th ** 3.5)
-                                         * np.exp(ref_water[:, 2] * (1 - th)), axis=1)
+    line_strength_oxygen = (ref_ox[:, 1] * 1e-7 * press * th ** 3) * np.exp(ref_ox[:, 2] * (1 - th))
+    line_strength_water = (ref_water[:, 1] * 1e-1 * water_vapor_press * th ** 3.5) * np.exp(ref_water[:, 2] * (1 - th))
     
     # Compute the line shape factor for each
     #  Correction factor due to interference effects in oxygen lines (eq 7)
-    dox = np.expand_dims((ref_ox[:, 5]+ref_ox[:, 6]*th) * 1e-4 * (press + water_vapor_press) * th ** .8, axis=1)
+    dox = (ref_ox[:, 5]+ref_ox[:, 6]*th) * 1e-4 * (press + water_vapor_press) * th ** .8
     dw = 0
     
     # spectroscopic line width (eq 6a)
-    dfox = np.expand_dims((ref_ox[:, 3]*1e-4)*(press * th ** (.8 - ref_ox[:, 4]) + 1.1 * water_vapor_press * th),
-                          axis=1)
-    dfw = np.expand_dims((ref_water[:, 3]*1e-4)*(press * th ** (ref_water[:, 4])
-                                                 + ref_water[:, 5] * water_vapor_press * th ** ref_water[:, 6]), axis=1)
+    dfox = (ref_ox[:, 3]*1e-4)*(press * th ** (.8 - ref_ox[:, 4]) + 1.1 * water_vapor_press * th)
+    dfw = (ref_water[:, 3]*1e-4)*(press * th ** (ref_water[:, 4])
+                                  + ref_water[:, 5] * water_vapor_press * th ** ref_water[:, 6])
     
     # modify spectroscopic line width to account for Zeeman splitting of oxygen
     # lines and Doppler broadening of water vapour lines (eq 6b)
     dfox_sq = dfox**2+2.25e-6
     dfox = np.sqrt(dfox_sq)
-    dfw = .535*dfw+np.sqrt(.217*dfw**2+(2.1316e-12*np.expand_dims(ref_water[:, 0], axis=1)**2)/th)
+    dfw = .535*dfw+np.sqrt(.217*dfw**2+(2.1316e-12*ref_water[:, 0]**2)/th)
     
     # Compute line shape factor
-    delta_fox = np.expand_dims(ref_ox[:, 0], axis=1)-f0
-    sum_fox = np.expand_dims(ref_ox[:, 0], axis=1)+f0
-    delta_fw = np.expand_dims(ref_water[:, 0], axis=1)-f0
-    sum_fw = np.expand_dims(ref_water[:, 0], axis=1)+f0
+    delta_fox = ref_ox[:, 0] - f0
+    sum_fox = ref_ox[:, 0] + f0
+    delta_fw = ref_water[:, 0] - f0
+    sum_fw = ref_water[:, 0] + f0
     line_shape_oxygen = f0*(((dfox-dox*delta_fox)/(delta_fox**2+dfox**2))
-                            + ((dfox-dox*sum_fox)/(sum_fox**2+dfox_sq))) / np.expand_dims(ref_ox[:, 0], axis=1)
+                            + ((dfox-dox*sum_fox)/(sum_fox**2+dfox_sq))) / ref_ox[:, 0]
     line_shape_water = f0*(((dfw-dw*delta_fw)/(delta_fw**2+dfw**2))
-                           + ((dfw-dw*sum_fw)/(sum_fw**2+dfw**2))) / np.expand_dims(ref_water[:, 0], axis=1)
+                           + ((dfw-dw*sum_fw)/(sum_fw**2+dfw**2))) / ref_water[:, 0]
     
     # Compute complex refractivities
-    refractivity_oxygen = np.squeeze(np.sum(line_strength_oxygen*line_shape_oxygen, axis=0)+nd)
-    refractivity_water = np.squeeze(np.sum(line_strength_water*line_shape_water, axis=0))
-    
+    # Now that we've summed over the spectral lines (or, are about to), strip the extra dimension from
+    # fo and nd. This prevents errors with array broadcasting.
+    f0 = f0[..., 0]
+    nd = nd[..., 0]
+    refractivity_oxygen = np.sum(line_strength_oxygen*line_shape_oxygen, axis=-1) + nd
+    refractivity_water = np.sum(line_strength_water*line_shape_water, axis=-1)
+
+    # Compute coefficients
     coeff_ox = .1820*f0*refractivity_oxygen
     coeff_water = .1820*f0*refractivity_water
     
