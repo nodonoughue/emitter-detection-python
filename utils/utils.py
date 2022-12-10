@@ -509,3 +509,28 @@ def is_broadcastable(a, b):
         return True
     except:
         return False
+
+
+def modulo2pi(x):
+    """
+    Perform a 2*pi modulo operation, but with the result centered on zero, spanning
+    from -pi to pi, rather than on the interval 0 to 2*pi.
+
+    8 December 2022
+    Nicholas O'Donoughue
+
+    :param x: Numpy array-like or scalar
+    :return: Modulo, centered on 0 (on the interval -pi to pi)
+    """
+
+    # Shift the input so that zero is now pi
+    x_shift = x + np.pi
+
+    # Perform a modulo operation; result is on the interval [0, 2*pi)
+    x_modulo = x_shift % (2*np.pi)
+
+    # Undo the shift, so that a zero input is now a zero output.
+    # Result is on the interval [-pi, pi)
+    result = x_modulo - np.pi
+
+    return result

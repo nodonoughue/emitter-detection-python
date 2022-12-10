@@ -51,7 +51,7 @@ def get_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, include_atm_loss=True, atm
     return loss_path + loss_atmosphere
 
 
-def get_tworay_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, include_atm_loss=True, atmosphere=None):
+def get_tworay_path_loss(range_m, freq_hz, height_tx_m, height_rx_m=None, include_atm_loss=True, atmosphere=None):
     """
     Computes the two-ray path loss according to
          L = 10*log10(R^4/(h_t^2*h_r^2))
@@ -68,19 +68,22 @@ def get_tworay_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, include_atm_loss=Tr
     
     :param range_m: Range [m]
     :param freq_hz: Carrier frequency [Hz]
-    :param tx_ht_m: Height of the transmitter [m]
-    :param rx_ht_m: Height of the receiver [m]
+    :param height_tx_m: Height of the transmitter [m]
+    :param height_rx_m: Height of the receiver [m]
     :param include_atm_loss: Boolean flag indicating whether atmospheric loss should be included (Default = True)
     :param atmosphere: Optional atmosphere, to be used for atmospheric loss.
     :return: Path Loss [dB]
     """
 
+    if height_rx_m is None:
+        height_rx_m = height_tx_m
+
     # Two-Ray Path Loss    
-    loss_tworay = 10*np.log10(range_m ** 4 / (tx_ht_m ** 2 * rx_ht_m ** 2))
+    loss_tworay = 10*np.log10(range_m ** 4 / (height_tx_m ** 2 * height_rx_m ** 2))
     
     if include_atm_loss:
         if atmosphere is None:
-            atmosphere = atm.reference.get_standard_atmosphere(np.sort(np.unique(tx_ht_m, rx_ht_m)))
+            atmosphere = atm.reference.get_standard_atmosphere(np.sort(np.unique(height_tx_m, height_rx_m)))
             
         loss_atmosphere = atm.model.calc_atm_loss(freq_hz, gas_path_len_m=range_m, atmosphere=atmosphere)
     else:

@@ -3,7 +3,8 @@ from utils import solvers
 from . import model
 
 
-def max_likelihood(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_ctr, search_size, epsilon=None, tdoa_ref_idx=None, fdoa_ref_idx=None):
+def max_likelihood(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
+                   x_ctr=0., search_size=1., epsilon=None, tdoa_ref_idx=None, fdoa_ref_idx=None, cov_is_inverted=False):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -21,6 +22,8 @@ def max_likelihood(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_ctr, search_size,
     :param epsilon: Desired resolution of search grid [m]
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions
@@ -28,7 +31,12 @@ def max_likelihood(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_ctr, search_size,
 
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x, tdoa_ref_idx, fdoa_ref_idx)
+        return model.log_likelihood(x_aoa=x_aoa, x_tdoa=x_tdoa,
+                                    x_fdoa=x_fdoa, v_fdoa=v_fdoa,
+                                    zeta=zeta, x_source=x, v_source=v_source,
+                                    cov=cov,
+                                    tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
+                                    cov_is_inverted=cov_is_inverted)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon)
@@ -36,9 +44,9 @@ def max_likelihood(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_ctr, search_size,
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_init, alpha, beta, epsilon=None,
-                     max_num_iterations=None, force_full_calc=False, plot_progress=False, tdoa_ref_idx=None,
-                     fdoa_ref_idx=None):
+def gradient_descent(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
+                     alpha=None, beta=None, epsilon=None, max_num_iterations=None, force_full_calc=False,
+                     plot_progress=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -60,7 +68,7 @@ def gradient_descent(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_init, alpha, be
     :param max_num_iterations: Maximum number of iterations to perform
     :param force_full_calc: Boolean flag to force all iterations (up to max_num_iterations) to be computed, regardless
                             of convergence (DEFAULT = False)
-    :param plot_progress: Boolean flag dictacting whether to plot intermediate solutions as they are derived
+    :param plot_progress: Boolean flag dictating whether to plot intermediate solutions as they are derived
                           (DEFAULT = False).
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings, for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings, for FDOA
@@ -70,20 +78,25 @@ def gradient_descent(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_init, alpha, be
 
     # Initialize measurement error and jacobian functions
     def y(this_x):
-        return zeta - model.measurement(x_aoa, x_tdoa, x_fdoa, v_fdoa, this_x, tdoa_ref_idx, fdoa_ref_idx)
+        return zeta - model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
+                                        x_source=this_x, v_source=v_source,
+                                        tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     def jacobian(this_x):
-        return model.jacobian(x_aoa, x_tdoa, x_fdoa, v_fdoa, this_x, tdoa_ref_idx, fdoa_ref_idx)
+        return model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
+                              x_source=this_x, v_source=v_source, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, alpha, beta, epsilon, max_num_iterations, force_full_calc,
-                                  plot_progress)
+    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, alpha=alpha, beta=beta,
+                                  epsilon=epsilon, max_num_iterations=max_num_iterations,
+                                  force_full_calc=force_full_calc, plot_progress=plot_progress)
 
     return x, x_full
 
 
-def least_square(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_init, epsilon=None, max_num_iterations=None,
-                 force_full_calc=False, plot_progress=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
+def least_square(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
+                 epsilon=None, max_num_iterations=None, force_full_calc=False, plot_progress=False,
+                 tdoa_ref_idx=None, fdoa_ref_idx=None):
     """
     Computes the least square solution for FDOA processing.
 
@@ -113,19 +126,25 @@ def least_square(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_init, epsilon=None,
 
     # Initialize measurement error and Jacobian function handles
     def y(this_x):
-        return zeta - model.measurement(x_aoa, x_tdoa, x_fdoa, v_fdoa, this_x, tdoa_ref_idx, fdoa_ref_idx)
+        return zeta - model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
+                                        x_source=this_x, v_source=v_source,
+                                        tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     def jacobian(this_x):
-        return model.jacobian(x_aoa, x_tdoa, x_fdoa, v_fdoa, this_x, tdoa_ref_idx, fdoa_ref_idx)
+        return model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
+                              x_source=this_x, v_source=v_source,
+                              tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, epsilon, max_num_iterations, force_full_calc, plot_progress)
+    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, covariance=cov, x_init=x_init, epsilon=epsilon,
+                                  max_num_iterations=max_num_iterations, force_full_calc=force_full_calc,
+                                  plot_progress=plot_progress)
 
     return x, x_full
 
 
-def bestfix(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_ctr, search_size, epsilon, tdoa_ref_idx=None, fdoa_ref_idx=None,
-            pdftype=None):
+def bestfix(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None, x_ctr=0., search_size=1.,
+            epsilon=None, tdoa_ref_idx=None, fdoa_ref_idx=None, pdftype=None):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
     a series of coordinates, and returning the index of the maximum.
@@ -164,7 +183,9 @@ def bestfix(x_aoa, x_tdoa, x_fdoa, v_fdoa, zeta, cov, x_ctr, search_size, epsilo
 
     # Generate the PDF
     def msmt(this_x):
-        return model.measurement(x_aoa, x_tdoa, x_fdoa, v_fdoa, this_x, tdoa_ref_idx, fdoa_ref_idx)
+        return model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
+                                 x_source=this_x, v_source=v_source, tdoa_ref_idx=tdoa_ref_idx,
+                                 fdoa_ref_idx=fdoa_ref_idx)
 
     pdfs = utils.make_pdfs(msmt, zeta, pdftype, cov)
 

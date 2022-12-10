@@ -76,7 +76,17 @@ def jacobian(x_sensor, x_source, ref_idx=None):
 
     # Compute the Jacobians
     j = (dx[:, test_idx_vec, :] / r[:, test_idx_vec, :]) - (dx[:, ref_idx_vec, :] / r[:, ref_idx_vec, :])
-    return np.squeeze(j)
+
+    # Reshape
+    n_msmt = test_idx_vec.size
+    if n_source > 1:
+        out_dims = (n_dim, n_msmt, n_source)
+    else:
+        out_dims = (n_dim, n_msmt)
+
+    j = np.reshape(j, newshape=out_dims)
+
+    return j
 
 
 def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False):

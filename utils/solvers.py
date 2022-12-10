@@ -284,7 +284,7 @@ def ml_solver(ell, x_ctr, search_size, epsilon):
     x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
 
     # Evaluate the likelihood function at each coordinate in the search space
-    likelihood = np.asarray([ell(this_x) for this_x in x_set])
+    likelihood = ell(x_set.T)
 
     # Find the peak
     idx_pk = likelihood.argmax()

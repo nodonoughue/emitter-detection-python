@@ -26,6 +26,10 @@ def measurement(x_sensor, x_source, do_2d_aoa=False):
     # Parse inputs
     n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
     n_dim2, n_source = utils.safe_2d_shape(x_source)
+    if n_source > 1:
+        out_dims = (n_sensor, n_source)
+    else:
+        out_dims = (n_sensor, )
 
     if n_dim1 != n_dim2:
         raise TypeError('First dimension of all inputs must match')
@@ -34,17 +38,12 @@ def measurement(x_sensor, x_source, do_2d_aoa=False):
     dx = np.reshape(x_source, (n_dim1, 1, n_source)) - np.reshape(x_sensor, (n_dim1, n_sensor, 1))
 
     # Compute angle in radians
-    az = np.arctan2(dx[1, :, :], dx[0, :, :])
-
-    if n_source > 1:
-        az = np.reshape(az, newshape=(n_sensor, n_source))
-    else:
-        az = np.squeeze(az)
+    az = np.reshape(np.arctan2(dx[1, :, :], dx[0, :, :]), newshape=out_dims)
 
     # Elevation angle, if desired
     if do_2d_aoa and n_dim1 == 3:
         ground_rng = np.expand_dims(np.sqrt(np.sum(dx[0:1, :, :]**2, axis=0)), axis=0)
-        el = np.reshape(np.arctan2(dx[2, :, :], ground_rng), newshape=(n_sensor, n_source))
+        el = np.reshape(np.arctan2(dx[2, :, :], ground_rng), newshape=out_dims)
 
         # Stack az/el along the first dimension
         psi = np.concatenate((az, el), axis=0)
@@ -83,12 +82,16 @@ def jacobian(x_sensor, x_source, do_2d_aoa=False):
         raise TypeError('Input variables must match along first dimension.')
 
     n_dim = n_dim1
+    if n_source > 1:
+        out_dims = (2, n_sensor, n_source)
+    else:
+        out_dims = (2, n_sensor)
 
     # Turn off divide by zero warning
     np.seterr(all='ignore')
 
     # Compute the Offset Vectors
-    dx = np.reshape(x_source, (n_dim, 1, n_source)) - x_sensor[:, :, np.newaxis]  # n_dim x n_sensor x n_source
+    dx = np.reshape(x_source, (n_dim, 1, n_source)) - np.reshape(x_sensor, (n_dim, n_sensor, 1))  # n_dim x n_sensor x n_source
     slant_range_sq = np.sum(dx ** 2, axis=0)  # Euclidean norm-squared for each offset vector, n_sensor x n_source
     ground_range_sq = np.sum(dx[0:2, :, :]**2, axis=0)  # Ground grange squared, n_sensor x n_source
 
@@ -96,11 +99,16 @@ def jacobian(x_sensor, x_source, do_2d_aoa=False):
     dxx = dx[0, :, :]  # 1 x n_sensor x n_source
     dxy = dx[1, :, :]  # 1 x n_sensor x n_source
 
-    # Build Jacobian for azimuth measurements ( n_dim x n_sensor x n_source)
+    # Build Jacobian for azimuth measurements ( 2 x n_sensor x n_source)
     j = np.concatenate((-dxy[np.newaxis, :], dxx[np.newaxis, :]), axis=0)/ground_range_sq[np.newaxis, :]
 
     # Repeat for elevation angle, if necessary
     if do_2d_aoa and n_dim == 3:
+        if n_source > 1:
+            out_dims = (n_dim, 2*n_sensor, n_source)
+        else:
+            out_dims = (n_dim, 2*n_sensor)
+
         # Add a z dimension to the azimuth Jacobian
         j = np.concatenate((j, np.zeros(shape=(1, n_sensor, n_source))), axis=0)
 
@@ -122,6 +130,8 @@ def jacobian(x_sensor, x_source, do_2d_aoa=False):
 
     # Reactive warning
     np.seterr(all='warn')
+
+    j = np.reshape(j, out_dims)
 
     return j
 
@@ -172,7 +182,7 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False):
         this_psi = measurement(x_aoa, x_i, do_2d_aoa)
 
         # Evaluate the measurement error
-        err = (psi - this_psi)
+        err = utils.modulo2pi(psi - this_psi)
 
         # Compute the scaled log likelihood
         a = scipy.linalg.solve_triangular(cov_lower, err)
@@ -234,7 +244,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, do_2d_aoa):
         psi_i = measurement(x_sensor, x_i, do_2d_aoa)
 
         # Compute the measurement error
-        err = psi - psi_i
+        err = utils.modulo2pi(psi - psi_i)
 
         # Evaluate the scaled log likelihood
         a = scipy.linalg.solve_triangular(cov_lower, err)

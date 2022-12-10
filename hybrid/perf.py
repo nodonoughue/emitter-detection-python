@@ -1,11 +1,11 @@
 import numpy as np
+
 import utils
 from . import model
-import scipy
 
 
-def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov_aoa, cov_tdoa, cov_fdoa, tdoa_ref_idx=None,
-                 fdoa_ref_idx=None):
+def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov, tdoa_ref_idx=None,
+                 fdoa_ref_idx=None, do_resample=True, cov_is_inverted=False):
     """
     Computes the CRLB on position accuracy for source at location xs and
     a combined set of AOA, TDOA, and FDOA measurements.  The covariance
@@ -22,33 +22,50 @@ def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov_aoa, cov_tdoa, cov
     :param x_fdoa: nDim x nFDOA array of FDOA sensor positions
     :param v_fdoa: nDim x nFDOA array of FDOA sensor velocities
     :param x_source: Candidate source positions
-    :param cov_aoa: AOA measurement error covariance matrix
-    :param cov_tdoa: TDOA measurement error covariance matrix
-    :param cov_fdoa: FDOA measurement error covariance matrix
+    :param cov: Measurement error covariance matrix
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return crlb: Lower bound on the error covariance matrix for an unbiased AOA/TDOA/FDOA estimator (Ndim x Ndim)
     """
 
-    n_dim, n_source = np.shape(x_source)
+    n_dim, n_source = utils.safe_2d_shape(x_source)
 
-    # Parse the TDOA and FDOA sensor pairs
-    _, n_tdoa = np.shape(x_tdoa)
-    _, n_fdoa = np.shape(x_fdoa)
-    tdoa_test_idx_vec, tdoa_ref_idx_vec = utils.parse_reference_sensor(tdoa_ref_idx, n_tdoa)
-    fdoa_test_idx_vec, fdoa_ref_idx_vec = utils.parse_reference_sensor(fdoa_ref_idx, n_fdoa)
-
-    # Resample the covariance matrices
-    cov_tdoa_resample = utils.resample_covariance_matrix(cov_tdoa, tdoa_test_idx_vec, tdoa_ref_idx_vec)
-    cov_fdoa_resample = utils.resample_covariance_matrix(cov_fdoa, fdoa_test_idx_vec, fdoa_ref_idx_vec)
+    if n_source == 1:
+        # Make sure it's got a second dimension, so that it doesn't fail when we iterate over source positions
+        x_source = x_source[:, np.newaxis]
 
     # Pre-compute covariance matrix inverses
-    cov_aoa_inv = np.linalg.pinv(cov_aoa)
-    cov_tdoa_inv = np.linalg.pinv(cov_tdoa_resample)
-    cov_fdoa_inv = np.linalg.pinv(cov_fdoa_resample)
+    if cov_is_inverted:
+        # You can't resample a covariance matrix after inversion, so if it's already inverted, we assume it was
+        # resampled, regardless of what the 'do_resample' flag says
+        cov_inv = cov
+    else:
+        # Resample the covariance matrix, if necessary
+        if do_resample:
+            # TODO: Test matrix resampling
+            _, num_aoa_sensors = utils.safe_2d_shape(x_aoa)
+            _, num_tdoa_sensors = utils.safe_2d_shape(x_tdoa)
+            _, num_fdoa_sensors = utils.safe_2d_shape(x_fdoa)
 
-    # Assemble into a single covariance matrix matching the measurement vector zeta
-    cov_inv = scipy.linalg.blkdiag(cov_aoa_inv, cov_tdoa_inv, cov_fdoa_inv)
+            # First, we generate the test and reference index vectors
+            test_idx_vec_aoa = np.arange(num_aoa_sensors)
+            ref_idx_vec_aoa = np.nan * np.ones((num_aoa_sensors,))
+            test_idx_vec_tdoa, ref_idx_vec_tdoa = utils.parse_reference_sensor(tdoa_ref_idx, num_tdoa_sensors)
+            test_idx_vec_fdoa, ref_idx_vec_fdoa = utils.parse_reference_sensor(fdoa_ref_idx, num_fdoa_sensors)
+
+            # Second, we assemble them into a single vector
+            test_idx_vec = np.concatenate((test_idx_vec_aoa, num_aoa_sensors + test_idx_vec_tdoa,
+                                           num_aoa_sensors + num_tdoa_sensors + test_idx_vec_fdoa), axis=0)
+            ref_idx_vec = np.concatenate((ref_idx_vec_aoa, num_aoa_sensors + ref_idx_vec_tdoa,
+                                          num_aoa_sensors + num_tdoa_sensors + ref_idx_vec_fdoa), axis=0)
+
+            # Finally, we resample the full covariance matrix using the assembled indices
+            cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+
+        # Invert the covariance matrix
+        cov_inv = np.linalg.inv(cov)
 
     # Initialize output variable
     crlb = np.zeros((n_dim, n_dim, n_source))
@@ -58,13 +75,16 @@ def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov_aoa, cov_tdoa, cov
         this_x = x_source[:, idx]
 
         # Evaluate the Jacobian
-        this_jacobian = model.jacobian(x_aoa, x_tdoa, x_fdoa, v_fdoa, this_x, tdoa_ref_idx, fdoa_ref_idx)
+        this_jacobian = model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa,
+                                       x_fdoa=x_fdoa, v_fdoa=v_fdoa,
+                                       x_source=this_x,
+                                       tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
         # Compute the Fisher Information Matrix
-        fisher_matrix = this_jacobian.dot(cov_inv.dot(this_jacobian.H))
+        fisher_matrix = this_jacobian.dot(cov_inv.dot(np.conjugate(this_jacobian.T)))
 
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
-            # Problem is ill defined, Fisher Information Matrix cannot be
+            # Problem is ill-defined, Fisher Information Matrix cannot be
             # inverted
             crlb[:, :, idx] = np.NaN
         else:
