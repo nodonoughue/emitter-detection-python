@@ -107,9 +107,9 @@ def make_figure_2(prefix=None):
     plt.ylim([1e-5, 1e2])
     plt.xlabel('Frequency [GHz]')
     plt.ylabel(r'Gas Loss Coefficient $\gamma_g$ [dB/km]')
-    plt.legend(loc='upper right')
+    plt.legend(loc='upper left')
 
-    # TODO: Check text locations
+    # Text Annotation
     plt.text(2, 1.5e-2, '0 km')
     plt.text(2, 1.5e-3, '10 km')
     plt.text(2, 8e-5, '20 km')
@@ -140,7 +140,6 @@ def make_figure_3(prefix=None, colors=None):
 
     # Initialize Parameters
     rain_rate_set = [1., 4., 16., 100.]
-    rain_rate_name = ['Light Rain', 'Moderate Rain', 'Heavy Rain', 'Very Heavy Rain']
     colors = colors[:len(rain_rate_set)]  # Keep as many colors as there are rainfall rate settings
 
     pol_ang_vec = [0, np.pi / 2]
@@ -154,23 +153,26 @@ def make_figure_3(prefix=None, colors=None):
     fig3 = plt.figure()
 
     # Iterate over rainfall rate conditions and polarity conditions
-    for rain_rate, rain_label, this_color in zip(rain_rate_set, rain_rate_name, colors):
+    for rain_rate, this_color in zip(rain_rate_set, colors):
         for pol_ang_rad, pol_label, this_linestyle in zip(pol_ang_vec, pol_set, linestyle_set):
             # Compute rain loss coefficients
             gamma = atm.model.get_rain_loss_coeff(freq_hz=freq_hz, pol_angle_rad=pol_ang_rad,
                                                   el_angle_rad=el_ang_rad, rainfall_rate=rain_rate)
 
-            plt.loglog(freq_hz/1e9, gamma, linestyle=this_linestyle, color=this_color,
-                       label=rain_label+' ('+pol_label+')')
+            plt.loglog(freq_hz/1e9, gamma, linestyle=this_linestyle, color=this_color, label=pol_label)
 
-    plt.grid()
+        # Clear the polarization labels; so we only get one set of legend entries
+        pol_set = (None, None)
+
+    plt.grid('on')
     plt.ylim([.01, 50])
+    plt.xlim([freq_hz[0]/1e9, freq_hz[-1]/1e9])
 
-    # % Add rainfall condition labels
-    # ht=text(10,6,'Very Heavy');set(ht,'rotation',25);
-    # ht=text(10,.6,'Heavy');set(ht,'rotation',40);
-    # ht=text(10,.12,'Moderate');set(ht,'rotation',40);
-    # ht=text(10,.023,'Light');set(ht,'rotation',40);
+    # Add rainfall condition labels
+    plt.text(10, 6, 'Very Heavy', rotation=25)  # set(ht,'rotation',25)
+    plt.text(10, .6, 'Heavy', rotation=40)      # set(ht,'rotation',40)
+    plt.text(10, .12, 'Moderate', rotation=40)  # set(ht,'rotation',40)
+    plt.text(10, .023, 'Light', rotation=40)    # set(ht,'rotation',40)
 
     plt.xlabel('Frequency [GHz]')
     plt.ylabel(r'Rain Loss Coefficient $\gamma_r$ [dB/km]')
@@ -211,7 +213,7 @@ def make_figure_4(prefix=None):
 
         plt.loglog(freq_hz/1e9, gamma, label=this_fog_label)
 
-    plt.grid()
+    plt.grid('on')
 
     # ht=text(10,.2,'30 m Visibility');set(ht,'rotation',30);
     # ht=text(10,.025,'120 m Visibility');set(ht,'rotation',30);
@@ -268,7 +270,7 @@ def make_figure_5(prefix=None):
     plt.ylabel('Zenith Attenuation')
     plt.legend(loc='upper left')
 
-    plt.grid()
+    plt.grid('on')
     plt.xlim([1, 350])
     plt.ylim([1e-2, 1e3])
 

@@ -81,6 +81,9 @@ def make_figure_4(prefix=None):
     freq_vec = np.array([1e9, 1e10])
     ht_vec = np.array([10., 100.])
 
+    fresnel_zone_range_vec = []
+    fresnel_zone_loss_vec = []
+
     for freq_hz, ht_m in zip(freq_vec, ht_vec):
 
         # Compute Path Loss two ways
@@ -98,7 +101,12 @@ def make_figure_4(prefix=None):
 
         y_fz = prop.model.get_free_space_path_loss(range_m=r_fz, freq_hz=freq_hz, height_tx_m=ht_m,
                                                    include_atm_loss=False)
-        plt.scatter(r_fz/1e3, y_fz, marker='^', color='k', label='Fresnel Zone, h={} m'.format(ht_m))
+
+        fresnel_zone_range_vec.append(r_fz)
+        fresnel_zone_loss_vec.append(y_fz)
+
+    plt.scatter(fresnel_zone_range_vec/1e3, fresnel_zone_loss_vec,
+                marker='^', color='k', zorder=3, label='Fresnel Zone')
 
     plt.xscale('log')
     plt.legend(loc='upper left')
