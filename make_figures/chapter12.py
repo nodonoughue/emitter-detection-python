@@ -105,10 +105,10 @@ def make_figure_1(prefix=None):
     iso_doppler_label = 'Lines of Constant FDOA'
     for idx in np.arange(num_sensors-1):
         idx2 = idx+1
-        vdiff = utils.geo.calc_doppler_diff(x_source, np.array([0, 0]), x_sensor[idx, :], v_sensor[idx, :],
-                                            x_sensor[idx2, :], v_sensor[idx2, :], utils.constants.speed_of_light)
-        x_isodop, y_isodop = fdoa.model.draw_isodop(x_sensor[idx, :], v_sensor[idx, :],
-                                                    x_sensor[idx2, :], v_sensor[idx2, :], vdiff, 1000, 5)
+        vdiff = utils.geo.calc_doppler_diff(x_source, np.array([0, 0]), x_sensor[idx], v_sensor[idx],
+                                            x_sensor[idx2], v_sensor[idx2], utils.constants.speed_of_light)
+        x_isodop, y_isodop = fdoa.model.draw_isodop(x_sensor[idx], v_sensor[idx],
+                                                    x_sensor[idx2], v_sensor[idx2], vdiff, 1000, 5)
 
         plt.plot(x_isodop, y_isodop, linestyle='-.', label=iso_doppler_label)
         iso_doppler_label = None  # Suppress all but the first label
@@ -121,7 +121,6 @@ def make_figure_1(prefix=None):
     plt.axis('off')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig1.svg')
         fig1.savefig(prefix + 'fig1.png')
         fig1.savefig(prefix + 'fig1.svg')
 
@@ -219,13 +218,11 @@ def make_figure_2(prefix=None):
     plt.axis('off')
 
     if prefix is not None:
-        plt.figure(fig2a)
-        plt.savefig(prefix + 'fig2a.png')
-        plt.savefig(prefix + 'fig2a.svg')
+        fig2a.savefig(prefix + 'fig2a.png')
+        fig2a.savefig(prefix + 'fig2a.svg')
 
-        plt.figure(fig2b)
-        plt.savefig(prefix + 'fig2b.png')
-        plt.savefig(prefix + 'fig2b.svg')
+        fig2b.savefig(prefix + 'fig2b.png')
+        fig2b.savefig(prefix + 'fig2b.svg')
 
     return fig2a, fig2b
 
@@ -244,135 +241,78 @@ def make_figure_3(prefix):
     """
 
     # Figure 3a -- FDOA Error
-    print('Generating Figure 12.3a...')
+    print('Generating Figure 12.3...')
     x_sensor = np.array([[0., 0.], [-1., 1.], [1., 0.]])
     v_sensor = np.array([[1., 0.], [0., 1.], [0., 1.]])
     num_sensors = np.shape(x_sensor)[0]
     x_source = np.array([1., 3.])
     # f0 = 1e9
 
-    eps1, x_vec,  y_vec = fdoa.model.error(x_sensor=x_sensor[[0, 1], :].T, v_sensor=v_sensor[[0, 1], :].T, cov=np.eye(2),
-                                           x_source=x_source, x_max=4., num_pts=1001, do_resample=True)
-    eps2, x_vec2, y_vec2 = fdoa.model.error(x_sensor=x_sensor[[0, 2], :].T, v_sensor=v_sensor[[0, 2], :].T, cov=np.eye(2),
-                                            x_source=x_source, x_max=4, num_pts=1001, do_resample=True)
-    eps3, x_vec3, y_vec3 = fdoa.model.error(x_sensor=x_sensor[[1, 2], :].T, v_sensor=v_sensor[[1, 2], :].T, cov=np.eye(2),
-                                            x_source=x_source, x_max=4, num_pts=1001, do_resample=True)
+    eps1, x_vec1,  y_vec1 = fdoa.model.error(x_sensor=x_sensor[[0, 1], :].T, v_sensor=v_sensor[[0, 1], :].T,
+                                             cov=np.eye(2), x_source=x_source, x_max=4., num_pts=1001, do_resample=True)
+    eps2, x_vec2, y_vec2 = fdoa.model.error(x_sensor=x_sensor[[0, 2], :].T, v_sensor=v_sensor[[0, 2], :].T,
+                                            cov=np.eye(2), x_source=x_source, x_max=4, num_pts=1001, do_resample=True)
+    eps3, x_vec3, y_vec3 = fdoa.model.error(x_sensor=x_sensor[[1, 2], :].T, v_sensor=v_sensor[[1, 2], :].T,
+                                            cov=np.eye(2), x_source=x_source, x_max=4, num_pts=1001, do_resample=True)
     eps4, x_vec4, y_vec4 = fdoa.model.error(x_sensor=x_sensor.T, v_sensor=v_sensor.T, cov=np.eye(3),
                                             x_source=x_source, x_max=4, num_pts=1001, do_resample=True)
 
-    fig3a, ax = plt.subplots()
-    ax.imshow(10*np.log10(np.flipud(eps1)), extent=[x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]], aspect='auto')
-    plt.scatter(x_source[0], x_source[1], marker='^', s=14)
-
-    for sensor_num in [0, 1]:
-        this_x = x_sensor[sensor_num]
-        this_v = v_sensor[sensor_num]
-
-        # Sensor Position
-        handle_sensor = plt.scatter(this_x[0], this_x[1], marker='o', s=14, color='k')
-        this_color = handle_sensor.get_edgecolor()
-
-        # Velocity Arrow
-        plt.arrow(x=this_x[0], y=this_x[1], dx=this_v[0] / 2, dy=this_v[1] / 2,
-                  width=.01, head_width=.05, color=this_color)
-
-        # Annotation Text
-        plt.text(this_x[0] - .5, this_x[1] + .25, '$S_{}$'.format(sensor_num), fontsize=12)
-
-    # Annotation Text
-    plt.text(x_source[0]+.25, x_source[1]-.25, 'Source', fontsize=12)
-
-    # Remove the axes for a clean image
-    plt.axis('off')
-
-    # Figure 3b
+    # Generate Plots
+    print('Generating Figures 12.3a...')
+    fig3a = _make_figure3_subfigure(eps1, x_vec1, y_vec1, x_sensor, v_sensor, x_source, [int(0), int(1)])
     print('Generating Figure 12.3b...')
-    fig3b, ax = plt.subplots()
-    ax.imshow(10*np.log10(np.flipud(eps2)), extent=[x_vec2[0], x_vec2[-1], y_vec2[0], y_vec2[-1]], aspect='auto')
-    plt.scatter(x_source[0], x_source[1], marker='^', s=14)
-    for sensor_num in [0, 2]:
-        this_x = x_sensor[sensor_num]
-        this_v = v_sensor[sensor_num]
-
-        # Sensor Position
-        handle_sensor = plt.scatter(this_x[0], this_x[1], marker='o', s=14, color='k')
-        this_color = handle_sensor.get_edgecolor()
-
-        # Velocity Arrow
-        plt.arrow(x=this_x[0], y=this_x[1], dx=this_v[0] / 2, dy=this_v[1] / 2,
-                  width=.01, head_width=.05, color=this_color)
-
-        # Annotation Text
-        plt.text(this_x[0] - .5, this_x[1] + .25, '$S_{}$'.format(sensor_num), fontsize=12)
-
-    # Annotation Text
-    plt.text(x_source[0]+.25, x_source[1]-.25, 'Source', fontsize=12)
-
-    # Remove the axes for a clean image
-    plt.axis('off')
-
-    # Figure 3c
+    fig3b = _make_figure3_subfigure(eps2, x_vec2, y_vec2, x_sensor, v_sensor, x_source, [int(0), int(2)])
     print('Generating Figure 12.3c...')
-    fig3c, ax = plt.subplots()
-    ax.imshow(10*np.log10(np.flipud(eps3)), extent=[x_vec3[0], x_vec3[-1], y_vec3[0], y_vec3[-1]], aspect='auto')
-    plt.scatter(x_source[0], x_source[1], marker='^', s=14)
-    for sensor_num in [1, 2]:
-        this_x = x_sensor[sensor_num]
-        this_v = v_sensor[sensor_num]
-
-        # Sensor Position
-        handle_sensor = plt.scatter(this_x[0], this_x[1], marker='o', s=14, color='k')
-        this_color = handle_sensor.get_edgecolor()
-
-        # Velocity Arrow
-        plt.arrow(x=this_x[0], y=this_x[1], dx=this_v[0]/2, dy=this_v[1]/2,
-                  width=.01, head_width=.05, color=this_color)
-
-        # Annotation Text
-        plt.text(this_x[0]-.5,  this_x[1]+.25, '$S_{}$'.format(sensor_num), fontsize=12)
-
-    plt.text(x_source[0]+.25, x_source[1]-.25, 'Source', fontsize=12)
-
-    # Remove the axes for a clean image
-    plt.axis('off')
-
-    # Figure 3d
+    fig3c = _make_figure3_subfigure(eps3, x_vec3, y_vec3, x_sensor, v_sensor, x_source, [int(1), int(2)])
     print('Generating Figure 12.3d...')
-    fig3d, ax = plt.subplots()
-    ax.imshow(10*np.log10(np.flipud(eps4)), extent=[x_vec4[0], x_vec4[-1], y_vec4[0], y_vec4[-1]], aspect='auto')
-    handle_sensors = plt.scatter(x_sensor[:, 0], x_sensor[:, 1], marker='o', color='k', s=14)
+    fig3d = _make_figure3_subfigure(eps4, x_vec4, y_vec4, x_sensor, v_sensor, x_source, np.arange(num_sensors))
+
+    if prefix is not None:
+        fig3a.savefig(prefix + 'fig3a.png')
+        fig3a.savefig(prefix + 'fig3a.svg')
+
+        fig3b.savefig(prefix + 'fig3b.png')
+        fig3b.savefig(prefix + 'fig3b.svg')
+
+        fig3c.savefig(prefix + 'fig3c.png')
+        fig3c.savefig(prefix + 'fig3c.svg')
+
+        fig3d.savefig(prefix + 'fig3d.png')
+        fig3d.savefig(prefix + 'fig3d.svg')
+
+    return fig3a, fig3b, fig3c, fig3d
+
+
+def _make_figure3_subfigure(eps, x_vec, y_vec, x_sensor, v_sensor, x_source, sensors_to_plot):
+
+    # Open the plot
+    fig, ax = plt.subplots()
+
+    # Make the background image using the difference between each pixel's FDOA and the true source's FDOA
+    ax.imshow(10 * np.log10(np.flipud(eps)), extent=[x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]], aspect='auto')
+
+    # Add the sensors and source markers
+    handle_sensors = plt.scatter(x_sensor[sensors_to_plot, 0], x_sensor[sensors_to_plot, 1],
+                                 marker='o', color='k', s=14)
     plt.scatter(x_source[0], x_source[1], marker='^', s=14)
     plt.text(x_source[0] + .25, x_source[1] - .25, 'Source', fontsize=12)
 
-    for sensor_num, this_x, this_v in zip(np.arange(num_sensors), x_sensor, v_sensor):
+    # Annotate the sensors
+    for sensor_num in sensors_to_plot:
+        this_x = x_sensor[sensor_num]
+        this_v = v_sensor[sensor_num]
+
         # Velocity Arrow
-        plt.arrow(x=this_x[0], y=this_x[1], dx=this_v[0]/2, dy=this_v[1]/2,
+        plt.arrow(x=this_x[0], y=this_x[1], dx=this_v[0] / 2, dy=this_v[1] / 2,
                   width=.01, head_width=.05, color=handle_sensors.get_edgecolor())
 
         # Annotation Text
-        plt.text(this_x[0]-.6, this_x[1], '$S_{}$'.format(sensor_num), fontsize=12)
+        plt.text(this_x[0] - .25, this_x[1], '$S_{}$'.format(sensor_num), fontsize=12)
 
     # Remove the axes for a clean image
     plt.axis('off')
 
-    if prefix is not None:
-        plt.figure(fig3a)
-        plt.savefig(prefix + 'fig3a.png')
-        plt.savefig(prefix + 'fig3a.svg')
-
-        plt.figure(fig3b)
-        plt.savefig(prefix + 'fig3b.png')
-        plt.savefig(prefix + 'fig3b.svg')
-
-        plt.figure(fig3c)
-        plt.savefig(prefix + 'fig3c.png')
-        plt.savefig(prefix + 'fig3c.svg')
-
-        plt.figure(fig3d)
-        plt.savefig(prefix + 'fig3d.png')
-        plt.savefig(prefix + 'fig3d.svg')
-
-    return fig3a, fig3b, fig3c, fig3d
+    return fig
 
 
 def make_figure_4(prefix):
@@ -442,8 +382,8 @@ def make_figure_4(prefix):
     plt.xlim([-5, 5])
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig4.png')
-        plt.savefig(prefix + 'fig4.svg')
+        fig4.savefig(prefix + 'fig4.png')
+        fig4.savefig(prefix + 'fig4.svg')
 
     return fig4
 
@@ -479,10 +419,6 @@ def make_figure_5(prefix):
                                         snr_db[np.newaxis, :])
 
     fig5 = plt.figure()
-    # plt.plot(snr_db,delta_f(Ts)*ones(size(snr_db)),'k-.',label=sprintf('Nyquist, T_s=# d ms',Ts*1e3))
-    # plt.plot(snr_db,sigma_f(N,snr_lin),'k--',label=sprintf('CRLB (freq), N=# d',N))
-    # plt.plot(snr_db,sigma_f(10*N,snr_lin),'k--',label='CRLB (freq), 10 \mu s pulse')
-    # TODO: Verify legend/labels and desired plots
     for idx_bt, this_bt in enumerate(time_bw_product):
         line = plt.plot(snr_db, 2*sigma_f[idx_bt, :], linestyle='-.', linewidth=2-idx_bt/2,
                         label='$\\sigma_f$, BT={}'.format(this_bt))
@@ -495,8 +431,8 @@ def make_figure_5(prefix):
     plt.ylabel('$\\sigma_f$ [Hz]')
 
     if prefix is not None:
-        plt.savefig(prefix + 'fig5.png')
-        plt.savefig(prefix + 'fig5.svg')
+        fig5.savefig(prefix + 'fig5.png')
+        fig5.savefig(prefix + 'fig5.svg')
 
     return fig5
 
@@ -636,21 +572,17 @@ def make_figure_6(prefix):
     plt.ylabel('Down-range [km]')
 
     if prefix is not None:
-        plt.figure(fig6a)
-        plt.savefig(prefix + 'fig6a.png')
-        plt.savefig(prefix + 'fig6a.svg')
+        fig6a.savefig(prefix + 'fig6a.png')
+        fig6a.savefig(prefix + 'fig6a.svg')
 
-        plt.figure(fig6b)
-        plt.savefig(prefix + 'fig6b.png')
-        plt.savefig(prefix + 'fig6b.svg')
+        fig6b.savefig(prefix + 'fig6b.png')
+        fig6b.savefig(prefix + 'fig6b.svg')
 
-        plt.figure(fig6c)
-        plt.savefig(prefix + 'fig6c.png')
-        plt.savefig(prefix + 'fig6c.svg')
+        fig6c.savefig(prefix + 'fig6c.png')
+        fig6c.savefig(prefix + 'fig6c.svg')
 
-        plt.figure(fig6d)
-        plt.savefig(prefix + 'fig6d.png')
-        plt.savefig(prefix + 'fig6d.svg')
+        fig6d.savefig(prefix + 'fig6d.png')
+        fig6d.savefig(prefix + 'fig6d.svg')
 
     return fig6a, fig6b, fig6c, fig6d
 
@@ -658,7 +590,8 @@ def make_figure_6(prefix):
 def make_figures_7_8(prefix, force_recalc=False):
 
     if not force_recalc:
-        return
+        print('Skipping Figures 12.7 and 12.8...')
+        return None, None, None
 
     # Figures 7-8, Example FDOA Calculation
     #  Figure 7 is geometry
@@ -667,16 +600,13 @@ def make_figures_7_8(prefix, force_recalc=False):
     fig7a, fig7b, fig8 = chapter12.example1()
 
     if prefix is not None:
-        plt.figure(fig7a)
-        plt.savefig(prefix + 'fig7a.png')
-        plt.savefig(prefix + 'fig7a.svg')
+        fig7a.savefig(prefix + 'fig7a.png')
+        fig7a.savefig(prefix + 'fig7a.svg')
 
-        plt.figure(fig7b)
-        plt.savefig(prefix + 'fig7b.png')
-        plt.savefig(prefix + 'fig7b.svg')
+        fig7b.savefig(prefix + 'fig7b.png')
+        fig7b.savefig(prefix + 'fig7b.svg')
 
-        plt.figure(fig8)
-        plt.savefig(prefix + 'fig8.png')
-        plt.savefig(prefix + 'fig8.svg')
+        fig8.savefig(prefix + 'fig8.png')
+        fig8.savefig(prefix + 'fig8.svg')
 
     return fig7a, fig7b, fig8

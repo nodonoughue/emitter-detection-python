@@ -43,20 +43,28 @@ def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     if not utils.is_broadcastable(x_source, v_source):
         raise TypeError('Sensor position and velocity inputs must have matching shapes.')
 
-    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor1)
+    n_sensor = np.amax((n_sensor1, n_sensor2))
+    n_source = np.amax((n_source1, n_source2))
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor2)
     
     # Compute distance from each source position to each sensor
     dx = np.reshape(x_source, (n_dim1, 1, n_source1)) - np.reshape(x_sensor, (n_dim1, n_sensor1, 1))
-    r = np.sqrt(np.sum(dx**2, axis=0))  # 1 x nSensor x n_source
+    r = np.sqrt(np.sum(dx**2, axis=0))  # 1 x nSensor1 x n_source1
     
     # Compute range rate from range and velocity
-    # TODO: Check sign on dv; is this right?
     dv = np.reshape(v_sensor, (n_dim1, n_sensor2, 1)) - np.reshape(v_source, (n_dim1, 1, n_source2))
-    rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor2, n_source2))  # nSensor x n_source
+    rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor, n_source))  # nSensor x n_source
     
     # Apply reference sensors to compute range rate difference for each sensor
     # pair
-    rrdoa = rr[test_idx_vec, :] - rr[ref_idx_vec, :]
+    if n_source1 > 1 or n_source2 > 1:
+        # There are multiple sources; they must traverse the second dimension
+        out_dims = (np.size(test_idx_vec), np.amax((n_source1, n_source2)))
+    else:
+        # Single source, make it an array
+        out_dims = (np.size(test_idx_vec), )
+
+    rrdoa = np.reshape(rr[test_idx_vec, :] - rr[ref_idx_vec, :], newshape=out_dims)
 
     return rrdoa
 
@@ -103,6 +111,8 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
         raise TypeError('Sensor position and velocity inputs must have matching shapes.')
 
     n_dim = n_dim1
+    n_source = np.amax((n_source1, n_source2))
+    n_sensor = np.amax((n_sensor1, n_sensor2))
 
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor1)
 
@@ -114,18 +124,26 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     # n_dim x n_dim x n_sensor x n_source
     
     # Compute the gradient of R_n
-    # TODO: Check dv; correct sign? correct usage in nabla_rn?
-    dv = v_sensor[:, :, np.newaxis] - np.reshape(v_source, (n_dim, 1, n_source2))  # n_dim x n_sensor x n_source
+    dv = np.reshape(v_sensor, (n_dim, n_sensor2, 1)) - np.reshape(v_source, (n_dim, 1, n_source2))  # n_dim x n_sensor x n_source
     dv_norm = dv/rn  # n_dim x n_sensor x n_source
     # Iterate the matmul over the number of sensors and sources
     nabla_rn = np.asarray([[np.dot(np.eye(n_dim) - px[:, :, idx_sen, idx_src],
                                    dv_norm[:, idx_sen, idx_src])
-                            for idx_src in np.arange(n_source2)] for idx_sen in np.arange(n_sensor2)])
+                            for idx_src in np.arange(n_source)] for idx_sen in np.arange(n_sensor)])
+
     # Rearrange the axes to match expectation (n_dim x n_sensor x n_source)
     nabla_rn = np.moveaxis(nabla_rn, source=2, destination=0)
 
-    # Take the reference of each w.r.t. to the N-th
-    return nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :]  # n_dim x nPair x n_source
+    # Compute test/reference differences and reshape output
+    n_msmt = test_idx_vec.size
+    if n_source > 1:
+        out_dims = (n_dim, n_msmt, n_source)
+    else:
+        out_dims = (n_dim, n_msmt)
+
+    result = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], newshape=out_dims)
+
+    return result  # n_dim x nPair x n_source
 
 
 def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=None, ref_idx=None, do_resample=False):
@@ -239,7 +257,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
                           v_sensor=v_sensor, v_source=v_source,
                           ref_idx=ref_idx)
 
-    err = rr - rr_list
+    err = rr[:, np.newaxis] - rr_list
 
     epsilon_list = [np.conjugate(this_err).T @  cov_inv @ this_err for this_err in err.T]
 
@@ -270,11 +288,11 @@ def draw_isodop(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
 
     # Set frequency to 3e8, so that c/f_0 is unity, and output of utils.dopDiff
     # is velocity difference [m/s]
-    f_0 = 3.0e8
+    f_0 = utils.constants.speed_of_light
 
     # Set up test points
     grid_spacing = 2 * max_ortho / (num_pts - 1)  # Compute grid density
-    x_set, x_grid, n_elements = utils.make_nd_grid(x_ctr=(0., 0.),
+    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0., 0.),
                                                    max_offset=max_ortho,
                                                    grid_spacing=grid_spacing)
 
@@ -304,7 +322,7 @@ def draw_isodop(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
 
     # Compute contour
     fig00 = plt.figure()
-    contour_set = plt.contour(x_grid[0], x_grid[1], np.reshape(df_plot, np.shape(x_grid[0])), levels=level_set)
+    contour_set = plt.contour(x_grid[0], x_grid[1], np.reshape(df_plot, grid_shape), levels=level_set)
 
     # Close the figure generated
     plt.close(fig00)
