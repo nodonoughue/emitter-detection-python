@@ -259,14 +259,14 @@ def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_
     fig, ax = plt.subplots()
 
     # Make the background image using the difference between each pixel's FDOA and the true source's FDOA
-    handle_contour = plt.contour(x_vec, x_vec, -eps, levels=np.arange(start=-100, step=20, stop=0))
+    handle_contour = plt.contour(x_vec/1e3, y_vec/1e3, -eps, levels=np.arange(start=-100, step=20, stop=0))
     ax.clabel(handle_contour, fmt='%.0f', colors='k', fontsize=14)
 
     # Add the sensors and source markers
-    handle_sensors = plt.scatter(x_sensor[:, 0], x_sensor[:, 1],
-                                 marker='o', color='k', s=14)
-    plt.scatter(x_source[0], x_source[1], marker='^', s=16)
-    plt.text(x_source[0] + 2e3, x_source[1] - 2e3, 'Source', fontsize=12)
+    handle_sensors = plt.scatter(x_sensor[:, 0]/1e3, x_sensor[:, 1]/1e3,
+                                 marker='o', color='k', s=16)
+    plt.scatter(x_source[0]/1e3, x_source[1]/1e3, marker='^', s=18)
+    plt.text(x_source[0]/1e3 + 2, x_source[1]/1e3 - 2, 'Source', fontsize=12)
 
     # Annotate the sensors
     for sensor_num in np.arange(np.size(x_sensor, axis=0)):
@@ -274,17 +274,19 @@ def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_
         this_v = v_sensor[sensor_num]
 
         # Velocity Arrow
-        plt.arrow(x=this_x[0], y=this_x[1], dx=this_v[0] * 20, dy=this_v[1] * 20,
-                  width=.1e3, head_width=.5e3, color=handle_sensors.get_edgecolor())
+        plt.arrow(x=this_x[0]/1e3, y=this_x[1]/1e3, dx=this_v[0] / 20, dy=this_v[1] / 20,
+                  width=.1, head_width=.5, color=handle_sensors.get_edgecolor())
 
         # Annotation Text
-        plt.text(this_x[0] - 2e3, this_x[1] - 2e3, '$S_{}$'.format(sensor_num), fontsize=12)
+        plt.text(this_x[0]/1e3 - 2, this_x[1]/1e3 - 2, '$S_{}$'.format(sensor_num), fontsize=12)
 
     # Adjust limits
-    plt.xlim([-10e3, 40e3])
-    plt.ylim([-10e3, 50e3])
+    plt.xlim([-10, 40])
+    plt.ylim([-10, 50])
+    plt.grid('on')
+
     # Remove the axes for a clean image
-    plt.axis('off')
+    # plt.axis('off')
 
     return fig
 

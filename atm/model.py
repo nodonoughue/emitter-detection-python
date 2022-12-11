@@ -52,11 +52,11 @@ def calc_atm_loss(freq_hz, gas_path_len_m=0, rain_path_len_m=0, cloud_path_len_m
         coeff_cloud = 0
     
     # Compute loss components
-    loss_gass_db = coeff_gas * gas_path_len_m / 1.0e3
+    loss_gas_db = coeff_gas * gas_path_len_m / 1.0e3
     loss_rain_db = coeff_rain * rain_path_len_m / 1.0e3
     loss_cloud_db = coeff_cloud * cloud_path_len_m / 1.0e3
     
-    return loss_gass_db + loss_rain_db + loss_cloud_db
+    return loss_gas_db + loss_rain_db + loss_cloud_db
 
 
 def calc_zenith_loss(freq_hz, alt_start_m=0, zenith_angle_deg=0):
@@ -124,7 +124,7 @@ def calc_zenith_loss(freq_hz, alt_start_m=0, zenith_angle_deg=0):
     zenith_loss_by_layer_water = aw*layer_delta_eff
     
     # Cumulative Zenith Loss
-    # Loss from ground to the bottom of each layer
+    # (from ground to the bottom of each layer)
     zenith_loss_o = np.sum(zenith_loss_by_layer_oxygen, axis=-1)
     zenith_loss_w = np.sum(zenith_loss_by_layer_water, axis=-1)
     zenith_loss = zenith_loss_o + zenith_loss_w
@@ -343,11 +343,13 @@ def get_gas_loss_coeff(freq_hz, press, water_vapor_press, temp):
         if np.isscalar(coeff_ox):
             coeff_ox = 0
         else:
-            np.place(coeff_ox, low_freq_mask, 0)
+            _, mask_full = np.broadcast_arrays(coeff_ox, low_freq_mask)
+            np.place(coeff_ox, mask_full, 0)
 
         if np.isscalar(coeff_water):
             coeff_water = 0
         else:
-            np.place(coeff_water, low_freq_mask, 0)
+            _, mask_full = np.broadcast_arrays(coeff_water, low_freq_mask)
+            np.place(coeff_water, mask_full, 0)
 
     return coeff_ox, coeff_water

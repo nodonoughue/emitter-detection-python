@@ -13,4 +13,4 @@ from . import chapter12
 from . import chapter13
 from . import appendixB
 from . import appendixC
-# from . import appendixD
+from . import appendixD

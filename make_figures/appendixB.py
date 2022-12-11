@@ -102,10 +102,10 @@ def make_figure_4(prefix=None):
         y_fz = prop.model.get_free_space_path_loss(range_m=r_fz, freq_hz=freq_hz, height_tx_m=ht_m,
                                                    include_atm_loss=False)
 
-        fresnel_zone_range_vec.append(r_fz)
+        fresnel_zone_range_vec.append(r_fz/1e3)
         fresnel_zone_loss_vec.append(y_fz)
 
-    plt.scatter(fresnel_zone_range_vec/1e3, fresnel_zone_loss_vec,
+    plt.scatter(fresnel_zone_range_vec, fresnel_zone_loss_vec,
                 marker='^', color='k', zorder=3, label='Fresnel Zone')
 
     plt.xscale('log')

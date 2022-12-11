@@ -27,7 +27,7 @@ def make_all_figures(close_figs=False):
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('appendixC')
+    prefix = utils.init_output_dir('appendixD')
 
     # Random Number Generator
     # rng = np.random.default_rng(0)
@@ -122,22 +122,20 @@ def make_figure_2(prefix=None):
 
     ref_temp = utils.constants.ref_temp
 
-    fig2 = plt.figure()
+    fig2, ax = plt.subplots()
     plt.loglog(freq_ghz, noise_temp, linestyle='-', linewidth=1, label='Cosmic Noise')
     plt.loglog(freq_ghz, noise_temp_sun, linewidth=1, label=None)
     plt.loglog(freq_ghz, noise_temp_moon, linewidth=1, label=None)
-    plt.loglog(freq_ghz, ref_temp*np.ones_lise(freq), linestyle=':', linewidth=1, label='Thermal Noise')
+    plt.loglog(freq_ghz, ref_temp*np.ones_like(freq), linestyle=':', linewidth=1, label='Thermal Noise')
     plt.loglog(freq_ghz, ref_temp + noise_temp, linestyle='-.', linewidth=1, label='Thermal + Cosmic Noise')
     plt.loglog(freq_ghz, ref_temp + noise_temp_sun, linestyle='-.', linewidth=1, label=None)
     plt.loglog(freq_ghz, ref_temp + noise_temp_moon, linestyle='-.', linewidth=1, label=None)
 
-    # TODO: Draw arrow
-    # annotation(fig2,'arrow',[0.582465277777775 0.582465277777775],...
-    #     [0.658489583333333 0.801302083333333])
-    plt.text(1, 200, 'Impact of cosmic noise', fontsize=9)
-    plt.text(.65, 3, 'Sidelobe Cosmic Noise', fontsize=9)
+    plt.text(.7, 200, 'Impact of cosmic noise', fontsize=9)
+    ax.annotate("", xy=(1, 1e3), xytext=(1, ref_temp), arrowprops=dict(arrowstyle="->", color="k"))
+    plt.text(.45, 3, 'Sidelobe Cosmic Noise', fontsize=9)
     plt.text(1.5, 9, 'Mainbeam pointed at Moon', fontsize=9)
-    plt.text(2.4, 75, 'Mainbeam pointed at Sun', fontsize=9)
+    plt.text(1, 75, 'Mainbeam pointed at Sun', fontsize=9)
     plt.legend(loc='upper left')
     plt.xlabel('Frequency [GHz]')
     plt.ylabel('Noise Temperature [K]')
@@ -173,7 +171,7 @@ def make_figure_3(prefix=None):
     ref_temp = utils.constants.ref_temp
 
     # Open the figure
-    fig3 = plt.figure()
+    fig3, ax = plt.subplots()
     plt.semilogx(freq_ghz, ref_temp*np.ones_like(freq_vec), linestyle=':', label='Thermal Noise')
     degree_sign = u'\N{DEGREE SIGN}'
     thermal_plus_noise_label = 'Thermal + Atmospheric Noise'
@@ -183,7 +181,7 @@ def make_figure_3(prefix=None):
         ta = noise.model.get_atmospheric_noise_temp(freq_hz=freq_vec, alt_start_m=0, el_angle_deg=90-this_zenith)
 
         handle = plt.semilogx(freq_ghz, ta, label='{}{} from Zenith'.format(this_zenith, degree_sign))
-        plt.semilogx(freq_ghz, ref_temp + ta, linestyle='-.', color=handle.get_color(),
+        plt.semilogx(freq_ghz, ref_temp + ta, linestyle='-.', color=handle[0].get_color(),
                      label=thermal_plus_noise_label)
         thermal_plus_noise_label = None  # clear the label, so we only get one entry in the legend
 
@@ -191,10 +189,8 @@ def make_figure_3(prefix=None):
     plt.ylabel('Noise Temperature[K]')
     plt.xlim([1, 350])
 
-    # TODO: Add an arrow
-    # annotation(fig3,'arrow',[0.72 0.72],...
-    #     [0.547839506172839 0.861111111111111]);
-    plt.text(60, 310, 'Impact of Atmospheric Noise', fontsize=9)
+    plt.text(60, ref_temp+10, 'Impact of Atmospheric Noise', fontsize=9)
+    ax.annotate("", xy=(60, 525), xytext=(60, ref_temp), arrowprops=dict(arrowstyle="->", color="k"))
 
     if prefix is not None:
         fig3.savefig(prefix + 'fig3.png')
@@ -221,19 +217,17 @@ def make_figure_4(prefix=None):
     ref_temp = utils.constants.ref_temp
     ground_noise_temp = noise.model.get_ground_noise_temp(ant_gain_ground_dbi=ground_ant_gain_dbi)
 
-    fig4 = plt.figure()
-    plt.plot(ground_ant_gain_dbi, ground_noise_temp, label='Ground Noise')  # TODO: semilogy??
+    fig4, ax = plt.subplots()
+    plt.plot(ground_ant_gain_dbi, ground_noise_temp, label='Ground Noise')
     plt.plot(ground_ant_gain_dbi, ref_temp * np.ones_like(ground_ant_gain_dbi), linestyle=':', label='Thermal Noise')
     plt.plot(ground_ant_gain_dbi, ground_noise_temp+ref_temp, linestyle='-.', label='Thermal + Ground Noise')
     plt.xlabel('Average Ground Antenna Gain [dBi]')
     plt.ylabel('Noise Temperature [K]')
     plt.legend(loc='upper left')
-    # % set(gca,'yscale','log');
 
-    # TODO: draw arrow
-    # annotation(fig4,'arrow',[0.91 0.91],...
-    #     [0.74437037037037 0.819444444444444]);
+    # Annotation
     plt.text(-8, 270, 'Impact of Ground Noise', fontsize=9)
+    ax.annotate("", xy=(-3, 330), xytext=(-3, ref_temp), arrowprops=dict(arrowstyle="->", color="k"))
 
     if prefix is not None:
         fig4.savefig(prefix + 'fig4.png')

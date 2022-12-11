@@ -78,9 +78,9 @@ def example1(rng=np.random.default_rng()):
                                           tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Initialize Solvers
-    num_mc_trials = int(100)  # TODO: Raise to 1,000
+    num_mc_trials = int(10)  # TODO: Raise to 1,000
     x_extent = 5 * baseline
-    num_iterations = int(1000)
+    num_iterations = int(1000)  # TODO: Raise to 1,000
     alpha = .3
     beta = .8
     epsilon = 100  # [m] desired iterative search stopping condition
@@ -146,6 +146,8 @@ def example1(rng=np.random.default_rng()):
                'grad': x_grad_full}
 
     # Call the common plot generator for both examples
+    args['x_source'] = x_source  # Add the true source position, for plotting
+    args['x_sensor'] = x_sensor  # Set the 'x_sensor' flag, to plot all three sensors as a single type
     fig_geo, fig_err = _plot_mc_iteration_result(args, results)
 
     return fig_geo, fig_err
@@ -206,7 +208,7 @@ def example2(rng=np.random.default_rng()):
                                           tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Initialize Solvers
-    num_mc_trials = int(100)  # TODO: Raise to 1,000
+    num_mc_trials = int(10)  # TODO: Raise to 1,000
     x_extent = 5 * baseline
     num_iterations = int(1000)
     alpha = .3
@@ -274,6 +276,8 @@ def example2(rng=np.random.default_rng()):
                'grad': x_grad_full}
 
     # Call the common plot generator for both examples
+    args['x_source'] = x_source  # Add the true source position, for plotting
+    args['x_sensor'] = None  # Set the 'x_sensor' flag to none, so that AOA and TDOA/FDOA sensors are plotted separately
     fig_geo, fig_err = _plot_mc_iteration_result(args, results)
 
     return fig_geo, fig_err
@@ -349,35 +353,43 @@ def _plot_mc_iteration_result(args, results):
 
     # Generate plot of geographic laydown
     fig_geo, ax = plt.subplots()
-    plt.scatter(args['x_aoa'][0] / 1e3, args['x_aoa'][1] / 1e3, marker='o', label='AOA Sensor')
-    time_freq_handle = plt.scatter(args['x_time_freq'][0] / 1e3, args['x_time_freq'][1] / 1e3,
-                                   marker='o', label='Time/Freq Sensor')
-    plt.scatter(args['x_source'][0] / 1e3, args['x_source'][1] / 1e3, marker='^', label='Transmitter')
+    if args['x_sensor'] is not None:
+        # Plot all sensors together
+        time_freq_handle = plt.scatter(args['x_sensor'][0] / 1e3, args['x_sensor'][1] / 1e3,
+                                       marker='o', label='Sensor')
+    else:
+        # Plot AOA and TDOA/FDOA separately
+        plt.scatter(args['x_aoa'][0] / 1e3, args['x_aoa'][1] / 1e3, marker='^', label='AOA Sensor')
+        time_freq_handle = plt.scatter(args['x_tdoa'][0] / 1e3, args['x_tdoa'][1] / 1e3,
+                                       marker='o', label='Time/Freq Sensor')
 
-    for this_x, this_v in zip(args['x_time_freq'].T, args['v_time_freq'].T):
+    # Add velocity arrows to FDOA sensors
+    for this_x, this_v in zip(args['x_fdoa'].T, args['v_fdoa'].T):
         plt.arrow(x=this_x[0] / 1e3, y=this_x[1] / 1e3, dx=this_v[0] / 100, dy=this_v[1] / 100,
                   width=.1, head_width=.5, color=time_freq_handle.get_edgecolor())
 
+    plt.scatter(args['x_source'][0] / 1e3, args['x_source'][1] / 1e3, marker='^', label='Transmitter')
+
     # Plot Closed-Form Solutions
-    plt.scatter(results['x_ml'][0, 0] / 1e3, results['x_ml'][1, 0] / 1e3, marker='v', label='Maximum Likelihood')
-    plt.scatter(results['x_bf'][0, 0] / 1e3, results['x_bf'][1, 0] / 1e3, marker='o', label='BestFix')
+    plt.scatter(results['ml'][0, 0] / 1e3, results['ml'][1, 0] / 1e3, marker='v', label='Maximum Likelihood')
+    plt.scatter(results['bf'][0, 0] / 1e3, results['bf'][1, 0] / 1e3, marker='o', label='BestFix')
 
     # Plot Iterative Solutions
     plt.scatter(args['x_init'][0] / 1e3, args['x_init'][1] / 1e3, marker='x', label='Initial Estimate')
-    plt.plot(results['x_ls'][0, :, 0] / 1e3, results['x_ls'][1, :, 0] / 1e3,
+    plt.plot(results['ls'][0, :, 0] / 1e3, results['ls'][1, :, 0] / 1e3,
              linestyle=':', label='Least Squares')
-    plt.plot(results['x_grad'][0, :, 0] / 1e3, results['x_grad'][1, :, 0] / 1e3,
+    plt.plot(results['grad'][0, :, 0] / 1e3, results['grad'][1, :, 0] / 1e3,
              linestyle='--', label='Grad Descent')
     plt.xlabel('[km]')
     plt.ylabel('[km]')
 
     # Compute and Plot CRLB and Error Ellipse Expectations
-    err_crlb = np.squeeze(hybrid.perf.compute_crlb(x_aoa=args['x_aoa'], x_tdoa=args['x_time_freq'],
-                                                   x_fdoa=args['x_time_freq'], v_fdoa=args['x_time_freq'],
+    err_crlb = np.squeeze(hybrid.perf.compute_crlb(x_aoa=args['x_aoa'], x_tdoa=args['x_tdoa'],
+                                                   x_fdoa=args['x_fdoa'], v_fdoa=args['v_fdoa'],
                                                    cov=args['covar_inv'], x_source=args['x_source'],
                                                    cov_is_inverted=True, tdoa_ref_idx=args['tdoa_ref_idx'],
                                                    fdoa_ref_idx=args['fdoa_ref_idx']))
-    crlb_cep50 = utils.errors.compute_cep50(err_crlb) / 1e3  # [km]
+    crlb_cep50 = utils.errors.compute_cep50(err_crlb)/1e3  # [m]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=args['x_source'], covariance=err_crlb,
                                                    num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :] / 1e3, crlb_ellipse[1, :] / 1e3, linewidth=.5, label='90% Error Ellipse')
@@ -388,10 +400,10 @@ def _plot_mc_iteration_result(args, results):
     plt.show()
 
     # Compute Error Statistics
-    err_ml = args['x_source'][:, np.newaxis] - results['x_ml']
-    err_bf = args['x_source'][:, np.newaxis] - results['x_bf']
-    err_ls = args['x_source'][:, np.newaxis, np.newaxis] - results['x_ls']
-    err_grad = args['x_source'][:, np.newaxis, np.newaxis] - results['x_grad']
+    err_ml = args['x_source'][:, np.newaxis] - results['ml']
+    err_bf = args['x_source'][:, np.newaxis] - results['bf']
+    err_ls = args['x_source'][:, np.newaxis, np.newaxis] - results['ls']
+    err_grad = args['x_source'][:, np.newaxis, np.newaxis] - results['grad']
 
     bias_ml = np.mean(err_ml, axis=1)
     bias_bf = np.mean(err_bf, axis=1)

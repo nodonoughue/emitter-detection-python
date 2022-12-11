@@ -52,13 +52,14 @@ def get_atmospheric_noise_temp(freq_hz, alt_start_m=0, el_angle_deg=90):
     alpha_a = 1
 
     # Compute zenith loss along main propagation path
-    zenith_angle_rad = (90-el_angle_deg)*np.pi/180
-    loss_db = atm.calc_zenith_loss(freq_hz,alt_start_m,zenith_angle_rad)
+    zenith_angle_deg = (90-el_angle_deg)
+    loss_db, _, _ = atm.model.calc_zenith_loss(freq_hz=freq_hz, alt_start_m=alt_start_m,
+                                               zenith_angle_deg=zenith_angle_deg)
     loss_lin = db_to_lin(loss_db)
 
     # Compute average atmospheric temp
     alt_bands = np.arange(start=alt_start_m, stop=100.0e3+100, step=100)
-    atmosphere = atm.make_standard_atmosphere(alt_bands)
+    atmosphere = atm.reference.get_standard_atmosphere(alt_bands)
     t_atmos = np.mean(atmosphere.temp)
     # t_atmos = utils.constants.T0;
 
@@ -93,7 +94,7 @@ def get_sun_noise_temp(freq_hz):
                         6.2e3, 6e3, 6e3, 6e3, 6e3, 6e3, 6e3])
 
     # Perform linear interpolation
-    return np.interp(xp=f_ghz, yp=t_ref, x=freq_hz/1e9, left=0, right=0)
+    return np.interp(xp=f_ghz, fp=t_ref, x=freq_hz/1e9, left=0, right=0)
 
 
 def get_moon_noise_temp():
@@ -154,8 +155,8 @@ def get_cosmic_noise_temp(freq_hz, rx_alt_m=0, alpha_c=0.95, gain_sun_dbi=-np.in
     init_temp = (temp_cosmic * alpha_c) + (temp_sun * 4.75e-6 * gain_sun_lin) + (temp_moon * 4.75e-6 * gain_moon_lin)
 
     # Compute Atmospheric Losses for Zenith Path at pi/4 (45 deg from zenith)
-    zenith_loss_db = np.reshape(atm.calc_zenith_loss(freq_hz, rx_alt_m, np.pi / 4), np.shape(freq_hz))
-    zenith_loss_lin = db_to_lin(zenith_loss_db)
+    zenith_loss_db, _, _ = atm.model.calc_zenith_loss(freq_hz, rx_alt_m, np.pi / 4)
+    zenith_loss_lin = db_to_lin(np.reshape(zenith_loss_db, np.shape(freq_hz)))
 
     # Apply Atmospheric Loss to combined galactic noise temp
     return init_temp / zenith_loss_lin
