@@ -1,7 +1,7 @@
 """
 Draw Figures - Chapter 3
 
-This script generates all of the figures that appear in Chapter 3 of the textbook.
+This script generates all the figures that appear in Chapter 3 of the textbook.
 
 Ported from MATLAB Code
 
@@ -32,7 +32,7 @@ def make_all_figures(close_figs=False):
     # Initializes colorSet - Mx3 RGB vector for successive plot lines
     colors = plt.get_cmap("tab10")
 
-    # Reset the random number generator, to ensure reproducability
+    # Reset the random number generator, to ensure reproducibility
     rng = np.random.default_rng(0)
 
     # Find the output directory
@@ -340,8 +340,8 @@ def make_figure_8(prefix=None):
     f0 = 100e6
 
     # Compute Losses and Fresnel Zone
-    # Lfspl = prop.model.get_free_space_path_loss(R=range_vec, f0=f0, include_atm_loss=False)
-    # Ltworay = prop.model.get_tworay_path_loss(R=range_vec, f0=f0, ht=ht, hr=hr, includeAtmLoss=False)
+    # loss_free_space = prop.model.get_free_space_path_loss(R=range_vec, f0=f0, include_atm_loss=False)
+    # loss_two_ray = prop.model.get_two_ray_path_loss(R=range_vec, f0=f0, ht=ht, hr=hr, includeAtmLoss=False)
     loss_prop = prop.model.get_path_loss(range_m=range_vec, freq_hz=f0, tx_ht_m=ht, rx_ht_m=hr, include_atm_loss=False)
 
     # Noise Power

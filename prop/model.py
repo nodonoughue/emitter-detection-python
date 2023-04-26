@@ -28,7 +28,7 @@ def get_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, include_atm_loss=True, atm
     
     # Compute free space path loss - w/out atmospherics
     loss_freespace = get_free_space_path_loss(range_m, freq_hz, False)
-    loss_tworay = get_tworay_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, False)
+    loss_tworay = get_two_ray_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, False)
     broadcast_out = np.broadcast(loss_freespace, loss_tworay)
 
     # Combine the free space and two ray path loss calculations, using binary singleton expansion to handle non-uniform
@@ -51,7 +51,7 @@ def get_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, include_atm_loss=True, atm
     return loss_path + loss_atmosphere
 
 
-def get_tworay_path_loss(range_m, freq_hz, height_tx_m, height_rx_m=None, include_atm_loss=True, atmosphere=None):
+def get_two_ray_path_loss(range_m, freq_hz, height_tx_m, height_rx_m=None, include_atm_loss=True, atmosphere=None):
     """
     Computes the two-ray path loss according to
          L = 10*log10(R^4/(h_t^2*h_r^2))

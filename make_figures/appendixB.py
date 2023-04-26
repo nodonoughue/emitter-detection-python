@@ -89,8 +89,8 @@ def make_figure_4(prefix=None):
         # Compute Path Loss two ways
         fspl = prop.model.get_free_space_path_loss(range_m=range_vec, freq_hz=freq_hz, height_tx_m=ht_m,
                                                    include_atm_loss=False)
-        tworay = prop.model.get_tworay_path_loss(range_m=range_vec, freq_hz=freq_hz, height_tx_m=ht_m,
-                                                 include_atm_loss=False)
+        tworay = prop.model.get_two_ray_path_loss(range_m=range_vec, freq_hz=freq_hz, height_tx_m=ht_m,
+                                                  include_atm_loss=False)
 
         handle = plt.plot(range_vec/1e3, fspl, label='Free-Space Path Loss, f={} GHz'.format(freq_hz/1e9))
         plt.plot(range_vec/1e3, tworay, linestyle='-.', color=handle[0].get_color(),

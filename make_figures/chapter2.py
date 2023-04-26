@@ -1,7 +1,7 @@
 """
 Draw Figures - Chapter 2
 
-This script generates all of the figures that appear in
+This script generates all the figures that appear in
 Chapter 2 of the textbook.
 
 Ported from MATLAB Code
@@ -31,7 +31,7 @@ def make_all_figures(close_figs=False):
     # Initializes colorSet - Mx3 RGB vector for successive plot lines
     colors = plt.get_cmap("tab10")
 
-    # Reset the random number generator, to ensure reproducability
+    # Reset the random number generator, to ensure reproducibility
     rng = np.random.default_rng()
 
     # Find the output directory
@@ -73,7 +73,7 @@ def make_figure_1(prefix=None):
     :return: figure handle
     """
     
-    # Number of x axis points
+    # Number of x-axis points
     num_points = 512
     
     # Centroids
@@ -112,8 +112,8 @@ def make_figure_1(prefix=None):
 
     # Output to file
     if prefix is not None:
-        fig1.savefig(fnm + 'fig1.svg')
-        fig1.savefig(fnm + 'fig1.png')
+        fig1.savefig(prefix + 'fig1.svg')
+        fig1.savefig(prefix + 'fig1.png')
 
     return fig1
 
@@ -152,7 +152,7 @@ def make_figure_2(prefix=None, cmap=None):
     eta = 4.5
     mask = ell >= eta  # Region above the threshold
     fa = f0[mask]
-    misseddet = f1[np.logical_not(mask)]
+    missed_det = f1[np.logical_not(mask)]
     
     # Plot the likelihood functions
     fig2 = plt.figure()
@@ -165,7 +165,7 @@ def make_figure_2(prefix=None, cmap=None):
     # text(eta+.1,.38,'$\eta$');
     
     # Add the PFA/PD regions
-    plt.fill_between(ell[np.logical_not(mask)], misseddet, label='Missed Detection', facecolor=cmap(2), alpha=.6)
+    plt.fill_between(ell[np.logical_not(mask)], missed_det, label='Missed Detection', facecolor=cmap(2), alpha=.6)
     plt.fill_between(ell[mask], fa, label='False Alarm', facecolor=cmap(3), alpha=.6)
     
     # Add text overlay
@@ -296,8 +296,8 @@ def make_figure_5(prefix=None, rng=None):
                              + 1j*rng.standard_normal(size=(idx_high_end-idx_high_start, 1)))
     
     # Variance Estimate
-    num_window = 64  # window size - one sided
-    num_guard = 4  # Number of guard cells - one sided
+    num_window = 64  # window size - one-sided
+    num_guard = 4  # Number of guard cells - one-sided
     mask = np.concatenate((np.ones(shape=(num_window, 1)), np.zeros(shape=(2*num_guard+1, 1)),
                            np.ones(shape=(num_window, 1))), axis=0)  # Initial CA-CFAR mask
     mask = mask/(2*num_window)

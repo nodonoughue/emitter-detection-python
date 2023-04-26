@@ -1,7 +1,7 @@
 """
 Draw Figures - Chapter 1
 
-This script generates all of the figures that appear in Chapter 1 of the textbook.
+This script generates all the figures that appear in Chapter 1 of the textbook.
 
 Ported from MATLAB Code
 
@@ -25,7 +25,7 @@ def make_all_figures(close_figs=False):
     :return: List of figure handles
     """
 
-    # Reset the random number generator, to ensure reproducability
+    # Reset the random number generator, to ensure reproducibility
     rng = np.random.default_rng()
 
     # Find the output directory
@@ -67,8 +67,8 @@ def make_figure_1(prefix=None, rng=None):
                                             + 1j*rng.standard_normal((num_samples, 1)))
 
     # Compute Threshold
-    prob_falsealarm = 1e-12
-    threshold = np.sqrt(-np.log10(prob_falsealarm))
+    prob_false_alarm = 1e-12
+    threshold = np.sqrt(-np.log10(prob_false_alarm))
 
     # Manually spike one noise sample
     index_spike = rng.integers(low=0, high=num_samples-1, size=(1, ))
@@ -80,7 +80,7 @@ def make_figure_1(prefix=None, rng=None):
     index_2 = int(np.fix(5*num_samples/8))
     amplitude_2 = threshold - 1
 
-    # Target signal - use the autocorrelation of a window of length N to generate the lobing structure
+    # Target signal - use the auto-correlation of a window of length N to generate the lobing structure
     t = 10*np.pi*np.linspace(start=-1, stop=1, num=num_samples)
     p = np.sinc(t)/np.sqrt(np.sum(np.sinc(t)**2, axis=0))
     s = np.zeros((1, num_samples))
@@ -139,21 +139,22 @@ def make_figure_2(prefix=None):
     r1 = utils.geo.calc_range(x1, xs)
 
     # Error Values
-    epsang = 5*np.pi/180
+    angle_error = 5*np.pi/180
 
     # Find AOA
     lob = xs - x1
     aoa1 = np.arctan2(lob[1], lob[0])
-    xaoa1 = x1 + np.array([[0, np.cos(aoa1)], [0, np.sin(aoa1)]])*5*r1
-    xaoap1 = x1 + np.array([[0, np.cos(aoa1+epsang)], [0, np.sin(aoa1+epsang)]])*5*r1
-    xaoam1 = x1 + np.array([[0, np.cos(aoa1-epsang)], [0, np.sin(aoa1-epsang)]])*5*r1
-    lob_fill1 = np.concatenate((xaoap1, np.fliplr(xaoam1), np.expand_dims(xaoap1[:, 0], axis=1)), axis=1)
+    x_aoa_1 = x1 + np.array([[0, np.cos(aoa1)], [0, np.sin(aoa1)]])*5*r1
+    x_aoa_1_plus = x1 + np.array([[0, np.cos(aoa1+angle_error)], [0, np.sin(aoa1+angle_error)]])*5*r1
+    x_aoa_1_minus = x1 + np.array([[0, np.cos(aoa1-angle_error)], [0, np.sin(aoa1-angle_error)]])*5*r1
+    lob_fill1 = np.concatenate((x_aoa_1_plus, np.fliplr(x_aoa_1_minus),
+                                np.expand_dims(x_aoa_1_plus[:, 0], axis=1)), axis=1)
 
     # Draw Figure
     fig2 = plt.figure()
 
     # LOBs
-    plt.plot(xaoa1[0, :], xaoa1[1, :], linestyle='-', color='k', label='AOA Solution')
+    plt.plot(x_aoa_1[0, :], x_aoa_1[1, :], linestyle='-', color='k', label='AOA Solution')
 
     # Uncertainty Intervals
     plt.fill(lob_fill1[0, :], lob_fill1[1, :], linestyle='--', alpha=.1, edgecolor='k', label='Uncertainty Interval')
@@ -188,7 +189,6 @@ def make_figure_3(prefix=None):
     22 March 2021
 
     :param prefix: output directory to place generated figure
-    :param rng: random number generator
     :return: figure handle
     """
 
@@ -202,29 +202,31 @@ def make_figure_3(prefix=None):
     r2 = utils.geo.calc_range(x2, xs)
     
     # Error Values
-    epsang = 5*np.pi/180
+    angle_error = 5*np.pi/180
     
     # Find AOA 
     lob1 = xs - x1
     aoa1 = np.arctan2(lob1[1], lob1[0])
-    xaoa1 = x1 + np.array([[0, np.cos(aoa1)], [0, np.sin(aoa1)]])*5*r1
-    xaoap1 = x1 + np.array([[0, np.cos(aoa1+epsang)], [0, np.sin(aoa1+epsang)]])*5*r1
-    xaoam1 = x1 + np.array([[0, np.cos(aoa1-epsang)], [0, np.sin(aoa1-epsang)]])*5*r1
-    lob_fill1 = np.concatenate((xaoap1, np.fliplr(xaoam1), np.expand_dims(xaoap1[:, 0], axis=1)), axis=1)
+    x_aoa_1 = x1 + np.array([[0, np.cos(aoa1)], [0, np.sin(aoa1)]])*5*r1
+    x_aoa_1_plus = x1 + np.array([[0, np.cos(aoa1+angle_error)], [0, np.sin(aoa1+angle_error)]])*5*r1
+    x_aoa_1_minus = x1 + np.array([[0, np.cos(aoa1-angle_error)], [0, np.sin(aoa1-angle_error)]])*5*r1
+    lob_fill1 = np.concatenate((x_aoa_1_plus, np.fliplr(x_aoa_1_minus),
+                                np.expand_dims(x_aoa_1_plus[:, 0], axis=1)), axis=1)
     
     lob2 = xs - x2
     aoa2 = np.arctan2(lob2[1], lob2[0])
-    xaoa2 = x2 + np.array([[0, np.cos(aoa2)], [0, np.sin(aoa2)]])*5*r2
-    xaoap2 = x2 + np.array([[0, np.cos(aoa2+epsang)], [0, np.sin(aoa2+epsang)]])*5*r2
-    xaoam2 = x2 + np.array([[0, np.cos(aoa2-epsang)], [0, np.sin(aoa2-epsang)]])*5*r2
-    lob_fill2 = np.concatenate((xaoap2, np.fliplr(xaoam2), np.expand_dims(xaoap2[:, 0], axis=1)), axis=1)
+    x_aoa_2 = x2 + np.array([[0, np.cos(aoa2)], [0, np.sin(aoa2)]])*5*r2
+    x_aoa_2_plus = x2 + np.array([[0, np.cos(aoa2+angle_error)], [0, np.sin(aoa2+angle_error)]])*5*r2
+    x_aoa_2_minus = x2 + np.array([[0, np.cos(aoa2-angle_error)], [0, np.sin(aoa2-angle_error)]])*5*r2
+    lob_fill2 = np.concatenate((x_aoa_2_plus, np.fliplr(x_aoa_2_minus),
+                                np.expand_dims(x_aoa_2_plus[:, 0], axis=1)), axis=1)
     
     # Draw Figure
     fig3 = plt.figure()
     
     # LOBs
-    plt.plot(xaoa1[0, :], xaoa1[1, :], linestyle='-', color='b', label='AOA Solution')
-    plt.plot(xaoa2[0, :], xaoa2[1, :], linestyle='-', color='b', label=None)
+    plt.plot(x_aoa_1[0, :], x_aoa_1[1, :], linestyle='-', color='b', label='AOA Solution')
+    plt.plot(x_aoa_2[0, :], x_aoa_2[1, :], linestyle='-', color='b', label=None)
 
     # Uncertainty Intervals
     plt.fill(lob_fill1[0, :], lob_fill1[1, :], facecolor='k', alpha=.1, linestyle='--',
