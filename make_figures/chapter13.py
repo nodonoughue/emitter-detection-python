@@ -99,13 +99,13 @@ def make_figure_1(prefix=None, colors=None):
 
     # Draw Geometry
     fig1 = plt.figure()
-    plt.scatter(x_source[0], x_source[1], marker='^', color=colors[0], label='Transmitter')
-    plt.scatter(x_sensor[:, 0], x_sensor[:, 1], marker='o', color=colors[1], label='Sensors')
+    plt.scatter(x_source[0], x_source[1], marker='^', color=colors(0), label='Transmitter')
+    plt.scatter(x_sensor[:, 0], x_sensor[:, 1], marker='o', color=colors(1), label='Sensors')
     for this_x, this_v in zip(x_sensor, v_sensor):
         plt.arrow(x=this_x[0], y=this_x[1],
                   dx=this_v[0]/4, dy=this_v[1]/4,
                   width=.01, head_width=.05,
-                  color=colors[1])
+                  color=colors(1))
 
     for idx, this_x in enumerate(x_sensor):
         plt.text(this_x[0]-.2, this_x[1]-.2, '$S_{}$'.format(idx+1), fontsize=10)
@@ -123,7 +123,7 @@ def make_figure_1(prefix=None, colors=None):
         # Plot the LOB
         lob_x = this_x[0] + np.array([0, np.cos(this_psi)]) * 5 * this_range
         lob_y = this_x[1] + np.array([0, np.sin(this_psi)]) * 5 * this_range
-        plt.plot(lob_x, lob_y, color=colors[2], linestyle='-', label=this_lob_label)
+        plt.plot(lob_x, lob_y, color=colors(2), linestyle='-', label=this_lob_label)
 
         # Turn off legend entry for subsequent angles
         this_lob_label = None
@@ -131,13 +131,13 @@ def make_figure_1(prefix=None, colors=None):
     # Draw isochrone
     xy_isochrone = tdoa.model.draw_isochrone(x_sensor[0, :], x_sensor[1, :], range_diff=rdiff,
                                              num_pts=1000, max_ortho=5)
-    plt.plot(xy_isochrone[0], xy_isochrone[1], color=colors[3], linestyle=':', label='Isochrone')
+    plt.plot(xy_isochrone[0], xy_isochrone[1], color=colors(3), linestyle=':', label='Isochrone')
 
     # Draw isodoppler line
     x_isodop, y_isodop = fdoa.model.draw_isodop(x1=x_sensor[0], v1=v_sensor[0], x2=x_sensor[1], v2=v_sensor[1],
                                                 vdiff=vdiff, num_pts=1000, max_ortho=5)
 
-    plt.plot(x_isodop, y_isodop, color=colors[4], linestyle='-.', label='Lines of Constant FDOA')
+    plt.plot(x_isodop, y_isodop, color=colors(4), linestyle='-.', label='Lines of Constant FDOA')
 
     # Adjust Plot Display
     plt.xlim([-2, 4])
