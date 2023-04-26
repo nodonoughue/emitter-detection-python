@@ -272,6 +272,8 @@ def get_gas_loss_coeff(freq_hz, press, water_vapor_press, temp):
     # Add a new dimension, so that we can do array operations on it
     if np.size(freq_hz) > 1:
         freq_hz = freq_hz[..., np.newaxis]
+    else:
+        freq_hz = np.array([freq_hz])  # If it's a scalar, let's make it an array
 
     if np.size(press) > 1:
         press = press[..., np.newaxis]
