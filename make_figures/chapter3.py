@@ -101,10 +101,8 @@ def make_figure_1(prefix=None):
     plt.legend(loc='upper right')
 
     # Annotate the bandwidth
-    plt.annotate(s='', xy=(-1.2, 5.1), xytext=(-0.8, 5.1), arrowprops=dict(arrowstyle='<->',
-                                                                           color='k'))
-    plt.annotate(s='', xy=(1.2, 5.1), xytext=(0.8, 5.1), arrowprops=dict(arrowstyle='<->',
-                                                                         color='k'))
+    plt.annotate(text='', xy=(-1.2, 5.1), xytext=(-0.8, 5.1), arrowprops=dict(arrowstyle='<->', color='k'))
+    plt.annotate(text='', xy=(1.2, 5.1), xytext=(0.8, 5.1), arrowprops=dict(arrowstyle='<->', color='k'))
     plt.text(-1.1, 5.2, r'$B_F$')
     plt.text(.9, 5.2, r'$B_F$')
 
@@ -168,10 +166,8 @@ def make_figure_2(prefix=None):
     plt.legend(loc='lower right')
 
     # Annotate the bandwidth
-    plt.annotate(s='', xy=(-1.2, 5.1), xytext=(-0.8, 5.1), arrowprops=dict(arrowstyle='<->',
-                                                                           color='k'))
-    plt.annotate(s='', xy=(1.2, 5.1), xytext=(0.8, 5.1), arrowprops=dict(arrowstyle='<->',
-                                                                         color='k'))
+    plt.annotate(text='', xy=(-1.2, 5.1), xytext=(-0.8, 5.1), arrowprops=dict(arrowstyle='<->', color='k'))
+    plt.annotate(text='', xy=(1.2, 5.1), xytext=(0.8, 5.1), arrowprops=dict(arrowstyle='<->', color='k'))
     plt.text(-1.1, 5.2, r'$B_F$')
     plt.text(.9, 5.2, r'$B_F$')
 
