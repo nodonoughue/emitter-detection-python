@@ -169,9 +169,8 @@ def make_figure_2(prefix=None, cmap=None):
     plt.fill_between(ell[mask], fa, label='False Alarm', facecolor=cmap(3), alpha=.6)
     
     # Add text overlay
-    plt.annotate(s='', xy=(eta-1.5, 0.325), xytext=(eta+1.5, 0.325), arrowprops=dict(arrowstyle='<->',
-                                                                                     color='k',
-                                                                                     lw=1))
+    plt.annotate(text='', xy=(eta-1.5, 0.325), xytext=(eta+1.5, 0.325), arrowprops=dict(arrowstyle='<->',
+                                                                                        color='k', lw=1))
     plt.text(eta+.5, .35, 'Reduce $P_{FA}$')
     plt.text(eta-2.1, .35, 'Reduce $P_{MD}$')
     

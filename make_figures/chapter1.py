@@ -103,9 +103,9 @@ def make_figure_1(prefix=None, rng=None):
     plt.xlim([1, num_samples])
 
     # Add overlay text
-    plt.text(index_1+(num_samples/50), amplitude_1, 'Detection', FontSize=12)
-    plt.text(index_2, amplitude_2+.5, 'Missed Detection', FontSize=12)
-    plt.text(index_spike-10, threshold+4, 'False Alarm', FontSize=12)
+    plt.text(index_1+(num_samples/50), amplitude_1, 'Detection', fontsize=12)
+    plt.text(index_2, amplitude_2+.5, 'Missed Detection', fontsize=12)
+    plt.text(index_spike-10, threshold+4, 'False Alarm', fontsize=12)
 
     # Add legend
     plt.legend(loc='upper right')
