@@ -14,9 +14,8 @@ from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import numpy as np
-import scipy as sp
+from scipy.fft import fft, fftshift
 from scipy import stats
-from scipy import fftpack
 import seaborn as sns
 import detector
 
@@ -100,7 +99,7 @@ def make_figure_1a(prefix=None):
         plt.plot(num_points*idx*np.array([1, 1]), np.array([-1, 2]), color='k', linestyle=':')
 
     # Annotation
-    plt.annotate(s='', xy=(2*num_points, 1.1), xytext=(3*num_points, 1.1), arrowprops=dict(arrowstyle='<->'))
+    plt.annotate(text='', xy=(2*num_points, 1.1), xytext=(3*num_points, 1.1), arrowprops=dict(arrowstyle='<->'))
     plt.text(2.35*num_points, 1.25, r'$T_{chip}$')
 
     # Turn off the axes
@@ -156,10 +155,10 @@ def make_figure_1b(prefix=None, rng=None):
         signal_rf = signal_if*lo
     
         # Take the fourier transform
-        spectral_average += np.absolute(sp.fft((np.real(signal_rf))))
+        spectral_average += np.absolute(fft((np.real(signal_rf))))
 
     # Normalize, and use an fftshift to put the center frequency in the middle of the vector
-    spectral_average = fftpack.fftshift(spectral_average)/np.max(np.absolute(spectral_average))
+    spectral_average = fftshift(spectral_average)/np.max(np.absolute(spectral_average))
     
     fig1b = plt.figure()
     plt.plot(np.linspace(start=-1, stop=1, num=num_code_samples),
@@ -178,11 +177,11 @@ def make_figure_1b(prefix=None, rng=None):
     # Create doublearrows
     f0 = 0.625  # (normalized freq is 1/16 (y_chip) + 4/16 (lo))
     bw = 0.125
-    plt.annotate(s='', xy=(0, 1), xytext=(0.64, 1), arrowprops=dict(arrowstyle='<->', color='k'))
-    plt.annotate(s='', xy=(-.5, 0), xytext=(-.5, -3), arrowprops=dict(arrowstyle='<->', color='k'))
-    plt.annotate(s='', xy=(f0-bw/2, -3), xytext=(f0+bw/2, -3), arrowprops=dict(arrowstyle='<->', color='k'))
-    plt.annotate(s=r'$B_s=1/T_{\mathrm{chip}}$', xy=(f0, -3), xytext=(.1, -6), arrowprops=dict(arrowstyle='-',
-                                                                                               color='k'))
+    plt.annotate(text='', xy=(0, 1), xytext=(0.64, 1), arrowprops=dict(arrowstyle='<->', color='k'))
+    plt.annotate(text='', xy=(-.5, 0), xytext=(-.5, -3), arrowprops=dict(arrowstyle='<->', color='k'))
+    plt.annotate(text='', xy=(f0-bw/2, -3), xytext=(f0+bw/2, -3), arrowprops=dict(arrowstyle='<->', color='k'))
+    plt.annotate(text=r'$B_s=1/T_{\mathrm{chip}}$', xy=(f0, -3), xytext=(.1, -6), arrowprops=dict(arrowstyle='-',
+                                                                                                  color='k'))
 
     # Turn off the axes
     ax = plt.gca()
@@ -325,12 +324,12 @@ def make_figure_2b(prefix=None, rng=None):
             signal2[np.arange(chip_len_code2)+chip_len_code2*idx] = chip2*np.exp(1j*np.pi*bit)*starting_phase2
 
         # Take the fourier transform
-        spectral_average1 += np.absolute(sp.fft(signal1))
-        spectral_average2 += np.absolute(sp.fft(signal2))
+        spectral_average1 += np.absolute(fft(signal1))
+        spectral_average2 += np.absolute(fft(signal2))
 
     # Normalize the spectra and use an fftshift to move the center frequency to the middle
-    spectral_average1 = fftpack.fftshift(spectral_average1)/np.amax(spectral_average1, axis=None)
-    spectral_average2 = fftpack.fftshift(spectral_average2)/np.amax(spectral_average2, axis=None)
+    spectral_average1 = fftshift(spectral_average1)/np.amax(spectral_average1, axis=None)
+    spectral_average2 = fftshift(spectral_average2)/np.amax(spectral_average2, axis=None)
 
     # Shift to account for central frequency of chip waveform
     spectral_average1 = np.roll(spectral_average1, -num_bits_code1)
@@ -353,9 +352,9 @@ def make_figure_2b(prefix=None, rng=None):
     plt.text(.55, -4.5, r'$B_d = 1/T_{sym}$')
 
     # Annotation
-    plt.annotate(s='', xy=(.5-.7/num_bits_code1, -2.5), xytext=(.5+.7/num_bits_code1, -2.5),
+    plt.annotate(text='', xy=(.5-.7/num_bits_code1, -2.5), xytext=(.5+.7/num_bits_code1, -2.5),
                  arrowprops=dict(arrowstyle='<->', color='k'))
-    plt.annotate(s='', xy=(.5-.7/num_bits_code2, -3.5), xytext=(.5+.7/num_bits_code2, -3.5),
+    plt.annotate(text='', xy=(.5-.7/num_bits_code2, -3.5), xytext=(.5+.7/num_bits_code2, -3.5),
                  arrowprops=dict(arrowstyle='<->', color='k'))
 
     # Save figure
@@ -546,22 +545,19 @@ def make_figure_6(prefix=None, rng=None, colors=None):
     # Create ellipses
     ax = plt.gca()
     ell = Ellipse(xy=(2, .4), width=5, height=.05)
-    ell.set_fill(False)
-    ell.set_edgecolor(colors(0))
+    ell.set(fill=False, edgecolor=colors(0))
     ax.add_artist(ell)
-    plt.annotate(s='TB=10', xy=(-.5, .4), xytext=(-16, .3), arrowprops=dict(arrowstyle='-', color=colors(0)))
+    plt.annotate(text='TB=10', xy=(-.5, .4), xytext=(-16, .3), arrowprops=dict(arrowstyle='-', color=colors(0)))
 
     ell = Ellipse(xy=(-3.5, .5), width=3, height=.05)
-    ell.set_fill(False)
-    ell.set_edgecolor(colors(1))
+    ell.set(fill=False, edgecolor=colors(1))
     ax.add_artist(ell)
-    plt.annotate(s='TB=100', xy=(-5, .5), xytext=(-16, .5), arrowprops=dict(arrowstyle='-', color=colors(1)))
+    plt.annotate(text='TB=100', xy=(-5, .5), xytext=(-16, .5), arrowprops=dict(arrowstyle='-', color=colors(1)))
 
     ell = Ellipse(xy=(-8.5, .6), width=3, height=.05)
-    ell.set_fill(False)
-    ell.set_edgecolor(colors(2))
+    ell.set(fill=False, edgecolor=colors(2))
     ax.add_artist(ell)
-    plt.annotate(s='TB=1,000', xy=(-10, .6), xytext=(-16, .7), arrowprops=dict(arrowstyle='-', color=colors(2)))
+    plt.annotate(text='TB=1,000', xy=(-10, .6), xytext=(-16, .7), arrowprops=dict(arrowstyle='-', color=colors(2)))
 
     # Save figure
     if prefix is not None:
