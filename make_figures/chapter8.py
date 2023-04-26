@@ -175,7 +175,7 @@ def make_figure_5(prefix=None):
     def el_pat(angle_rad):
         return np.cos(angle_rad) ** 1.2
 
-    fig = plt.figure()
+    fig5 = plt.figure()
 
     d_vec = [.5, 1, 2]
     for idx_d, this_d in enumerate(d_vec):
@@ -196,7 +196,7 @@ def make_figure_5(prefix=None):
         fig5.savefig(prefix + 'fig5.png')
         fig5.savefig(prefix + 'fig5.svg')
 
-    return fig
+    return fig5
 
 
 def make_figure_6(prefix=None):
@@ -237,14 +237,14 @@ def make_figure_6(prefix=None):
     array_factor1 = array_df.model.compute_array_factor(v, v1, psi_scan)
     array_factor2 = array_df.model.compute_array_factor(v, v2, psi_scan)
 
-    fig = plt.figure()
+    fig6 = plt.figure()
     plt.plot(u_scan, 2*lin_to_db(np.abs(array_factor1)/np.max(np.abs(array_factor1), axis=0)))
     plt.plot(u_scan, 2*lin_to_db(np.abs(array_factor2)/np.max(np.abs(array_factor2), axis=0)))
     plt.plot(u1*np.array([1, 1]), [-20, 0], linestyle='--', color='black')
     plt.plot(u2*np.array([1, 1]), [-20, 0], linestyle='--', color='black')
 
     # Annotate the beamwidth
-    plt.annotate(s='', xy=(u1, -16.5), xytext=(u2, -16.5), arrowprops=dict(arrowstyle='<->', color='k'))
+    plt.annotate(text='', xy=(u1, -16.5), xytext=(u2, -16.5), arrowprops=dict(arrowstyle='<->', color='k'))
     plt.text(-.02, -18, r'$\delta_u$', fontsize=11)
 
     plt.ylabel('Array Factor [linear]')
@@ -255,7 +255,7 @@ def make_figure_6(prefix=None):
         fig6.savefig(prefix + 'fig6.png')
         fig6.savefig(prefix + 'fig6.svg')
 
-    return fig
+    return fig6
 
 
 def make_figure_7a(prefix=None):
@@ -399,7 +399,7 @@ def make_figure_9(prefix=None, rng=None):
     pwr_vec = pwr_vec/np.max(pwr_vec)
     pwr_vec_mvdr = pwr_vec_mvdr/np.max(pwr_vec_mvdr)
     
-    fig = plt.figure()
+    fig9 = plt.figure()
     plt.plot(np.sin(psi_vec), lin_to_db(pwr_vec), linewidth=1.5, label='Beamscan')
     plt.plot(np.sin(psi_vec), lin_to_db(pwr_vec_mvdr), linewidth=1.25, label='MVDR')
     plt.ylim([-30, 0])
@@ -417,10 +417,10 @@ def make_figure_9(prefix=None, rng=None):
     plt.legend()
 
     if prefix is not None:
-        fig11.savefig(prefix + 'fig11.png')
-        fig11.savefig(prefix + 'fig11.svg')
+        fig9.savefig(prefix + 'fig11.png')
+        fig9.savefig(prefix + 'fig11.svg')
 
-    return fig
+    return fig9
     
 
 def make_figure_10(prefix=None):
@@ -531,7 +531,7 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
     t_elapsed = time.perf_counter() - t_start
     utils.print_elapsed(t_elapsed)
 
-    fig = plt.figure()
+    fig12 = plt.figure()
     plt.semilogy(snr_db, crlb_rmse_deg, linestyle='--', color='black', label='Det. CRLB')
     plt.plot(snr_db, crlb_rmse_deg_stoch, linestyle='-.', color='black', label='Stochastic CRLB')
     plt.legend(loc='upper right')
@@ -547,7 +547,7 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
         fig12.savefig(prefix + 'fig12.png')
         fig12.savefig(prefix + 'fig12.svg')
 
-    return fig
+    return fig12
 
 
 def make_figure_13(prefix=None, rng=None, force_recalc=True):
