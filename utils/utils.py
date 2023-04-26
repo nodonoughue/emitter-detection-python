@@ -419,7 +419,7 @@ def safe_2d_shape(x: np.array) -> np.array:
     :return dim2: length of second dimension
     """
 
-    # Wrap x in an array, in case its a scalar or list
+    # Wrap x in an array, in case it's a scalar or list
     x = np.asarray(x)
 
     # Initialize output dimensions

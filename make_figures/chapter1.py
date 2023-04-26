@@ -115,8 +115,8 @@ def make_figure_1(prefix=None, rng=None):
 
     # Output to file
     if prefix is not None:
-        fig1.savefig(fnm + 'fig1.svg')
-        fig1.savefig(fnm + 'fig1.png')
+        fig1.savefig(prefix + 'fig1.svg')
+        fig1.savefig(prefix + 'fig1.png')
 
     return fig1
 
