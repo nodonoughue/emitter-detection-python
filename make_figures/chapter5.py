@@ -1,7 +1,7 @@
 """
 Draw Figures - Chapter 5
 
-This script generates all of the figures that appear in Chapter 5 of the textbook.
+This script generates all the figures that appear in Chapter 5 of the textbook.
 
 Ported from MATLAB Code
 
@@ -11,7 +11,6 @@ Nicholas O'Donoughue
 
 import utils
 import matplotlib.pyplot as plt
-import numpy as np
 import seaborn as sns
 from examples import chapter5
 
@@ -25,12 +24,6 @@ def make_all_figures(close_figs=False):
     :return: List of figure handles
     """
 
-    # Initializes colorSet - Mx3 RGB vector for successive plot lines
-    colors = plt.get_cmap("tab10")
-
-    # Reset the random number generator, to ensure reproducability
-    rng = np.random.default_rng(0)
-
     # Find the output directory
     prefix = utils.init_output_dir('chapter5')
 
@@ -38,9 +31,9 @@ def make_all_figures(close_figs=False):
     sns.set()
 
     # Generate all figures
-    fig4 = make_figure_4(prefix, rng, colors)
-    fig6 = make_figure_6(prefix, rng, colors)
-    fig7 = make_figure_7(prefix, rng, colors)
+    fig4 = make_figure_4(prefix)
+    fig6 = make_figure_6(prefix)
+    fig7 = make_figure_7(prefix)
 
     figs = [fig4, fig6, fig7]
 
@@ -55,9 +48,9 @@ def make_all_figures(close_figs=False):
         return figs
 
 
-def make_figure_4(prefix=None, rng=None, colors=None):
+def make_figure_4(prefix=None):
     """
-    Figure 4 - Example 5.1 - Superhet Performance
+    Figure 4 - Example 5.1 - Super-heterodyne Performance
 
     Ported from MATLAB Code
 
@@ -65,16 +58,8 @@ def make_figure_4(prefix=None, rng=None, colors=None):
     25 March 2021
 
     :param prefix: output directory to place generated figure
-    :param rng: random number generator
-    :param colors: colormap for plots
     :return: figure handle
     """
-
-    if rng is None:
-        rng = np.random.default_rng(0)
-    
-    if colors is None:
-        colors = plt.get_cmap('tab10')
 
     fig4 = chapter5.example1()
 
@@ -86,7 +71,7 @@ def make_figure_4(prefix=None, rng=None, colors=None):
     return fig4
 
 
-def make_figure_6(prefix=None, rng=None, colors=None):
+def make_figure_6(prefix=None):
     """
     Figure 6 - Example 5.2 - FMCW Radar
 
@@ -96,16 +81,8 @@ def make_figure_6(prefix=None, rng=None, colors=None):
     25 March 2021
 
     :param prefix: output directory to place generated figure
-    :param rng: random number generator
-    :param colors: colormap for plots
     :return: figure handle
     """
-
-    if rng is None:
-        rng = np.random.default_rng(0)
-
-    if colors is None:
-        colors = plt.get_cmap('tab10')
 
     fig6 = chapter5.example2()
 
@@ -117,7 +94,7 @@ def make_figure_6(prefix=None, rng=None, colors=None):
     return fig6
 
 
-def make_figure_7(prefix=None, rng=None, colors=None):
+def make_figure_7(prefix=None):
     """
     Figure 7 - Example 5.3 - Pulsed Radar
 
@@ -127,16 +104,8 @@ def make_figure_7(prefix=None, rng=None, colors=None):
     25 March 2021
 
     :param prefix: output directory to place generated figure
-    :param rng: random number generator
-    :param colors: colormap for plots
     :return: figure handle
     """
-
-    if rng is None:
-        rng = np.random.default_rng(0)
-
-    if colors is None:
-        colors = plt.get_cmap('tab10')
 
     fig7 = chapter5.example3()
 

@@ -1,7 +1,7 @@
 """
 Draw Figures - Chapter 8
 
-This script generates all of the figures that appear in Chapter 8 of the textbook.
+This script generates all the figures that appear in Chapter 8 of the textbook.
 
 Ported from MATLAB Code
 
@@ -25,7 +25,7 @@ def make_all_figures(close_figs=False, force_recalc=True):
 
     :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
-    :force_recalc: If set to False, will skip any figures that are time consuming to generate.
+    :force_recalc: If set to False, will skip any figures that are time-consuming to generate.
     :return: List of figure handles
     """
 
@@ -456,7 +456,7 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 
@@ -561,7 +561,7 @@ def make_figure_13(prefix=None, rng=None, force_recalc=True):
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time consuming recalculation
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 

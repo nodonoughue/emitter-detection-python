@@ -1,7 +1,7 @@
 """
 Draw Figures - Chapter 6
 
-This script generates all of the figures that appear in Chapter 6 of the textbook.
+This script generates all the figures that appear in Chapter 6 of the textbook.
 
 Ported from MATLAB Code
 

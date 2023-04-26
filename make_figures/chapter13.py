@@ -40,11 +40,11 @@ def make_all_figures(close_figs=False, force_recalc=False):
     # Activate seaborn for prettier plots
     sns.set()
 
-    # Colormap
-    # colors = plt.get_cmap("tab10")
+    # Initializes colorSet - Mx3 RGB vector for successive plot lines
+    colors = plt.get_cmap("tab10")
 
     # Generate all figures
-    fig1 = make_figure_1(prefix)
+    fig1 = make_figure_1(prefix, colors)
     plt.show()
     fig2a, fig2b, fig2c, fig2d = make_figure_2(prefix)
     plt.show()
@@ -81,11 +81,12 @@ def make_figure_1(prefix=None, colors=None):
     28 October 2022
 
     :param prefix: output directory to place generated figure
+    :param colors: set of colors for plotting
     :return: figure handle
     """
 
     if colors is None:
-        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        colors = plt.get_cmap("tab10")
 
     # Figure 1, System Drawing
     print('Generating Figure 13.1...')
@@ -301,6 +302,8 @@ def make_figures_3_4(prefix=None, rng=np.random.default_rng(0), force_recalc=Fal
     4 December 2022
 
     :param prefix: output directory to place generated figure
+    :param rng: random number generator
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 
@@ -331,6 +334,8 @@ def make_figures_5_6(prefix=None, rng=np.random.default_rng(0), force_recalc=Fal
     4 December 2022
 
     :param prefix: output directory to place generated figure
+    :param rng: random number generator
+    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
 
@@ -649,7 +654,7 @@ def make_figure_9(prefix):
     # Draw Figure
     fig9, ax = plt.subplots()
 
-    handle_sensors = plt.scatter(x_sensor[:, 0] / 1e3, x_sensor[:, 1] / 1e3, marker='o', label='Sensors')
+    plt.scatter(x_sensor[:, 0] / 1e3, x_sensor[:, 1] / 1e3, marker='o', label='Sensors')
     contour_set = ax.contour(x_grid[0] / 1e3, x_grid[1] / 1e3, cep50 / 1e3, contour_levels)
     ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
 

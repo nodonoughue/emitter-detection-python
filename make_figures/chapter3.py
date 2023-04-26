@@ -386,7 +386,7 @@ def make_figure_9(prefix=None, rng=None, colors=None):
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
-    :param colors: colormap for plotting
+    :param colors: set of colors for plotting
     :return: figure handle
     """
 

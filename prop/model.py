@@ -27,18 +27,18 @@ def get_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, include_atm_loss=True, atm
     fz = get_fresnel_zone(freq_hz, tx_ht_m, rx_ht_m)
     
     # Compute free space path loss - w/out atmospherics
-    loss_freespace = get_free_space_path_loss(range_m, freq_hz, False)
-    loss_tworay = get_two_ray_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, False)
-    broadcast_out = np.broadcast(loss_freespace, loss_tworay)
+    loss_free_space = get_free_space_path_loss(range_m, freq_hz, False)
+    loss_two_ray = get_two_ray_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, False)
+    broadcast_out = np.broadcast(loss_free_space, loss_two_ray)
 
     # Combine the free space and two ray path loss calculations, using binary singleton expansion to handle non-uniform
     # parameter sizes, so long as all non-singleton dimension match, this will succeed.
-    fspl_mask = range_m < fz
-    tworay_mask = np.logical_not(fspl_mask)
+    free_space_mask = range_m < fz
+    two_ray_mask = np.logical_not(free_space_mask)
 
     loss_path = np.zeros(shape=broadcast_out.shape)
-    loss_path[fspl_mask] = loss_freespace[fspl_mask]
-    loss_path[tworay_mask] = loss_tworay[tworay_mask]
+    loss_path[free_space_mask] = loss_free_space[free_space_mask]
+    loss_path[two_ray_mask] = loss_two_ray[two_ray_mask]
 
     if include_atm_loss:
         if atmosphere is None:
@@ -79,7 +79,7 @@ def get_two_ray_path_loss(range_m, freq_hz, height_tx_m, height_rx_m=None, inclu
         height_rx_m = height_tx_m
 
     # Two-Ray Path Loss    
-    loss_tworay = 10*np.log10(range_m ** 4 / (height_tx_m ** 2 * height_rx_m ** 2))
+    loss_two_ray = 10*np.log10(range_m ** 4 / (height_tx_m ** 2 * height_rx_m ** 2))
     
     if include_atm_loss:
         if atmosphere is None:
@@ -89,7 +89,7 @@ def get_two_ray_path_loss(range_m, freq_hz, height_tx_m, height_rx_m=None, inclu
     else:
         loss_atmosphere = 0
     
-    return loss_tworay + loss_atmosphere
+    return loss_two_ray + loss_atmosphere
 
 
 def get_knife_edge_path_loss(dist_tx_m, dist_rx_m, ht_above_los):

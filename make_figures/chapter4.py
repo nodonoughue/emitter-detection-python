@@ -1,7 +1,7 @@
 """
 Draw Figures - Chapter 4
 
-This script generates all of the figures that appear in Chapter 4 of the textbook.
+This script generates all the figures that appear in Chapter 4 of the textbook.
 
 Ported from MATLAB Code
 
@@ -32,7 +32,7 @@ def make_all_figures(close_figs=False):
     # Initializes colorSet - Mx3 RGB vector for successive plot lines
     colors = plt.get_cmap("tab10")
 
-    # Reset the random number generator, to ensure reproducability
+    # Reset the random number generator, to ensure reproducibility
     rng = np.random.default_rng(0)
 
     # Find the output directory
@@ -174,7 +174,7 @@ def make_figure_1b(prefix=None, rng=None):
     plt.text(-.4, -1.5, '3 dB')
     plt.text(.3, 2, r'$f_0$')
     
-    # Create doublearrows
+    # Create double arrows
     f0 = 0.625  # (normalized freq is 1/16 (y_chip) + 4/16 (lo))
     bw = 0.125
     plt.annotate(text='', xy=(0, 1), xytext=(0.64, 1), arrowprops=dict(arrowstyle='<->', color='k'))

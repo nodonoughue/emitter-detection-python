@@ -74,7 +74,7 @@ def make_figure_1(prefix=None):
     sxy = rho*np.sqrt(sx2*sy2)  # cross-covariance
     cov_mtx = np.array([[sx2, sxy], [sxy, sy2]])
     
-    # Compute Elippses
+    # Compute Ellipses
     x_ell1, y_ell1 = utils.errors.draw_error_ellipse(x2, cov_mtx, num_pts=361, conf_interval=1)    # 1 sigma
     x_ell2, y_ell2 = utils.errors.draw_error_ellipse(x2, cov_mtx, num_pts=361, conf_interval=95)   # 95% conf interval
     
@@ -90,7 +90,6 @@ def make_figure_1(prefix=None):
     plt.plot(x_ell2, y_ell2, linestyle='--', label='95% Ellipse')
     
     # Adjust Figure Display
-    # plt.xlim([-1, 1])
     plt.legend(loc='upper left')
 
     if prefix is not None:
