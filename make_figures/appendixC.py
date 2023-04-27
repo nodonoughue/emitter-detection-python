@@ -76,7 +76,7 @@ def make_figure_2(prefix=None):
     fig2 = plt.figure()
     ao_label = 'Dry Air Only'
     aw_label = 'Water Vapor'
-    atot_label = 'Total'
+    a_tot_label = 'Total'
 
     # Set up frequencies
     fo, fw = atm.reference.get_spectral_lines()
@@ -88,19 +88,19 @@ def make_figure_2(prefix=None):
     for alt_m in np.array([0, 10, 20])*1e3:
         atmosphere = atm.reference.get_standard_atmosphere(alt_m)
 
-        # Compute Loss Coeffs
+        # Compute Loss Coefficients
         ao, aw = atm.model.get_gas_loss_coeff(freq_hz=freq_vec, press=atmosphere.press,
                                               water_vapor_press=atmosphere.water_vapor_press, temp=atmosphere.temp)
 
         # Plot
         handle = plt.loglog(freq_vec/1e9, np.squeeze(ao), linestyle=':', label=ao_label)
         plt.loglog(freq_vec/1e9, np.squeeze(aw), linestyle='--', color=handle[0].get_color(), label=aw_label)
-        plt.loglog(freq_vec/1e9, np.squeeze(ao + aw), linestyle='-', color=handle[0].get_color(), label=atot_label)
+        plt.loglog(freq_vec/1e9, np.squeeze(ao + aw), linestyle='-', color=handle[0].get_color(), label=a_tot_label)
 
         # Clear the labels -- keeps the legend clean (don't print labels for subsequent altitude bands)
         ao_label = None
         aw_label = None
-        atot_label = None
+        a_tot_label = None
 
     # Adjust Plot Display
     plt.xlim([1, 350])
@@ -144,7 +144,7 @@ def make_figure_3(prefix=None, colors=None):
 
     pol_ang_vec = [0, np.pi / 2]
     pol_set = ('Horizontal', 'Vertical')
-    linestyle_set = ('-', '-.')
+    line_style_set = ('-', '-.')
 
     freq_hz = np.arange(start=1, stop=100, step=.5) * 1e9
     el_ang_rad = 0*np.pi/180
@@ -154,12 +154,12 @@ def make_figure_3(prefix=None, colors=None):
 
     # Iterate over rainfall rate conditions and polarity conditions
     for rain_rate, this_color in zip(rain_rate_set, colors):
-        for pol_ang_rad, pol_label, this_linestyle in zip(pol_ang_vec, pol_set, linestyle_set):
+        for pol_ang_rad, pol_label, this_line_style in zip(pol_ang_vec, pol_set, line_style_set):
             # Compute rain loss coefficients
             gamma = atm.model.get_rain_loss_coeff(freq_hz=freq_hz, pol_angle_rad=pol_ang_rad,
                                                   el_angle_rad=el_ang_rad, rainfall_rate=rain_rate)
 
-            plt.loglog(freq_hz/1e9, gamma, linestyle=this_linestyle, color=this_color, label=pol_label)
+            plt.loglog(freq_hz/1e9, gamma, linestyle=this_line_style, color=this_color, label=pol_label)
 
         # Clear the polarization labels; so we only get one set of legend entries
         pol_set = (None, None)

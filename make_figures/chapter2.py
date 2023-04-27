@@ -153,7 +153,7 @@ def make_figure_2(prefix=None, cmap=None):
     mask = ell >= eta  # Region above the threshold
     fa = f0[mask]
     missed_det = f1[np.logical_not(mask)]
-    
+
     # Plot the likelihood functions
     fig2 = plt.figure()
     
@@ -237,7 +237,7 @@ def make_figure_4(prefix=None):
     xi = np.expand_dims(np.arange(start=0, step=0.1, stop=10.1), axis=1)  # dB Scale
     xi_lin = db_to_lin(xi)  # Convert SNR to linear
 
-    # Compute the PD according to the simplified erf/erfinv equation
+    # Compute the PD according to the simplified erf equation and its inverse
     prob_det = .5*(1-erf(erfinv(1-2*prob_fa)-xi_lin/np.sqrt(2)))
     
     # Plot the ROC curve
@@ -303,7 +303,6 @@ def make_figure_5(prefix=None, rng=None):
     s2est = np.convolve(np.squeeze(np.absolute(noise_vec)**2), np.squeeze(mask), 'same')
     
     # Threshold Equation --- need to replace
-    # eta = s2est*10;
     eta = np.sum(sp.linalg.toeplitz(s2est[0:100], s2est), axis=0)/10
 
     # Plot

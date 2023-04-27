@@ -113,9 +113,9 @@ def make_figure_1(prefix=None, colors=None):
     # True Measurements
     range_act = utils.geo.calc_range(x1=x_sensor.T, x2=x_source)
     psi_act = triang.model.measurement(x_sensor=x_sensor.T, x_source=x_source)
-    rdiff = tdoa.model.measurement(x_sensor=x_sensor.T, x_source=x_source, ref_idx=tdoa_ref_idx)
-    vdiff = fdoa.model.measurement(x_sensor=x_sensor.T, v_sensor=v_sensor.T, x_source=x_source, v_source=None,
-                                   ref_idx=fdoa_ref_idx)
+    range_diff = tdoa.model.measurement(x_sensor=x_sensor.T, x_source=x_source, ref_idx=tdoa_ref_idx)
+    velocity_diff = fdoa.model.measurement(x_sensor=x_sensor.T, v_sensor=v_sensor.T, x_source=x_source, v_source=None,
+                                           ref_idx=fdoa_ref_idx)
 
     # Draw DF lines
     this_lob_label = 'AOA Solution'
@@ -129,15 +129,15 @@ def make_figure_1(prefix=None, colors=None):
         this_lob_label = None
 
     # Draw isochrone
-    xy_isochrone = tdoa.model.draw_isochrone(x_sensor[0, :], x_sensor[1, :], range_diff=rdiff,
+    xy_isochrone = tdoa.model.draw_isochrone(x_sensor[0, :], x_sensor[1, :], range_diff=range_diff,
                                              num_pts=1000, max_ortho=5)
     plt.plot(xy_isochrone[0], xy_isochrone[1], color=colors(3), linestyle=':', label='Isochrone')
 
     # Draw isodoppler line
-    x_isodop, y_isodop = fdoa.model.draw_isodop(x1=x_sensor[0], v1=v_sensor[0], x2=x_sensor[1], v2=v_sensor[1],
-                                                vdiff=vdiff, num_pts=1000, max_ortho=5)
+    x_isodoppler, y_isodoppler = fdoa.model.draw_isodop(x1=x_sensor[0], v1=v_sensor[0], x2=x_sensor[1], v2=v_sensor[1],
+                                                        vdiff=velocity_diff, num_pts=1000, max_ortho=5)
 
-    plt.plot(x_isodop, y_isodop, color=colors(4), linestyle='-.', label='Lines of Constant FDOA')
+    plt.plot(x_isodoppler, y_isodoppler, color=colors(4), linestyle='-.', label='Lines of Constant FDOA')
 
     # Adjust Plot Display
     plt.xlim([-2, 4])
@@ -302,9 +302,11 @@ def make_figures_3_4(prefix=None, rng=np.random.default_rng(0), force_recalc=Fal
     4 December 2022
 
     :param prefix: output directory to place generated figure
-    :param rng: random number generator
+    :param rng: (Optional) random number generator
     :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
-    :return: figure handle
+    :return fig3: figure handle for figure 13.3
+    :return fig4: figure handle for figure 13.4
+
     """
 
     if not force_recalc:
@@ -334,7 +336,7 @@ def make_figures_5_6(prefix=None, rng=np.random.default_rng(0), force_recalc=Fal
     4 December 2022
 
     :param prefix: output directory to place generated figure
-    :param rng: random number generator
+    :param rng: (Optional) random number generator
     :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """

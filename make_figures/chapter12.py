@@ -107,10 +107,10 @@ def make_figure_1(prefix=None):
         idx2 = idx+1
         vdiff = utils.geo.calc_doppler_diff(x_source, np.array([0, 0]), x_sensor[idx], v_sensor[idx],
                                             x_sensor[idx2], v_sensor[idx2], utils.constants.speed_of_light)
-        x_isodop, y_isodop = fdoa.model.draw_isodop(x_sensor[idx], v_sensor[idx],
-                                                    x_sensor[idx2], v_sensor[idx2], vdiff, 1000, 5)
+        x_isodoppler, y_isodoppler = fdoa.model.draw_isodop(x_sensor[idx], v_sensor[idx],
+                                                            x_sensor[idx2], v_sensor[idx2], vdiff, 1000, 5)
 
-        plt.plot(x_isodop, y_isodop, linestyle='-.', label=iso_doppler_label)
+        plt.plot(x_isodoppler, y_isodoppler, linestyle='-.', label=iso_doppler_label)
         iso_doppler_label = None  # Suppress all but the first label
 
     plt.xlim([-2, 3])
@@ -366,10 +366,10 @@ def make_figure_4(prefix):
                                             x1=x_now[0], v1=v_sensor[0],
                                             x2=x_now[1], v2=v_sensor[1],
                                             f=utils.constants.speed_of_light)
-        x_isodop, y_isodop = fdoa.model.draw_isodop(x1=x_now[0], v1=v_sensor[0],
-                                                    x2=x_now[1], v2=v_sensor[1],
-                                                    vdiff=vdiff, num_pts=1000, max_ortho=20)
-        plt.plot(x_isodop, y_isodop, linestyle='-.', label=None, color=this_color)
+        x_isodoppler, y_isodoppler = fdoa.model.draw_isodop(x1=x_now[0], v1=v_sensor[0],
+                                                            x2=x_now[1], v2=v_sensor[1],
+                                                            vdiff=vdiff, num_pts=1000, max_ortho=20)
+        plt.plot(x_isodoppler, y_isodoppler, linestyle='-.', label=None, color=this_color)
 
     # Add Transmitter to plot -- use zorder=3 to ensure the marker is above the lines
     handle_transmitter = plt.scatter(x_source[0], x_source[1], marker='^', s=20, color='k', zorder=3)

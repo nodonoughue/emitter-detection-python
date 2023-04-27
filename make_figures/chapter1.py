@@ -220,7 +220,7 @@ def make_figure_3(prefix=None):
     x_aoa_2_minus = x2 + np.array([[0, np.cos(aoa2-angle_error)], [0, np.sin(aoa2-angle_error)]])*5*r2
     lob_fill2 = np.concatenate((x_aoa_2_plus, np.fliplr(x_aoa_2_minus),
                                 np.expand_dims(x_aoa_2_plus[:, 0], axis=1)), axis=1)
-    
+
     # Draw Figure
     fig3 = plt.figure()
     

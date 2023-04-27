@@ -21,7 +21,7 @@ import time
 
 def make_all_figures(close_figs=False, force_recalc=True):
     """
-    Call all the figure generators for this chapter
+    Call all the figure generators for this chapter.
 
     :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
