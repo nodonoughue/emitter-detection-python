@@ -1,8 +1,8 @@
 import numpy as np
-import triang
-import tdoa
-import fdoa
-import utils
+from .. import triang
+from .. import tdoa
+from .. import fdoa
+from ..import utils
 
 
 def measurement(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None, tdoa_ref_idx=None,

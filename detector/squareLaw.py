@@ -1,8 +1,8 @@
 import scipy.stats as stats
 import numpy as np
-from utils.unit_conversions import db_to_lin
+from ..utils.unit_conversions import db_to_lin
 import warnings
-import prop
+from .. import prop
 
 
 def det_test(z, noise_var, prob_fa):

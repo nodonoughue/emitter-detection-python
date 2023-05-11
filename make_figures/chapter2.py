@@ -10,14 +10,14 @@ Nicholas O'Donoughue
 22 March 2021
 """
 
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin
+from .. import utils
+from ..utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 from scipy.special import erf, erfinv
 import seaborn as sns
-
+from ..examples import chapter2
 
 def make_all_figures(close_figs=False):
     """
@@ -169,8 +169,9 @@ def make_figure_2(prefix=None, cmap=None):
     plt.fill_between(ell[mask], fa, label='False Alarm', facecolor=cmap(3), alpha=.6)
     
     # Add text overlay
-    plt.annotate(text='', xy=(eta-1.5, 0.325), xytext=(eta+1.5, 0.325), arrowprops=dict(arrowstyle='<->',
-                                                                                        color='k', lw=1))
+    plt.annotate(text='', xy=(eta-1.5, 0.325), xytext=(eta+1.5, 0.325), 
+        arrowprops=dict(arrowstyle='<->',
+            color='k', lw=1))
     plt.text(eta+.5, .35, 'Reduce $P_{FA}$')
     plt.text(eta-2.1, .35, 'Reduce $P_{MD}$')
     
@@ -205,7 +206,6 @@ def make_figure_3(prefix=None):
     :return: figure handle
     """
 
-    from examples import chapter2
     fig3 = chapter2.example2()
 
     # Draw the figure

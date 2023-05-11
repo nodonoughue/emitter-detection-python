@@ -9,12 +9,12 @@ Nicholas O'Donoughue
 19 May 2021
 """
 
-import utils
+from .. import utils
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import triang
-from examples import chapter10
+from .. import triang
+from ..examples import chapter10
 
 
 def make_all_figures(close_figs=False, force_recalc=False):

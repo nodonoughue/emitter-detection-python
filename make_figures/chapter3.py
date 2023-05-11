@@ -9,16 +9,16 @@ Nicholas O'Donoughue
 23 March 2021
 """
 
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin, kft_to_km
+from .. import utils
+from ..utils.unit_conversions import lin_to_db, db_to_lin, kft_to_km
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 import seaborn as sns
-import atm
-import prop
-import detector
-
+from .. import atm
+from .. import prop
+from .. import detector
+from ..examples import chapter3
 
 def make_all_figures(close_figs=False):
     """
@@ -390,7 +390,7 @@ def make_figure_9(prefix=None, rng=None, colors=None):
     :return: figure handle
     """
 
-    from examples import chapter3
+    
     fig9 = chapter3.example1(rng, colors)
 
     # Save figure
@@ -417,7 +417,6 @@ def make_figure_10(prefix=None, rng=None, colors=None):
     """
 
     # Figure 10, Monte Carlo Results
-    from examples import chapter3
     fig10 = chapter3.example2(rng, colors)
 
     # Save figure

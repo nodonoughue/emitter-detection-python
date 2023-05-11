@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 import warnings
 
-import utils
+from .. import utils
 from . import model
 
 
@@ -33,8 +33,10 @@ def compute_crlb(x_aoa, xs, cov):
     if len(np.shape(xs)) == 1:
         xs = np.expand_dims(xs, axis=1)
 
+    if np.isscalar(cov):
+        cov = np.array([[cov]])
     # Pre-compute the covariance matrix inverse for speed
-    cov_lower = np.linalg.cholesky(cov)
+    cov_lower = np.linalg.pinv(cov)#np.linalg.cholesky(cov)
 
     # Initialize output variable
     crlb = np.zeros((num_dimension, num_dimension, num_sources))
@@ -44,7 +46,7 @@ def compute_crlb(x_aoa, xs, cov):
         this_x = xs[:, idx]
 
         # Evaluate the Jacobian
-        this_jacobian = np.squeeze(model.jacobian(x_aoa, this_x))  # Remove the third dimension (n_source=1)
+        this_jacobian = model.jacobian(x_aoa, this_x)
 
         if np.any(np.isnan(this_jacobian)):
             # This occurs when the ground range is zero for one of the sensors, which causes a divide by zero error.
@@ -53,8 +55,9 @@ def compute_crlb(x_aoa, xs, cov):
             continue
 
         # Compute the Fisher Information Matrix
-        a = scipy.linalg.solve_triangular(cov_lower, this_jacobian.T)
-        fisher_matrix = a.T @ a
+        # a = scipy.linalg.solve_triangular(cov_lower, this_jacobian.T)
+        # fisher_matrix = a.T @ a
+        fisher_matrix = this_jacobian.dot(cov_lower.dot(np.conjugate(this_jacobian.T)))
 
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
             # Problem is ill-defined, Fisher Information Matrix cannot be

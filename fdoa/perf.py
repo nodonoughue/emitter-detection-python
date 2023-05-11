@@ -1,6 +1,6 @@
 import numpy as np
-import utils
-from utils.unit_conversions import db_to_lin
+from .. import utils
+from ..utils.unit_conversions import db_to_lin
 from . import model
 
 
@@ -56,8 +56,9 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov, ref_idx=None, do_resample=Tr
                                        x_source=this_x, v_source=None,
                                        ref_idx=ref_idx)
 
-        # Squeeze the jacobian -- the third dimension is singleton, and doesn't matter here
-        this_jacobian = np.squeeze(this_jacobian)
+        # Squeeze the jacobian -- the third dimension is singleton, and doesn't matter here 
+        #LAZ: doesn't matter in matlab but matters in NP
+        # this_jacobian = np.squeeze(this_jacobian)
 
         # Compute the Fisher Information Matrix
         fisher_matrix = this_jacobian.dot(cov_inv.dot(np.conjugate(this_jacobian).T))

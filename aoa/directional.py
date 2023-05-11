@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.unit_conversions import db_to_lin
-from utils import constants
+from ..utils.unit_conversions import db_to_lin
+from ..utils import constants
 from .aoa import make_gain_functions
 
 

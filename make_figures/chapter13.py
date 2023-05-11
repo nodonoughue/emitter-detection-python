@@ -9,16 +9,16 @@ Nicholas O'Donoughue
 4 December 2022
 """
 
-import utils
+from .. import utils
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 import seaborn as sns
-import triang
-import tdoa
-import fdoa
-import hybrid
-from examples import chapter13
+from .. import triang
+from .. import tdoa
+from .. import fdoa
+from .. import hybrid
+from ..examples import chapter13
 
 
 def make_all_figures(close_figs=False, force_recalc=False):

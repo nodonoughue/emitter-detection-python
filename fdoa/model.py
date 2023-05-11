@@ -1,5 +1,5 @@
 import numpy as np
-import utils
+from .. import utils
 import matplotlib.pyplot as plt
 
 
@@ -142,7 +142,7 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
         out_dims = (n_dim, n_msmt)
 
     result = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], newshape=out_dims)
-
+    #result = np.delete(result, np.unique(ref_idx_vec), axis=1) # rm ref_sensor column b/c all zeros # not needed when parse_ref_sensors is fixed
     return result  # n_dim x nPair x n_source
 
 
@@ -183,6 +183,9 @@ def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=Non
     if do_resample:
         cov = utils.resample_covariance_matrix(cov, ref_idx)
 
+    if np.isscalar(cov):
+        # cov_lower = 1/cov
+        cov = np.array([[cov]])
     # Pre-invert the covariance matrix; to avoid repeatedly redoing the same work in the
     # for loop over source positions
     cov_inv = np.linalg.pinv(cov)
@@ -303,6 +306,7 @@ def draw_isodop(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
         # Multiple velocity differences were specified, they have to be in ascending order to be used in contour command
         sort_idx = np.argsort(vdiff)
         unsort_idx = np.argsort(sort_idx)   # Indices to unsort
+        sort_idx = np.unravel_index(sort_idx, vdiff.shape)
         level_set = vdiff[sort_idx]
         multiple_outputs = True
     elif np.isscalar(vdiff):

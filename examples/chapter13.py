@@ -4,8 +4,8 @@ import time
 
 import scipy.linalg
 
-import utils
-import hybrid
+from .. import utils
+from .. import hybrid
 
 
 def run_all_examples():

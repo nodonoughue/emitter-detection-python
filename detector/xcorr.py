@@ -1,8 +1,8 @@
 import numpy as np
 import scipy.stats as stats
 from . import squareLaw
-from utils.unit_conversions import lin_to_db, db_to_lin
-import prop
+from ..utils.unit_conversions import lin_to_db, db_to_lin
+from .. import prop
 
 
 def det_test(y1, y2, noise_var, num_samples, prob_fa):

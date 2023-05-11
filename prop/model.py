@@ -1,6 +1,6 @@
 import numpy as np
-from utils import constants
-import atm
+from ..utils import constants
+from .. import atm
 
 
 def get_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, include_atm_loss=True, atmosphere=None):

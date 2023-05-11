@@ -9,13 +9,13 @@ Nicholas O'Donoughue
 26 March 2021
 """
 
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin
+from .. import utils
+from ..utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import aoa
-from examples import chapter7
+from .. import aoa
+from ..examples import chapter7
 
 
 def make_all_figures(close_figs=False, force_recalc=True):
@@ -299,8 +299,7 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
             rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2)/this_num_mc)
 
             # CRLB
-            crlb_psi[idx_num_samples, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot,
-                                                                                  psi, psi_true))
+            crlb_psi[idx_num_samples, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot, psi, psi_true))
 
     # Generate figure
     fig5 = plt.figure()

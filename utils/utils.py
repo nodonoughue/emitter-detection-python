@@ -117,7 +117,10 @@ def parse_reference_sensor(ref_idx, num_sensors):
 
     if ref_idx is None:
         # Default behavior is to use the last sensor as a common reference
-        test_idx_vec = np.asarray([i for i in np.arange(num_sensors - 1)])
+        #test_idx_vec = np.arange(num_sensors)#np.asarray([i for i in np.arange(num_sensors - 1)])
+
+        # do num_sensors=1 b/c we don't want to compare ref sensor to ref sensor
+        test_idx_vec = np.arange(num_sensors-1)#np.asarray([i for i in np.arange(num_sensors - 1)])
         ref_idx_vec = (num_sensors - 1) * np.ones_like(test_idx_vec)
 
     elif ref_idx == 'full':
@@ -213,59 +216,37 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
     b_i_wt = 1.
     b_j_wt = 1.
 
-    # Step through reference sensors
-    for idx_row in np.arange(n_pair_out):
+    def element_func(idx_row,idx_col):
+        idx_row = idx_row.astype(int)
+        idx_col = idx_col.astype(int)
         a_i = test_idx_vec[idx_row % n_test]
         b_i = ref_idx_vec[idx_row % n_ref]
-
-        # print('\tRow: {}, a_i: {}, b_i: {}'.format(idx_row, a_i, b_i))
-
+        a_j = test_idx_vec[idx_col % n_test]
+        b_j = ref_idx_vec[idx_col % n_ref]
         if test_weights:
             a_i_wt = test_weights[idx_row % shp_test_wt]
-
+            a_j_wt = test_weights[idx_col % shp_test_wt]
+        else:
+            a_i_wt = a_j_wt = 1
         if ref_weights:
             b_i_wt = ref_weights[idx_row % shp_ref_wt]
-
-        for idx_col in np.arange(n_pair_out):
-            a_j = test_idx_vec[idx_col % n_test]
-            b_j = ref_idx_vec[idx_col % n_ref]
-
-            # print('\tCol: {}, a_j: {}, b_j: {}'.format(idx_col, a_j, b_j))
-
-            if test_weights:
-                a_j_wt = test_weights[idx_col % shp_test_wt]
-
-            if ref_weights:
-                b_j_wt = ref_weights[idx_col % shp_ref_wt]
-
-            # Parse input covariances
-            if np.isnan(b_i) or np.isnan(b_j):
-                cov_bibj = 0.
-            else:
-                cov_bibj = cov[b_i, b_j]
-
-            if np.isnan(a_i) or np.isnan(a_j):
-                cov_aiaj = 0.
-            else:
-                cov_aiaj = cov[a_i, a_j]
-
-            if np.isnan(a_i) or np.isnan(b_j):
-                cov_aibj = 0.
-            else:
-                cov_aibj = cov[a_i, b_j]
-
-            if np.isnan(b_i) or np.isnan(a_j):
-                cov_biaj = 0.
-            else:
-                cov_biaj = cov[b_i, a_j]
-
-            #  [cov_out]_ij = [cov]_bi,bj + [cov]_ai,aj - [cov]_ai,bj - [cov]_bi,aj
-            # Put it together with the weights
-            cov_out[idx_row, idx_col] = b_i_wt * b_j_wt * cov_bibj + \
-                                        a_i_wt * a_j_wt * cov_aiaj - \
-                                        a_i_wt * b_j_wt * cov_aibj - \
-                                        b_i_wt * a_j_wt * cov_biaj
-
+            b_j_wt = ref_weights[idx_col % shp_ref_wt]
+        else:
+            b_i_wt = b_j_wt = 1
+        cov_bibj = cov_aiaj = cov_aibj = cov_biaj = 0
+        try:
+            cov_bibj = cov[b_i, b_j]
+            cov_aiaj = cov[a_i, a_j]
+            cov_aibj = cov[a_i, b_j]
+            cov_biaj = cov[b_i, a_j]
+        except:
+            pass
+        res = b_i_wt * b_j_wt * cov_bibj + \
+            a_i_wt * a_j_wt * cov_aiaj - \
+            a_i_wt * b_j_wt * cov_aibj - \
+            b_i_wt * a_j_wt * cov_biaj
+        return res
+    cov_out = np.fromfunction(element_func, (n_pair_out,n_pair_out), dtype=float)
     return cov_out
 
 

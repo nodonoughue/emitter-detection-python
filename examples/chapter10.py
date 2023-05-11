@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy.random
 
-import utils
-import triang
+from .. import utils
+from .. import triang
 import time
 
 
