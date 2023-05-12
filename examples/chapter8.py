@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import constants
-from utils.unit_conversions import lin_to_db, db_to_lin
-from utils import print_elapsed
-import prop
-import array_df
+from ..utils import constants
+from ..utils.unit_conversions import lin_to_db, db_to_lin
+from ..utils import print_elapsed
+from .. import prop
+from .. import array_df
 from scipy import signal
 from scipy import io as sio
 import time
@@ -97,7 +97,7 @@ def generate_ex1_data(rng=None):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    sio.savemat('examples/ex8_1.mat', {'x': noisy_signal,
+    sio.savemat('./ex8_1.mat', {'x': noisy_signal,
                                        'num_sources': num_sources,
                                        'num_elements': num_elements,
                                        'num_samples': num_samples,
@@ -122,7 +122,7 @@ def generate_ex1_data(rng=None):
     num_elements = 25   # Array elements
     num_samples = 100  # Time samples
     d_lam = .5
-    v = array_df.model.make_steering_vector(d_lam, num_elements)
+    v, v_dot = array_df.model.make_steering_vector(d_lam, num_elements)
 
     # Initialize source positions
     num_sources = 3  # Sources
@@ -141,15 +141,17 @@ def generate_ex1_data(rng=None):
 
     # Set up received data vector
     v_steer_mtx = v(psi)  # num_elements x num_sources
-    rx_signal = v_steer_mtx*np.sqrt(rx_pwr_w[:]/2)*(rng.standard_normal(size=(num_sources, num_samples))
-                                                    + 1j * (rng.standard_normal(size=(num_sources, num_samples))))
+    rx_signal = np.matmul( np.multiply(v_steer_mtx,np.sqrt(rx_pwr_w[:]/2)),
+                        (rng.standard_normal(size=(num_sources, num_samples))
+                        + 1j * (rng.standard_normal(size=(num_sources, num_samples))))
+        )
 
     # Add noise
     noise = np.sqrt(rx_noise_w/2)*(rng.standard_normal(size=(num_elements, num_samples))
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    sio.savemat('hw/problem8_5.mat', {'x': noisy_signal,
+    sio.savemat('./problem8_5.mat', {'x': noisy_signal,
                                       'num_sources': num_sources,
                                       'num_elements': num_elements,
                                       'num_samples': num_samples,
@@ -174,7 +176,7 @@ def generate_ex1_data(rng=None):
     num_elements = 25  # Array elements
     num_samples = 100  # Time samples
     d_lam = .5
-    v = array_df.model.make_steering_vector(d_lam, num_elements)
+    v, v_dot = array_df.model.make_steering_vector(d_lam, num_elements)
 
     # Initialize source positions
     num_sources = 3  # Sources
@@ -193,15 +195,17 @@ def generate_ex1_data(rng=None):
 
     # Set up received data vector
     v_steer_mtx = v(psi)  # num_elements x num_sources
-    rx_signal = v_steer_mtx*(np.sqrt(rx_pwr_w[:]/2)*(rng.standard_normal(size=(num_sources, num_samples))
-                                                     + 1j * (rng.standard_normal(size=(num_sources, num_samples)))))
+    rx_signal = np.matmul( np.multiply(v_steer_mtx,np.sqrt(rx_pwr_w[:]/2)),
+                        (rng.standard_normal(size=(num_sources, num_samples))
+                        + 1j * (rng.standard_normal(size=(num_sources, num_samples))))
+                )
 
     # Add noise
     noise = np.sqrt(rx_noise_w/2)*(rng.standard_normal(size=(num_elements, num_samples))
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    sio.savemat('hw/problem8_6.mat', {'x': noisy_signal,
+    sio.savemat('./problem8_6.mat', {'x': noisy_signal,
                                       'num_sources': num_sources,
                                       'num_elements': num_elements,
                                       'num_samples': num_samples,
@@ -222,7 +226,7 @@ def example1(rng=None):
     """
 
     # If the data is missing, make it
-    data_fnm = 'examples/ex8_1.mat'
+    data_fnm = './ex8_1.mat'
     if not os.path.exists(data_fnm):
         generate_ex1_data(rng)
 
@@ -305,7 +309,7 @@ def example2(rng=None):
     
     # Compute the number of snapshots
     t_samp = 1/(2*tx_freq)
-    num_samples = np.int(np.floor(t_integration/t_samp))
+    num_samples = int(np.floor(t_integration/t_samp))
     
     # Generate the array factor
     v, v_dot = array_df.model.make_steering_vector(d_lam, num_elements)

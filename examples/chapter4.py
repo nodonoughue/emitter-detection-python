@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import prop
-import detector
-import utils
-from utils.unit_conversions import lin_to_db
+from .. import prop
+from .. import detector
+from .. import utils
+from ..utils.unit_conversions import lin_to_db
 
 
 def run_all_examples(colors=None):

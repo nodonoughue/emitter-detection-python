@@ -9,16 +9,16 @@ Nicholas O'Donoughue
 24 March 2021
 """
 
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin
+from .. import utils
+from ..utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import numpy as np
 from scipy.fft import fft, fftshift
 from scipy import stats
 import seaborn as sns
-import detector
-
+from .. import detector
+from ..examples import chapter4
 
 def make_all_figures(close_figs=False):
     """
@@ -181,8 +181,7 @@ def make_figure_1b(prefix=None, rng=None):
     plt.annotate(text='', xy=(-.5, 0), xytext=(-.5, -3), arrowprops=dict(arrowstyle='<->', color='k'))
     plt.annotate(text='', xy=(f0-bw/2, -3), xytext=(f0+bw/2, -3), arrowprops=dict(arrowstyle='<->', color='k'))
     plt.annotate(text=r'$B_s=1/T_{\mathrm{chip}}$', xy=(f0, -3), xytext=(.1, -6), arrowprops=dict(arrowstyle='-',
-                                                                                                  color='k'))
-
+        color='k'))
     # Turn off the axes
     ax = plt.gca()
     ax.axis('off')
@@ -580,7 +579,7 @@ def make_figure_7(prefix=None):
     :return: figure handle
     """
 
-    from examples import chapter4
+    
     fig7 = chapter4.example1()
 
     # Save figure
@@ -605,7 +604,6 @@ def make_figure_8(prefix=None, colors=None):
     :return: figure handle
     """
 
-    from examples import chapter4
     fig8 = chapter4.example2(colors)
 
     # Save figure

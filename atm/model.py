@@ -1,6 +1,6 @@
-from atm import reference
+from . import reference
 import numpy as np
-from utils import geo
+from ..utils import geo
 
 
 def calc_atm_loss(freq_hz, gas_path_len_m=0, rain_path_len_m=0, cloud_path_len_m=0, atmosphere=None, pol_angle=0,
@@ -35,8 +35,7 @@ def calc_atm_loss(freq_hz, gas_path_len_m=0, rain_path_len_m=0, cloud_path_len_m
 
     # Compute loss coefficients
     if np.any(gas_path_len_m > 0):
-        coeff_ox, coeff_water = get_gas_loss_coeff(freq_hz, atmosphere.press, atmosphere.water_vapor_press,
-                                                   atmosphere.temp)
+        coeff_ox, coeff_water = get_gas_loss_coeff(freq_hz, atmosphere.press, atmosphere.water_vapor_press, atmosphere.temp)
         coeff_gas = coeff_ox + coeff_water
     else:
         coeff_gas = 0
@@ -330,14 +329,14 @@ def get_gas_loss_coeff(freq_hz, press, water_vapor_press, temp):
     # Compute complex refractivities
     # Now that we've summed over the spectral lines (or, are about to), strip the extra dimension from
     # fo and nd. This prevents errors with array broadcasting.
-    f0 = f0[..., 0]
-    nd = nd[..., 0]
-    refractivity_oxygen = np.sum(line_strength_oxygen*line_shape_oxygen, axis=-1) + nd
-    refractivity_water = np.sum(line_strength_water*line_shape_water, axis=-1)
+    f0 = np.squeeze(f0)
+    nd = np.squeeze(nd)
+    refractivity_oxygen = np.sum(np.multiply(line_strength_oxygen,line_shape_oxygen), axis=-1) + nd
+    refractivity_water = np.sum(np.multiply(line_strength_water,line_shape_water), axis=-1)
 
     # Compute coefficients
-    coeff_ox = .1820*f0*refractivity_oxygen
-    coeff_water = .1820*f0*refractivity_water
+    coeff_ox = .1820*np.multiply(f0,refractivity_oxygen)
+    coeff_water = .1820*np.multiply(f0,refractivity_water)
     
     # Handle all freqs < 1 GHz
     if np.any(f0 < 1):
@@ -353,5 +352,4 @@ def get_gas_loss_coeff(freq_hz, press, water_vapor_press, temp):
         else:
             _, mask_full = np.broadcast_arrays(coeff_water, low_freq_mask)
             np.place(coeff_water, mask_full, 0)
-
     return coeff_ox, coeff_water

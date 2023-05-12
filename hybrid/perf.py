@@ -1,6 +1,6 @@
 import numpy as np
 
-import utils
+from .. import utils
 from . import model
 
 
@@ -60,12 +60,11 @@ def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov, tdoa_ref_idx=None
                                            num_aoa_sensors + num_tdoa_sensors + test_idx_vec_fdoa), axis=0)
             ref_idx_vec = np.concatenate((ref_idx_vec_aoa, num_aoa_sensors + ref_idx_vec_tdoa,
                                           num_aoa_sensors + num_tdoa_sensors + ref_idx_vec_fdoa), axis=0)
-
             # Finally, we resample the full covariance matrix using the assembled indices
             cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
 
         # Invert the covariance matrix
-        cov_inv = np.linalg.inv(cov)
+        cov_inv = np.linalg.pinv(cov)
 
     # Initialize output variable
     crlb = np.zeros((n_dim, n_dim, n_source))

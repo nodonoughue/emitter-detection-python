@@ -1,7 +1,8 @@
 import numpy as np
-from utils import unit_conversions, geo
-import utils
-
+# from ..utils import unit_conversions, geo
+from .. import utils
+unit_conversions = utils.unit_conversions
+geo = utils.geo
 
 def measurement(x_sensor, x_source, ref_idx=None):
     """
@@ -25,6 +26,7 @@ def measurement(x_sensor, x_source, ref_idx=None):
     if n_dim1 != n_dim2:
         raise TypeError('First dimension of all inputs must match')
 
+
     # Parse sensor pairs
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
 
@@ -35,7 +37,6 @@ def measurement(x_sensor, x_source, ref_idx=None):
 
     # Compute range difference for each pair of sensors
     rdoa = r[test_idx_vec] - r[ref_idx_vec]
-
     return rdoa
 
 
@@ -85,7 +86,7 @@ def jacobian(x_sensor, x_source, ref_idx=None):
         out_dims = (n_dim, n_msmt)
 
     j = np.reshape(j, newshape=out_dims)
-
+    # j = np.delete(j, np.unique(ref_idx_vec), axis=1) # remove reference id b/c its all zeros # not needed when parse_ref_sensors is fixed
     return j
 
 
@@ -123,6 +124,9 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
     if do_resample:
         cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
 
+    if np.isscalar(cov):
+        # cov_lower = 1/cov
+        cov = np.array([[cov]])
     # Pre-compute covariance matrix inverse
     cov_inv = np.linalg.inv(cov)
 

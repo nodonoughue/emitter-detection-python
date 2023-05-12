@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.linalg
 
-import utils
+from .. import utils
 
 
 def measurement(x_sensor, x_source, do_2d_aoa=False):
@@ -170,6 +170,10 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False):
         x_source = np.expand_dims(x_source, axis=1)
 
     # Pre-invert covariance matrix for speedup
+    if np.isscalar(cov):
+        # cov_lower = 1/cov
+        cov = np.array([[cov]])
+    
     cov_lower = np.linalg.cholesky(cov)
 
     # Initialize Output
@@ -251,3 +255,36 @@ def error(x_sensor, cov, x_source, x_max, num_pts, do_2d_aoa):
         epsilon[idx_pt] = np.conj(a.T) @ a
 
     return epsilon
+
+
+def drawLob(x_sensor, psi, x_source=None, scale = 1):
+    M1 = x_sensor.shape[1]
+    M2 = len(psi)
+
+    if M1 != M2:
+        print('The number of sensor positions and measurements must match.\n')
+        M = np.min([M1,M2])
+        x_sensor = x_sensor[:M]
+        psi = psi[:M]
+    else:
+        M = M1
+
+    if x_source is None:
+        range = 1
+    else:
+        # range = utils.rng(x_sensor, x_source)
+        range = utils.geo.calc_range(x_sensor, x_source)
+
+    x_end = np.cos(psi) * range * scale
+    y_end = np.sin(psi) * range * scale
+
+    xy_end = np.vstack([ np.reshape(x_end, [1,1,M]),
+                        np.reshape(y_end, [1,1,M]),
+                        ])
+    xy_start = np.zeros([2,1,M])
+    xy_lob_centered = np.hstack([xy_start,
+                                 xy_end
+                                 ])
+    xy_lob  = np.reshape(x_sensor,[2,1,M]) + xy_lob_centered
+
+    return xy_lob

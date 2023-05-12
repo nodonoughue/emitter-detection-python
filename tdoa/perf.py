@@ -1,5 +1,5 @@
 import numpy as np
-import utils
+from .. import utils
 from . import model
 
 
@@ -56,6 +56,6 @@ def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True):
             # inverted
             crlb[:, :, idx] = np.NaN
         else:
-            crlb[:, :, idx] = np.linalg.inv(fisher_matrix)
+            crlb[:, :, idx] = np.linalg.pinv(fisher_matrix)
 
     return crlb

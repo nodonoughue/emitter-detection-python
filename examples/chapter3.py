@@ -1,11 +1,12 @@
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
-import prop
-import detector
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin
-
+from .. import prop
+from .. import detector
+from .. import utils
+# from utils.unit_conversions import lin_to_db, db_to_lin
+lin_to_db = utils.unit_conversions.lin_to_db
+db_to_lin = utils.unit_conversions.db_to_lin
 
 def run_all_examples(rng=None, colors=None):
     """

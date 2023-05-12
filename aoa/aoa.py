@@ -1,5 +1,5 @@
 import numpy as np
-from utils import sinc_derivative
+from ..utils import sinc_derivative
 
 
 def make_gain_functions(type, d_lam, psi_0):

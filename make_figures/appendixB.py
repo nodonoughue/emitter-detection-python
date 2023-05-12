@@ -9,11 +9,11 @@ Nicholas O'Donoughue
 8 December 2022
 """
 
-import utils
+from .. import utils
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import prop
+from .. import prop
 
 
 def make_all_figures(close_figs=False):
