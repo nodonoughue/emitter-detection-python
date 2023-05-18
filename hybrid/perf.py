@@ -50,8 +50,13 @@ def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov, tdoa_ref_idx=None
             _, num_fdoa_sensors = utils.safe_2d_shape(x_fdoa)
 
             # First, we generate the test and reference index vectors
-            test_idx_vec_aoa = np.arange(num_aoa_sensors)
-            ref_idx_vec_aoa = np.nan * np.ones((num_aoa_sensors,))
+            if num_aoa_sensors > 0:
+                test_idx_vec_aoa = np.arange(num_aoa_sensors)
+                ref_idx_vec_aoa = np.nan * np.ones((num_aoa_sensors,))
+            else:
+                test_idx_vec_aoa = np.asarray([])
+                ref_idx_vec_aoa = np.asarray([])
+                
             test_idx_vec_tdoa, ref_idx_vec_tdoa = utils.parse_reference_sensor(tdoa_ref_idx, num_tdoa_sensors)
             test_idx_vec_fdoa, ref_idx_vec_fdoa = utils.parse_reference_sensor(fdoa_ref_idx, num_fdoa_sensors)
 
@@ -61,10 +66,10 @@ def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov, tdoa_ref_idx=None
             ref_idx_vec = np.concatenate((ref_idx_vec_aoa, num_aoa_sensors + ref_idx_vec_tdoa,
                                           num_aoa_sensors + num_tdoa_sensors + ref_idx_vec_fdoa), axis=0)
             # Finally, we resample the full covariance matrix using the assembled indices
-            cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
-
-        # Invert the covariance matrix
-        cov_inv = np.linalg.pinv(cov)
+            cov_resample = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+            cov_inv = np.linalg.inv(cov_resample)
+        else:
+            cov_inv = np.linalg.inv(cov)
 
     # Initialize output variable
     crlb = np.zeros((n_dim, n_dim, n_source))

@@ -209,7 +209,7 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
         shp_ref_wt = np.size(ref_weights)
 
     # Initialize output
-    cov_out = np.zeros((n_pair_out, n_pair_out))
+    # cov_out = np.zeros((n_pair_out, n_pair_out), dtype=float)
 
     a_i_wt = 1.
     a_j_wt = 1.
@@ -217,12 +217,15 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
     b_j_wt = 1.
 
     def element_func(idx_row,idx_col):
-        idx_row = idx_row.astype(int)
-        idx_col = idx_col.astype(int)
+        # Interpret test/ref coordinates for each sensor pair
+        idx_row = int(idx_row)
+        idx_col = int(idx_col)
         a_i = test_idx_vec[idx_row % n_test]
         b_i = ref_idx_vec[idx_row % n_ref]
         a_j = test_idx_vec[idx_col % n_test]
         b_j = ref_idx_vec[idx_col % n_ref]
+
+        # Parse weights
         if test_weights:
             a_i_wt = test_weights[idx_row % shp_test_wt]
             a_j_wt = test_weights[idx_col % shp_test_wt]
@@ -233,20 +236,26 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
             b_j_wt = ref_weights[idx_col % shp_ref_wt]
         else:
             b_i_wt = b_j_wt = 1
-        cov_bibj = cov_aiaj = cov_aibj = cov_biaj = 0
-        try:
-            cov_bibj = cov[b_i, b_j]
-            cov_aiaj = cov[a_i, a_j]
-            cov_aibj = cov[a_i, b_j]
-            cov_biaj = cov[b_i, a_j]
-        except:
-            pass
+
+        # Lookup covariance matrix elements
+        # Note: if b_i or b_j is NaN, that's because this is an AOA measurement with
+        #       no reference sensor. So, we don't need the cross-terms, but we still
+        #       need cov_aiaj.
+        cov_aiaj = cov[int(a_i), int(a_j)]  # This should always work
+        if b_i is np.nan or b_j is np.nan:
+            cov_bibj = cov_aibj = cov_biaj = 0.
+        else:
+            cov_bibj = cov[int(b_i), int(b_j)]
+            cov_aibj = cov[int(a_i), int(b_j)]
+            cov_biaj = cov[int(b_i), int(a_j)]
+
         res = b_i_wt * b_j_wt * cov_bibj + \
             a_i_wt * a_j_wt * cov_aiaj - \
             a_i_wt * b_j_wt * cov_aibj - \
             b_i_wt * a_j_wt * cov_biaj
         return res
-    cov_out = np.fromfunction(element_func, (n_pair_out,n_pair_out), dtype=float)
+    
+    cov_out = np.fromfunction(np.vectorize(element_func), (n_pair_out,n_pair_out), dtype=float)
     return cov_out
 
 
@@ -400,6 +409,9 @@ def safe_2d_shape(x: np.array) -> np.array:
     :return dim2: length of second dimension
     """
 
+    if x is None:
+        return [0, 0]
+        
     # Wrap x in an array, in case it's a scalar or list
     x = np.asarray(x)
 
