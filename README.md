@@ -1,6 +1,6 @@
 # Python Companion to Emitter Detection and Geolocation for Electronic Warfare
 
-![Textbook cover](https://us.artechhouse.com/Assets/ProductImages/5645_t.jpg "Emitter Detection and Geolocation for Electronic Warfare")
+<img src="graphics/cover_emitterDet.png" height=200 /><img src="graphics/cover_practicalGeo.png" height=200 />
 
 This repository is a port of the [MATLAB software companion](https://github.com/nodonoughue/emitter-detection-book/) to *Emitter Detection and Geolocation for Electronic Warfare,* by Nicholas A. O'Donoughue, Artech House, 2019.
 
