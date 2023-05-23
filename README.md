@@ -2,9 +2,11 @@
 
 ![Textbook cover](https://us.artechhouse.com/Assets/ProductImages/5645_t.jpg "Emitter Detection and Geolocation for Electronic Warfare")
 
-This repository is a port of the [MATLAB software companion](https://github.com/nodonoughue/emitter-detection-textbook/) to *Emitter Detection and Geolocation for Electronic Warfare,* by Nicholas A. O'Donoughue, Artech House, 2019.
+This repository is a port of the [MATLAB software companion](https://github.com/nodonoughue/emitter-detection-book/) to *Emitter Detection and Geolocation for Electronic Warfare,* by Nicholas A. O'Donoughue, Artech House, 2019.
 
-The textbook can be purchased from **[Artech House](https://us.artechhouse.com/Emitter-Detection-and-Geolocation-for-Electronic-Warfare-P2052.aspx)**.
+This repository contains the Python code, released under the MIT License, and when it is complete, it will generate all of the figures and implements all of the algorithms and many of the performance calculations within the texts *Emitter Detection and Geolocation for Electronic Warfare,* by Nicholas A. O'Donoughue, Artech House, 2019 and *Practical Geolocation for Electronic Warfare using MATLAB,* by Nicholas A. O'Donoughue, Artech House, 2022.
+
+The textbooks can be purchased from Artech House directly at the following links: **[Emitter Detection and Geolocation for Electronic Warfare](https://us.artechhouse.com/Emitter-Detection-and-Geolocation-for-Electronic-Warfare-P2291.aspx)**, and **[Practical Geolocation for Electronic Warfare using MATLAB](https://us.artechhouse.com/Practical-Geolocation-for-Electronic-Warfare-Using-MATLAB-P2292.aspx)** Both are also available from Amazon.
 
 ## Installation
 
