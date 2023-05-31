@@ -26,13 +26,21 @@ def measurement(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_s
     """
 
     # Construct component measurements
-    z_a = triang.model.measurement(x_sensor=x_aoa, x_source=x_source)
-    z_t = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_source, ref_idx=tdoa_ref_idx)
-    z_f = fdoa.model.measurement(x_sensor=x_fdoa, v_sensor=v_fdoa, x_source=x_source, v_source=v_source,
-                                 ref_idx=fdoa_ref_idx)
+    to_concat = []
+    if x_aoa is not None:
+        z_a = triang.model.measurement(x_sensor=x_aoa, x_source=x_source)
+        to_concat.append(z_a)
+    if x_tdoa is not None:
+        z_t = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_source, ref_idx=tdoa_ref_idx)
+        to_concat.append(z_t)
+    if x_fdoa is not None:
+        z_f = fdoa.model.measurement(x_sensor=x_fdoa, v_sensor=v_fdoa, 
+            x_source=x_source, v_source=v_source,
+            ref_idx=fdoa_ref_idx)
+        to_concat.append(z_f)
 
     # Combine into a single data vector
-    z = np.concatenate((z_a, z_t, z_f), axis=0)
+    z = np.concatenate(to_concat, axis=0)
 
     return z
 
