@@ -145,34 +145,6 @@ def parse_reference_sensor(ref_idx, num_sensors):
 
 
 def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights=None, ref_weights=None):
-    """
-    Resample a covariance matrix based on a set of reference and test indices.  This assumes a linear combination
-    of the test and reference vectors.  The output is an n_pair x n_pair covariance matrix for the n_pair linear
-    combinations.
-
-    In the resampled covariance matrix, the i,j-th entry is given
-    [cov_out]_ij = [cov]_bi,bj + [cov]_ai,aj - [cov]_ai,bj - [cov]_bi,aj
-       where:  a_i, a_j are the i-th and j-th reference indices
-               b_i, b_j are the i-th and j-th test indices
-               C is the input covariance matrix
-
-    If any elements of the test_idx_vec or ref_idx_vec are set to nan, then those elements will be ignored for
-    covariance matrix resampling.  This is used to correspond either to perfect (noise-free) measurements, or to single
-    sensor measurements, such as AoA, that do not require comparison with a second sensor measurement.
-
-    Nicholas O'Donoughue
-    21 February 2021
-
-    :param cov: n_sensor x n_sensor array representing the covariance matrix for input data.  Optional: if input is a
-                1D array, it is assumed to be a diagonal matrix.
-    :param test_idx_vec: n_pair x 1 array of indices for the 'test' sensor in each pair -- or -- a valid reference
-                         index input to parse_reference_sensor.
-    :param ref_idx_vec: n_pair x 1 array of indices for the 'reference' sensor in each pair.  Set to None (or do not
-                        provide) if test_idx_vec is to be passed to parse_reference_sensor.
-    :param test_weights: Optional, applies a scale factor to the test measurements
-    :param ref_weights: Optional, applies a scale factor to the reference measurements
-    :return:
-    """
 
     # Parse Inputs
     n_sensor = np.size(cov, axis=0)
@@ -209,7 +181,7 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
         shp_ref_wt = np.size(ref_weights)
 
     # Initialize output
-    # cov_out = np.zeros((n_pair_out, n_pair_out), dtype=float)
+    cov_out = np.zeros((n_pair_out, n_pair_out))
 
     a_i_wt = 1.
     a_j_wt = 1.
@@ -217,15 +189,12 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
     b_j_wt = 1.
 
     def element_func(idx_row,idx_col):
-        # Interpret test/ref coordinates for each sensor pair
-        idx_row = int(idx_row)
-        idx_col = int(idx_col)
+        idx_row = idx_row.astype(int)
+        idx_col = idx_col.astype(int)
         a_i = test_idx_vec[idx_row % n_test]
         b_i = ref_idx_vec[idx_row % n_ref]
         a_j = test_idx_vec[idx_col % n_test]
         b_j = ref_idx_vec[idx_col % n_ref]
-
-        # Parse weights
         if test_weights:
             a_i_wt = test_weights[idx_row % shp_test_wt]
             a_j_wt = test_weights[idx_col % shp_test_wt]
@@ -237,25 +206,41 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
         else:
             b_i_wt = b_j_wt = 1
 
-        # Lookup covariance matrix elements
-        # Note: if b_i or b_j is NaN, that's because this is an AOA measurement with
-        #       no reference sensor. So, we don't need the cross-terms, but we still
-        #       need cov_aiaj.
-        cov_aiaj = cov[int(a_i), int(a_j)]  # This should always work
-        if b_i is np.nan or b_j is np.nan:
-            cov_bibj = cov_aibj = cov_biaj = 0.
+        cov_aiaj = cov[a_i,a_j]
+        cov_aibj = np.zeros_like(cov_aiaj)
+        cov_biaj = cov_aibj.copy()
+        cov_bibj = cov_aibj.copy() 
+        
+        mask_ai = np.isnan(a_i)
+        mask_aj = np.isnan(a_j)
+        mask_bi = np.isnan(b_i)
+        mask_bj = np.isnan(b_j)
+
+        mask_bibj = ~np.logical_or(mask_bi,mask_bj)
+        if not np.all(mask_bibj):
+            cov_bibj[mask_bibj] = cov[b_i[mask_bibj].astype(int), b_j[mask_bibj].astype(int)]
+        else: 
+            cov_bibj = cov[b_i.astype(int),b_j.astype(int)]
+            
+        mask_aibj = ~np.logical_or(mask_ai,mask_bj)
+        if not np.all(mask_aibj):
+            cov_aibj[mask_aibj] = cov[a_i[mask_aibj].astype(int), b_j[mask_aibj].astype(int)]
         else:
-            cov_bibj = cov[int(b_i), int(b_j)]
-            cov_aibj = cov[int(a_i), int(b_j)]
-            cov_biaj = cov[int(b_i), int(a_j)]
+            cov_aibj = cov[a_i.astype(int),b_j.astype(int)]
+
+        mask_biaj = ~np.logical_or(mask_bi,mask_aj)
+        if not np.all(mask_biaj):
+            cov_biaj[mask_biaj] = cov[b_i[mask_biaj].astype(int), a_j[mask_biaj].astype(int)]
+        else:
+            cov_biaj = cov[b_i.astype(int),a_j.astype(int)]
 
         res = b_i_wt * b_j_wt * cov_bibj + \
             a_i_wt * a_j_wt * cov_aiaj - \
             a_i_wt * b_j_wt * cov_aibj - \
             b_i_wt * a_j_wt * cov_biaj
+        # raise ValueError('mo')
         return res
-    
-    cov_out = np.fromfunction(np.vectorize(element_func), (n_pair_out,n_pair_out), dtype=float)
+    cov_out = np.fromfunction(element_func, (n_pair_out,n_pair_out), dtype=float)
     return cov_out
 
 
