@@ -279,7 +279,7 @@ def ensure_invertible(covariance, epsilon=1e-10):
         this_cov = np.squeze(covariance[:, :, idx_matrix])
 
         # Eigen-decomposition
-        lam, v = np.linalg.eig(this_cov)
+        lam, v = np.linalg.eigh(this_cov)
 
         # Initialize the diagonal loading term
         d = epsilon * np.eye(N=dim)
@@ -290,7 +290,7 @@ def ensure_invertible(covariance, epsilon=1e-10):
             this_cov += d
 
             # Re-examine the eigenvalue
-            lam, v = np.linalg.eig(this_cov)
+            lam, v = np.linalg.eigh(this_cov)
 
             # Increase the magnitude of diagonal loading (for the next iteration)
             d *= 10.0

@@ -63,7 +63,7 @@ def compute_cep50(covariance):
             continue
 
         # Eigenvector analysis to identify independent components of error
-        lam, _ = np.linalg.eig(this_covariance)
+        lam, _ = np.linalg.eigh(this_covariance)
         # print('\tEigenvalues: {}'.format(lam))
         lam_min = np.min(lam)
         lam_max = np.max(lam)
@@ -191,7 +191,7 @@ def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
     """
 
     # Eigenvector analysis to identify major/minor axes rotation and length
-    lam, v = np.linalg.eig(covariance)
+    lam, v = np.linalg.eigh(covariance)
 
     # Sort the eigenvalues
     idx_sort = np.argsort(lam)  # Sorted in ascending order by default

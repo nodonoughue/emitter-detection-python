@@ -113,7 +113,7 @@ def music(x, steer, num_sig_dims=0, max_psi=np.pi / 2, num_points=101):
         covariance += tmp/m
 
     # Perform Eigendecomposition of the covariance matrix
-    lam, eig_vec = np.linalg.eig(covariance)
+    lam, eig_vec = np.linalg.eigh(covariance)
 
     # Sort the eigenvectors and eigenvectors
     idx_sort = np.flip(np.argsort(np.abs(lam)))  # np.argsort operates in ascending order, reverse it

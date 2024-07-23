@@ -30,7 +30,7 @@ def example1():
     
     # Set up error covariance matrix
     covariance = np.array([[10, -3], [-3, 5]])
-    eigenvalues, eigenvectors = np.linalg.eig(covariance)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
     sort_index = np.argsort(eigenvalues)
 
     v_max = eigenvectors[:, sort_index[-1]]
