@@ -1,8 +1,7 @@
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
-
-# import utils
+import utils
 
 
 def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iterations=10e3, force_full_calc=False,

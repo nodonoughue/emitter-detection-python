@@ -12,6 +12,14 @@ The textbooks can be purchased from Artech House directly at the following links
 
 coming soon...
 
+### Dependencies
+
+This repository is dependent on the following packages, and was written with Python 3.12.
++ matplotlib
++ numpy
++ scipy
++ seaborn
+
 ## Figures
 The **make_figures/** folder contains the code to generate all the figures in the textbook. The subfolder **make_figures/practical_geo** generates figures for the second textbook.
 
