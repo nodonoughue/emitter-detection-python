@@ -1,6 +1,6 @@
 import numpy as np
-# from ..utils import unit_conversions, geo
-from .. import utils
+# from utils import unit_conversions, geo
+import utils
 unit_conversions = utils.unit_conversions
 geo = utils.geo
 

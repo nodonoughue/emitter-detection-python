@@ -9,11 +9,11 @@ Nicholas O'Donoughue
 17 May 2021
 """
 
-from .. import utils
+import utils
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from ..examples import chapter9
+from examples import chapter9
 
 
 def make_all_figures(close_figs=False):

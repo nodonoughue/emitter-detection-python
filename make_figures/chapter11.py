@@ -9,13 +9,13 @@ Nicholas O'Donoughue
 8 March 2022
 """
 
-from .. import utils
+import utils
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 import seaborn as sns
-from .. import tdoa
-from ..examples import chapter11
+import tdoa
+from examples import chapter11
 
 
 def make_all_figures(close_figs=False, force_recalc=False):

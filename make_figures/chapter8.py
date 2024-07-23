@@ -9,13 +9,13 @@ Nicholas O'Donoughue
 6 May 2021
 """
 
-from .. import utils
-from ..utils.unit_conversions import lin_to_db, db_to_lin
+import utils
+from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from .. import array_df
-from ..examples import chapter8
+import array_df
+from examples import chapter8
 import time
 
 

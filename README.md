@@ -4,7 +4,7 @@
 
 This repository is a port of the [MATLAB software companion](https://github.com/nodonoughue/emitter-detection-book/) to *Emitter Detection and Geolocation for Electronic Warfare,* by Nicholas A. O'Donoughue, Artech House, 2019.
 
-This repository contains the Python code, released under the MIT License, and when it is complete, it will generate all of the figures and implements all of the algorithms and many of the performance calculations within the texts *Emitter Detection and Geolocation for Electronic Warfare,* by Nicholas A. O'Donoughue, Artech House, 2019 and *Practical Geolocation for Electronic Warfare using MATLAB,* by Nicholas A. O'Donoughue, Artech House, 2022.
+This repository contains the Python code, released under the MIT License, and when it is complete, it will generate all the figures and implements all the algorithms and many of the performance calculations within the texts *Emitter Detection and Geolocation for Electronic Warfare,* by Nicholas A. O'Donoughue, Artech House, 2019 and *Practical Geolocation for Electronic Warfare using MATLAB,* by Nicholas A. O'Donoughue, Artech House, 2022.
 
 The textbooks can be purchased from Artech House directly at the following links: **[Emitter Detection and Geolocation for Electronic Warfare](https://us.artechhouse.com/Emitter-Detection-and-Geolocation-for-Electronic-Warfare-P2291.aspx)**, and **[Practical Geolocation for Electronic Warfare using MATLAB](https://us.artechhouse.com/Practical-Geolocation-for-Electronic-Warfare-Using-MATLAB-P2292.aspx)** Both are also available from Amazon.
 
@@ -13,14 +13,16 @@ The textbooks can be purchased from Artech House directly at the following links
 coming soon...
 
 ## Figures
+The **make_figures/** folder contains the code to generate all the figures in the textbook. The subfolder **make_figures/practical_geo** generates figures for the second textbook.
 
-coming soon...
+To generate all figures, run the file **make_figures.py**. To run figures for an individual chapter, use a command such as the following:
+```python
+import make_figures
+chap1_figs = make_figures.chapter1.make_all_figures()
+```
 
 ## Examples
-The **examples/** folder contains the code to execute each of the examples in the textbook.
-
-## Homework
-The **hw/** folder contains data sets used for two homework problems in Chapter 8.
+The **examples/** folder contains the code to execute each of the examples in the textbook. The subfolder **examples/practical_geo** has examples from the second textbook.
 
 ## Utilities
 A number of utilities are provided in this repository, under the following namespaces:

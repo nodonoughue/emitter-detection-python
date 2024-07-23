@@ -9,16 +9,16 @@ Nicholas O'Donoughue
 24 March 2021
 """
 
-from .. import utils
-from ..utils.unit_conversions import lin_to_db, db_to_lin
+import utils
+from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import numpy as np
 from scipy.fft import fft, fftshift
 from scipy import stats
 import seaborn as sns
-from .. import detector
-from ..examples import chapter4
+import detector
+from examples import chapter4
 
 def make_all_figures(close_figs=False):
     """

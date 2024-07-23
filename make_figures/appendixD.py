@@ -9,12 +9,12 @@ Nicholas O'Donoughue
 8 December 2022
 """
 
-from .. import utils
+import utils
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from .. import atm
-from .. import noise
+import atm
+import noise
 
 
 def make_all_figures(close_figs=False):

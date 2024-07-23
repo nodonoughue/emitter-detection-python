@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-from .. import utils
-from .. import fdoa
+import utils
+import fdoa
 
 
 def run_all_examples():

@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from ..utils import constants
-from ..utils.unit_conversions import lin_to_db, db_to_lin
-from ..utils import print_elapsed
-from .. import prop
-from .. import array_df
+from utils import constants
+from utils.unit_conversions import lin_to_db, db_to_lin
+from utils import print_elapsed
+import prop
+import array_df
 from scipy import signal
 from scipy import io as sio
 import time

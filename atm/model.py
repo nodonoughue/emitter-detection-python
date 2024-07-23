@@ -1,6 +1,6 @@
-from . import reference
 import numpy as np
-from ..utils import geo
+from utils import geo
+from . import reference
 
 
 def calc_atm_loss(freq_hz, gas_path_len_m=0, rain_path_len_m=0, cloud_path_len_m=0, atmosphere=None, pol_angle=0,

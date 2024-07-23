@@ -1,7 +1,7 @@
 import numpy as np
-from ..utils.unit_conversions import db_to_lin, lin_to_db
-from ..utils import constants
-from .. import atm
+from utils.unit_conversions import db_to_lin, lin_to_db
+from utils import constants
+import atm
 
 
 def get_thermal_noise(bandwidth_hz, noise_figure_db=0, temp_ext_k=0):

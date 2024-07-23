@@ -1,6 +1,6 @@
 import numpy as np
-from .. import utils
-from . import model
+import utils
+import model
 
 
 def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True):

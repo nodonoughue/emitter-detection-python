@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from ..utils import constants
-from ..utils.unit_conversions import lin_to_db
-from .. import prop
-from .. import aoa
+from utils import constants
+from utils.unit_conversions import lin_to_db
+import prop
+import aoa
 
 
 def run_all_examples():

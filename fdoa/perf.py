@@ -1,6 +1,6 @@
 import numpy as np
-from .. import utils
-from ..utils.unit_conversions import db_to_lin
+import utils
+from utils.unit_conversions import db_to_lin
 from . import model
 
 

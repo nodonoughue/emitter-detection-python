@@ -1,7 +1,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from ..utils.unit_conversions import lin_to_db, db_to_lin
+from utils.unit_conversions import lin_to_db, db_to_lin
 
 
 def crlb(snr1, snr2, num_samples, d_lam, psi_true):

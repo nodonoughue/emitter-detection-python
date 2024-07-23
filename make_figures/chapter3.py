@@ -9,16 +9,16 @@ Nicholas O'Donoughue
 23 March 2021
 """
 
-from .. import utils
-from ..utils.unit_conversions import lin_to_db, db_to_lin, kft_to_km
+import utils
+from utils.unit_conversions import lin_to_db, db_to_lin, kft_to_km
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 import seaborn as sns
-from .. import atm
-from .. import prop
-from .. import detector
-from ..examples import chapter3
+import atm
+import prop
+import detector
+from examples import chapter3
 
 def make_all_figures(close_figs=False):
     """

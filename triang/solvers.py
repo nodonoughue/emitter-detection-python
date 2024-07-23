@@ -1,6 +1,6 @@
-from .. import utils
-from ..utils import solvers
-from . import model
+import utils
+from utils import solvers
+import model
 import numpy as np
 from itertools import combinations
 

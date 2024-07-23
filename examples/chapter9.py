@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from ..utils import errors
+from utils import errors
 
 
 def run_all_examples():

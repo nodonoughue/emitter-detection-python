@@ -2,8 +2,8 @@ import numpy as np
 import scipy
 import warnings
 
-from .. import utils
-from . import model
+import utils
+import model
 
 
 def compute_crlb(x_aoa, xs, cov):

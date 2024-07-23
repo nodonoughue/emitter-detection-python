@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.linalg
 
-from .. import utils
+import utils
 
 
 def measurement(x_sensor, x_source, do_2d_aoa=False):

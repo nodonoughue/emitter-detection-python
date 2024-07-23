@@ -4,7 +4,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from ..utils.unit_conversions import db_to_lin
+from utils.unit_conversions import db_to_lin
 
 
 def crlb(snr, num_samples):

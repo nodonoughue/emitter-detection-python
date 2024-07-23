@@ -1,5 +1,5 @@
-from .. import utils
-from ..utils import solvers
+import utils
+from utils import solvers
 from . import model
 
 

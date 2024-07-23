@@ -10,14 +10,14 @@ Nicholas O'Donoughue
 22 March 2021
 """
 
-from .. import utils
-from ..utils.unit_conversions import lin_to_db, db_to_lin
+import utils
+from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 from scipy.special import erf, erfinv
 import seaborn as sns
-from ..examples import chapter2
+from examples import chapter2
 
 def make_all_figures(close_figs=False):
     """

@@ -9,8 +9,8 @@ Nicholas O'Donoughue
 21 March 2021
 """
 
-from .. import utils
-from ..utils.unit_conversions import lin_to_db, db_to_lin
+import utils
+from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns

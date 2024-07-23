@@ -9,12 +9,12 @@ Nicholas O'Donoughue
 28 October 2022
 """
 
-from .. import utils
+import utils
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from .. import fdoa
-from ..examples import chapter12
+import fdoa
+from examples import chapter12
 
 
 def make_all_figures(close_figs=False, force_recalc=False):
