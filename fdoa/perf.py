@@ -57,7 +57,7 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov, ref_idx=None, do_resample=Tr
                                        ref_idx=ref_idx)
 
         # Squeeze the jacobian -- the third dimension is singleton, and doesn't matter here 
-        #LAZ: doesn't matter in matlab but matters in NP
+        # LAZ: doesn't matter in matlab but matters in NP
         # this_jacobian = np.squeeze(this_jacobian)
 
         # Compute the Fisher Information Matrix

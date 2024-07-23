@@ -47,7 +47,7 @@ def example1():
 
     fig = plt.figure()
     for idx, this_thop in enumerate(t_hop):
-        plt.plot(snr_db_vec, prob_det[:, idx], label=r'$T_{hop}$ = ' + '{:.1f} ms'.format(this_thop*1e3))
+        plt.plot(snr_db_vec, prob_det[:, idx], label=r'$T_{{hop}}$ = ' + '{:.1f} ms'.format(this_thop*1e3))
 
     plt.xlabel('SNR [dB]')
     plt.ylabel('$P_D$')

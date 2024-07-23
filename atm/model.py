@@ -35,7 +35,8 @@ def calc_atm_loss(freq_hz, gas_path_len_m=0, rain_path_len_m=0, cloud_path_len_m
 
     # Compute loss coefficients
     if np.any(gas_path_len_m > 0):
-        coeff_ox, coeff_water = get_gas_loss_coeff(freq_hz, atmosphere.press, atmosphere.water_vapor_press, atmosphere.temp)
+        coeff_ox, coeff_water = get_gas_loss_coeff(freq_hz, atmosphere.press, atmosphere.water_vapor_press,
+                                                   atmosphere.temp)
         coeff_gas = coeff_ox + coeff_water
     else:
         coeff_gas = 0
@@ -170,8 +171,8 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     m = -0.18961
     ck = 0.71147
 
-    log_kh = np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True) \
-                + (m * np.log10(freq_hz / 1e9) + ck)
+    log_kh = (np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True)
+              + (m * np.log10(freq_hz / 1e9) + ck))
     kh = 10**log_kh
     
     # Coeffs for kv
@@ -182,8 +183,8 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     ck = 0.63297
 
     # Sum across the coefficient array and squeeze out that dimension
-    log_kv = np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True) + \
-               (m * np.log10(freq_hz / 1e9) + ck)
+    log_kv = (np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True)
+              + (m * np.log10(freq_hz / 1e9) + ck))
     kv = 10**log_kv
     
     # Coeffs for ah
@@ -194,8 +195,8 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     ca = -1.95537
 
     # Sum across the coefficient array and squeeze out that dimension
-    ah = np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True) \
-         + (m * np.log10(freq_hz / 1e9) + ca)
+    ah = (np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True)
+          + (m * np.log10(freq_hz / 1e9) + ca))
 
     # Coeffs for av
     a = np.array([-0.07771, 0.56727, -0.20238, -48.2991, 48.5833])
@@ -205,8 +206,8 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     ca = 0.83433
 
     # Sum across the coefficient array and squeeze out that dimension
-    av = np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True) \
-         + (m * np.log10(freq_hz / 1e9) + ca)
+    av = (np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True)
+          + (m * np.log10(freq_hz / 1e9) + ca))
     
     # Account for Polarization and Elevation Angles
     k = .5*(kh + kv + (kh-kv) * np.cos(el_angle_rad) ** 2 * np.cos(2 * pol_angle_rad))
@@ -331,12 +332,12 @@ def get_gas_loss_coeff(freq_hz, press, water_vapor_press, temp):
     # fo and nd. This prevents errors with array broadcasting.
     f0 = np.squeeze(f0)
     nd = np.squeeze(nd)
-    refractivity_oxygen = np.sum(np.multiply(line_strength_oxygen,line_shape_oxygen), axis=-1) + nd
-    refractivity_water = np.sum(np.multiply(line_strength_water,line_shape_water), axis=-1)
+    refractivity_oxygen = np.sum(np.multiply(line_strength_oxygen, line_shape_oxygen), axis=-1) + nd
+    refractivity_water = np.sum(np.multiply(line_strength_water, line_shape_water), axis=-1)
 
     # Compute coefficients
-    coeff_ox = .1820*np.multiply(f0,refractivity_oxygen)
-    coeff_water = .1820*np.multiply(f0,refractivity_water)
+    coeff_ox = .1820*np.multiply(f0, refractivity_oxygen)
+    coeff_water = .1820*np.multiply(f0, refractivity_water)
     
     # Handle all freqs < 1 GHz
     if np.any(f0 < 1):

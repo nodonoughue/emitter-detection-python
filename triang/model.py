@@ -1,6 +1,5 @@
 import numpy as np
-import scipy.linalg
-
+from scipy.linalg import solve_triangular
 import utils
 
 
@@ -91,7 +90,8 @@ def jacobian(x_sensor, x_source, do_2d_aoa=False):
     np.seterr(all='ignore')
 
     # Compute the Offset Vectors
-    dx = np.reshape(x_source, (n_dim, 1, n_source)) - np.reshape(x_sensor, (n_dim, n_sensor, 1))  # n_dim x n_sensor x n_source
+    dx = (np.reshape(x_source, (n_dim, 1, n_source))
+          - np.reshape(x_sensor, (n_dim, n_sensor, 1)))  # n_dim x n_sensor x n_source
     slant_range_sq = np.sum(dx ** 2, axis=0)  # Euclidean norm-squared for each offset vector, n_sensor x n_source
     ground_range_sq = np.sum(dx[0:2, :, :]**2, axis=0)  # Ground grange squared, n_sensor x n_source
 
@@ -189,7 +189,7 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False):
         err = utils.modulo2pi(psi - this_psi)
 
         # Compute the scaled log likelihood
-        a = scipy.linalg.solve_triangular(cov_lower, err)
+        a = solve_triangular(cov_lower, err)
         ell[idx_source] = - np.conj(a.T) @ a
 
     return ell
@@ -238,7 +238,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, do_2d_aoa):
     x_vec = xx_vec[0, :]
     y_vec = xx_vec[1, :]
     xx, yy = np.meshgrid(x_vec, y_vec)
-    x_plot = np.stack(xx.flatten(), yy.flatten(), axis=1).T  # 2 x numPts^2
+    x_plot = np.stack((xx.flatten(), yy.flatten()), axis=1).T  # 2 x numPts^2
 
     epsilon = np.zeros_like(xx)
     for idx_pt in np.arange(np.size(xx)):
@@ -251,19 +251,19 @@ def error(x_sensor, cov, x_source, x_max, num_pts, do_2d_aoa):
         err = utils.modulo2pi(psi - psi_i)
 
         # Evaluate the scaled log likelihood
-        a = scipy.linalg.solve_triangular(cov_lower, err)
+        a = solve_triangular(cov_lower, err)
         epsilon[idx_pt] = np.conj(a.T) @ a
 
     return epsilon
 
 
-def drawLob(x_sensor, psi, x_source=None, scale = 1):
+def drawLob(x_sensor, psi, x_source=None, scale=1):
     M1 = x_sensor.shape[1]
     M2 = len(psi)
 
     if M1 != M2:
         print('The number of sensor positions and measurements must match.\n')
-        M = np.min([M1,M2])
+        M = np.min([M1, M2])
         x_sensor = x_sensor[:M]
         psi = psi[:M]
     else:
@@ -278,13 +278,12 @@ def drawLob(x_sensor, psi, x_source=None, scale = 1):
     x_end = np.cos(psi) * range * scale
     y_end = np.sin(psi) * range * scale
 
-    xy_end = np.vstack([ np.reshape(x_end, [1,1,M]),
-                        np.reshape(y_end, [1,1,M]),
-                        ])
-    xy_start = np.zeros([2,1,M])
+    xy_end = np.vstack([np.reshape(x_end, [1, 1, M]),
+                        np.reshape(y_end, [1, 1, M])])
+    xy_start = np.zeros([2, 1, M])
     xy_lob_centered = np.hstack([xy_start,
                                  xy_end
                                  ])
-    xy_lob  = np.reshape(x_sensor,[2,1,M]) + xy_lob_centered
+    xy_lob = np.reshape(x_sensor,[2, 1, M]) + xy_lob_centered
 
     return xy_lob

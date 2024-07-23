@@ -2,6 +2,7 @@ import utils
 from utils import solvers
 import model
 import numpy as np
+import math
 from itertools import combinations
 
 
@@ -188,7 +189,7 @@ def angle_bisector(x_sensor, psi):
     if num_sensors <= 15:
         # Get all possible sets of 3 sensors
         sensor_sets = combinations(np.arange(num_sensors), 3)
-        num_sets = np.math.factorial(num_sensors) / (np.math.factorial(3)*np.math.factorial(num_sensors-3))
+        num_sets = math.factorial(num_sensors) / (math.factorial(3)*math.factorial(num_sensors-3))
     else:
         # If there are more than ~15 rows, nchoosek returns an extremely large
         # set.
@@ -264,7 +265,7 @@ def centroid(x_sensor, psi):
     if num_sensors <= 15:
         # Get all possible sets of 3 sensors
         sensor_sets = combinations(np.arange(num_sensors), 3)
-        num_sets = np.math.factorial(num_sensors) / (np.math.factorial(3)*np.math.factorial(num_sensors-3))
+        num_sets = math.factorial(num_sensors) / (math.factorial(3)*math.factorial(num_sensors-3))
     else:
         # If there are more than ~15 rows, nchoosek returns an extremely large
         # set.

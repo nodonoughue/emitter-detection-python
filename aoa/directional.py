@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from utils.unit_conversions import db_to_lin
-from utils import constants
 from .aoa import make_gain_functions
 
 
@@ -44,7 +43,7 @@ def crlb(snr, M, g, g_dot, psi_samples, psi_true):
     return 1./jacobian  # 1 x numel(th)
 
 
-def compute_df(s, psi_samples, g, psi_res = 0.1, min_psi = -np.pi, max_psi = np.pi):
+def compute_df(s, psi_samples, g, psi_res=0.1, min_psi=-np.pi, max_psi=np.pi):
     """
     Computes an estimate of the angle of arrival psi (in radians) for a set of amplitude measurements s, taken at
     various steering angles psi_samples
@@ -115,15 +114,15 @@ def run_example():
     # Create the antenna pattern generating function
     # --- NOTE --- g,g_dot take radian inputs (psi, not theta)
     d_lam = .25
-    [g,g_dot] = make_gain_functions(type='adcock', d_lam=d_lam, psi_0=0.)
+    [g, g_dot] = make_gain_functions(type='adcock', d_lam=d_lam, psi_0=0.)
         
     # Generate the angular samples and true gain values
     th_true = 5.                    # degrees
     psi_true = np.deg2rad(th_true)  # radians
-    psi_res = .001 # desired resolution from multi-stage search directional_df() for details.
+    psi_res = .001  # desired resolution from multi-stage search directional_df() for details.
 
     num_angles = 10.                         # Number of angular samples
-    th = np.linspace(start=-180, stop=180, num=num_angles, endpoint=False) # evenly spaced across unit circle
+    th = np.linspace(start=-180., stop=180., num=num_angles, endpoint=False)  # evenly spaced across unit circle
     psi = np.deg2rad(th)
     x = g(psi-psi_true)  # Actual gain values
     
@@ -140,11 +139,11 @@ def run_example():
     # Loop over parameters
     print('Executing Adcock Monte Carlo sweep...')
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
-        this_num_mc = num_mc / num_samples
-        print('\tnum_samples={}'.format(num_samples))
+        this_num_mc = num_mc / num_samples[0]
+        print('\tnum_samples={}'.format(num_samples[0]))
     
         # Generate Monte Carlo Noise with unit power
-        noise_base = [np.random.normal(size=(num_angles,num_samples)) for _ in np.arange(this_num_mc)]
+        noise_base = [np.random.normal(size=(num_angles, num_samples[0])) for _ in np.arange(this_num_mc)]
         
         # Loop over SNR levels
         for snr_db, idx_snr in enumerate(snr_db_vec):
@@ -186,16 +185,16 @@ def run_example():
     # ============================= Reflector/Array Test Script =============================
     # Create the antenna pattern generating function
     D_lam = 5
-    [g,g_dot] = make_gain_functions(type='rectangular', d_lam=D_lam, psi_0=0.)
+    [g, g_dot] = make_gain_functions(type='rectangular', d_lam=D_lam, psi_0=0.)
         
     # Generate the angular samples and true gain values
     th_true = 5.
     psi_true = np.deg2rad(th_true)
-    num_angles = 36 # number of samples
+    num_angles = 36  # number of samples
     th = np.linspace(start=-180, stop=180, num=num_angles, endpoint=False)  # evenly spaced across unit circle
     psi = np.deg2rad(th)
     x = g(psi - psi_true)  # Actual gain values
-    psi_res = .001 # desired resolution from multi-stage search, see directional_df for details.
+    psi_res = .001  # desired resolution from multi-stage search, see directional_df for details.
 
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100])  # Number of temporal samples at each antenna test point
@@ -210,11 +209,11 @@ def run_example():
     # Loop over parameters
     print('Executing Adcock Monte Carlo sweep...')
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
-        this_num_mc = num_mc / num_samples
-        print('\tnum_samples={}'.format(num_samples))
+        this_num_mc = num_mc / num_samples[0]
+        print('\tnum_samples={}'.format(num_samples[0]))
 
         # Generate Monte Carlo Noise with unit power
-        noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in np.arange(this_num_mc)]
+        noise_base = [np.random.normal(size=(num_angles, num_samples[0])) for _ in np.arange(this_num_mc)]
 
         # Loop over SNR levels
         for snr_db, idx_snr in enumerate(snr_db_vec):

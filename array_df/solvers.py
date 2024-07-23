@@ -1,5 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
+
 
 def beamscan(x, v, psi_max=np.pi/2, num_points=101):
     """

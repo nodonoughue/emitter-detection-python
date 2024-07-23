@@ -177,7 +177,7 @@ def make_figure_3(prefix=None):
     thermal_plus_noise_label = 'Thermal + Atmospheric Noise'
 
     # Iterate over zenith angles
-    for idx_ang, this_zenith in enumerate(zenith_angle_deg):
+    for this_zenith in zenith_angle_deg:
         ta = noise.model.get_atmospheric_noise_temp(freq_hz=freq_vec, alt_start_m=0, el_angle_deg=90-this_zenith)
 
         handle = plt.semilogx(freq_ghz, ta, label='{}{} from Zenith'.format(this_zenith, degree_sign))

@@ -20,6 +20,7 @@ import seaborn as sns
 import detector
 from examples import chapter4
 
+
 def make_all_figures(close_figs=False):
     """
     Call all the figure generators for this chapter
@@ -181,7 +182,7 @@ def make_figure_1b(prefix=None, rng=None):
     plt.annotate(text='', xy=(-.5, 0), xytext=(-.5, -3), arrowprops=dict(arrowstyle='<->', color='k'))
     plt.annotate(text='', xy=(f0-bw/2, -3), xytext=(f0+bw/2, -3), arrowprops=dict(arrowstyle='<->', color='k'))
     plt.annotate(text=r'$B_s=1/T_{\mathrm{chip}}$', xy=(f0, -3), xytext=(.1, -6), arrowprops=dict(arrowstyle='-',
-        color='k'))
+                 color='k'))
     # Turn off the axes
     ax = plt.gca()
     ax.axis('off')
@@ -579,7 +580,6 @@ def make_figure_7(prefix=None):
     :return: figure handle
     """
 
-    
     fig7 = chapter4.example1()
 
     # Save figure

@@ -4,6 +4,7 @@ import model
 import numpy as np
 solvers = utils.solvers
 
+
 def max_likelihood(x_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx=None, do_resample=False):
     """
     Construct the ML Estimate by systematically evaluating the log

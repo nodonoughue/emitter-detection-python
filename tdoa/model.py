@@ -4,6 +4,7 @@ import utils
 unit_conversions = utils.unit_conversions
 geo = utils.geo
 
+
 def measurement(x_sensor, x_source, ref_idx=None):
     """
     Computes TDOA measurements and converts to range difference of arrival (by compensating for the speed of light).
@@ -25,7 +26,6 @@ def measurement(x_sensor, x_source, ref_idx=None):
 
     if n_dim1 != n_dim2:
         raise TypeError('First dimension of all inputs must match')
-
 
     # Parse sensor pairs
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
@@ -86,7 +86,8 @@ def jacobian(x_sensor, x_source, ref_idx=None):
         out_dims = (n_dim, n_msmt)
 
     j = np.reshape(j, newshape=out_dims)
-    # j = np.delete(j, np.unique(ref_idx_vec), axis=1) # remove reference id b/c its all zeros # not needed when parse_ref_sensors is fixed
+    # j = np.delete(j, np.unique(ref_idx_vec), axis=1) # remove reference id b/c its all zeros
+    # not needed when parse_ref_sensors is fixed
     return j
 
 
@@ -187,8 +188,8 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=Fal
     xx_vec = x_max.flatten() * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))
     x_vec = xx_vec[0, :]
     y_vec = xx_vec[1, :]
-    xx, yy = np.mgrid(x_vec, y_vec)
-    x_plot = np.vstack(xx.flatten(), yy.flatten()).T  # 2 x numPts^2
+    xx, yy = np.meshgrid(x_vec, y_vec)
+    x_plot = np.vstack((xx.flatten(), yy.flatten())).T  # 2 x numPts^2
 
     epsilon = np.zeros_like(xx)
     for idx_pt in np.arange(np.size(xx)):

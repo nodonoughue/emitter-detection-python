@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-import scipy.linalg
+from scipy.linalg import block_diag
 
 import utils
 import hybrid
@@ -63,7 +63,7 @@ def example1(rng=np.random.default_rng()):
     covar_rdoa = utils.resample_covariance_matrix(covar_roa, tdoa_ref_idx)
     covar_rrdoa = utils.resample_covariance_matrix(covar_rroa, fdoa_ref_idx)
 
-    covar_rho = scipy.linalg.block_diag(covar_ang, covar_rdoa, covar_rrdoa)
+    covar_rho = block_diag(covar_ang, covar_rdoa, covar_rrdoa)
     covar_lower = np.linalg.cholesky(covar_rho)
     covar_inv = np.linalg.inv(covar_rho)
 
@@ -193,7 +193,7 @@ def example2(rng=np.random.default_rng()):
     covar_rdoa = utils.resample_covariance_matrix(covar_roa, tdoa_ref_idx)
     covar_rrdoa = utils.resample_covariance_matrix(covar_rroa, fdoa_ref_idx)
 
-    covar_rho = scipy.linalg.block_diag(covar_ang, covar_rdoa, covar_rrdoa)
+    covar_rho = block_diag(covar_ang, covar_rdoa, covar_rrdoa)
     covar_lower = np.linalg.cholesky(covar_rho)
     covar_inv = np.linalg.inv(covar_rho)
 

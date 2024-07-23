@@ -97,11 +97,12 @@ def generate_ex1_data(rng=None):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    sio.savemat('./ex8_1.mat', {'x': noisy_signal,
-                                       'num_sources': num_sources,
-                                       'num_elements': num_elements,
-                                       'num_samples': num_samples,
-                                       'd_lam': d_lam})
+    sio.savemat('./ex8_1.mat',
+                {'x': noisy_signal,
+                 'num_sources': num_sources,
+                 'num_elements': num_elements,
+                 'num_samples': num_samples,
+                 'd_lam': d_lam})
 
     # ===== Problem 8.5 =====
 
@@ -141,21 +142,21 @@ def generate_ex1_data(rng=None):
 
     # Set up received data vector
     v_steer_mtx = v(psi)  # num_elements x num_sources
-    rx_signal = np.matmul( np.multiply(v_steer_mtx,np.sqrt(rx_pwr_w[:]/2)),
-                        (rng.standard_normal(size=(num_sources, num_samples))
-                        + 1j * (rng.standard_normal(size=(num_sources, num_samples))))
-        )
+    rx_signal = np.matmul(np.multiply(v_steer_mtx, np.sqrt(rx_pwr_w[:]/2)),
+                          (rng.standard_normal(size=(num_sources, num_samples))
+                          + 1j * (rng.standard_normal(size=(num_sources, num_samples)))))
 
     # Add noise
     noise = np.sqrt(rx_noise_w/2)*(rng.standard_normal(size=(num_elements, num_samples))
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    sio.savemat('./problem8_5.mat', {'x': noisy_signal,
-                                      'num_sources': num_sources,
-                                      'num_elements': num_elements,
-                                      'num_samples': num_samples,
-                                      'd_lam': d_lam})
+    sio.savemat('./problem8_5.mat',
+                {'x': noisy_signal,
+                 'num_sources': num_sources,
+                 'num_elements': num_elements,
+                 'num_samples': num_samples,
+                 'd_lam': d_lam})
 
     # ===== Problem 8.6 =====
 
@@ -195,21 +196,21 @@ def generate_ex1_data(rng=None):
 
     # Set up received data vector
     v_steer_mtx = v(psi)  # num_elements x num_sources
-    rx_signal = np.matmul( np.multiply(v_steer_mtx,np.sqrt(rx_pwr_w[:]/2)),
-                        (rng.standard_normal(size=(num_sources, num_samples))
-                        + 1j * (rng.standard_normal(size=(num_sources, num_samples))))
-                )
+    rx_signal = np.matmul(np.multiply(v_steer_mtx, np.sqrt(rx_pwr_w[:]/2)),
+                          (rng.standard_normal(size=(num_sources, num_samples))
+                          + 1j * (rng.standard_normal(size=(num_sources, num_samples)))))
 
     # Add noise
     noise = np.sqrt(rx_noise_w/2)*(rng.standard_normal(size=(num_elements, num_samples))
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    sio.savemat('./problem8_6.mat', {'x': noisy_signal,
-                                      'num_sources': num_sources,
-                                      'num_elements': num_elements,
-                                      'num_samples': num_samples,
-                                      'd_lam': d_lam})
+    sio.savemat('./problem8_6.mat',
+                {'x': noisy_signal,
+                 'num_sources': num_sources,
+                 'num_elements': num_elements,
+                 'num_samples': num_samples,
+                 'd_lam': d_lam})
 
 
 def example1(rng=None):

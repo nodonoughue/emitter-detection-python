@@ -124,7 +124,8 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     # n_dim x n_dim x n_sensor x n_source
     
     # Compute the gradient of R_n
-    dv = np.reshape(v_sensor, (n_dim, n_sensor2, 1)) - np.reshape(v_source, (n_dim, 1, n_source2))  # n_dim x n_sensor x n_source
+    dv = (np.reshape(v_sensor, (n_dim, n_sensor2, 1))
+          - np.reshape(v_source, (n_dim, 1, n_source2)))  # n_dim x n_sensor x n_source
     dv_norm = dv/rn  # n_dim x n_sensor x n_source
     # Iterate the matmul over the number of sensors and sources
     nabla_rn = np.asarray([[np.dot(np.eye(n_dim) - px[:, :, idx_sen, idx_src],
@@ -142,7 +143,8 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
         out_dims = (n_dim, n_msmt)
 
     result = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], newshape=out_dims)
-    #result = np.delete(result, np.unique(ref_idx_vec), axis=1) # rm ref_sensor column b/c all zeros # not needed when parse_ref_sensors is fixed
+    # result = np.delete(result, np.unique(ref_idx_vec), axis=1) # rm ref_sensor column b/c all zeros
+    # not needed when parse_ref_sensors is fixed
     return result  # n_dim x nPair x n_source
 
 

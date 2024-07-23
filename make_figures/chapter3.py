@@ -20,6 +20,7 @@ import prop
 import detector
 from examples import chapter3
 
+
 def make_all_figures(close_figs=False):
     """
     Call all the figure generators for this chapter
@@ -390,7 +391,6 @@ def make_figure_9(prefix=None, rng=None, colors=None):
     :return: figure handle
     """
 
-    
     fig9 = chapter3.example1(rng, colors)
 
     # Save figure

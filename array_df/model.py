@@ -114,7 +114,7 @@ def make_arbitrary_steering_vector(d_lam_vec):
     """
 
     # Ensure that the input is a row vector
-    d_lam_vec = np.flatten(d_lam_vec)
+    d_lam_vec = d_lam_vec.flatten()
 
     # Accumulate the inter-element spacings, to compute the distance from each
     # element to the reference element (first)

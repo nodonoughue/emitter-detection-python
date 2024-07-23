@@ -117,10 +117,10 @@ def parse_reference_sensor(ref_idx, num_sensors):
 
     if ref_idx is None:
         # Default behavior is to use the last sensor as a common reference
-        #test_idx_vec = np.arange(num_sensors)#np.asarray([i for i in np.arange(num_sensors - 1)])
+        # test_idx_vec = np.arange(num_sensors)#np.asarray([i for i in np.arange(num_sensors - 1)])
 
         # do num_sensors=1 b/c we don't want to compare ref sensor to ref sensor
-        test_idx_vec = np.arange(num_sensors-1)#np.asarray([i for i in np.arange(num_sensors - 1)])
+        test_idx_vec = np.arange(num_sensors-1)  # np.asarray([i for i in np.arange(num_sensors - 1)])
         ref_idx_vec = (num_sensors - 1) * np.ones_like(test_idx_vec)
 
     elif ref_idx == 'full':
@@ -188,7 +188,7 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
     b_i_wt = 1.
     b_j_wt = 1.
 
-    def element_func(idx_row,idx_col):
+    def element_func(idx_row, idx_col):
         idx_row = idx_row.astype(int)
         idx_col = idx_col.astype(int)
         a_i = test_idx_vec[idx_row % n_test]
@@ -206,7 +206,7 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
         else:
             b_i_wt = b_j_wt = 1
 
-        cov_aiaj = cov[a_i,a_j]
+        cov_aiaj = cov[a_i, a_j]
         cov_aibj = np.zeros_like(cov_aiaj)
         cov_biaj = cov_aibj.copy()
         cov_bibj = cov_aibj.copy() 
@@ -216,23 +216,23 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
         mask_bi = np.isnan(b_i)
         mask_bj = np.isnan(b_j)
 
-        mask_bibj = ~np.logical_or(mask_bi,mask_bj)
+        mask_bibj = ~np.logical_or(mask_bi, mask_bj)
         if not np.all(mask_bibj):
             cov_bibj[mask_bibj] = cov[b_i[mask_bibj].astype(int), b_j[mask_bibj].astype(int)]
         else: 
-            cov_bibj = cov[b_i.astype(int),b_j.astype(int)]
+            cov_bibj = cov[b_i.astype(int), b_j.astype(int)]
             
-        mask_aibj = ~np.logical_or(mask_ai,mask_bj)
+        mask_aibj = ~np.logical_or(mask_ai, mask_bj)
         if not np.all(mask_aibj):
             cov_aibj[mask_aibj] = cov[a_i[mask_aibj].astype(int), b_j[mask_aibj].astype(int)]
         else:
-            cov_aibj = cov[a_i.astype(int),b_j.astype(int)]
+            cov_aibj = cov[a_i.astype(int), b_j.astype(int)]
 
-        mask_biaj = ~np.logical_or(mask_bi,mask_aj)
+        mask_biaj = ~np.logical_or(mask_bi, mask_aj)
         if not np.all(mask_biaj):
             cov_biaj[mask_biaj] = cov[b_i[mask_biaj].astype(int), a_j[mask_biaj].astype(int)]
         else:
-            cov_biaj = cov[b_i.astype(int),a_j.astype(int)]
+            cov_biaj = cov[b_i.astype(int), a_j.astype(int)]
 
         res = b_i_wt * b_j_wt * cov_bibj + \
             a_i_wt * a_j_wt * cov_aiaj - \
@@ -240,7 +240,7 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
             b_i_wt * a_j_wt * cov_biaj
         # raise ValueError('mo')
         return res
-    cov_out = np.fromfunction(element_func, (n_pair_out,n_pair_out), dtype=float)
+    cov_out = np.fromfunction(element_func, (n_pair_out, n_pair_out), dtype=float)
     return cov_out
 
 
@@ -276,7 +276,7 @@ def ensure_invertible(covariance, epsilon=1e-10):
     cov_out = np.zeros(shape=sz)
     for idx_matrix in np.arange(n_matrices):
         # Isolate the current covariance matrix
-        this_cov = np.squeze(covariance[:, :, idx_matrix])
+        this_cov = np.squeeze(covariance[:, :, idx_matrix])
 
         # Eigen-decomposition
         lam, v = np.linalg.eigh(this_cov)

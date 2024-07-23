@@ -42,8 +42,9 @@ def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=Non
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, v_sensor, rho, cov, x_init, v_source=None, alpha=None, beta=None, epsilon=None, max_num_iterations=None,
-                     force_full_calc=False, plot_progress=False, ref_idx=None, do_resample=False):
+def gradient_descent(x_sensor, v_sensor, rho, cov, x_init, v_source=None, alpha=None, beta=None, epsilon=None,
+                     max_num_iterations=None, force_full_calc=False, plot_progress=False, ref_idx=None,
+                     do_resample=False):
     """
     Computes the gradient descent solution for FDOA processing.
 

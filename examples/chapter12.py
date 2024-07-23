@@ -41,8 +41,8 @@ def example1(rng=np.random.default_rng()):
 
     #  Set up FDOA Receiver system
     #  Spacing of 10 km at 120 degree intervals around origin
-    baseline = 10e3    # m
-    std_velocity = 100 # m/s
+    baseline = 10e3     # m
+    std_velocity = 100  # m/s
     num_sensors = 3
     sensor_pos_angle = np.arange(num_sensors)*2*np.pi/num_sensors + np.pi/2
     x_sensor = baseline * np.array([np.cos(sensor_pos_angle), np.sin(sensor_pos_angle)])
@@ -278,9 +278,9 @@ def _mc_iteration(args):
                                                            x_ctr=args['x_init'], search_size=args['x_extent'],
                                                            epsilon=args['grid_res'], do_resample=False)
     res_bf, bf_surf, bf_grid = fdoa.solvers.bestfix(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
-                                        rho=rho, cov=args['covar_rho'],
-                                        x_ctr=args['x_init'], search_size=args['x_extent'], epsilon=args['grid_res'],
-                                        do_resample=False)
+                                                    rho=rho, cov=args['covar_rho'],
+                                                    x_ctr=args['x_init'], search_size=args['x_extent'],
+                                                    epsilon=args['grid_res'], do_resample=False)
     _, res_ls = fdoa.solvers.least_square(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
                                           rho=rho, cov=args['covar_rho'],
                                           x_init=args['x_init'], max_num_iterations=args['num_iterations'],

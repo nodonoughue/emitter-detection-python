@@ -149,7 +149,7 @@ def max_range(prob_fa, prob_d, corr_time, pulse_duration, bw_noise, bw_signal, f
         iter_num = 0        # Iteration counter
 
         # Perform the optimization
-        while iter_num < max_iter and abs(err)>err_tol:
+        while iter_num < max_iter and abs(err) > err_tol:
             # Compute derivative
             d_r = 1  # 1 meter
             y1 = err_fun(this_r+d_r)

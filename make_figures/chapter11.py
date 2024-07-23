@@ -346,7 +346,7 @@ def make_figure_4(prefix=None, rng=np.random.default_rng()):
     chirp_len = np.floor(noise_len/2)    # Length of chirp
     t_chirp = np.arange(chirp_len)
     p = np.sqrt(signal_energy/2)*signal.chirp(t_chirp, f0=0, t1=chirp_len, f1=.1, method='linear', phi=-90)
-    y = np.zeros(shape=(noise_len, ), dtype=np.complex)
+    y = np.zeros(shape=(noise_len, ), dtype=complex)
     y[t0+np.arange(chirp_len).astype(int)] = p+p*np.exp(1j*np.pi/2)
 
     # Sensors Received Signals

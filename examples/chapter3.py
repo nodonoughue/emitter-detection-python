@@ -8,6 +8,7 @@ import utils
 lin_to_db = utils.unit_conversions.lin_to_db
 db_to_lin = utils.unit_conversions.db_to_lin
 
+
 def run_all_examples(rng=None, colors=None):
     """
     Run all chapter 3 examples and return a list of figure handles
@@ -53,7 +54,8 @@ def example1(rng=None, colors=None):
     
     # Compute Losses and Fresnel Zone
     loss_prop = prop.model.get_path_loss(range_m=range_vec, freq_hz=f0, tx_ht_m=ht, rx_ht_m=hr, include_atm_loss=False)
-    loss_prop_coarse = prop.model.get_path_loss(range_m=range_vec_coarse, freq_hz=f0, tx_ht_m=ht, rx_ht_m=hr, include_atm_loss=False)
+    loss_prop_coarse = prop.model.get_path_loss(range_m=range_vec_coarse, freq_hz=f0, tx_ht_m=ht, rx_ht_m=hr,
+                                                include_atm_loss=False)
     
     # Noise Power
     bandwidth = 2e6         # channel bandwidth [Hz]
@@ -177,7 +179,8 @@ def example2(rng=None, colors=None):
 
     alt_m = 1000
 
-    loss_prop_vec = prop.model.get_path_loss(range_m=range_vec, freq_hz=f0, tx_ht_m=alt_m, rx_ht_m=alt_m, include_atm_loss=True)
+    loss_prop_vec = prop.model.get_path_loss(range_m=range_vec, freq_hz=f0, tx_ht_m=alt_m, rx_ht_m=alt_m,
+                                             include_atm_loss=True)
     loss_prop_vec_coarse = prop.model.get_path_loss(range_m=range_vec_coarse, freq_hz=f0, tx_ht_m=alt_m, rx_ht_m=alt_m,
                                                     include_atm_loss=True)
 

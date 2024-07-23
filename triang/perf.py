@@ -1,6 +1,5 @@
 import numpy as np
 import scipy
-import warnings
 
 import utils
 import model
@@ -36,7 +35,7 @@ def compute_crlb(x_aoa, xs, cov):
     if np.isscalar(cov):
         cov = np.array([[cov]])
     # Pre-compute the covariance matrix inverse for speed
-    cov_lower = np.linalg.pinv(cov)#np.linalg.cholesky(cov)
+    cov_lower = np.linalg.pinv(cov)  # np.linalg.cholesky(cov)
 
     # Initialize output variable
     crlb = np.zeros((num_dimension, num_dimension, num_sources))

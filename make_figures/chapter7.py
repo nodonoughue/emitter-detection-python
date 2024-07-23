@@ -274,7 +274,7 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
     # Loop over parameters
     print('Executing Rectangular Aperture Monte Carlo sweep...')
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
-        this_num_mc = int(np.fix(num_mc / num_samples))
+        this_num_mc = int(np.fix(num_mc / num_samples[0]))
         print('\t M={:d}'.format(num_samples))
 
         # Generate Monte Carlo Noise with unit power
@@ -299,7 +299,8 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
             rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2)/this_num_mc)
 
             # CRLB
-            crlb_psi[idx_num_samples, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot, psi, psi_true))
+            crlb_psi[idx_num_samples, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot, psi,
+                                                                                  psi_true))
 
     # Generate figure
     fig5 = plt.figure()
@@ -412,7 +413,7 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
     # Loop over parameters
     print('Executing Watson-Watt Monte Carlo sweep...')
     for idx_M, this_num_samples in enumerate(num_samples_vec):
-        this_num_mc = int(np.fix(num_mc/this_num_samples))
+        this_num_mc = int(np.fix(num_mc/this_num_samples[0]))
         print('\t M={:d}'.format(this_num_samples))
 
         # Generate signal vectors
@@ -570,7 +571,7 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
     # Loop over parameters
     print('Executing Doppler Monte Carlo sweep...')
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
-        this_num_mc = int(np.fix(num_mc/num_samples))
+        this_num_mc = int(np.fix(num_mc/num_samples[0]))
         print('\t M={:d}'.format(num_samples))
 
         # Reference signal
@@ -578,7 +579,7 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
         r0 = signal_amp*np.exp(1j*phi0)*np.exp(1j*2*np.pi*f*t_vec)
 
         # Doppler signal
-        fr = 1/(ts*num_samples)  # Ensure a single cycle during num_samples
+        fr = 1/(ts*num_samples[0])  # Ensure a single cycle during num_samples
         x0 = signal_amp*np.exp(1j*phi0)*np.exp(1j*2*np.pi*f*t_vec)*np.exp(1j*2*np.pi*f*ant_radius/c *
                                                                           np.cos(2*np.pi*fr*t_vec-psi_true))
 

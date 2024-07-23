@@ -35,8 +35,8 @@ def measurement(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_s
         to_concat.append(z_t)
     if x_fdoa is not None:
         z_f = fdoa.model.measurement(x_sensor=x_fdoa, v_sensor=v_fdoa, 
-            x_source=x_source, v_source=v_source,
-            ref_idx=fdoa_ref_idx)
+                                     x_source=x_source, v_source=v_source,
+                                     ref_idx=fdoa_ref_idx)
         to_concat.append(z_f)
 
     # Combine into a single data vector
@@ -87,7 +87,8 @@ def jacobian(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_sour
 
     # Compute Jacobian for FDOA measurements
     if x_fdoa is not None and v_fdoa is not None:
-        j_fdoa = fdoa.model.jacobian(x_sensor=x_fdoa, v_sensor=v_fdoa, x_source=x_source, v_source=v_source, ref_idx=fdoa_ref_idx)
+        j_fdoa = fdoa.model.jacobian(x_sensor=x_fdoa, v_sensor=v_fdoa, x_source=x_source, v_source=v_source,
+                                     ref_idx=fdoa_ref_idx)
     else:
         j_fdoa = np.zeros(shape=empty_dims)
 
@@ -203,7 +204,8 @@ def error(x_source, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, x_max=1, num_pts=
     :param num_pts: Number of test points along each dimension
     :param v_fdoa: nDim x N matrix of sensor velocities
     :param v_source: nDim x 1 matrix of true emitter velocity
-    :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
+    :param tdoa_ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings for TDOA
+    :param fdoa_ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings for FDOA
     :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
     :return epsilon: 2-D plot of FDOA error
     :return x_vec:
