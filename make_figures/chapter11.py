@@ -12,7 +12,7 @@ Nicholas O'Donoughue
 import utils
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy import signal
+import scipy
 import seaborn as sns
 import tdoa
 from examples import chapter11
@@ -290,7 +290,7 @@ def make_figure_3(prefix=None, rng=np.random):
     t0 = int(np.floor(.3*signal_len))  # Start position of chirp
     chirp_len = np.floor(signal_len/2)    # Length of chirp
     t_chirp = np.arange(start=0, stop=chirp_len)
-    p = np.sqrt(signal_energy)*signal.chirp(t=t_chirp, f0=0., t1=chirp_len, f1=.1, method='linear', phi=-90)
+    p = np.sqrt(signal_energy)*scipy.signal.chirp(t=t_chirp, f0=0., t1=chirp_len, f1=.1, method='linear', phi=-90)
     y = np.zeros(shape=(signal_len, ))
     y[t0+t_chirp.astype(int)] = p
 
@@ -345,7 +345,7 @@ def make_figure_4(prefix=None, rng=np.random.default_rng()):
     t0 = int(np.floor(.3*noise_len))  # Start position of chirp
     chirp_len = np.floor(noise_len/2)    # Length of chirp
     t_chirp = np.arange(chirp_len)
-    p = np.sqrt(signal_energy/2)*signal.chirp(t_chirp, f0=0, t1=chirp_len, f1=.1, method='linear', phi=-90)
+    p = np.sqrt(signal_energy/2)*scipy.signal.chirp(t_chirp, f0=0, t1=chirp_len, f1=.1, method='linear', phi=-90)
     y = np.zeros(shape=(noise_len, ), dtype=complex)
     y[t0+np.arange(chirp_len).astype(int)] = p+p*np.exp(1j*np.pi/2)
 

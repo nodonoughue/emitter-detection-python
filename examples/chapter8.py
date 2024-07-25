@@ -5,8 +5,7 @@ from utils.unit_conversions import lin_to_db, db_to_lin
 from utils import print_elapsed
 import prop
 import array_df
-from scipy import signal
-from scipy import io as sio
+import scipy
 import time
 import os
 
@@ -97,12 +96,12 @@ def generate_ex1_data(rng=None):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    sio.savemat('./ex8_1.mat',
-                {'x': noisy_signal,
-                 'num_sources': num_sources,
-                 'num_elements': num_elements,
-                 'num_samples': num_samples,
-                 'd_lam': d_lam})
+    scipy.io.savemat('./ex8_1.mat',
+                     {'x': noisy_signal,
+                      'num_sources': num_sources,
+                      'num_elements': num_elements,
+                      'num_samples': num_samples,
+                      'd_lam': d_lam})
 
     # ===== Problem 8.5 =====
 
@@ -151,12 +150,12 @@ def generate_ex1_data(rng=None):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    sio.savemat('./problem8_5.mat',
-                {'x': noisy_signal,
-                 'num_sources': num_sources,
-                 'num_elements': num_elements,
-                 'num_samples': num_samples,
-                 'd_lam': d_lam})
+    scipy.io.savemat('./problem8_5.mat',
+                     {'x': noisy_signal,
+                      'num_sources': num_sources,
+                      'num_elements': num_elements,
+                      'num_samples': num_samples,
+                      'd_lam': d_lam})
 
     # ===== Problem 8.6 =====
 
@@ -205,12 +204,12 @@ def generate_ex1_data(rng=None):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    sio.savemat('./problem8_6.mat',
-                {'x': noisy_signal,
-                 'num_sources': num_sources,
-                 'num_elements': num_elements,
-                 'num_samples': num_samples,
-                 'd_lam': d_lam})
+    scipy.io.savemat('./problem8_6.mat',
+                     {'x': noisy_signal,
+                      'num_sources': num_sources,
+                      'num_elements': num_elements,
+                      'num_samples': num_samples,
+                      'd_lam': d_lam})
 
 
 def example1(rng=None):
@@ -232,7 +231,7 @@ def example1(rng=None):
         generate_ex1_data(rng)
 
     # Load sample data
-    data = sio.loadmat(data_fnm)
+    data = scipy.io.loadmat(data_fnm)
     #   x                noisy data vector (M x N)
     #   num_source       number of sources
     #   num_elements     number of array elements
@@ -244,7 +243,7 @@ def example1(rng=None):
 
     # Call Beamformer
     pwr_vec, psi_vec = array_df.solvers.beamscan(data['x'], v, np.pi/2, 1001)
-    peaks, _ = signal.find_peaks(pwr_vec, prominence=.1*np.max(pwr_vec))
+    peaks, _ = scipy.signal.find_peaks(pwr_vec, prominence=.1*np.max(pwr_vec))
     print(peaks)
     psi_peaks = psi_vec[peaks]
     peak_vals = pwr_vec[peaks]
@@ -252,7 +251,7 @@ def example1(rng=None):
 
     # Call MVDR Beamformer
     pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(data['x'], v, np.pi/2, 1001)
-    peaks_mvdr, _ = signal.find_peaks(pwr_vec_mvdr, prominence=.1*np.max(pwr_vec_mvdr))
+    peaks_mvdr, _ = scipy.signal.find_peaks(pwr_vec_mvdr, prominence=.1*np.max(pwr_vec_mvdr))
     psi_peaks_mvdr = psi_vec[peaks_mvdr]
     peak_vals_mvdr = pwr_vec_mvdr[peaks_mvdr]
     th_peaks_mvdr = 180*psi_peaks_mvdr/np.pi
