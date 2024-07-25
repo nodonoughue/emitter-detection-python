@@ -139,14 +139,14 @@ def run_example():
     # Loop over parameters
     print('Executing Adcock Monte Carlo sweep...')
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
-        this_num_mc = num_mc / num_samples[0]
-        print('\tnum_samples={}'.format(num_samples[0]))
+        this_num_mc = num_mc / num_samples
+        print('\tnum_samples={}'.format(num_samples))
     
         # Generate Monte Carlo Noise with unit power
-        noise_base = [np.random.normal(size=(num_angles, num_samples[0])) for _ in np.arange(this_num_mc)]
+        noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in np.arange(this_num_mc)]
         
         # Loop over SNR levels
-        for snr_db, idx_snr in enumerate(snr_db_vec):
+        for idx_snr, snr_db in enumerate(snr_db_vec):
             print('.')
             
             # Compute noise power, scale base noise
@@ -168,7 +168,7 @@ def run_example():
 
     _, _ = plt.subplots()
 
-    for this_num_samples, idx_num_samples in enumerate(num_samples_vec):
+    for idx_num_samples, this_num_samples in enumerate(num_samples_vec):
         crlb_label = 'CRLB, M={}'.format(this_num_samples)
         mc_label = 'Simulation Result, M={}'.format(this_num_samples)
 
@@ -209,14 +209,14 @@ def run_example():
     # Loop over parameters
     print('Executing Adcock Monte Carlo sweep...')
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
-        this_num_mc = num_mc / num_samples[0]
-        print('\tnum_samples={}'.format(num_samples[0]))
+        this_num_mc = num_mc / num_samples
+        print('\tnum_samples={}'.format(num_samples))
 
         # Generate Monte Carlo Noise with unit power
-        noise_base = [np.random.normal(size=(num_angles, num_samples[0])) for _ in np.arange(this_num_mc)]
+        noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in np.arange(this_num_mc)]
 
         # Loop over SNR levels
-        for snr_db, idx_snr in enumerate(snr_db_vec):
+        for idx_snr, snr_db in enumerate(snr_db_vec):
             print('.')
 
             # Compute noise power, scale base noise
@@ -238,7 +238,7 @@ def run_example():
 
     _, _ = plt.subplots()
 
-    for this_num_samples, idx_num_samples in enumerate(num_samples_vec):
+    for idx_num_samples, this_num_samples in enumerate(num_samples_vec):
         crlb_label = 'CRLB, M={}'.format(this_num_samples)
         mc_label = 'Simulation Result, M={}'.format(this_num_samples)
 

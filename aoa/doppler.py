@@ -170,7 +170,7 @@ def run_example():
 
     # Loop over parameters
     print('Executing Doppler Monte Carlo sweep...')
-    for this_num_samples, idx_num_samples in enumerate(num_samples_vec):
+    for idx_num_samples, this_num_samples in enumerate(num_samples_vec):
         this_num_mc = num_mc / this_num_samples
         print('\t M={}'.format(this_num_samples))
 
@@ -216,7 +216,7 @@ def run_example():
 
     print('done.')
 
-    for this_num_samples, idx_num_samples in enumerate(num_samples_vec):
+    for idx_num_samples, this_num_samples in enumerate(num_samples_vec):
         crlb_label = 'CRLB, M={}'.format(this_num_samples)
         mc_label = 'Simulation Result, M={}'.format(this_num_samples)
 

@@ -274,7 +274,7 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
     # Loop over parameters
     print('Executing Rectangular Aperture Monte Carlo sweep...')
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
-        this_num_mc = int(np.fix(num_mc / num_samples[0]))
+        this_num_mc = int(np.fix(num_mc / num_samples))
         print('\t M={:d}'.format(num_samples))
 
         # Generate Monte Carlo Noise with unit power
@@ -413,7 +413,7 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
     # Loop over parameters
     print('Executing Watson-Watt Monte Carlo sweep...')
     for idx_M, this_num_samples in enumerate(num_samples_vec):
-        this_num_mc = int(np.fix(num_mc/this_num_samples[0]))
+        this_num_mc = int(np.fix(num_mc/this_num_samples))
         print('\t M={:d}'.format(this_num_samples))
 
         # Generate signal vectors
