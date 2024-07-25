@@ -1,6 +1,6 @@
 import utils
 # from ..utils import solvers
-import model
+from . import model
 import numpy as np
 solvers = utils.solvers
 

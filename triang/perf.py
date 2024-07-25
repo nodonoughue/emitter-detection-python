@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 
 import utils
-import model
+from . import model
 
 
 def compute_crlb(x_aoa, xs, cov):
