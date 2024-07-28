@@ -159,6 +159,7 @@ def make_figure_3(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+    import warnings
 
     zenith_angle_deg = np.array([0, 10, 30, 60])
 
@@ -178,7 +179,9 @@ def make_figure_3(prefix=None):
 
     # Iterate over zenith angles
     for this_zenith in zenith_angle_deg:
-        ta = noise.model.get_atmospheric_noise_temp(freq_hz=freq_vec, alt_start_m=0, el_angle_deg=90-this_zenith)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # This sets an overflow warning in db_to_lin; ignore it
+            ta = noise.model.get_atmospheric_noise_temp(freq_hz=freq_vec, alt_start_m=0, el_angle_deg=90-this_zenith)
 
         handle = plt.semilogx(freq_ghz, ta, label='{}{} from Zenith'.format(this_zenith, degree_sign))
         plt.semilogx(freq_ghz, ref_temp + ta, linestyle='-.', color=handle[0].get_color(),
