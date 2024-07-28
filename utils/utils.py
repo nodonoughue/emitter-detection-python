@@ -352,7 +352,7 @@ def print_elapsed(t_elapsed):
     minutes_elapsed = np.floor((t_elapsed - 3600 * hrs_elapsed) / 60)
     secs_elapsed = t_elapsed - hrs_elapsed * 3600 - minutes_elapsed * 60
 
-    print('Elapsed Time: {} hrs, {} min, {} sec'.format(hrs_elapsed, minutes_elapsed, secs_elapsed))
+    print('Elapsed Time: {} hrs, {} min, {:.2f} sec'.format(hrs_elapsed, minutes_elapsed, secs_elapsed))
 
 
 def print_predicted(t_elapsed, pct_elapsed, do_elapsed=False):
