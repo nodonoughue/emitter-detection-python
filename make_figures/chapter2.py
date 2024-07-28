@@ -14,20 +14,18 @@ import utils
 from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy as sp
+from scipy.special import erf, erfinv
+from scipy.linalg import toeplitz
 import seaborn as sns
 from examples import chapter2
-
-erf = sp.special.erf
-erfinv = sp.special.erfinv
 
 
 def make_all_figures(close_figs=False):
     """
     Call all the figure generators for this chapter
 
-    :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
-                 Default=False
+    :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
+                       Default=False
     :return: List of figure handles
     """
 
@@ -305,7 +303,7 @@ def make_figure_5(prefix=None, rng=None):
     s2est = np.convolve(np.squeeze(np.absolute(noise_vec)**2), np.squeeze(mask), 'same')
     
     # Threshold Equation --- need to replace
-    eta = np.sum(sp.linalg.toeplitz(s2est[0:100], s2est), axis=0)/10
+    eta = np.sum(toeplitz(s2est[0:100], s2est), axis=0)/10
 
     # Plot
     fig5 = plt.figure()

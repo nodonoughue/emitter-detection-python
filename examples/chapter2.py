@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import special
+from scipy.special import erf, erfinv
 import matplotlib.pyplot as plt
 
 
@@ -31,10 +31,10 @@ def example2():
 
     # Compute the threshold eta using MATLAB's built-in error function erf(x)
     # and inverse error function erfinv(x).
-    eta = np.sqrt(2*d2_vec) * special.erfinv(1-2*prob_fa)-d2_vec/2
+    eta = np.sqrt(2*d2_vec) * erfinv(1-2*prob_fa)-d2_vec/2
 
     # Compute the probability of detection
-    prob_det = .5*(1-special.erf((eta-d2_vec/2)/np.sqrt(2*d2_vec)))
+    prob_det = .5*(1-erf((eta-d2_vec/2)/np.sqrt(2*d2_vec)))
 
     # Plot the ROC curve
     fig = plt.figure()

@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import array_df
-from examples import chapter8
 import time
+from examples import chapter8
 
 
 def make_all_figures(close_figs=False, force_recalc=True):

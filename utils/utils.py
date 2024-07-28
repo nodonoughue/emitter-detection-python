@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.stats as stats
+from scipy import stats
 from .unit_conversions import lin_to_db
 from itertools import permutations
 import os
