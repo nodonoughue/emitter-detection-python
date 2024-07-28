@@ -4,7 +4,7 @@ from utils.unit_conversions import db_to_lin
 from .aoa import make_gain_functions
 
 
-def crlb(snr, M, g, g_dot, psi_samples, psi_true):
+def crlb(snr, num_samples, g, g_dot, psi_samples, psi_true):
     """
     Computes the CRLB for a directional antenna with amplitude measurements taken at a series of angles.  Supports M
     measurements from each of N different angles.
