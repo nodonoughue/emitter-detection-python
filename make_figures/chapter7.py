@@ -589,7 +589,7 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
     # Loop over parameters
     print('Executing Doppler Monte Carlo sweep...')
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
-        this_num_mc = int(np.fix(num_mc/num_samples[0]))
+        this_num_mc = int(np.fix(num_mc/num_samples))
         print('\t M={:d}'.format(num_samples))
 
         # Reference signal
@@ -597,7 +597,7 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
         r0 = signal_amp*np.exp(1j*phi0)*np.exp(1j*2*np.pi*f*t_vec)
 
         # Doppler signal
-        fr = 1/(ts*num_samples[0])  # Ensure a single cycle during num_samples
+        fr = 1/(ts*num_samples)  # Ensure a single cycle during num_samples
         x0 = signal_amp*np.exp(1j*phi0)*np.exp(1j*2*np.pi*f*t_vec)*np.exp(1j*2*np.pi*f*ant_radius/c *
                                                                           np.cos(2*np.pi*fr*t_vec-psi_true))
 
