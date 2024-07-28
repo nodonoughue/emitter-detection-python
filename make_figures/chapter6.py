@@ -200,7 +200,7 @@ def make_figure_3(prefix=None):
 
     x_vec = np.arange(num_updates)
     plt.scatter(x_vec, y, marker='x', label='Measurement', zorder=10)
-    plt.plot(x_vec, x, linestyle='-.', marker='o', label='Estimate')
+    plt.plot(x_vec, x, linestyle='-.', marker='o', fillstyle='none', label='Estimate')
     plt.legend(loc='upper left')
     plt.xlabel('Time')
     plt.ylabel(r'Parameter ($\theta$)')

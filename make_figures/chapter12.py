@@ -286,8 +286,8 @@ def _make_figure3_subfigure(eps, x_vec, y_vec, x_sensor, v_sensor, x_source, sen
 
     # Add the sensors and source markers
     handle_sensors = plt.scatter(x_sensor[sensors_to_plot, 0], x_sensor[sensors_to_plot, 1],
-                                 marker='o', color='k', s=14)
-    plt.scatter(x_source[0], x_source[1], marker='^', s=14)
+                                 marker='o', color='k', s=16)
+    plt.scatter(x_source[0], x_source[1], marker='^', s=16)
     plt.text(x_source[0] + .25, x_source[1] - .25, 'Source', fontsize=12)
 
     # Annotate the sensors
@@ -300,7 +300,7 @@ def _make_figure3_subfigure(eps, x_vec, y_vec, x_sensor, v_sensor, x_source, sen
                   width=.01, head_width=.05, color=handle_sensors.get_edgecolor())
 
         # Annotation Text
-        plt.text(this_x[0] - .25, this_x[1], '$S_{}$'.format(sensor_num), fontsize=12)
+        plt.text(this_x[0] - .5, this_x[1], '$S_{}$'.format(sensor_num), fontsize=12)
 
     # Remove the axes for a clean image
     plt.axis('off')

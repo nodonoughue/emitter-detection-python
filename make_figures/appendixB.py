@@ -85,26 +85,27 @@ def make_figure_4(prefix=None):
     fresnel_zone_range_vec = []
     fresnel_zone_loss_vec = []
 
-    for freq_hz, ht_m in zip(freq_vec, ht_vec):
+    for freq_hz in freq_vec:
+         for ht_m in ht_vec:
 
-        # Compute Path Loss two ways
-        fspl = prop.model.get_free_space_path_loss(range_m=range_vec, freq_hz=freq_hz, height_tx_m=ht_m,
-                                                   include_atm_loss=False)
-        two_ray = prop.model.get_two_ray_path_loss(range_m=range_vec, freq_hz=freq_hz, height_tx_m=ht_m,
-                                                   include_atm_loss=False)
+            # Compute Path Loss two ways
+            fspl = prop.model.get_free_space_path_loss(range_m=range_vec, freq_hz=freq_hz, height_tx_m=ht_m,
+                                                       include_atm_loss=False)
+            two_ray = prop.model.get_two_ray_path_loss(range_m=range_vec, freq_hz=freq_hz, height_tx_m=ht_m,
+                                                       include_atm_loss=False)
 
-        handle = plt.plot(range_vec/1e3, fspl, label='Free-Space Path Loss, f={} GHz'.format(freq_hz/1e9))
-        plt.plot(range_vec/1e3, two_ray, linestyle='-.', color=handle[0].get_color(),
-                 label='Two-Ray Path Loss, f={} GHz, h={} m'.format(freq_hz/1e9, ht_m))
+            handle = plt.plot(range_vec/1e3, fspl, label='Free-Space Path Loss, f={} GHz'.format(freq_hz/1e9))
+            plt.plot(range_vec/1e3, two_ray, linestyle='-.', color=handle[0].get_color(),
+                     label='Two-Ray Path Loss, f={} GHz, h={} m'.format(freq_hz/1e9, ht_m))
 
-        # Overlay the Fresnel Zone Range
-        r_fz = prop.model.get_fresnel_zone(f0=freq_hz, ht=ht_m, hr=ht_m)
+            # Overlay the Fresnel Zone Range
+            r_fz = prop.model.get_fresnel_zone(f0=freq_hz, ht=ht_m, hr=ht_m)
 
-        y_fz = prop.model.get_free_space_path_loss(range_m=r_fz, freq_hz=freq_hz, height_tx_m=ht_m,
-                                                   include_atm_loss=False)
+            y_fz = prop.model.get_free_space_path_loss(range_m=r_fz, freq_hz=freq_hz, height_tx_m=ht_m,
+                                                       include_atm_loss=False)
 
-        fresnel_zone_range_vec.append(r_fz/1e3)
-        fresnel_zone_loss_vec.append(y_fz)
+            fresnel_zone_range_vec.append(r_fz/1e3)
+            fresnel_zone_loss_vec.append(y_fz)
 
     plt.scatter(fresnel_zone_range_vec, fresnel_zone_loss_vec,
                 marker='^', color='k', zorder=3, label='Fresnel Zone')

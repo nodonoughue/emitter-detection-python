@@ -170,6 +170,7 @@ def make_figure_2(prefix=None):
     # Adjust Axes
     plt.legend(loc='lower right')
     plt.ylim([-.5, 1.5])
+    plt.axis('off')
 
     # Draw the figure
     plt.draw()
@@ -251,9 +252,7 @@ def make_figure_3(prefix=None):
     plt.legend(loc='lower right')
     plt.ylim([-.5, 1.5])
     plt.xlim([-1, 2])
-    
-    # Draw the figure
-    plt.draw()
+    plt.axis('off')
 
     # Save figure
     if prefix is not None:

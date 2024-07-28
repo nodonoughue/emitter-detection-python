@@ -120,7 +120,7 @@ def get_moon_noise_temp():
 def get_cosmic_noise_temp(freq_hz, rx_alt_m=0, alpha_c=0.95, gain_sun_dbi=-np.inf, gain_moon_dbi=-np.inf):
     """
     Computes the combined cosmic noise temperature, including contributions from the sun, the moon, and the galactic
-    background.  Includes approximate effect of atmospheric loss (sun and moon are treated as as coming from zenith;
+    background.  Includes approximate effect of atmospheric loss (sun and moon are treated as coming from zenith),
     rather than their true angles.
 
     Ported from MATLAB Code

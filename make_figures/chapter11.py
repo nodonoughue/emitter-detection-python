@@ -140,7 +140,8 @@ def make_figure_1(prefix=None):
     plt.xlim([-2, 3])
     plt.ylim([-1, 2])
     plt.legend(loc='lower right')
-    
+    plt.axis('off')
+
     # Figure 1b TDOA Circles
     print('Generating Figure 11.1b...')
 
@@ -188,6 +189,7 @@ def make_figure_1(prefix=None):
     plt.xlim([-2, 3])
     plt.ylim([-1, 2])
     plt.legend(loc='lower right')
+    plt.axis('off')
 
     if prefix is not None:
         fig1a.savefig(prefix + 'fig1a.png')
@@ -247,6 +249,7 @@ def make_figure_2(prefix=None):
     # Adjust Display
     plt.xlim([-0.5, 1.5])
     plt.ylim([-1.5, 1.5])
+    plt.axis('off')
 
     if prefix is not None:
         fig2.savefig(prefix + 'fig2.png')
@@ -301,6 +304,7 @@ def make_figure_3(prefix=None, rng=np.random):
     plt.text(830, 2.5, 'Signal')
     plt.text(300, 3, r'$\tau_i$')
     plt.xlim([1, signal_len])
+    plt.axis('off')
 
     if prefix is not None:
         fig3.savefig(prefix + 'fig3.png')
@@ -373,7 +377,7 @@ def make_figure_4(prefix=None, rng=np.random.default_rng()):
     ax2.plot(tau*1e3, np.abs(sx))
     ax2.plot([-10, -10], [0, 40], 'k:')
     # ax2.plot([0, 0], [0, 40], 'k:')
-    ax2.text(-20, 30, r'$\tau_{1,2}$')
+    ax2.text(-25, 30, r'$\tau_{1,2}$')
     # ax2.text(5, 20, '0')
     ax2.set_xlabel('Time Difference of Arrival [ms]')
     ax2.set_title('Cross Correlation')
@@ -651,7 +655,7 @@ def make_figure_9(prefix=None):
     plt.legend(loc='upper left')
 
     # Remove axis ticks and grid
-    ax.grid('off')
+    plt.axis('off')
     ax.set_xticklabels([])
     ax.set_yticklabels([])
 
@@ -708,9 +712,9 @@ def make_figure_10(prefix=None):
 
     # Emitter/Sensor Locations
     plt.plot([x_sensor1[0], x_sensor2[0], x_sensor3[0]],
-             [x_sensor1[1], x_sensor2[1], x_sensor3[1]], 'ko', label='Sensors')
+             [x_sensor1[1], x_sensor2[1], x_sensor3[1]], 'o', label='Sensors')
     plt.plot([x_source1[0], x_source2[0]],
-             [x_source1[1], x_source2[1]], 'k^', markersize=8, label='Transmitters')
+             [x_source1[1], x_source2[1]], '^', markersize=8, label='Transmitters')
 
     # Transmitter/Sensor Labels
     plt.text(x_sensor1[0]+.05, x_sensor1[1]+.1, r'$S_1$')
@@ -734,7 +738,7 @@ def make_figure_10(prefix=None):
     plt.text(label_x_location, y_isochrone2[ind2] + label_y_offset, r'$TDOA_{23,b}$')
 
     # False Solution
-    plt.plot(x_false_solution[0], x_false_solution[1], 'k^', markerfacecolor='k', markersize=8,
+    plt.plot(x_false_solution[0], x_false_solution[1], '^', markersize=8,
              label='False TDOA Solution')
 
     # Adjust Display
@@ -743,7 +747,7 @@ def make_figure_10(prefix=None):
     plt.xlim([-2.5, 3.5])
 
     # Remove axis ticks and grid
-    ax.grid('off')
+    plt.axis('off')
     ax.set_xticklabels([])
     ax.set_yticklabels([])
 

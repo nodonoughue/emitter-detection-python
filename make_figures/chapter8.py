@@ -258,6 +258,7 @@ def make_figure_6(prefix=None):
     plt.ylabel('Array Factor [linear]')
     plt.xlabel(r'$u=sin(\theta)$')
     plt.ylim([-20, 0])
+    plt.xlim([-.3, .3])
 
     if prefix is not None:
         fig6.savefig(prefix + 'fig6.png')
@@ -553,7 +554,6 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
     fig12 = plt.figure()
     plt.semilogy(snr_db, crlb_rmse_deg, linestyle='--', color='black', label='Det. CRLB')
     plt.plot(snr_db, crlb_rmse_deg_stoch, linestyle='-.', color='black', label='Stochastic CRLB')
-    plt.legend(loc='upper right')
 
     plt.plot(snr_db, rmse_deg_beamscan, label='Beamscan', linewidth=2)
     plt.plot(snr_db, rmse_deg_mvdr, label='MVDR', linewidth=1.5)
@@ -561,6 +561,7 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
     
     plt.xlabel('SNR [dB]')
     plt.ylabel('RMSE [deg]')
+    plt.legend(loc='upper right')
 
     if prefix is not None:
         fig12.savefig(prefix + 'fig12.png')

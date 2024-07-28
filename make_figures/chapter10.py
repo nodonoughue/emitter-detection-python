@@ -136,7 +136,8 @@ def make_figure_1(prefix=None, cmap=None):
     # Adjust Axes
     plt.legend(loc='lower right')
     plt.ylim([-.5, 1.5])
-    plt.xlim([-1, 2])
+    plt.xlim([-1.5, 2])
+    plt.axis('off')
 
     if prefix is not None:
         fig1.savefig(prefix + 'fig1.png')
@@ -227,7 +228,8 @@ def make_figure_2(prefix=None, cmap=None):
     # Adjust Axes
     plt.legend(loc='lower right')
     plt.ylim([-.5, 1.5])
-    plt.xlim([-1, 2])
+    plt.xlim([-1.5, 2])
+    plt.axis('off')
 
     if prefix is not None:
         fig2.savefig(prefix + 'fig2.png')
@@ -256,9 +258,9 @@ def make_figure_3(prefix=None):
     num_dims, num_sensors = np.shape(x_sensor)
 
     # Initialize all 3 plots
-    fig3, axes = plt.subplots(nrows=1, ncols=2)
+    fig3, (ax0, ax1) = plt.subplots(nrows=1, ncols=2)
 
-    for this_ax in axes:
+    for this_ax in (ax0, ax1):
         this_ax.plot(np.append(x_sensor[0, :], x_sensor[0, 0]),
                      np.append(x_sensor[1, :], x_sensor[1, 0]), label=None)
 
@@ -271,8 +273,8 @@ def make_figure_3(prefix=None):
         this_vertex = x_sensor[:, idx_sensor]
         this_midpoint = midpoints[:, idx_sensor]
 
-        axes[0].plot([this_vertex[0], this_midpoint[0]],
-                     [this_vertex[1], this_midpoint[1]], label=None, linewidth=0.5)
+        ax0.plot([this_vertex[0], this_midpoint[0]],
+                 [this_vertex[1], this_midpoint[1]], label=None, linewidth=0.5)
 
     # Second subplot -- Angle Bisector method
 
@@ -298,10 +300,11 @@ def make_figure_3(prefix=None):
         this_rng = rng_bisector[idx_sensor]
         this_th = th_bisector[idx_sensor]
 
-        axes[1].plot(this_x[0] + this_rng*np.array([0, np.cos(this_th)]),
-                     this_x[1] + this_rng*np.array([0, np.sin(this_th)]),
-                     linewidth=.5, label=None)
+        ax1.plot(this_x[0] + this_rng*np.array([0, np.cos(this_th)]),
+                 this_x[1] + this_rng*np.array([0, np.sin(this_th)]),
+                 linewidth=.5, label=None)
 
+    plt.axis('off')
     if prefix is not None:
         fig3.savefig(prefix + 'fig3.png')
         fig3.savefig(prefix + 'fig3.svg')
@@ -368,6 +371,7 @@ def make_figure_4(prefix=None):
     plt.legend(loc='upper left')
     plt.xlim([-1.5, 5.5])
     plt.ylim([-.5, 10.5])
+    plt.axis('off')
 
     if prefix is not None:
         fig4.savefig(prefix + 'fig4.png')

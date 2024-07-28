@@ -58,8 +58,8 @@ def example1():
     plt.plot(x, y, linestyle='-', label='Error Ellipse')
 
     # Draw the semi-minor and semi-major axes
-    plt.plot([0, a*np.cos(alpha)], [0, a*np.sin(alpha)], color='k', linestyle='--')
-    plt.plot([0, -b*np.sin(alpha)], [0, b*np.cos(alpha)], color='k', linestyle='--')
+    plt.plot([0, -a*np.cos(alpha)], [0, -a*np.sin(alpha)], color='k', linestyle='--')
+    plt.plot([0, b*np.sin(alpha)], [0, -b*np.cos(alpha)], color='k', linestyle='--')
     plt.text(4.5, -2, '$r_1=7.24$', fontsize=12)
     plt.text(1.1, 2, '$r_2=4.07$', fontsize=12)
     

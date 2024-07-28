@@ -368,9 +368,10 @@ def make_figure_6b(prefix=None):
 
     plt.axis('off')
 
-    plt.text(1.1, .25, 'Reference', fontsize=10)
-    plt.text(1.5, 1, 'Horizontal Adcock', fontsize=10)
-    plt.text(0, 2.1, 'Vertical Adcock', fontsize=10)
+    # Text coordinates are in (th, r) instead of (x, y) because we're using plt.polar
+    plt.text(.25, 1.1, 'Reference', fontsize=10)
+    plt.text(0, 2.1, 'Horizontal Adcock', fontsize=10)
+    plt.text(np.pi/2, 2.1, 'Vertical Adcock', fontsize=10)
 
     if prefix is not None:
         fig6b.savefig(prefix + 'fig6b.png')

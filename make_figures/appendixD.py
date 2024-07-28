@@ -105,12 +105,9 @@ def make_figure_2(prefix=None):
     """
 
     print('Generating Figure D.2...')
-
     # Plot cosmic noise [dB] as a function of frequency for a fixed bandwidth
     # (a) without solar/lunar gain
-    # (b) with solar gain = 0 dBi
     # (c) with solar gain = 30 dBi
-    # (d) with lunar gain = 0 dBi
     # (e) with lunar gain = 30 dBi
 
     freq = np.arange(start=100e6, step=100e6, stop=1e10)
@@ -123,12 +120,12 @@ def make_figure_2(prefix=None):
 
     fig2, ax = plt.subplots()
     plt.loglog(freq_ghz, noise_temp, linestyle='-', linewidth=1, label='Cosmic Noise')
-    plt.loglog(freq_ghz, noise_temp_sun, linewidth=1, label=None)
-    plt.loglog(freq_ghz, noise_temp_moon, linewidth=1, label=None)
+    plt.loglog(freq_ghz, noise_temp_sun, linewidth=1, label='Sun Noise')
+    plt.loglog(freq_ghz, noise_temp_moon, linewidth=1, label='Moon Noise')
     plt.loglog(freq_ghz, ref_temp*np.ones_like(freq), linestyle=':', linewidth=1, label='Thermal Noise')
     plt.loglog(freq_ghz, ref_temp + noise_temp, linestyle='-.', linewidth=1, label='Thermal + Cosmic Noise')
-    plt.loglog(freq_ghz, ref_temp + noise_temp_sun, linestyle='-.', linewidth=1, label=None)
-    plt.loglog(freq_ghz, ref_temp + noise_temp_moon, linestyle='-.', linewidth=1, label=None)
+    plt.loglog(freq_ghz, ref_temp + noise_temp_sun, linestyle='-.', linewidth=1, label='Thermal + Sun Noise')
+    plt.loglog(freq_ghz, ref_temp + noise_temp_moon, linestyle='-.', linewidth=1, label='Thermal + Moon Noise')
 
     plt.text(.7, 200, 'Impact of cosmic noise', fontsize=9)
     ax.annotate("", xy=(1, 1e3), xytext=(1, ref_temp), arrowprops=dict(arrowstyle="->", color="k"))
@@ -192,6 +189,7 @@ def make_figure_3(prefix=None):
     plt.xlabel('Freq [GHz]')
     plt.ylabel('Noise Temperature[K]')
     plt.xlim([1, 350])
+    plt.legend(loc='upper left')
 
     plt.text(60, ref_temp+10, 'Impact of Atmospheric Noise', fontsize=9)
     ax.annotate("", xy=(60, 525), xytext=(60, ref_temp), arrowprops=dict(arrowstyle="->", color="k"))

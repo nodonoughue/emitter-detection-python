@@ -102,7 +102,8 @@ def make_figure_1a(prefix=None):
         plt.plot(num_points*idx*np.array([1, 1]), np.array([-1, 2]), color='k', linestyle=':')
 
     # Annotation
-    plt.annotate(text='', xy=(2*num_points, 1.1), xytext=(3*num_points, 1.1), arrowprops=dict(arrowstyle='<->'))
+    plt.annotate(text='', xy=(2*num_points, 1.1), xytext=(3*num_points, 1.1),
+                 arrowprops=dict(arrowstyle='<->', color='k'))
     plt.text(2.35*num_points, 1.25, r'$T_{chip}$')
 
     # Turn off the axes

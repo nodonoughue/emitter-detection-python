@@ -245,7 +245,7 @@ def example1(rng=None):
     # Call Beamformer
     pwr_vec, psi_vec = array_df.solvers.beamscan(data['x'], v, np.pi/2, 1001)
     peaks, _ = find_peaks(pwr_vec, prominence=.1*np.max(pwr_vec))
-    print(peaks)
+    # print(peaks)
     psi_peaks = psi_vec[peaks]
     peak_vals = pwr_vec[peaks]
     th_peaks = 180*psi_peaks/np.pi

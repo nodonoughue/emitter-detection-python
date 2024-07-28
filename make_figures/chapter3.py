@@ -152,7 +152,7 @@ def make_figure_2(prefix=None):
     signal_vec = np.fmax(0, signal_amplitude * (1 - 2 * np.absolute(np.absolute(freq_vec) - freq0) / bandwidth))
 
     # Filtered
-    bandwidth_filtered = 2*bandwidth
+    bandwidth_filtered = bandwidth
     filter_mask = np.absolute(np.absolute(freq_vec) - freq0) <= bandwidth_filtered/2
     filter_vec = np.zeros_like(freq_vec)   
     filter_vec[filter_mask] = 1.2*signal_amplitude  # Mark the pass-band slightly higher than the signal amplitude
@@ -246,8 +246,8 @@ def make_figure_4(prefix=None):
     print('Generating Figure 3.4...')
 
     prob_fa = 1e-6
-    num_samples = np.expand_dims(np.array([1, 10, 100, 1000]), axis=0)
-    xi_db = np.expand_dims(np.arange(start=-20, step=.1, stop=20.1), axis=1)
+    num_samples = np.array([1, 10, 100, 1000])
+    xi_db = np.arange(start=-20, step=.1, stop=20.1)
     xi_lin = db_to_lin(xi_db)
 
     # Compute threshold
@@ -255,11 +255,12 @@ def make_figure_4(prefix=None):
 
     # Compute Probability of Detection
     chi_lambda = 2*xi_lin  # Non-centrality parameter, lambda, or chi-squared RV
-    prob_det = 1 - stats.ncx2.cdf(x=eta, df=2*num_samples, nc=num_samples*chi_lambda)
+    prob_det = 1 - stats.ncx2.cdf(x=eta[np.newaxis, :], df=2*num_samples[np.newaxis, :],
+                                  nc=num_samples[np.newaxis, :]*chi_lambda[:, np.newaxis])
 
     # Plot
     fig4 = plt.figure()
-    for idx, this_m in enumerate(num_samples[0, :]):
+    for idx, this_m in enumerate(num_samples):
         plt.plot(xi_db, prob_det[:, idx], label='M = {}'.format(this_m))
 
     plt.legend(loc='upper left')
@@ -369,7 +370,7 @@ def make_figure_8(prefix=None):
     snr0 = eirp+rx_gain-rx_loss-noise_pwr  # snr with no propagation loss
     range_max = detector.squareLaw.max_range(prob_fa=1e-6, prob_d=.5, num_samples=10, f0=f0, ht=ht, hr=hr,
                                              snr0=snr0, include_atm_loss=False)
-    print('Max Range: {} m'.format(range_max))
+    print('Max Range: {} m'.format(range_max[0]))
 
     fig8 = plt.figure()
     plt.plot(range_vec/1e3, signal_pwr, label='$P_R$')

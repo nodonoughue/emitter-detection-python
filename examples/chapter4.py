@@ -117,7 +117,6 @@ def example2(colors=None):
     """
 
     # Initialize colormap
-
     if colors is None:
         colors = plt.get_cmap('tab10')
 
@@ -146,7 +145,7 @@ def example2(colors=None):
     xi0 = xi0 + lin_to_db(np.minimum(1, pulse_duration/corr_time))
     
     # Compute Prop Loss
-    range_vec_m = np.logspace(start=4, stop=7, num=100)
+    range_vec_m = np.logspace(start=4, stop=6, num=201)
     prop_loss = prop.model.get_path_loss(range_m=range_vec_m, freq_hz=freq_hz, tx_ht_m=tx_ht_m, rx_ht_m=rx_ht_m,
                                          include_atm_loss=False)
     
