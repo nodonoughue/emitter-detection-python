@@ -330,8 +330,8 @@ def get_gas_loss_coeff(freq_hz, press, water_vapor_press, temp):
     # Compute complex refractivities
     # Now that we've summed over the spectral lines (or, are about to), strip the extra dimension from
     # fo and nd. This prevents errors with array broadcasting.
-    f0 = np.squeeze(f0)
-    nd = np.squeeze(nd)
+    nd = nd[..., 0]
+    f0 = f0[..., 0]
     refractivity_oxygen = np.sum(np.multiply(line_strength_oxygen, line_shape_oxygen), axis=-1) + nd
     refractivity_water = np.sum(np.multiply(line_strength_water, line_shape_water), axis=-1)
 
