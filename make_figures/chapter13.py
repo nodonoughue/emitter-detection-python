@@ -277,7 +277,7 @@ def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_
     # Adjust limits
     plt.xlim([-10, 40])
     plt.ylim([-10, 50])
-    plt.grid('on')
+    plt.grid(True)
 
     # Remove the axes for a clean image
     # plt.axis('off')
@@ -432,7 +432,7 @@ def make_figure_7(prefix):
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
     plt.legend(loc='upper right')
-    plt.grid('off')
+    plt.grid(False)
 
     # Figure 13.7b -- Repeat with +x Velocity
     print('Generating Figure 13.7b...')
@@ -461,7 +461,7 @@ def make_figure_7(prefix):
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
     plt.legend(loc='upper right')
-    plt.grid('off')
+    plt.grid(False)
 
     if prefix is not None:
         fig7a.savefig(prefix + 'fig7a.png')
@@ -552,7 +552,7 @@ def make_figure_8(prefix):
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
     plt.legend(loc='upper right')
-    plt.grid('off')
+    plt.grid(False)
 
     # Figure 13.8b -- Repeat with +x Velocity
     print('Generating Figure 13.8b...')
@@ -581,7 +581,7 @@ def make_figure_8(prefix):
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
     plt.legend(loc='upper right')
-    plt.grid('off')
+    plt.grid(False)
 
     if prefix is not None:
         fig8a.savefig(prefix + 'fig8a.png')
@@ -657,7 +657,7 @@ def make_figure_9(prefix):
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
     plt.legend(loc='upper right')
-    plt.grid('off')
+    plt.grid(False)
 
     if prefix is not None:
         fig9.savefig(prefix + 'fig9.png')

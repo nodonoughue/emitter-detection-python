@@ -351,36 +351,36 @@ def make_figure_4(prefix=None, rng=np.random.default_rng()):
 
     sx = np.fft.fftshift(np.fft.ifft(np.fft.fft(s1)*np.conj(np.fft.fft(s2))))/noise_len
 
-    fig4, axs = plt.subplots(3)
+    fig4, (ax0, ax1, ax2) = plt.subplots(3)
 
     # Subplot 1
-    axs[0].plot(t*1e3, np.real(s1))
-    axs[0].set_title('Sensor 1')
-    axs[0].plot([36, 36], [-10, 10], 'k:')
-    axs[0].text(32, -5, r'$\tau_1$')
-    axs[0].set_ylim([-10, 10])
-    axs[0].set_xlim([0, (noise_len-1)*1e3/fs])
+    ax0.plot(t*1e3, np.real(s1))
+    ax0.set_title('Sensor 1')
+    ax0.plot([36, 36], [-10, 10], 'k:')
+    ax0.text(32, -5, r'$\tau_1$')
+    ax0.set_ylim([-10, 10])
+    ax0.set_xlim([0, (noise_len-1)*1e3/fs])
 
     # Subplot 2
-    axs[1].plot(t*1e3, np.real(s2))
-    axs[1].set_title('Sensor 2')
-    axs[1].plot([46, 46], [-10, 10], 'k:')
-    axs[1].text(41, -5, r'$\tau_2$')
-    axs[1].set_xlim([0, (noise_len-1)*1e3/fs])
-    axs[1].set_ylim([-10, 10])
+    ax1.plot(t*1e3, np.real(s2))
+    ax1.set_title('Sensor 2')
+    ax1.plot([46, 46], [-10, 10], 'k:')
+    ax1.text(41, -5, r'$\tau_2$')
+    ax1.set_xlim([0, (noise_len-1)*1e3/fs])
+    ax1.set_ylim([-10, 10])
 
     # Subplot 3
-    axs[2].plot(tau*1e3, np.abs(sx))
-    axs[2].plot([-10, -10], [0, 40], 'k:')
-    # axs[2].plot([0, 0], [0, 40], 'k:')
-    axs[2].text(-20, 30, r'$\tau_{1,2}$')
-    # axs[2].text(5, 20, '0')
-    axs[2].set_xlabel('Time Difference of Arrival [ms]')
-    axs[2].set_title('Cross Correlation')
-    axs[2].set_xlim(np.array([-1., 1.])*(noise_len-1)*1e3/fs)
+    ax2.plot(tau*1e3, np.abs(sx))
+    ax2.plot([-10, -10], [0, 40], 'k:')
+    # ax2.plot([0, 0], [0, 40], 'k:')
+    ax2.text(-20, 30, r'$\tau_{1,2}$')
+    # ax2.text(5, 20, '0')
+    ax2.set_xlabel('Time Difference of Arrival [ms]')
+    ax2.set_title('Cross Correlation')
+    ax2.set_xlim(np.array([-1., 1.])*(noise_len-1)*1e3/fs)
 
     # Remove axis ticks to clean up plot
-    for ax in axs:
+    for ax in (ax0, ax1, ax2):
         ax.set_yticklabels([])
         ax.set_xticklabels([])
 
