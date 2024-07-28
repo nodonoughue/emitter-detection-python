@@ -104,7 +104,7 @@ def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov, tdoa_ref_idx=None
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
             # Problem is ill-defined, Fisher Information Matrix cannot be
             # inverted
-            crlb[:, :, idx] = np.NaN
+            crlb[:, :, idx] = np.nan
         else:
             crlb[:, :, idx] = np.linalg.pinv(fisher_matrix)
 

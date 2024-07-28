@@ -50,7 +50,7 @@ def compute_crlb(x_aoa, xs, cov):
         if np.any(np.isnan(this_jacobian)):
             # This occurs when the ground range is zero for one of the sensors, which causes a divide by zero error.
             # In other words, if this_x overlaps perfectly with one of the sensors.
-            crlb[:, :, idx] = np.NaN
+            crlb[:, :, idx] = np.nan
             continue
 
         # Compute the Fisher Information Matrix
@@ -61,7 +61,7 @@ def compute_crlb(x_aoa, xs, cov):
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
             # Problem is ill-defined, Fisher Information Matrix cannot be
             # inverted
-            crlb[:, :, idx] = np.NaN
+            crlb[:, :, idx] = np.nan
         else:
             crlb[:, :, idx] = np.real(scipy.linalg.pinvh(fisher_matrix))
 

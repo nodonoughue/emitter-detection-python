@@ -208,7 +208,7 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
             num_expanding_iterations += 1
             if num_expanding_iterations >= max_num_expanding_iterations:
                 # Divergence detected
-                x_full[:, current_iteration:] = np.NaN
+                x_full[:, current_iteration:] = np.nan
                 break
 
         prev_error = error

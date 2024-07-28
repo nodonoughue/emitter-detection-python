@@ -740,7 +740,7 @@ def make_figure_15b(prefix=None, force_recalc=True):
     s = a*np.cos(np.pi*x)
     d = a*np.sin(np.pi*x)
     k = d/s
-    k[np.absolute(x) > .5] = np.Inf
+    k[np.absolute(x) > .5] = np.inf
 
     fig15b = plt.figure()
     plt.plot(x, s, label='Sum')

@@ -66,7 +66,7 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov, ref_idx=None, do_resample=Tr
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
             # Problem is ill defined, Fisher Information Matrix cannot be
             # inverted
-            crlb[:, :, idx] = np.NaN
+            crlb[:, :, idx] = np.nan
         else:
             crlb[:, :, idx] = np.linalg.pinv(fisher_matrix)
 
