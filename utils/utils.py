@@ -485,7 +485,7 @@ def is_broadcastable(a, b):
     try:
         np.broadcast_arrays(a, b)
         return True
-    except:
+    except ValueError:
         return False
 
 

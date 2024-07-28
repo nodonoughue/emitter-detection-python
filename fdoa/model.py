@@ -166,7 +166,7 @@ def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=Non
     :param v_sensor: Sensor velocities [m/s]
     :param v_source: n_dim x n_source vector of source velocities
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
-    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -232,7 +232,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
     :param v_sensor: nDim x N matrix of sensor velocities
     :param v_source: nDim x 1 matrix of true emitter velocity
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
-    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return epsilon: 2-D plot of FDOA error
     :return x_vec:
     :return y_vec:

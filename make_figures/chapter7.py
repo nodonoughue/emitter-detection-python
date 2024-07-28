@@ -135,7 +135,7 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
 
     # Create the antenna pattern generating function
     d_lam = .25
-    g, g_dot = aoa.make_gain_functions(type='adcock', d_lam=d_lam, psi_0=0)
+    g, g_dot = aoa.make_gain_functions(aperture_type='adcock', d_lam=d_lam, psi_0=0)
     # --- NOTE --- g,g_dot take radian inputs (psi, not theta)
         
     # Generate the angular samples and true gain values
@@ -249,7 +249,7 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
 
     # Create the antenna pattern generating function
     aperture_wavelengths = 5
-    g, g_dot = aoa.make_gain_functions(type='rectangular', d_lam=aperture_wavelengths, psi_0=0)
+    g, g_dot = aoa.make_gain_functions(aperture_type='rectangular', d_lam=aperture_wavelengths, psi_0=0)
     # --- NOTE --- g,g_dot take radian inputs (psi, not theta)
 
     # Generate the angular samples and true gain values
@@ -505,7 +505,7 @@ def make_figure_8(prefix=None):
     plt.text(.35*num_samples, f0 + fd[int(np.fix(.3*num_samples))] - .15, r'$f+f_d(t)$', fontsize=12)
 
     fd_desc = np.copy(fd)
-    np.place(fd_desc[:-1], fd[1:] > fd[:-1], np.Inf)
+    np.place(fd_desc[:-1], fd[1:] > fd[:-1], np.inf)
     idx = np.argmin(np.absolute(fd_desc), axis=None)
     plt.text(idx+1, f0-.8*np.max(fd, axis=None), r'$\tau$', fontsize=12)
     plt.vlines(idx, 0, f0, linestyles='dashed')

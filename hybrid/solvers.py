@@ -15,6 +15,7 @@ def max_likelihood(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
     :param x_tdoa: TDOA sensor positions [m]
     :param x_fdoa: FDOA sensor positions [m]
     :param v_fdoa: FDOA sensor velocities [m/s]
+    :param v_source: Source velocity [m/s] [assumed zero if not provided]
     :param zeta: Combined measurement vector
     :param cov: Measurement error covariance matrix
     :param x_ctr: Center of search grid [m]
@@ -59,6 +60,7 @@ def gradient_descent(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
     :param x_tdoa: TDOA sensor positions [m]
     :param x_fdoa: FDOA sensor positions [m]
     :param v_fdoa: FDOA sensor velocities [m/s]
+    :param v_source: Source velocity [m/s] [assumed zero if not provided]
     :param zeta: Combined measurement vector
     :param cov: FDOA error covariance matrix
     :param x_init: Initial estimate of source position [m]
@@ -109,6 +111,7 @@ def least_square(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa
     :param x_tdoa: TDOA sensor positions [m]
     :param x_fdoa: FDOA sensor positions [m]
     :param v_fdoa: FDOA sensor velocities [m/s]
+    :param v_source: Source velocity [m/s] [assumed zero if not provided]
     :param zeta: Combined measurement vector
     :param cov: Measurement Error Covariance Matrix [(m/s)^2]
     :param x_init: Initial estimate of source position [m]
@@ -168,6 +171,7 @@ def bestfix(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_sour
     :param x_tdoa: TDOA sensor positions [m]
     :param x_fdoa: FDOA sensor positions [m]
     :param v_fdoa: FDOA sensor velocities [m/s]
+    :param v_source: Source velocity [m/s] [assumed zero if not provided]
     :param zeta: Combined measurement vector
     :param cov: Measurement error covariance matrix
     :param x_ctr: Center of search grid [m]

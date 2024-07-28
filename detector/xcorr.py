@@ -73,10 +73,10 @@ def min_sinr(prob_fa, prob_d, corr_time, pulse_duration, bw_noise, bw_signal):
     # Make sure the signal bandwidth and time are observable
     bw_signal = np.minimum(bw_signal, bw_noise)
     pulse_duration = np.minimum(pulse_duration, corr_time)
-    M = np.fix(corr_time * bw_noise)
+    num_samples = np.fix(corr_time * bw_noise)
     
     # Find the min SNR after cross-correlation processing
-    xi_min_out = squareLaw.min_sinr(prob_fa, prob_d, M)
+    xi_min_out = squareLaw.min_sinr(prob_fa, prob_d, num_samples)
     
     # Invert the SNR Gain equation
     xi_out_lin = db_to_lin(xi_min_out)

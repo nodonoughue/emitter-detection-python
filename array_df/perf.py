@@ -77,7 +77,7 @@ def crlb_stochastic(covariance, noise_power, psi_vec, num_snapshots, v, v_dot):
     # Build the spectral matrix from linear SNR
     a = np.conjugate(r).T.dot(r).dot(covariance) / noise_power
     if num_sources > 1:
-        b = np.linalg.lstsq(np.eye(N=num_sources) + a, covariance).dot(a)
+        b = np.dot(np.linalg.lstsq(np.eye(N=num_sources) + a, covariance), a)
     else:
         b = covariance * a / (1+a)
 

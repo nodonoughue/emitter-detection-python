@@ -75,7 +75,7 @@ def example1(fig=None):
     params = initialize_parameters()
 
     # Generate the gain functions
-    g, g_dot = aoa.make_gain_functions(type='adcock', d_lam=.25, psi_0=0)
+    g, g_dot = aoa.make_gain_functions(aperture_type='adcock', d_lam=.25, psi_0=0)
     th_steer = np.array([-15, 0, 15])
     psi_steer = th_steer * np.pi / 180
     th_true = 10
@@ -87,7 +87,7 @@ def example1(fig=None):
 
     # Re-do for directional
     d_lam_rectangular = 5
-    g, g_dot = aoa.make_gain_functions(type='Rectangular', d_lam=d_lam_rectangular, psi_0=0)
+    g, g_dot = aoa.make_gain_functions(aperture_type='Rectangular', d_lam=d_lam_rectangular, psi_0=0)
     crlb_psi_rect = aoa.directional.crlb(params['snr_db'], params['num_samples'], g, g_dot, psi_steer,
                                          psi_true)
     rmse_th_rect = (180 / np.pi) * np.sqrt(crlb_psi_rect)

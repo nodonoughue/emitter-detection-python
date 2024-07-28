@@ -85,7 +85,7 @@ def make_figure_1(prefix=None):
     plt.semilogx(t_ext, noise_total-noise_ref)
     plt.xlabel('Combined Sky Noise Temperature [K]')
     plt.ylabel('Increase in Noise Level [dB]')
-    plt.grid('on')
+    plt.grid(True)
 
     if prefix is not None:
         plt.savefig(prefix + 'fig1.png')

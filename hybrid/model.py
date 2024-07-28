@@ -19,6 +19,7 @@ def measurement(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_s
     :param x_tdoa: nDim x nTDOA array of TDOA sensor positions
     :param x_fdoa: nDim x nFDOA array of FDOA sensor positions
     :param v_fdoa: nDim x nFDOA array of FDOA sensor velocities
+    :param v_source: nDim x 1 source velocity; assumed stationary if left blank
     :param x_source: nDim x n_source array of source positions
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
@@ -60,6 +61,7 @@ def jacobian(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_sour
     :param x_tdoa: nDim x nTDOA array of TDOA sensor positions
     :param x_fdoa: nDim x nFDOA array of FDOA sensor positions
     :param v_fdoa: nDim x nFDOA array of FDOA sensor velocities
+    :param v_source: nDim x 1 source velocity; assumed stationary if left blank
     :param x_source: nDim x n_source array of source positions
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
@@ -112,6 +114,7 @@ def log_likelihood(x_source, zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
     :param x_tdoa: nDim x nTDOA array of TDOA sensor positions
     :param x_fdoa: nDim x nFDOA array of FDOA sensor positions
     :param v_fdoa: nDim x nFDOA array of FDOA sensor velocities
+    :param v_source: nDim x 1 source velocity; assumed stationary if left blank
     :param zeta: Combined AOA/TDOA/FDOA measurement vector
     :param x_source: Candidate source positions
     :param cov: Measurement covariance matrix (or its precomputed inverse)
@@ -206,7 +209,9 @@ def error(x_source, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, x_max=1, num_pts=
     :param v_source: nDim x 1 matrix of true emitter velocity
     :param tdoa_ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings for FDOA
-    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return epsilon: 2-D plot of FDOA error
     :return x_vec:
     :return y_vec:

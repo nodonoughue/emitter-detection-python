@@ -5,7 +5,7 @@ from . import model
 
 
 def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov, tdoa_ref_idx=None,
-                 fdoa_ref_idx=None, do_resample=True, cov_is_inverted=False):
+                 fdoa_ref_idx=None, do_resample=False, cov_is_inverted=False):
     """
     Computes the CRLB on position accuracy for source at location xs and
     a combined set of AOA, TDOA, and FDOA measurements.  The covariance
@@ -25,6 +25,7 @@ def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov, tdoa_ref_idx=None
     :param cov: Measurement error covariance matrix
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
                             inverse of the covariance matrix.
     :return crlb: Lower bound on the error covariance matrix for an unbiased AOA/TDOA/FDOA estimator (Ndim x Ndim)

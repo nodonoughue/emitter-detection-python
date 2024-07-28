@@ -27,7 +27,7 @@ def det_test(z, noise_var, prob_fa):
     eta = stats.chi2.ppf(q=1-prob_fa, df=2*np.shape(z)[0])
 
     # Compare T to eta
-    det_result = suff_stat > eta
+    det_result = np.greater(suff_stat, eta)
     
     # In the rare event that T==eta, flip a weighted coin
     coin_flip_mask = suff_stat == eta

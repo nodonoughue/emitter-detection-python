@@ -164,7 +164,7 @@ def make_figure_3(prefix=None, colors=None):
         # Clear the polarization labels; so we only get one set of legend entries
         pol_set = (None, None)
 
-    plt.grid('on')
+    plt.grid(True)
     plt.ylim([.01, 50])
     plt.xlim([freq_hz[0]/1e9, freq_hz[-1]/1e9])
 
@@ -213,7 +213,7 @@ def make_figure_4(prefix=None):
 
         plt.loglog(freq_hz/1e9, gamma, label=this_fog_label)
 
-    plt.grid('on')
+    plt.grid(True)
 
     # ht=text(10,.2,'30 m Visibility');set(ht,'rotation',30);
     # ht=text(10,.025,'120 m Visibility');set(ht,'rotation',30);
@@ -270,7 +270,7 @@ def make_figure_5(prefix=None):
     plt.ylabel('Zenith Attenuation')
     plt.legend(loc='upper left')
 
-    plt.grid('on')
+    plt.grid(True)
     plt.xlim([1, 350])
     plt.ylim([1e-2, 1e3])
 

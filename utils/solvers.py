@@ -155,15 +155,15 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
     
     # Initialize Plotting
     if plot_progress:
-        fig_plot, ax_set = plt.subplots(ncols=1, nrows=2)
-        plt.xlabel(ax_set[0], 'Iteration Number')
-        plt.ylabel(ax_set[0], 'Change in Position Estimate')
-        plt.yscale(ax_set[0], 'log')
+        fig_plot, (ax1, ax2) = plt.subplots(ncols=1, nrows=2)
+        ax1.set_xlabel('Iteration Number')
+        ax1.set_ylabel('Change in Position Estimate')
+        ax1.set_yscale('log')
         
-        plt.xlabel(ax_set[1], 'x')
-        plt.ylabel(ax_set[1], 'y')
+        ax2.set_xlabel('x')
+        ax2.set_ylabel('y')
     else:
-        ax_set = None  # This removes a 'variable possibly unset' warning
+        ax1 = ax2 = None  # This removes a 'variable possibly unset' warning
 
     # Divergence Detection
     num_expanding_iterations = 0
@@ -198,8 +198,8 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
         error = t
         
         if plot_progress:
-            plt.plot(ax_set[0], current_iteration, error, '.')
-            plt.plot(ax_set[1], x_full[0, np.arange(current_iteration)], x_full[1, np.arange(current_iteration)], '-+')
+            ax1.plot(current_iteration, error, '.')
+            ax2.plot(x_full[0, np.arange(current_iteration)], x_full[1, np.arange(current_iteration)], '-+')
         
         # Check for divergence
         if error <= prev_error:

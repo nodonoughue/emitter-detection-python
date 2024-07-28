@@ -18,7 +18,7 @@ def crlb(snr, M, g, g_dot, psi_samples, psi_true):
     14 January 2021
     
     :param snr: Signal-to-Noise ratio [dB]
-    :param M: Number of samples for each antenna position
+    :param num_samples: Number of samples for each antenna position
     :param g: Function handle to g(psi)
     :param g_dot: Function handle to g_dot(psi)
     :param psi_samples: The sampled steering angles (radians)
@@ -39,8 +39,8 @@ def crlb(snr, M, g, g_dot, psi_samples, psi_true):
     g_dot_g_dot = np.sum(g_dot_vec * g_dot_vec, axis=0)
     
     # Compute CRLB for each true angle theta
-    jacobian = 2*M*snr_lin*(g_dot_g_dot-g_dot_g**2 / g_g)  # Eq 7.25
-    return 1./jacobian  # 1 x numel(th)
+    jacobian = 2 * num_samples * snr_lin * (g_dot_g_dot - g_dot_g ** 2 / g_g)  # Eq 7.25
+    return 1./jacobian  # 1 x num_angles
 
 
 def compute_df(s, psi_samples, g, psi_res=0.1, min_psi=-np.pi, max_psi=np.pi):
@@ -114,14 +114,14 @@ def run_example():
     # Create the antenna pattern generating function
     # --- NOTE --- g,g_dot take radian inputs (psi, not theta)
     d_lam = .25
-    [g, g_dot] = make_gain_functions(type='adcock', d_lam=d_lam, psi_0=0.)
+    [g, g_dot] = make_gain_functions(aperture_type='adcock', d_lam=d_lam, psi_0=0.)
         
     # Generate the angular samples and true gain values
     th_true = 5.                    # degrees
     psi_true = np.deg2rad(th_true)  # radians
     psi_res = .001  # desired resolution from multi-stage search directional_df() for details.
 
-    num_angles = 10.                         # Number of angular samples
+    num_angles = 10                        # Number of angular samples
     th = np.linspace(start=-180., stop=180., num=num_angles, endpoint=False)  # evenly spaced across unit circle
     psi = np.deg2rad(th)
     x = g(psi-psi_true)  # Actual gain values
@@ -184,8 +184,8 @@ def run_example():
     
     # ============================= Reflector/Array Test Script =============================
     # Create the antenna pattern generating function
-    D_lam = 5
-    [g, g_dot] = make_gain_functions(type='rectangular', d_lam=D_lam, psi_0=0.)
+    aperture_size_wavelengths = 5
+    [g, g_dot] = make_gain_functions(aperture_type='rectangular', d_lam=aperture_size_wavelengths, psi_0=0.)
         
     # Generate the angular samples and true gain values
     th_true = 5.

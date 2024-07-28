@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import numpy.random
 
 import utils
 import triang

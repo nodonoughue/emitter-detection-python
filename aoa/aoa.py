@@ -2,7 +2,7 @@ import numpy as np
 from utils import sinc_derivative
 
 
-def make_gain_functions(type, d_lam, psi_0):
+def make_gain_functions(aperture_type, d_lam, psi_0):
     """
     Generate function handles for the gain pattern (g) and gradient (g_dot),
     given the specified aperture type, aperture size, and mechanical steering
@@ -13,7 +13,7 @@ def make_gain_functions(type, d_lam, psi_0):
     Nicholas O'Donoughue
     9 January 2021
 
-    :param type: String indicating the type of aperture requested.  Supports 'omni', 'adcock', and 'rectangular'
+    :param aperture_type: String indicating the type of aperture requested.  Supports 'omni', 'adcock', 'rectangular'
     :param d_lam: Aperture length, in units of wavelength (d/lambda)
     :param psi_0: Mechanical steering angle (in radians) of the array [default=0]
     :return g: Function handle to the antenna pattern g(psi), for psi in radians
@@ -48,6 +48,6 @@ def make_gain_functions(type, d_lam, psi_0):
                 'adcock': (g_adcock, g_dot_adcock),
                 'rectangular': (g_rect, g_dot_rect)}
 
-    result = switcher.get(type.lower())
+    result = switcher.get(aperture_type.lower())
 
     return result[0], result[1]

@@ -19,7 +19,7 @@ def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=Non
     :param search_size: 2-D vector of search grid sizes [m]
     :param epsilon: Desired resolution of search grid [m]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
-    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions
@@ -68,7 +68,7 @@ def gradient_descent(x_sensor, v_sensor, rho, cov, x_init, v_source=None, alpha=
     :param plot_progress: Boolean flag dictacting whether to plot intermediate solutions as they are derived
                           (DEFAULT = False).
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
-    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
@@ -116,7 +116,7 @@ def least_square(x_sensor, v_sensor, rho, cov, x_init, epsilon=None, max_num_ite
     :param plot_progress: Boolean flag dictacting whether to plot intermediate solutions as they are derived
                           (DEFAULT = False).
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
-    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
@@ -171,7 +171,7 @@ def bestfix(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon, ref_idx=N
     :param epsilon: Desired resolution of search grid [m]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param pdf_type: String indicating the type of distribution to use. See +utils/makePDFs.m for options.
-    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions

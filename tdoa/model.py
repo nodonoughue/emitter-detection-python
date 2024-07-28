@@ -106,7 +106,7 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
     :param cov: measurement error covariance matrix
     :param x_source: Candidate source positions
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
-    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -164,7 +164,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=Fal
     :param x_max: nDim x 1 (or scalar) vector of maximum offset from origin for plotting
     :param num_pts: Number of test points along each dimension
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
-    :param do_resample: If true, cov is a sensor-level covariance matrix and must be resampled
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return epsilon: 2-D plot of FDOA error
     :return x_vec:
     :return y_vec:
