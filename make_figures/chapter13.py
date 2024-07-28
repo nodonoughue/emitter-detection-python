@@ -45,19 +45,12 @@ def make_all_figures(close_figs=False, force_recalc=False):
 
     # Generate all figures
     fig1 = make_figure_1(prefix, colors)
-    plt.show()
     fig2a, fig2b, fig2c, fig2d = make_figure_2(prefix)
-    plt.show()
     fig3, fig4 = make_figures_3_4(prefix, rng, force_recalc)
-    plt.show()
     fig5, fig6 = make_figures_5_6(prefix, rng, force_recalc)
-    plt.show()
     fig7a, fig7b = make_figure_7(prefix)
-    plt.show()
     fig8a, fig8b = make_figure_8(prefix)
-    plt.show()
     fig9 = make_figure_9(prefix)
-    plt.show()
 
     figs = [fig1, fig2a, fig2b, fig2c, fig2d, fig3, fig4, fig5, fig6, fig7a, fig7b, fig8a, fig8b, fig9]
     if close_figs:
@@ -310,10 +303,10 @@ def make_figures_3_4(prefix=None, rng=np.random.default_rng(0), force_recalc=Fal
     """
 
     if not force_recalc:
-        print('Skipping Figures 13.3 and 13.4...')
+        print('Skipping Figures 13.3 and 13.4... (re-run with force_recalc=True to generate)')
         return None, None
 
-    print('Generating Figures 13.3 and 13.4...')
+    print('Generating Figures 13.3 and 13.4 (using Example 13.1)...')
     fig3, fig4 = chapter13.example1(rng)
 
     if prefix is not None:
@@ -342,10 +335,10 @@ def make_figures_5_6(prefix=None, rng=np.random.default_rng(0), force_recalc=Fal
     """
 
     if not force_recalc:
-        print('Skipping Figures 13.5 and 13.6...')
+        print('Skipping Figures 13.5 and 13.6... (re-run with force_recalc=True to generate)')
         return None, None
 
-    print('Generating Figures 13.5 and 13.6...')
+    print('Generating Figures 13.5 and 13.6 (using Example 13.2)...')
     fig5, fig6 = chapter13.example2(rng)
 
     if prefix is not None:

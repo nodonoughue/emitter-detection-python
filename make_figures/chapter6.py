@@ -61,7 +61,9 @@ def make_figure_1(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
-    
+
+    print('Generating Figure 6.1...')
+
     d_lam_narrow_beam = 4
     num_array_elements = 10
     psi_0 = 135*np.pi/180
@@ -126,6 +128,8 @@ def make_figure_2(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 6.2...')
+
     # True position
     x0 = np.array([1, .5])
 
@@ -176,6 +180,8 @@ def make_figure_3(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 6.3...')
+
     # Measurements
     y = np.array([1, 1.1,  1.3, 1.4,  1.35,  1.3,  .7, .75])
     # Estimates
@@ -218,6 +224,8 @@ def make_figure_4(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 6.4...')
 
     # Sensor Coordinates
     x0 = np.array([0, 0])

@@ -39,7 +39,6 @@ def make_all_figures(close_figs=False):
 
     # Generate all figures
     fig4 = make_figure_4(prefix)
-    plt.show()
 
     figs = [fig4]
     if close_figs:
@@ -65,6 +64,8 @@ def make_figure_4(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure B.4...')
 
     # Define range axis
     range_vec = np.concatenate((np.arange(start=1e3, stop=100e3, step=1e3),

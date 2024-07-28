@@ -78,6 +78,8 @@ def make_figure_1(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 3.1...')
+
     # Frequency of Signal
     freq0 = 1
     bandwidth = .4
@@ -132,6 +134,8 @@ def make_figure_2(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 3.2...')
 
     # Frequency of Signal
     freq0 = 1
@@ -198,6 +202,8 @@ def make_figure_3(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 3.3...')
+
     num_samples = np.array([1, 10, 100])
     eta_db = np.arange(start=-10, step=.1, stop=30.1)
     eta_lin = db_to_lin(eta_db)
@@ -236,6 +242,8 @@ def make_figure_4(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 3.4...')
 
     prob_fa = 1e-6
     num_samples = np.expand_dims(np.array([1, 10, 100, 1000]), axis=0)
@@ -278,6 +286,8 @@ def make_figure_7(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 3.7...')
 
     range_m = 1.0e3   # set ref distance to 1 km
     freq_vec = np.arange(start=1.e9, step=50.e6, stop=100.e9+50.e6)
@@ -328,7 +338,7 @@ def make_figure_8(prefix=None):
     :return: figure handle
     """
 
-    # Figure 8 : SNR vs. range
+    print('Generating Figure 3.8...')
 
     # Set up RF environment
     ht = 100
@@ -391,6 +401,8 @@ def make_figure_9(prefix=None, rng=None, colors=None):
     :return: figure handle
     """
 
+    print('Generating Figure 3.9 (using Example 3.1)...')
+
     fig9 = chapter3.example1(rng, colors)
 
     # Save figure
@@ -416,7 +428,8 @@ def make_figure_10(prefix=None, rng=None, colors=None):
     :return: figure handle
     """
 
-    # Figure 10, Monte Carlo Results
+    print('Generating Figure 3.10 (using Example 3.2)...')
+
     fig10 = chapter3.example2(rng, colors)
 
     # Save figure

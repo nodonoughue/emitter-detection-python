@@ -76,6 +76,8 @@ def make_figure_3(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 8.3...')
+
     # Array parameters
     d_lam = 1/2
     th_0 = -30
@@ -116,6 +118,8 @@ def make_figure_4(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 8.4...')
 
     num_elements = 11
     th_0 = -30
@@ -162,6 +166,8 @@ def make_figure_5(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 8.5...')
 
     num_elements = 11
     th_0 = -30
@@ -211,6 +217,8 @@ def make_figure_6(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 8.6...')
 
     # Set up array
     num_elements = 25
@@ -271,6 +279,8 @@ def make_figure_7a(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 8.7a...')
+
     # Initialize tapers
     num_elements = 11
     element_idx_vec = np.arange(num_elements)
@@ -307,6 +317,8 @@ def make_figure_7b(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 8.7b...')
 
     # Taper Parameters
     num_elements = 11
@@ -356,6 +368,8 @@ def make_figure_9(prefix=None, rng=None):
     :param rng: random number generator
     :return: figure handle
     """
+
+    print('Generating Figure 8.9...')
 
     if rng is None:
         rng = np.random.default_rng(0)
@@ -436,6 +450,8 @@ def make_figure_10(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 8.10 (using Example 8.1)...')
+
     fig10 = chapter8.example1()
 
     if prefix is not None:
@@ -461,7 +477,10 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
     """
 
     if not force_recalc:
-        return plt.figure()
+        print('Skipping Figure 8.12... (re-run with force_recalc=True to generate)')
+        return None
+
+    print('Generating Figure 8.12...')
 
     if rng is None:
         rng = np.random.default_rng(0)
@@ -566,7 +585,10 @@ def make_figure_13(prefix=None, rng=None, force_recalc=True):
     """
 
     if not force_recalc:
-        return plt.figure()
+        print('Skipping Figure 8.13 (re-run with force_recalc=True to generate)')
+        return None
+
+    print('Generating Figure 8.13...')
 
     if rng is None:
         rng = np.random.default_rng(0)

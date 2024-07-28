@@ -39,13 +39,9 @@ def make_all_figures(close_figs=False):
 
     # Generate all figures
     fig2 = make_figure_2(prefix)
-    plt.show()
     fig3 = make_figure_3(prefix)
-    plt.show()
     fig4 = make_figure_4(prefix)
-    plt.show()
     fig5 = make_figure_5(prefix)
-    plt.show()
 
     figs = [fig2, fig3, fig4, fig5]
     if close_figs:
@@ -71,6 +67,8 @@ def make_figure_2(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure C.2...')
 
     # Open the Figure and Initialize Labels
     fig2 = plt.figure()
@@ -135,6 +133,8 @@ def make_figure_3(prefix=None, colors=None):
     :return: figure handle
     """
 
+    print('Generating Figure C.3...')
+
     if colors is None:
         colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
@@ -198,6 +198,8 @@ def make_figure_4(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure C.4...')
+
     # Initialize Parameters
     fog_set = [.032, .32, 2.3]
     fog_names = ['600 m Visibility', '120 m Visibility', '30 m Visibility']
@@ -243,6 +245,8 @@ def make_figure_5(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure C.5...')
 
     # Set up frequencies
     fo, fw = atm.reference.get_spectral_lines()

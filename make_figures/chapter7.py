@@ -77,7 +77,9 @@ def make_figure_1(prefix=None):
 
     :param prefix: output directory to place generated figure
     :return: figure handle
-    """    
+    """
+
+    print('Generating Figure 7.1...')
 
     num_lobes = 3
     num_samples = 501
@@ -125,7 +127,10 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
     """
 
     if not force_recalc:
-        return plt.figure()
+        print('Skipping Figure 7.3... (re-run with force_recalc=True to generate)')
+        return None
+
+    print('Generating Figure 7.3...')
 
     if rng is None:
         rng = np.random.default_rng(0)
@@ -239,7 +244,10 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
     """
 
     if not force_recalc:
-        return plt.figure()
+        print('Skipping Figure 7.5... (re-run with force_recalc=True to generate)')
+        return None
+
+    print('Generating Figure 7.5...')
 
     if rng is None:
         rng = np.random.default_rng(0)
@@ -345,6 +353,8 @@ def make_figure_6b(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 7.6b...')
+
     phi = np.arange(start=-np.pi, step=np.pi/101, stop=np.pi)
 
     gain_pattern_one = 2*np.cos(phi)
@@ -386,7 +396,10 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
     """
 
     if not force_recalc:
-        return plt.figure()
+        print('Skipping Figure 7.7... (re-run with force_recalc=True to generate)')
+        return None
+
+    print('Generating Figure 7.7...')
 
     if rng is None:
         rng = np.random.default_rng(0)
@@ -490,6 +503,8 @@ def make_figure_8(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 7.8b...')
+
     num_samples = 128
     m_vec = np.arange(num_samples)
     phi0 = 5*np.pi/3
@@ -536,7 +551,10 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
     """
 
     if not force_recalc:
-        return plt.figure()
+        print('Skipping Figure 7.10... (re-run with force_recalc=True to generate)')
+        return None
+
+    print('Generating Figure 7.10...')
 
     if rng is None:
         rng = np.random.default_rng(0)
@@ -655,7 +673,10 @@ def make_figure_12(prefix=None, force_recalc=True):
     """
 
     if not force_recalc:
-        return plt.figure()
+        print('Skipping Figure 7.12... (re-run with force_recalc=True to generate)')
+        return None
+
+    print('Generating Figure 7.12...')
 
     d_lam = np.array([.5, 1, 2, 4])
 
@@ -698,7 +719,10 @@ def make_figure_14(prefix=None, force_recalc=True):
     """
 
     if not force_recalc:
-        return plt.figure()
+        print('Skipping Figure 7.14... (re-run with force_recalc=True to generate)')
+        return None
+
+    print('Generating Figure 7.14 (using Example 7.1)...')
 
     fig14 = chapter7.example1(None)
     chapter7.example2(fig14)
@@ -727,7 +751,10 @@ def make_figure_15b(prefix=None, force_recalc=True):
     """
 
     if not force_recalc:
-        return plt.figure()
+        print('Skipping Figure 7.15b... (re-run with force_recalc=True to generate)')
+        return None
+
+    print('Generating Figure 7.15b...')
 
     # Make monopulse beampatterns
     num_angle_samples = 10001
@@ -770,6 +797,8 @@ def make_figure_16(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 7.16...')
 
     th_bw = 4
     th = np.arange(start=-th_bw/2, step=.1, stop=th_bw/2+.1)

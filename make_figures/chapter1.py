@@ -60,6 +60,8 @@ def make_figure_1(prefix=None, rng=None):
     :return: figure handle
     """
 
+    print('Generating Figure 1.1...')
+
     # Initialize variables
     noise_pwr_db = 0  # noise power, dB
     num_samples = 512  # number of points
@@ -129,6 +131,8 @@ def make_figure_2(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 1.2...')
+
     # Compute an AOA slice from sensor 1
 
     # Initialize Detector/Source Locations
@@ -191,6 +195,8 @@ def make_figure_3(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 1.3...')
 
     # Initialize Detector/Source Locations
     x1 = np.array([0, 0])

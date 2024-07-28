@@ -78,7 +78,9 @@ def make_figure_1a(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
-    
+
+    print('Generating Figure 4.1a...')
+
     # Sine wave
     num_points = 1024  # Sample points
     y_chip = np.exp(1j*(np.pi/2+2*np.pi*np.arange(num_points)/num_points))
@@ -128,6 +130,8 @@ def make_figure_1b(prefix=None, rng=None):
     :param rng: random number generator
     :return: figure handle
     """
+
+    print('Generating Figure 4.1b...')
 
     if rng is None:
         rng = np.random.default_rng()
@@ -209,6 +213,8 @@ def make_figure_2a(prefix=None, rng=None):
     :return: figure handle
     """
 
+    print('Generating Figure 4.2a...')
+
     if rng is None:
         rng = np.random.default_rng()
 
@@ -286,6 +292,8 @@ def make_figure_2b(prefix=None, rng=None):
     :param rng: random number generator
     :return: figure handle
     """
+
+    print('Generating Figure 4.2b...')
 
     if rng is None:
         rng = np.random.default_rng(0)
@@ -378,6 +386,8 @@ def make_figure_3(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 4.3...')
+
     snr_ref_db = 0
     bw_ref = 1e6
 
@@ -413,6 +423,8 @@ def make_figure_5(prefix=None, colors=None):
     :param colors: colormap for plotting
     :return: figure handle
     """
+
+    print('Generating Figure 4.5...')
 
     if colors is None:
         colors = plt.get_cmap('tab10')
@@ -461,6 +473,8 @@ def make_figure_6(prefix=None, rng=None, colors=None):
     :param colors: colormap for plotting
     :return: figure handle
     """
+
+    print('Generating Figure 4.6...')
 
     # Vary Time-Bandwidth Product
     tbwp_vec_db = np.arange(start=10., stop=31., step=10., dtype=int)
@@ -580,6 +594,8 @@ def make_figure_7(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 4.7 (using Example 4.1)...')
+
     fig7 = chapter4.example1()
 
     # Save figure
@@ -603,6 +619,8 @@ def make_figure_8(prefix=None, colors=None):
     :param colors: colormap for plotting
     :return: figure handle
     """
+
+    print('Generating Figure 4.8 (using Example 4.2)...')
 
     fig8 = chapter4.example2(colors)
 

@@ -80,6 +80,8 @@ def make_figure_1(prefix=None, cmap=None):
     if cmap is None:
         cmap = plt.get_cmap("tab10")
 
+    print('Generating Figure 10.1...')
+
     # Initialize Detector/Source Locations
     x_sensor = np.array([[0, 1, -1], [0, 1, 0]])
     x_source = np.array([[.1], [.9]])
@@ -159,6 +161,8 @@ def make_figure_2(prefix=None, cmap=None):
 
     if cmap is None:
         cmap = plt.get_cmap("tab10")
+
+    print('Generating Figure 10.2...')
 
     # Initialize Detector/Source Locations
     x_sensor = np.array([[0, 1, -1], [0, 1, 0]])
@@ -245,6 +249,8 @@ def make_figure_3(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 10.3...')
+
     # Define triangle
     x_sensor = np.array([[0, 1, .5], [0, 1, 1.5]])
     num_dims, num_sensors = np.shape(x_sensor)
@@ -316,6 +322,8 @@ def make_figure_4(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 10.4...')
+
     # Test LOB intersection
     x_sensor = np.array([[0, 1, 2], [2, 0, 0]])
     n_dims, num_sensors = np.shape(x_sensor)
@@ -385,7 +393,10 @@ def make_figure_5(prefix=None, rng=None, force_recalc=True):
     """
 
     if not force_recalc:
+        print('Skipping Figure 10.5... (re-run with force_recalc=True to generate)')
         return None, None
+
+    print('Generating Figure 10.5 (a and b)...')
 
     if rng is None:
         rng = np.random.default_rng(0)
@@ -417,6 +428,8 @@ def make_figure_6(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 10.6 (using Example 10.2)...')
+
     fig6 = chapter10.example2()
 
     if prefix is not None:
@@ -438,6 +451,8 @@ def make_figure_7(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 10.7 (using Example 10.3)...')
 
     fig7 = chapter10.example3()
 

@@ -40,13 +40,9 @@ def make_all_figures(close_figs=False):
 
     # Generate all figures
     fig1 = make_figure_1(prefix)
-    plt.show()
     fig2 = make_figure_2(prefix)
-    plt.show()
     fig3 = make_figure_3(prefix)
-    plt.show()
     fig4 = make_figure_4(prefix)
-    plt.show()
 
     figs = [fig1, fig2, fig3, fig4]
     if close_figs:
@@ -72,6 +68,7 @@ def make_figure_1(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+    print('Generating Figure D.1...')
 
     t_ext = np.arange(300.)
     # t_total = utils.constants.ref_temp + t_ext
@@ -106,6 +103,8 @@ def make_figure_2(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure D.2...')
 
     # Plot cosmic noise [dB] as a function of frequency for a fixed bandwidth
     # (a) without solar/lunar gain
@@ -161,6 +160,8 @@ def make_figure_3(prefix=None):
     """
     import warnings
 
+    print('Generating Figure D.3...')
+
     zenith_angle_deg = np.array([0, 10, 30, 60])
 
     # Set up frequencies
@@ -214,6 +215,8 @@ def make_figure_4(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure D.4...')
 
     ground_ant_gain_dbi = np.arange(start=-30, stop=0)
 

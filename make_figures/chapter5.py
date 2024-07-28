@@ -61,6 +61,8 @@ def make_figure_4(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 5.4 (using Example 5.1)...')
+
     fig4 = chapter5.example1()
 
     # Save figure
@@ -84,6 +86,8 @@ def make_figure_6(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 5.6 (using Example 5.2)...')
+
     fig6 = chapter5.example2()
 
     # Save figure
@@ -106,6 +110,8 @@ def make_figure_7(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 5.7 (using Example 5.3)...')
 
     fig7 = chapter5.example3()
 

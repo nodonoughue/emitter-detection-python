@@ -42,23 +42,14 @@ def make_all_figures(close_figs=False, force_recalc=False):
 
     # Generate all figures
     fig1a, fig1b = make_figure_1(prefix)
-    plt.show()
     fig2 = make_figure_2(prefix)
-    plt.show()
     fig3 = make_figure_3(prefix)
-    plt.show()
     fig4 = make_figure_4(prefix)
-    plt.show()
     fig5 = make_figure_5(prefix)
-    plt.show()
     fig6a, fig6b = make_figure_6(prefix)
-    plt.show()
     fig7a, fig7b, fig8 = make_figure_7_8(prefix, rng, force_recalc)
-    plt.show()
     fig9 = make_figure_9(prefix)
-    plt.show()
     fig10 = make_figure_10(prefix)
-    plt.show()
 
     figs = [fig1a, fig1b, fig2, fig3, fig4, fig5, fig6a, fig6b, fig7a, fig7b, fig8, fig9, fig10]
 
@@ -574,10 +565,10 @@ def make_figure_7_8(prefix=None, rng=np.random.default_rng(), force_recalc=False
     """
 
     if not force_recalc:
-        print('Skipping Example 11.1 (figures 11.7 and 11.8)...')
+        print('Skipping Figures 11.7 and 11.8 (re-run with force_recalc=True to generate)...')
         return None, None, None
 
-    print('Executing Example 11.1 (figures 11.7 and 11.8)...')
+    print('Generating Figures 11.7 and 11.8 (using Example 11.1)...')
     fig7a, fig7b, fig8 = chapter11.example1(rng)
 
     if prefix is not None:

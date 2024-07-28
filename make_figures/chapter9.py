@@ -61,7 +61,9 @@ def make_figure_1(prefix=None):
 
     :param prefix: output directory to place generated figure
     :return: figure handle
-    """    
+    """
+
+    print('Generating Figure 9.1...')
 
     # Define Positions
     x0 = np.array([0, 1])
@@ -110,7 +112,9 @@ def make_figure_2(prefix=None):
 
     :param prefix: output directory to place generated figure
     :return: figure handle
-    """    
+    """
+
+    print('Generating Figure 9.2 (using Example 9.1)...')
 
     fig2 = chapter9.example1()
 
@@ -132,7 +136,9 @@ def make_figure_3(prefix=None):
 
     :param prefix: output directory to place generated figure
     :return: figure handle
-    """    
+    """
+
+    print('Generating Figure 9.3...')
 
     # Initialize Emitter Location and Estimate
     x0 = np.array([0, 0])
@@ -180,7 +186,9 @@ def make_figure_4(prefix=None):
 
     :param prefix: output directory to place generated figure
     :return: figure handle
-    """    
+    """
+
+    print('Generating Figure 9.4 (using Example 9.2)...')
 
     fig4 = chapter9.example2()
 

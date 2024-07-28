@@ -41,19 +41,12 @@ def make_all_figures(close_figs=False, force_recalc=False):
 
     # Generate all figures
     fig1 = make_figure_1(prefix)
-    plt.show()
     fig2a, fig2b = make_figure_2(prefix)
-    plt.show()
     fig3a, fig3b, fig3c, fig3d = make_figure_3(prefix)
-    plt.show()
     fig4 = make_figure_4(prefix)
-    plt.show()
     fig5 = make_figure_5(prefix)
-    plt.show()
     fig6a, fig6b, fig6c, fig6d = make_figure_6(prefix)
-    plt.show()
     fig7a, fig7b, fig8 = make_figures_7_8(prefix, force_recalc)
-    plt.show()
 
     figs = [fig1, fig2a, fig2b, fig3a, fig3b, fig3c, fig3d, fig4, fig5, fig6a, fig6b, fig6c, fig6d, fig7a, fig7b, fig8]
     if close_figs:
@@ -590,11 +583,11 @@ def make_figure_6(prefix):
 def make_figures_7_8(prefix, force_recalc=False):
 
     if not force_recalc:
-        print('Skipping Figures 12.7 and 12.8...')
+        print('Skipping Figures 12.7 and 12.8... (re-run with force_recalc=True to generate)')
         return None, None, None
 
     # Figures 7-8, Example FDOA Calculation
-    #  Figure 7 is geometry
+    # Figure 7 is geometry
     print('Generating Figures 12.7 and 12.8...')
 
     fig7a, fig7b, fig8 = chapter12.example1()

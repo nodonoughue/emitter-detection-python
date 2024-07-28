@@ -73,7 +73,9 @@ def make_figure_1(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
-    
+
+    print('Generating Figure 2.1...')
+
     # Number of x-axis points
     num_points = 512
     
@@ -132,6 +134,8 @@ def make_figure_2(prefix=None, cmap=None):
     :param cmap: colormap
     :return: figure handle
     """
+
+    print('Generating Figure 2.2...')
 
     # Get default colormap
     if cmap is None:
@@ -206,6 +210,8 @@ def make_figure_3(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 2.3 (using Example 2.2)...')
+
     fig3 = chapter2.example2()
 
     # Draw the figure
@@ -231,6 +237,8 @@ def make_figure_4(prefix=None):
     :param prefix: output directory to place generated figure
     :return: figure handle
     """
+
+    print('Generating Figure 2.4...')
 
     # Set up PFA and SNR vectors
     prob_fa = np.expand_dims(np.array([1e-6, 1e-4, 1e-2]), axis=0)
@@ -276,6 +284,8 @@ def make_figure_5(prefix=None, rng=None):
     :param rng: random number generator
     :return: figure handle
     """
+
+    print('Generating Figure 2.5...')
 
     if rng is None:
         rng = np.random.default_rng()
