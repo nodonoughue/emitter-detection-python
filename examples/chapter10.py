@@ -89,21 +89,15 @@ def example1(rng=None, cmap=None):
                                             axis=1)
 
         # Plot the Uncertainty Interval
-        if idx_sensor == 0:
-            this_label = 'Uncertainty Interval'
-        else:
-            this_label = None
-
         plt.fill(lob_fill1[0, :], lob_fill1[1, :], linestyle='--', alpha=.1, edgecolor='k', facecolor=this_color,
-                 label=this_label)
+                 label=None)
 
-        # Plot the LOB
-        if idx_sensor == 0:
-            this_label = 'AOA Solution'
-        else:
-            this_label = None
-
-        plt.plot(lob[0, :], lob[1, :], linestyle='-', color=this_color, label=this_label)
+        # Plot the LOB -- removed to simplify the figure a little and better match the textbook version
+        # if idx_sensor == 0:
+        #     this_label = 'AOA Solution'
+        # else:
+        #     this_label = None
+        # plt.plot(lob[0, :], lob[1, :], linestyle='-', color=this_color, label=this_label)
 
     # Position Markers
     plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensors')
@@ -179,8 +173,8 @@ def example1(rng=None, cmap=None):
     plt.scatter(5, 5, marker='x', label='Initial Estimate')
     plt.plot(x_ls_full[0, :, 0], x_ls_full[1, :, 0], linestyle=':', label='Least Squares')
     plt.plot(x_grad_full[0, :, 0], x_grad_full[1, :, 0], linestyle='--', label='Grad Descent')
-    plt.text(15, 10, 'Least Squares', fontsize=10)
-    plt.text(-16, 10, 'Grad Descent', fontsize=10)
+    # plt.text(15, 10, 'Least Squares', fontsize=10) -- commented out to clean up graphic; rely on legend
+    # plt.text(-16, 10, 'Grad Descent', fontsize=10) -- commented out to clean up graphic; rely on legend
     plt.xlabel('[km]')
     plt.ylabel('[km]')
 
@@ -189,7 +183,7 @@ def example1(rng=None, cmap=None):
     crlb_cep50 = utils.errors.compute_cep50(err_crlb)  # [km]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linewidth=.5, label='90% Error Ellipse')
-    plt.text(-20, 45, '90% Error Ellipse', fontsize=10)
+    # plt.text(-20, 45, '90% Error Ellipse', fontsize=10) -- commented out to clean up graphic; rely on legend
     plt.plot([1, 11], [45, 45], linestyle='-', linewidth=.5, label=None)
 
     plt.xlim([-50, 50])
@@ -291,6 +285,8 @@ def _mc_iteration(args):
     Nicholas O'Donoughue
     18 March 2022
     """
+
+    # TODO: Find and catch underflow error (np.exp(self.logpdf(x) -- probably in bestfix)
 
     # Generate a random measurement
     rng = args['rng']
