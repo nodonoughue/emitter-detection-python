@@ -8,6 +8,7 @@ Ported from MATLAB Code
 Nicholas O'Donoughue
 26 March 2021
 """
+import time
 
 import utils
 from utils.unit_conversions import lin_to_db, db_to_lin
@@ -164,17 +165,19 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
     
     # Loop over parameters
     print('Executing Adcock Monte Carlo sweep...')
-    for idx_M, num_samples in enumerate(num_samples_vec):
-        this_num_mc = num_mc
-        print('\tM={:d}'.format(num_samples))
-    
+    iterations_per_marker = 1000
+    markers_per_row = 40
+    iterations_per_row = markers_per_row * iterations_per_marker
+    total_iterations = num_mc*len(snr_db_vec)*len(num_samples_vec)
+    t_start = time.perf_counter()
+    for idx_samples, num_samples in enumerate(num_samples_vec):
         # Generate Monte Carlo Noise with unit power
         # -- for simplicity, we only generate the real component, since this
         #    receiver is only working on the real portion of the received
         #    signal
-        noise_base = (1/np.sqrt(2))*rng.standard_normal(size=(num_angular_samples, num_samples, this_num_mc))
+        noise_base = (1/np.sqrt(2))*rng.standard_normal(size=(num_angular_samples, num_samples, num_mc))
+
         for idx_snr, snr_db in enumerate(snr_db_vec):
-            
             # Compute noise power, scale base noise
             noise_pwr = db_to_lin(-snr_db)
             
@@ -183,26 +186,32 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
             rx_signal = true_signal+noise
             
             # Estimate
-            psi_est = np.zeros(shape=(this_num_mc, 1), dtype=float)
-            for idx_mc in range(this_num_mc):
+            psi_est = np.zeros(shape=(num_mc, 1), dtype=float)
+
+            for idx_mc in range(num_mc):
+                curr_idx = idx_mc + idx_snr * num_mc + idx_samples * len(snr_db_vec) * num_mc
+                utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+
                 psi_est[idx_mc] = aoa.directional.compute_df(rx_signal[:, :, idx_mc], psi, g, psi_res,
                                                              min_psi, max_psi)
             
-            rmse_psi[idx_M, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2, axis=None)/this_num_mc)
+            rmse_psi[idx_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2, axis=None)/num_mc)
             
             # CRLB
-            crlb_psi[idx_M, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot, psi,
+            crlb_psi[idx_samples, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot, psi,
                                                                         psi_true))
         
-    print('\t...done with Monte Carlo sweep.')
+    print('done')
+    t_elapsed = time.perf_counter() - t_start
+    utils.print_elapsed(t_elapsed)
     
     # Generate plot
     fig3 = plt.figure()
     crlb_label = 'CRLB'
     mc_label = 'Simulation Result'
-    for idx_M, num_samples in enumerate(num_samples_vec):
-        plt.semilogy(snr_db_vec, np.sqrt(crlb_psi[idx_M, :])*180/np.pi, color=colors(idx_M), label=crlb_label)
-        plt.semilogy(snr_db_vec, rmse_psi[idx_M, :]*180/np.pi, linestyle='--', color=colors(idx_M), label=mc_label)
+    for idx_samples, num_samples in enumerate(num_samples_vec):
+        plt.semilogy(snr_db_vec, np.sqrt(crlb_psi[idx_samples, :])*180/np.pi, color=colors(idx_samples), label=crlb_label)
+        plt.semilogy(snr_db_vec, rmse_psi[idx_samples, :]*180/np.pi, linestyle='--', color=colors(idx_samples), label=mc_label)
         
         # Clear the labels, so only the first loop is printed in the legend
         crlb_label = None
@@ -278,16 +287,17 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
 
     # Loop over parameters
     print('Executing Rectangular Aperture Monte Carlo sweep...')
+    iterations_per_marker = 1000
+    markers_per_row = 40
+    iterations_per_row = markers_per_row * iterations_per_marker
+    total_iterations = num_mc * len(snr_db_vec) * len(num_samples_vec)
+    t_start = time.perf_counter()
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
-        this_num_mc = int(np.fix(num_mc / num_samples))
-        print('\t M={:d}'.format(num_samples))
-
         # Generate Monte Carlo Noise with unit power
-        noise_base = 1/np.sqrt(2)*(rng.standard_normal(size=(num_angular_samples, num_samples, this_num_mc))
-                                   + 1j*rng.standard_normal(size=(num_angular_samples, num_samples, this_num_mc)))
+        noise_base = 1/np.sqrt(2)*(rng.standard_normal(size=(num_angular_samples, num_samples, num_mc))
+                                   + 1j*rng.standard_normal(size=(num_angular_samples, num_samples, num_mc)))
 
         for idx_snr, snr_db in enumerate(snr_db_vec):
-
             # Compute noise power, scale base noise
             noise_pwr = db_to_lin(-snr_db)
 
@@ -296,16 +306,24 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
             signal_rx = signal_true+noise
 
             # Estimate
-            psi_est = np.zeros(shape=(this_num_mc, ))
-            for idx_mc in range(this_num_mc):
+            psi_est = np.zeros(shape=(num_mc, ))
+
+            for idx_mc in range(num_mc):
+                curr_idx = idx_mc + idx_snr * num_mc + idx_num_samples * len(snr_db_vec) * num_mc
+                utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+
                 psi_est[idx_mc] = aoa.directional.compute_df(signal_rx[:, :, idx_mc], psi, g, psi_res,
                                                              -np.pi, np.pi)
 
-            rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2)/this_num_mc)
+            rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2)/num_mc)
 
             # CRLB
             crlb_psi[idx_num_samples, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot, psi,
                                                                                   psi_true))
+
+    print('done')
+    t_elapsed = time.perf_counter() - t_start
+    utils.print_elapsed(t_elapsed)
 
     # Generate figure
     fig5 = plt.figure()
@@ -423,10 +441,12 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
 
     # Loop over parameters
     print('Executing Watson-Watt Monte Carlo sweep...')
-    for idx_M, this_num_samples in enumerate(num_samples_vec):
-        this_num_mc = int(np.fix(num_mc/this_num_samples))
-        print('\t M={:d}'.format(this_num_samples))
-
+    iterations_per_marker = 1000
+    markers_per_row = 40
+    iterations_per_row = markers_per_row * iterations_per_marker
+    total_iterations = num_mc * len(snr_db_vec) * len(num_samples_vec)
+    t_start = time.perf_counter()
+    for idx_num_samples, this_num_samples in enumerate(num_samples_vec):
         # Generate signal vectors
         t_vec = np.expand_dims(np.arange(this_num_samples)*t_samp, axis=1)
         r0 = np.cos(2*np.pi*f*t_vec)
@@ -435,9 +455,9 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
 
         # Generate Monte Carlo Noise with unit power
         sample_power = np.linalg.norm(r0)/np.sqrt(this_num_samples)  # average sample power
-        noise_base_r = sample_power*rng.standard_normal(size=(this_num_samples, this_num_mc))
-        noise_base_x = sample_power*rng.standard_normal(size=(this_num_samples, this_num_mc))
-        noise_base_y = sample_power*rng.standard_normal(size=(this_num_samples, this_num_mc))
+        noise_base_r = sample_power*rng.standard_normal(size=(this_num_samples, num_mc))
+        noise_base_x = sample_power*rng.standard_normal(size=(this_num_samples, num_mc))
+        noise_base_y = sample_power*rng.standard_normal(size=(this_num_samples, num_mc))
 
         # Loop over SNR vector
         for idx_snr, snr_db in enumerate(snr_db_vec):
@@ -451,23 +471,29 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
             x = x0 + noise_base_x/np.sqrt(snr_lin)
 
             # Compute the estimate
-            psi_est = np.zeros(shape=(this_num_mc, ))
-            for idx_mc in np.arange(this_num_mc):
+            psi_est = np.zeros(shape=(num_mc, ))
+
+            for idx_mc in np.arange(num_mc):
+                curr_idx = idx_mc + idx_snr * num_mc + idx_num_samples * len(snr_db_vec) * num_mc
+                utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+
                 psi_est[idx_mc] = aoa.watson_watt.compute_df(r[:, idx_mc], x[:, idx_mc], y[:, idx_mc])
 
-            rmse_psi[idx_snr, idx_M] = np.sqrt(((psi_est-psi_true)**2).mean())
+            rmse_psi[idx_snr, idx_num_samples] = np.sqrt(((psi_est-psi_true)**2).mean())
 
             # CRLB
-            crlb_psi[idx_snr, idx_M] = np.absolute(aoa.watson_watt.crlb(snr_db, this_num_samples))
+            crlb_psi[idx_snr, idx_num_samples] = np.absolute(aoa.watson_watt.crlb(snr_db, this_num_samples))
 
-    print('done.')
+    print('done')
+    t_elapsed = time.perf_counter() - t_start
+    utils.print_elapsed(t_elapsed)
 
     fig7 = plt.figure()
     crlb_label = 'CRLB'
     mc_label = 'Simulation Result'
-    for idx_M, _ in enumerate(num_samples_vec):
-        plt.semilogy(snr_db_vec, np.sqrt(crlb_psi[:, idx_M])*180/np.pi, color=colors(idx_M), label=crlb_label)
-        plt.semilogy(snr_db_vec, rmse_psi[:, idx_M]*180/np.pi, linestyle='--', color=colors(idx_M), label=mc_label)
+    for idx_num_samples, _ in enumerate(num_samples_vec):
+        plt.semilogy(snr_db_vec, np.sqrt(crlb_psi[:, idx_num_samples])*180/np.pi, color=colors(idx_num_samples), label=crlb_label)
+        plt.semilogy(snr_db_vec, rmse_psi[:, idx_num_samples]*180/np.pi, linestyle='--', color=colors(idx_num_samples), label=mc_label)
 
         crlb_label = None
         mc_label = None
@@ -586,10 +612,12 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
 
     # Loop over parameters
     print('Executing Doppler Monte Carlo sweep...')
+    iterations_per_marker = 1000
+    markers_per_row = 40
+    iterations_per_row = markers_per_row * iterations_per_marker
+    total_iterations = num_mc * len(snr_db_vec) * len(num_samples_vec)
+    t_start = time.perf_counter()
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
-        this_num_mc = int(np.fix(num_mc/num_samples))
-        print('\t M={:d}'.format(num_samples))
-
         # Reference signal
         t_vec = ts*np.arange(num_samples)
         r0 = signal_amp*np.exp(1j*phi0)*np.exp(1j*2*np.pi*f*t_vec)
@@ -601,7 +629,7 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
 
         # Generate noise signal
         sample_power = np.sqrt(signal_amp/2)
-        noise_shp = (num_samples, this_num_mc)
+        noise_shp = (num_samples, num_mc)
         noise_base_r = sample_power*(rng.standard_normal(size=noise_shp) + 1j*rng.standard_normal(size=noise_shp))
         noise_base_x = sample_power*(rng.standard_normal(size=noise_shp) + 1j*rng.standard_normal(size=noise_shp))
 
@@ -614,19 +642,24 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
             x = np.expand_dims(x0, axis=1) + noise_base_x*np.sqrt(noise_pwr)
 
             # Compute the estimate
-            psi_est = np.zeros(shape=(this_num_mc, ))
-            for idx_mc in range(this_num_mc):
+            psi_est = np.zeros(shape=(num_mc, ))
+            for idx_mc in range(num_mc):
+                curr_idx = idx_mc + idx_snr * num_mc + idx_num_samples * len(snr_db_vec) * num_mc
+                utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+
                 psi_est[idx_mc] = aoa.doppler.compute_df(r[:, idx_mc], x[:, idx_mc], ts, f, ant_radius, fr, psi_res,
                                                          -np.pi, np.pi)
             
             rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2, axis=None)
-                                                         / this_num_mc)
+                                                         / num_mc)
 
             # CRLB
             crlb_psi[idx_num_samples, idx_snr] = aoa.doppler.crlb(snr_db, num_samples, signal_amp, ts, f, ant_radius,
                                                                   fr, psi_true)
         
-    print('\tdone.')
+    print('done')
+    t_elapsed = time.perf_counter() - t_start
+    utils.print_elapsed(t_elapsed)
 
     fig10 = plt.figure()
     crlb_label = 'CRLB'
@@ -656,7 +689,7 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
     return fig10
 
 
-def make_figure_12(prefix=None, force_recalc=True):
+def make_figure_12(prefix=None):
     """
     Figure 12, Interferometer
 
@@ -666,13 +699,8 @@ def make_figure_12(prefix=None, force_recalc=True):
     26 March 2021
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
-
-    if not force_recalc:
-        print('Skipping Figure 7.12... (re-run with force_recalc=True to generate)')
-        return None
 
     print('Generating Figure 7.12...')
 
@@ -702,7 +730,7 @@ def make_figure_12(prefix=None, force_recalc=True):
     return fig12
 
 
-def make_figure_14(prefix=None, force_recalc=True):
+def make_figure_14(prefix=None):
     """
     Figure 14, Interferometer Example
 
@@ -712,13 +740,8 @@ def make_figure_14(prefix=None, force_recalc=True):
     26 March 2021
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
-
-    if not force_recalc:
-        print('Skipping Figure 7.14... (re-run with force_recalc=True to generate)')
-        return None
 
     print('Generating Figure 7.14 (using Example 7.1)...')
 
@@ -734,7 +757,7 @@ def make_figure_14(prefix=None, force_recalc=True):
     return fig14
 
 
-def make_figure_15b(prefix=None, force_recalc=True):
+def make_figure_15b(prefix=None):
     """
     Figure 15b, Monopulse
 
@@ -744,13 +767,8 @@ def make_figure_15b(prefix=None, force_recalc=True):
     26 March 2021
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
     :return: figure handle
     """
-
-    if not force_recalc:
-        print('Skipping Figure 7.15b... (re-run with force_recalc=True to generate)')
-        return None
 
     print('Generating Figure 7.15b...')
 

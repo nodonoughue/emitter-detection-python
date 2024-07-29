@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from utils import constants
 from utils.unit_conversions import lin_to_db, db_to_lin
-from utils import print_elapsed
+from utils import print_elapsed, print_progress
 import prop
 import array_df
 import time
@@ -346,38 +346,42 @@ def example2(rng=None):
     rmse_deg_music = np.zeros(shape=out_shp)
 
     print('Executing array DF monte carlo trial...')
+    iterations_per_marker = 10
+    markers_per_row = 40
+    iterations_per_row = markers_per_row * iterations_per_marker
+    total_iterations = num_monte_carlo * len(range_vec_m)
     t_start = time.perf_counter()
-    
-    for idxR, thisR in enumerate(range_vec_m):
-        print('.', end='')  # Use the end command to suppress a newline
-
-        this_signal = np.reshape(sig*np.sqrt(db_to_lin(snr_db[idxR])), (1, num_samples, num_monte_carlo))
+    for idx_r, this_range in enumerate(range_vec_m):
+        this_signal = np.reshape(sig*np.sqrt(db_to_lin(snr_db[idx_r])), (1, num_samples, num_monte_carlo))
         this_rx_signal = np.expand_dims(v(psi), axis=2) * this_signal + noise
     
         this_err_beamscan = np.zeros(shape=(num_monte_carlo, ))
         this_err_mvdr = np.zeros(shape=(num_monte_carlo, ))
         this_err_music = np.zeros(shape=(num_monte_carlo, ))
 
-        for idxMC in np.arange(num_monte_carlo):
+        for idx_mc in np.arange(num_monte_carlo):
+            curr_idx = idx_mc + idx_r * num_monte_carlo
+            print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+
             # Compute beamscan image
-            pwr_vec, psi_vec = array_df.solvers.beamscan(this_rx_signal[:, :, idxMC], v, np.pi/2, 2001)
+            pwr_vec, psi_vec = array_df.solvers.beamscan(this_rx_signal[:, :, idx_mc], v, np.pi/2, 2001)
             idx_pk = np.argmax(np.abs(pwr_vec))
-            this_err_beamscan[idxMC] = np.abs(psi_vec[idx_pk]-psi)
+            this_err_beamscan[idx_mc] = np.abs(psi_vec[idx_pk]-psi)
     
             # Compute beamscan MVDR image
-            pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(this_rx_signal[:, :, idxMC], v, np.pi/2, 2001)
+            pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(this_rx_signal[:, :, idx_mc], v, np.pi/2, 2001)
             idx_pk = np.argmax(np.abs(pwr_vec_mvdr))
-            this_err_mvdr[idxMC] = np.abs(psi_vec[idx_pk]-psi)
+            this_err_mvdr[idx_mc] = np.abs(psi_vec[idx_pk]-psi)
     
             # Compute MUSIC image
-            pwr_vec_music, psi_vec = array_df.solvers.music(this_rx_signal[:, :, idxMC], v, 1, np.pi/2, 2001)
+            pwr_vec_music, psi_vec = array_df.solvers.music(this_rx_signal[:, :, idx_mc], v, 1, np.pi/2, 2001)
             idx_pk = np.argmax(np.abs(pwr_vec_music))
-            this_err_music[idxMC] = np.abs(psi_vec[idx_pk]-psi)
+            this_err_music[idx_mc] = np.abs(psi_vec[idx_pk]-psi)
     
             # Average Results
-            rmse_deg_beam[idxR] = (180/np.pi)*np.sqrt(np.sum(this_err_beamscan**2)/num_monte_carlo)
-            rmse_deg_mvdr[idxR] = (180/np.pi)*np.sqrt(np.sum(this_err_mvdr**2)/num_monte_carlo)
-            rmse_deg_music[idxR] = (180/np.pi)*np.sqrt(np.sum(this_err_music**2)/num_monte_carlo)
+            rmse_deg_beam[idx_r] = (180/np.pi)*np.sqrt(np.sum(this_err_beamscan**2)/num_monte_carlo)
+            rmse_deg_mvdr[idx_r] = (180/np.pi)*np.sqrt(np.sum(this_err_mvdr**2)/num_monte_carlo)
+            rmse_deg_music[idx_r] = (180/np.pi)*np.sqrt(np.sum(this_err_music**2)/num_monte_carlo)
     
     print('done.')
     t_elapsed = time.perf_counter() - t_start

@@ -78,9 +78,9 @@ def example1(rng=np.random.default_rng()):
                                           tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Initialize Solvers
-    num_mc_trials = int(10)  # TODO: Raise to 1,000
+    num_mc_trials = int(1000)
     x_extent = 5 * baseline
-    num_iterations = int(1000)  # TODO: Raise to 1,000
+    num_iterations = int(1000)
     alpha = .3
     beta = .8
     epsilon = 100  # [m] desired iterative search stopping condition
@@ -120,14 +120,7 @@ def example1(rng=np.random.default_rng()):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     for idx in np.arange(num_mc_trials):
-        if np.mod(idx + 1, iterations_per_marker) == 0:
-            print('.', end='')  # Use end='' to prevent the newline
-
-        if np.mod(idx + 1, iterations_per_row) == 0:
-            print(' ({}/{}) '.format(idx + 1, num_mc_trials), end='')
-            pct_elapsed = idx / num_mc_trials
-            t_elapsed = time.perf_counter() - t_start
-            utils.print_predicted(t_elapsed, pct_elapsed, do_elapsed=True)
+        utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(args)
         x_ml[:, idx] = result['ml']
@@ -208,7 +201,7 @@ def example2(rng=np.random.default_rng()):
                                           tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Initialize Solvers
-    num_mc_trials = int(10)  # TODO: Raise to 1,000
+    num_mc_trials = int(1000)
     x_extent = 5 * baseline
     num_iterations = int(1000)
     alpha = .3
@@ -250,14 +243,7 @@ def example2(rng=np.random.default_rng()):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     for idx in np.arange(num_mc_trials):
-        if np.mod(idx + 1, iterations_per_marker) == 0:
-            print('.', end='')  # Use end='' to prevent the newline
-
-        if np.mod(idx + 1, iterations_per_row) == 0:
-            print(' ({}/{}) '.format(idx + 1, num_mc_trials), end='')
-            pct_elapsed = idx / num_mc_trials
-            t_elapsed = time.perf_counter() - t_start
-            utils.print_predicted(t_elapsed, pct_elapsed, do_elapsed=True)
+        utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(args)
         x_ml[:, idx] = result['ml']

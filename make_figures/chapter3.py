@@ -370,7 +370,7 @@ def make_figure_8(prefix=None):
     snr0 = eirp+rx_gain-rx_loss-noise_pwr  # snr with no propagation loss
     range_max = detector.squareLaw.max_range(prob_fa=1e-6, prob_d=.5, num_samples=10, f0=f0, ht=ht, hr=hr,
                                              snr0=snr0, include_atm_loss=False)
-    print('Max Range: {} m'.format(range_max[0]))
+    print('Max Range: {:.3f} km'.format(range_max[0]/1e3))
 
     fig8 = plt.figure()
     plt.plot(range_vec/1e3, signal_pwr, label='$P_R$')

@@ -5,6 +5,7 @@ from itertools import permutations
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+import time
 
 
 def init_plot_style(dpi=400):
@@ -393,6 +394,30 @@ def print_predicted(t_elapsed, pct_elapsed, do_elapsed=False):
     minutes_remaining = (t_remaining - 3600 * hrs_remaining) / 60
 
     print('Estimated Time Remaining: {} hrs, {:.2f} min'.format(hrs_remaining, minutes_remaining))
+
+
+def print_progress(num_total, curr_idx, iterations_per_marker, iterations_per_row, t_start):
+    """
+    Print progress for a long-duration simulation, including progress markers (dots),
+    and predicted time remaining.
+
+    Nicholas O'Donoughue
+    28 July 2024
+
+    :param num_total: Total number of iterations in for loop
+    :param curr_idx: Current iteration
+    :param iterations_per_marker: Number of iterations per marker
+    :param iterations_per_row: Number of iterations per row
+    :param t_start: Time at which the for loop began
+    """
+    if np.mod(curr_idx + 1, iterations_per_marker) == 0:
+        print('.', end='')  # Use end='' to prevent the newline
+
+    if np.mod(curr_idx + 1, iterations_per_row) == 0:
+        print(' ({}/{}) '.format(curr_idx + 1, num_total), end='')
+        pct_elapsed = curr_idx / num_total
+        t_elapsed = time.perf_counter() - t_start
+        print_predicted(t_elapsed, pct_elapsed, do_elapsed=True)
 
 
 def safe_2d_shape(x: np.array) -> np.array:

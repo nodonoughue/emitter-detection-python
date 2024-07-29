@@ -511,10 +511,12 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
     rmse_deg_music = np.zeros(shape=(np.size(snr_db), ))
     
     print('Executing array DF monte carlo trial...')
+    iterations_per_marker = 10
+    markers_per_row = 40
+    iterations_per_row = markers_per_row * iterations_per_marker
+    total_iterations = num_monte_carlo * len(snr_lin)
     t_start = time.perf_counter()
-    
     for idx_xi, this_xi in enumerate(snr_lin):
-        print('.', end='')  # Use end='' to prevent the newline
         sn2 = 1/this_xi
         x = x0 + np.sqrt(sn2)*n
 
@@ -523,7 +525,9 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
         this_err_music = np.zeros(shape=(num_monte_carlo, ))
 
         for idx_mc in np.arange(num_monte_carlo):
-            
+            curr_idx = idx_mc + idx_xi * num_monte_carlo
+            utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+
             # Compute beamscan image
             pwr_vec, psi_vec = array_df.solvers.beamscan(x[:, :, idx_mc], v, np.pi/2, 2001)
             idx_pk = np.argmax(np.abs(pwr_vec))
