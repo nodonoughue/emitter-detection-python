@@ -40,14 +40,13 @@ def max_likelihood(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
                                     cov_is_inverted=cov_is_inverted)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon)
 
     return x_est, likelihood, x_grid
 
 
 def gradient_descent(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                     alpha=None, beta=None, epsilon=None, max_num_iterations=None, force_full_calc=False,
-                     plot_progress=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
+                     tdoa_ref_idx=None, fdoa_ref_idx=None, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -64,14 +63,6 @@ def gradient_descent(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
     :param zeta: Combined measurement vector
     :param cov: FDOA error covariance matrix
     :param x_init: Initial estimate of source position [m]
-    :param alpha: Backtracking line search parameter
-    :param beta: Backtracking line search parameter
-    :param epsilon: Desired position error tolerance (stopping condition)
-    :param max_num_iterations: Maximum number of iterations to perform
-    :param force_full_calc: Boolean flag to force all iterations (up to max_num_iterations) to be computed, regardless
-                            of convergence (DEFAULT = False)
-    :param plot_progress: Boolean flag dictating whether to plot intermediate solutions as they are derived
-                          (DEFAULT = False).
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings, for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings, for FDOA
     :return x: Estimated source position
@@ -89,16 +80,13 @@ def gradient_descent(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
                               x_source=this_x, v_source=v_source, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, alpha=alpha, beta=beta,
-                                  epsilon=epsilon, max_num_iterations=max_num_iterations,
-                                  force_full_calc=force_full_calc, plot_progress=plot_progress)
+    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 
 
 def least_square(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                 epsilon=None, max_num_iterations=None, force_full_calc=False, plot_progress=False,
-                 tdoa_ref_idx=None, fdoa_ref_idx=None):
+                 tdoa_ref_idx=None, fdoa_ref_idx=None, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -115,12 +103,6 @@ def least_square(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa
     :param zeta: Combined measurement vector
     :param cov: Measurement Error Covariance Matrix [(m/s)^2]
     :param x_init: Initial estimate of source position [m]
-    :param epsilon: Desired estimate resolution [m]
-    :param max_num_iterations: Maximum number of iterations to perform
-    :param force_full_calc: Boolean flag to force all iterations (up to max_num_iterations) to be computed, regardless
-                            of convergence (DEFAULT = False)
-    :param plot_progress: Boolean flag dictating whether to plot intermediate solutions as they are derived
-                          (DEFAULT = False).
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
     :return x: Estimated source position
@@ -139,9 +121,7 @@ def least_square(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa
                               tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, covariance=cov, x_init=x_init, epsilon=epsilon,
-                                  max_num_iterations=max_num_iterations, force_full_calc=force_full_calc,
-                                  plot_progress=plot_progress)
+    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 

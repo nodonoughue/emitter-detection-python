@@ -36,13 +36,12 @@ def max_likelihood(x_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx
         return model.log_likelihood(x_sensor, rho, cov, x, ref_idx, do_resample=False)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon)
 
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, rho, cov, x_init, alpha=None, beta=None, epsilon=None, max_num_iterations=None,
-                     force_full_calc=False, plot_progress=False, ref_idx=None, do_resample=False):
+def gradient_descent(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, **kwargs):
     """
     Computes the gradient descent solution for tdoa processing.
 
@@ -55,14 +54,6 @@ def gradient_descent(x_sensor, rho, cov, x_init, alpha=None, beta=None, epsilon=
     :param rho: Measurement vector
     :param cov: tdoa error covariance matrix
     :param x_init: Initial estimate of source position [m]
-    :param alpha: Backtracking line search parameter
-    :param beta: Backtracking line search parameter
-    :param epsilon: Desired position error tolerance (stopping condition)
-    :param max_num_iterations: Maximum number of iterations to perform
-    :param force_full_calc: Boolean flag to force all iterations (up to max_num_iterations) to be computed, regardless
-                            of convergence (DEFAULT = False)
-    :param plot_progress: Boolean flag dictating whether to plot intermediate solutions as they are derived
-                          (DEFAULT = False).
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return x: Estimated source position
@@ -80,14 +71,12 @@ def gradient_descent(x_sensor, rho, cov, x_init, alpha=None, beta=None, epsilon=
         cov = utils.resample_covariance_matrix(cov, ref_idx)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, alpha, beta, epsilon, max_num_iterations, force_full_calc,
-                                  plot_progress)
+    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 
 
-def least_square(x_sensor, rho, cov, x_init, epsilon=None, max_num_iterations=None, force_full_calc=False,
-                 plot_progress=False, ref_idx=None, do_resample=False):
+def least_square(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, **kwargs):
     """
     Computes the least square solution for tdoa processing.
 
@@ -100,12 +89,6 @@ def least_square(x_sensor, rho, cov, x_init, epsilon=None, max_num_iterations=No
     :param rho: Range Difference Measurements [m/s]
     :param cov: Measurement Error Covariance Matrix [(m/s)^2]
     :param x_init: Initial estimate of source position [m]
-    :param epsilon: Desired estimate resolution [m]
-    :param max_num_iterations: Maximum number of iterations to perform
-    :param force_full_calc: Boolean flag to force all iterations (up to max_num_iterations) to be computed, regardless
-                            of convergence (DEFAULT = False)
-    :param plot_progress: Boolean flag dictating whether to plot intermediate solutions as they are derived
-                          (DEFAULT = False).
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :return x: Estimated source position
@@ -123,7 +106,7 @@ def least_square(x_sensor, rho, cov, x_init, epsilon=None, max_num_iterations=No
         cov = utils.resample_covariance_matrix(cov, ref_idx)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, epsilon, max_num_iterations, force_full_calc, plot_progress)
+    x, x_full = solvers.ls_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 

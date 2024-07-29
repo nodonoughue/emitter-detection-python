@@ -39,8 +39,7 @@ def max_likelihood(x_sensor, psi, cov, x_ctr, search_size, epsilon=None):
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, psi, cov, x_init, alpha=0.3, beta=0.8, epsilon=10, max_num_iterations=1e3,
-                     force_full_calc=False, plot_progress=False):
+def gradient_descent(x_sensor, psi, cov, x_init, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -53,14 +52,6 @@ def gradient_descent(x_sensor, psi, cov, x_init, alpha=0.3, beta=0.8, epsilon=10
     :param psi: AOA Measurement vector [rad]
     :param cov: Measurement error covariance matrix
     :param x_init: Initial estimate of source position [m]
-    :param alpha: Backtracking line search parameter
-    :param beta: Backtracking line search parameter
-    :param epsilon: Desired position error tolerance (stopping condition)
-    :param max_num_iterations: Maximum number of iterations to perform
-    :param force_full_calc: Boolean flag to force all iterations (up to max_num_iterations) to be computed, regardless
-                            of convergence (DEFAULT = False)
-    :param plot_progress: Boolean flag that dictates whether to plot intermediate solutions as they are derived
-                          (DEFAULT = False).
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
@@ -73,14 +64,12 @@ def gradient_descent(x_sensor, psi, cov, x_init, alpha=0.3, beta=0.8, epsilon=10
         return model.jacobian(x_sensor, this_x)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, alpha, beta, epsilon, max_num_iterations, force_full_calc,
-                                  plot_progress)
+    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 
 
-def least_square(x_sensor, psi, cov, x_init, epsilon=10, max_num_iterations=1e3, force_full_calc=False,
-                 plot_progress=False):
+def least_square(x_sensor, psi, cov, x_init, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -93,12 +82,6 @@ def least_square(x_sensor, psi, cov, x_init, epsilon=10, max_num_iterations=1e3,
     :param psi: AOA Measurements [rad]
     :param cov: Measurement Error Covariance Matrix [(m/s)^2]
     :param x_init: Initial estimate of source position [m]
-    :param epsilon: Desired estimate resolution [m]
-    :param max_num_iterations: Maximum number of iterations to perform
-    :param force_full_calc: Boolean flag to force all iterations (up to max_num_iterations) to be computed, regardless
-                            of convergence (DEFAULT = False)
-    :param plot_progress: Boolean flag that dictates whether to plot intermediate solutions as they are derived
-                          (DEFAULT = False).
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
@@ -111,7 +94,7 @@ def least_square(x_sensor, psi, cov, x_init, epsilon=10, max_num_iterations=1e3,
         return model.jacobian(x_sensor, this_x)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, epsilon, max_num_iterations, force_full_calc, plot_progress)
+    x, x_full = solvers.ls_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 
