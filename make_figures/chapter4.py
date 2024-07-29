@@ -16,7 +16,6 @@ from matplotlib.patches import Ellipse
 import numpy as np
 from scipy.fft import fft, fftshift
 from scipy import stats
-import seaborn as sns
 import detector
 from examples import chapter4
 
@@ -38,9 +37,7 @@ def make_all_figures(close_figs=False):
 
     # Find the output directory
     prefix = utils.init_output_dir('chapter4')
-
-    # Activate seaborn for prettier plots
-    sns.set()
+    utils.init_plot_style()
 
     # Generate all figures
     fig1a = make_figure_1a(prefix)

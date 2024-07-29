@@ -12,7 +12,6 @@ Nicholas O'Donoughue
 import utils
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import atm
 import noise
 
@@ -28,12 +27,10 @@ def make_all_figures(close_figs=False):
 
     # Find the output directory
     prefix = utils.init_output_dir('appendixD')
+    utils.init_plot_style()
 
     # Random Number Generator
     # rng = np.random.default_rng(0)
-
-    # Activate seaborn for prettier plots
-    sns.set()
 
     # Colormap
     # colors = plt.get_cmap("tab10")

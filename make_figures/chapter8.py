@@ -13,7 +13,6 @@ import utils
 from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import array_df
 import time
 from examples import chapter8
@@ -31,12 +30,10 @@ def make_all_figures(close_figs=False, force_recalc=True):
 
     # Find the output directory
     prefix = utils.init_output_dir('chapter8')
+    utils.init_plot_style()
 
     # Random Number Generator
     rng = np.random.default_rng(0)
-
-    # Activate seaborn for prettier plots
-    sns.set()
 
     # Generate all figures
     fig3 = make_figure_3(prefix)

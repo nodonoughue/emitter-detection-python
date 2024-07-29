@@ -13,7 +13,6 @@ import utils
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-import seaborn as sns
 import triang
 import tdoa
 import fdoa
@@ -33,12 +32,10 @@ def make_all_figures(close_figs=False, force_recalc=False):
 
     # Find the output directory
     prefix = utils.init_output_dir('chapter13')
+    utils.init_plot_style()
 
     # Random Number Generator
     rng = np.random.default_rng(0)
-
-    # Activate seaborn for prettier plots
-    sns.set()
 
     # Initializes colorSet - Mx3 RGB vector for successive plot lines
     colors = plt.get_cmap("tab10")

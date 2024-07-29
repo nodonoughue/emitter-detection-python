@@ -13,7 +13,6 @@ import utils
 from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import aoa
 from examples import chapter7
 
@@ -30,15 +29,13 @@ def make_all_figures(close_figs=False, force_recalc=True):
 
     # Find the output directory
     prefix = utils.init_output_dir('chapter7')
+    utils.init_plot_style()
 
     # Random Number Generator
     rng = np.random.default_rng(0)
 
     # Colormap
     colors = plt.get_cmap('tab10')
-
-    # Activate seaborn for prettier plots
-    sns.set()
 
     # Generate all figures
     fig1 = make_figure_1(prefix)

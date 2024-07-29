@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import erf, erfinv
 from scipy.linalg import toeplitz
-import seaborn as sns
 from examples import chapter2
 
 
@@ -37,9 +36,7 @@ def make_all_figures(close_figs=False):
 
     # Find the output directory
     prefix = utils.init_output_dir('chapter2')
-
-    # Activate seaborn for prettier plots
-    sns.set()
+    utils.init_plot_style()
 
     # Generate all figures
     fig1 = make_figure_1(prefix)

@@ -11,7 +11,6 @@ Nicholas O'Donoughue
 
 import utils
 import matplotlib.pyplot as plt
-import seaborn as sns
 from examples import chapter5
 
 
@@ -26,9 +25,7 @@ def make_all_figures(close_figs=False):
 
     # Find the output directory
     prefix = utils.init_output_dir('chapter5')
-
-    # Activate seaborn for prettier plots
-    sns.set()
+    utils.init_plot_style()
 
     # Generate all figures
     fig4 = make_figure_4(prefix)

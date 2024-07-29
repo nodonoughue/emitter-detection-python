@@ -13,7 +13,6 @@ import utils
 from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 
 
 def make_all_figures(close_figs=False):
@@ -30,9 +29,7 @@ def make_all_figures(close_figs=False):
 
     # Find the output directory
     prefix = utils.init_output_dir('chapter1')
-
-    # Activate seaborn for prettier plots
-    sns.set()
+    utils.init_plot_style()
 
     # Generate all figures
     fig1 = make_figure_1(prefix, rng)
