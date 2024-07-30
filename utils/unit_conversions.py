@@ -25,7 +25,7 @@ def lin_to_db(lin_value, eps=1e-99):
     return 10. * np.log10(lin_value)
 
 
-def db_to_lin(db_value):
+def db_to_lin(db_value, inf_val=3000):
     """
     Convert input from db units to linear, via the simple equation
         lin = 10^(db/10)
@@ -34,8 +34,13 @@ def db_to_lin(db_value):
     7 May 2021
 
     :param db_value: scalar or numpy array of db values to convert
+    :param inf_val: any dB values above this point will be converted to np.inf to avoid overflow
     :return: scalar or numpy array of linear values
     """
+
+    # Use the optional inf_val argument as a maximum dB value, above which we convert the output to np.inf to prevent
+    # overflow errors
+    db_value = np.where(db_value <= inf_val, db_value, np.inf)
 
     return np.power(10., db_value/10.)
 
