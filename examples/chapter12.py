@@ -263,7 +263,7 @@ def _mc_iteration(args):
 
     # Generate a random measurement
     rng = args['rng']
-    rho = args['rho_act'] + args['covar_lower'] @ rng.standard_normal(size=(args['num_measurements'], 1))
+    rho = args['rho_act'] + args['covar_lower'] @ rng.standard_normal(size=(args['num_measurements'], ))
 
     # Generate solutions
     res_ml, ml_surf, ml_grid = fdoa.solvers.max_likelihood(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
