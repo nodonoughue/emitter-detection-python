@@ -120,6 +120,7 @@ def log_likelihood(x_source, zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
     :param cov: Measurement covariance matrix (or its precomputed inverse)
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
                             inverse of the covariance matrix.
     :return ell: Log-likelihood evaluated at each position x_source.

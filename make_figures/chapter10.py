@@ -301,7 +301,9 @@ def make_figure_3(prefix=None):
                  this_x[1] + this_rng*np.array([0, np.sin(this_th)]),
                  linewidth=.5, label=None)
 
-    plt.axis('off')
+    ax0.axis('off')
+    ax1.axis('off')
+
     if prefix is not None:
         fig3.savefig(prefix + 'fig3.png')
         fig3.savefig(prefix + 'fig3.svg')

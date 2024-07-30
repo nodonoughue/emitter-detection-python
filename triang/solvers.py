@@ -94,7 +94,7 @@ def least_square(x_sensor, psi, cov, x_init, **kwargs):
         return model.jacobian(x_sensor, this_x)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
+    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 

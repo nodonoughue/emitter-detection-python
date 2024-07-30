@@ -621,8 +621,8 @@ def make_figure_9(prefix=None):
     fig9, ax = plt.subplots()
 
     # Transmitter/Sensor Locations
-    plt.plot([x_sensor1[0], x_sensor2[0]], [x_sensor1[1], x_sensor2[1]], 'ko', label='Sensors')
-    plt.plot([x_source1[0], x_source2[0]], [x_source1[1], x_source2[1]], 'k^', markersize=8, label='Transmitters')
+    plt.plot([x_sensor1[0], x_sensor2[0]], [x_sensor1[1], x_sensor2[1]], 'o', label='Sensors')
+    plt.plot([x_source1[0], x_source2[0]], [x_source1[1], x_source2[1]], '^', markersize=8, label='Transmitters')
 
     # Transmitter/Sensor Labels
     plt.text(x_sensor1[0]-.4, x_sensor1[1]-.1, '$S_1$')
@@ -632,9 +632,9 @@ def make_figure_9(prefix=None):
     plt.text(x_source2[0]+.1, x_source2[1]+.2, '$T_b$')
 
     # Isochrones
-    plt.plot(xy_isochrone1[0], xy_isochrone1[1], 'k--', label=None)
-    plt.plot(xy_isochrone2[0], xy_isochrone2[1], 'k--', label='True Isochrones')
-    plt.plot(xy_isochrone_error[0], xy_isochrone_error[1], 'k:', label='False Isochrone')
+    plt.plot(xy_isochrone1[0], xy_isochrone1[1], '--', label=None)
+    plt.plot(xy_isochrone2[0], xy_isochrone2[1], '--', label=None)
+    plt.plot(xy_isochrone_error[0], xy_isochrone_error[1], ':', label='False Isochrone')
 
     # Isochrone Labels
     label_y_location = -1.5
@@ -722,8 +722,8 @@ def make_figure_10(prefix=None):
     plt.text(x_source2[0]+.1, x_source2[1], r'$T_b$')
 
     # False Isochrones
-    plt.plot(x_isochrone1, y_isochrone1, 'k--', label=None)
-    plt.plot(x_isochrone2, y_isochrone2, 'k--', label=None)
+    plt.plot(x_isochrone1, y_isochrone1, '--', label=None)
+    plt.plot(x_isochrone2, y_isochrone2, '--', label=None)
 
     # Isochrone Labels
     label_x_location = 2

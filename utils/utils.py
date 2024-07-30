@@ -195,14 +195,7 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
     if ref_weights:
         shp_ref_wt = np.size(ref_weights)
 
-    # Initialize output
-    cov_out = np.zeros((n_pair_out, n_pair_out))
-
-    a_i_wt = 1.
-    a_j_wt = 1.
-    b_i_wt = 1.
-    b_j_wt = 1.
-
+    # Function to execute at each entry of output covariance matrix
     def element_func(idx_row, idx_col):
         idx_row = idx_row.astype(int)
         idx_col = idx_col.astype(int)
@@ -214,12 +207,12 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
             a_i_wt = test_weights[idx_row % shp_test_wt]
             a_j_wt = test_weights[idx_col % shp_test_wt]
         else:
-            a_i_wt = a_j_wt = 1
+            a_i_wt = a_j_wt = 1.
         if ref_weights:
             b_i_wt = ref_weights[idx_row % shp_ref_wt]
             b_j_wt = ref_weights[idx_col % shp_ref_wt]
         else:
-            b_i_wt = b_j_wt = 1
+            b_i_wt = b_j_wt = 1.
 
         cov_aiaj = cov[a_i, a_j]
         cov_aibj = np.zeros_like(cov_aiaj)

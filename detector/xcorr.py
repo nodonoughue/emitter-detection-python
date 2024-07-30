@@ -120,7 +120,7 @@ def max_range(prob_fa, prob_d, corr_time, pulse_duration, bw_noise, bw_signal, f
     # Find the required SNR Threshold
     snr_min = min_sinr(prob_fa, prob_d, corr_time, pulse_duration, bw_noise, bw_signal)
     
-    max_range = np.zeros(np.shape(snr_min))
+    max_range_val = np.zeros(np.shape(snr_min))
     
     for idx_snr_min, this_snr_min in enumerate(snr_min):
         if np.size(snr0) > 1:
@@ -168,7 +168,7 @@ def max_range(prob_fa, prob_d, corr_time, pulse_duration, bw_noise, bw_signal, f
             # Iteration count
             iter_num += 1
 
-        max_range[idx_snr_min] = this_r
+        max_range_val[idx_snr_min] = this_r
 
-    return max_range
+    return max_range_val
 

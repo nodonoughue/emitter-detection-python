@@ -119,7 +119,8 @@ def min_sinr(prob_fa, prob_d, num_samples):
             idx += 1
 
         if idx >= max_iter:
-            warnings.warn('Computation finished before suitable tolerance achieved.  Error = {}'.format(np.fabs(err)))
+            warnings.warn('Computation finished before suitable tolerance achieved.'
+                          '  Error = {:.6f}'.format(np.fabs(err)))
 
         xi[ii] = this_xi
 

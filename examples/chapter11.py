@@ -75,7 +75,7 @@ def example1(rng=np.random.default_rng()):
 
     # Set up the Monte Carlo Trial
     num_mc_trials = int(1000)
-    num_iterations = int(400)
+    num_iterations = int(1000)
     alpha = .3
     beta = .8
     epsilon = 100  # [m] desired iterative search stopping condition
@@ -148,9 +148,9 @@ def example1(rng=np.random.default_rng()):
     err_crlb = np.squeeze(tdoa.perf.compute_crlb(x_sensor, x_source, cov=covar_rho, do_resample=False))
     crlb_cep50 = utils.errors.compute_cep50(err_crlb)/1e3  # [km]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
-    plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linewidth=.5, label='90% Error Ellipse')
-    plt.text(-20, 45, '90% Error Ellipse', fontsize=10)
-    plt.plot([1, 11], [45, 45], linestyle='-', linewidth=.5, label=None)
+    plt.plot(crlb_ellipse[0, :]/1e3, crlb_ellipse[1, :]/1e3, linewidth=.5, label='90% Error Ellipse')
+    # plt.text(-20, 45, '90% Error Ellipse', fontsize=10)
+    # plt.plot([1, 11], [45, 45], linestyle='-', linewidth=.5, label=None)
 
     # Label Solutions
     # plt.text(x_init[0]/1e3+2, x_init[1]/1e3, 'Initial Guess', fontsize=12)
@@ -169,7 +169,7 @@ def example1(rng=np.random.default_rng()):
     plt.show()
 
     # Plot zoomed geometry
-    num_iter_to_plot = 100
+    num_iter_to_plot = 1000
 
     fig_geo_b = plt.figure()
     plt.scatter(x_source[0] / 1e3,

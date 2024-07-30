@@ -248,7 +248,7 @@ def make_figure_4(prefix=None):
     # Plot the ROC curve
     fig4 = plt.figure()
     for idx, this_pfa in enumerate(prob_fa[0, :]):
-        plt.plot(xi, prob_det[:, idx], label='$P_{{FA}}$ = {}'.format(this_pfa))
+        plt.plot(xi, prob_det[:, idx], label='$P_{{FA}}$ = {:.2f}'.format(this_pfa))
     
     # Axes Labels
     plt.ylabel('$P_D$')

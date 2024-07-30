@@ -4,7 +4,7 @@ from . import model
 import numpy as np
 
 
-def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx=None, do_resample=False, **kwargs):
+def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx=None, do_resample=False):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index

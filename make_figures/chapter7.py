@@ -199,7 +199,7 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
             
             # CRLB
             crlb_psi[idx_samples, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot, psi,
-                                                                        psi_true))
+                                                                              psi_true))
         
     print('done')
     t_elapsed = time.perf_counter() - t_start
@@ -210,8 +210,10 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
     crlb_label = 'CRLB'
     mc_label = 'Simulation Result'
     for idx_samples, num_samples in enumerate(num_samples_vec):
-        plt.semilogy(snr_db_vec, np.sqrt(crlb_psi[idx_samples, :])*180/np.pi, color=colors(idx_samples), label=crlb_label)
-        plt.semilogy(snr_db_vec, rmse_psi[idx_samples, :]*180/np.pi, linestyle='--', color=colors(idx_samples), label=mc_label)
+        plt.semilogy(snr_db_vec, np.sqrt(crlb_psi[idx_samples, :])*180/np.pi, color=colors(idx_samples),
+                     label=crlb_label)
+        plt.semilogy(snr_db_vec, rmse_psi[idx_samples, :]*180/np.pi, linestyle='--', color=colors(idx_samples),
+                     label=mc_label)
         
         # Clear the labels, so only the first loop is printed in the legend
         crlb_label = None
@@ -492,8 +494,10 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
     crlb_label = 'CRLB'
     mc_label = 'Simulation Result'
     for idx_num_samples, _ in enumerate(num_samples_vec):
-        plt.semilogy(snr_db_vec, np.sqrt(crlb_psi[:, idx_num_samples])*180/np.pi, color=colors(idx_num_samples), label=crlb_label)
-        plt.semilogy(snr_db_vec, rmse_psi[:, idx_num_samples]*180/np.pi, linestyle='--', color=colors(idx_num_samples), label=mc_label)
+        plt.semilogy(snr_db_vec, np.sqrt(crlb_psi[:, idx_num_samples])*180/np.pi,
+                     color=colors(idx_num_samples), label=crlb_label)
+        plt.semilogy(snr_db_vec, rmse_psi[:, idx_num_samples]*180/np.pi, linestyle='--',
+                     color=colors(idx_num_samples), label=mc_label)
 
         crlb_label = None
         mc_label = None

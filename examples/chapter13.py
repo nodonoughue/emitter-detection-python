@@ -113,7 +113,7 @@ def example1(rng=np.random.default_rng()):
             'gd_alpha': alpha,
             'gd_beta': beta}
 
-    print('Performing Monte Carlo simulation for FDOA performance...')
+    print('Performing Monte Carlo simulation for Hybrid AOA/TDOA/FDOA performance...')
     t_start = time.perf_counter()
 
     iterations_per_marker = 1

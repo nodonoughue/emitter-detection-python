@@ -106,7 +106,7 @@ def least_square(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, **
         cov = utils.resample_covariance_matrix(cov, ref_idx)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
+    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 

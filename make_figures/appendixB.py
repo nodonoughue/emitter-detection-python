@@ -83,15 +83,14 @@ def make_figure_4(prefix=None):
     fresnel_zone_loss_vec = []
 
     for freq_hz in freq_vec:
-         for ht_m in ht_vec:
-
+        for ht_m in ht_vec:
             # Compute Path Loss two ways
             fspl = prop.model.get_free_space_path_loss(range_m=range_vec, freq_hz=freq_hz, height_tx_m=ht_m,
                                                        include_atm_loss=False)
             two_ray = prop.model.get_two_ray_path_loss(range_m=range_vec, freq_hz=freq_hz, height_tx_m=ht_m,
                                                        include_atm_loss=False)
 
-            handle = plt.plot(range_vec/1e3, fspl, label='Free-Space Path Loss, f={} GHz'.format(freq_hz/1e9))
+            handle = plt.plot(range_vec/1e3, fspl, label='Free-Space Path Loss, f={:.1f} GHz'.format(freq_hz/1e9))
             plt.plot(range_vec/1e3, two_ray, linestyle='-.', color=handle[0].get_color(),
                      label='Two-Ray Path Loss, f={} GHz, h={} m'.format(freq_hz/1e9, ht_m))
 

@@ -263,7 +263,7 @@ def make_figure_2a(prefix=None, rng=None):
         plt.text(osf*num_code_bits*idx+osf*num_code_bits/2, 7.5, '{}'.format(bit))
         plt.plot(osf*num_code_bits*idx*np.array([1, 1]), [2, 8], color='w', linestyle='-', linewidth=.5, label=None)
 
-    plt.grid('off')
+    plt.grid(False)
     ax = plt.gca()
     ax.axis('off')
 

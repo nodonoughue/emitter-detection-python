@@ -272,8 +272,8 @@ def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_
         plt.text(this_x[0]/1e3 - 2, this_x[1]/1e3 - 2, '$S_{}$'.format(sensor_num), fontsize=12)
 
     # Adjust limits
-    plt.xlim([-10, 90])
-    plt.ylim([-10, 50])
+    plt.xlim([-30, 70])
+    plt.ylim([-10, 90])
     plt.grid(True)
 
     # Remove the axes for a clean image

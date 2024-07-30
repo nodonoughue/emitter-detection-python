@@ -82,7 +82,7 @@ def example1(rng=None, cmap=None):
         # dx = x_source - this_x
 
         # Find AOA
-        lob = this_x + np.array([[0.0, np.cos(this_psi)], [0.0, np.sin(this_psi)]]) * 5 * this_range
+        # lob = this_x + np.array([[0.0, np.cos(this_psi)], [0.0, np.sin(this_psi)]]) * 5 * this_range
         lob_err1 = np.array([[0, np.cos(this_psi + this_err)], [0, np.sin(this_psi + this_err)]]) * 5 * this_range
         lob_err0 = np.array([[0, np.cos(this_psi - this_err)], [0, np.sin(this_psi - this_err)]]) * 5 * this_range
         lob_fill1 = this_x + np.concatenate((lob_err1, np.fliplr(lob_err0), np.expand_dims(lob_err1[:, 0], axis=1)),
@@ -343,7 +343,7 @@ def example2():
     
     good_points = np.argwhere(cep50 <= 25e3)
     max_cross_range = np.amax(np.abs(x_source[0, good_points]))*1e3
-    print('Maximum cross range position at 100 km downrange that satisfies CEP < 25 km is {} km'
+    print('Maximum cross range position at 100 km downrange that satisfies CEP < 25 km is {:.2f} km'
           .format(max_cross_range/1e3))
 
     x_max = 100
@@ -410,7 +410,7 @@ def example3():
     good_point = cep50 <= 25e3
     rng_val = np.sqrt(np.sum(np.abs(x0)**2, axis=0))  # km
     max_range = np.max(rng_val[np.reshape(good_point, newshape=np.shape(rng_val))])  # km
-    print('Maximum range that satisfies CEP < 25 km is {} km'.format(max_range))
+    print('Maximum range that satisfies CEP < 25 km is {:.2f} km'.format(max_range))
 
     # Plot
     fig = plt.figure()
