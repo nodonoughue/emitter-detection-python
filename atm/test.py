@@ -49,8 +49,8 @@ def plot_itu_ref_figs():
     gamma = gamma_ox + gamma_h2o
     
     fig2 = plt.figure()
-    for idx, alt in enumerate(alts):
-        plt.semilogy(f_ghz, gamma[:, idx], linestyle='-', label='{} km'.format(alt/1e3))
+    for idx, alt in enumerate(alts.tolist()):
+        plt.semilogy(f_ghz, gamma[:, idx], linestyle='-', label='{:.0f} km'.format(alt/1e3))
 
     plt.legend(loc='NorthWest')
     plt.xlabel('Frequency (GHz)')
@@ -127,8 +127,8 @@ def plot_itu_ref_figs():
     l, _, _ = model.calc_zenith_loss(f, alts, zenith_angle_deg=0.0)
     
     fig12 = plt.figure()
-    for idx, alt in enumerate(alts):
-        plt.loglog(f_ghz, l[:, idx], linestyle='-', label='{} km'.format(alt/1e3))
+    for idx, alt in enumerate(alts.tolist()):
+        plt.loglog(f_ghz, l[:, idx], linestyle='-', label='{:.0f} km'.format(alt/1e3))
 
     plt.xlabel('Frequency (GHz)')
     plt.ylabel('Zenith Attenuation (dB)')

@@ -177,7 +177,7 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
         #    signal
         noise_base = (1/np.sqrt(2))*rng.standard_normal(size=(num_angular_samples, num_samples, num_mc))
 
-        for idx_snr, snr_db in enumerate(snr_db_vec):
+        for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):
             # Compute noise power, scale base noise
             noise_pwr = db_to_lin(-snr_db)
             
@@ -297,7 +297,7 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
         noise_base = 1/np.sqrt(2)*(rng.standard_normal(size=(num_angular_samples, num_samples, num_mc))
                                    + 1j*rng.standard_normal(size=(num_angular_samples, num_samples, num_mc)))
 
-        for idx_snr, snr_db in enumerate(snr_db_vec):
+        for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):
             # Compute noise power, scale base noise
             noise_pwr = db_to_lin(-snr_db)
 
@@ -446,7 +446,7 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
     iterations_per_row = markers_per_row * iterations_per_marker
     total_iterations = num_mc * len(snr_db_vec) * len(num_samples_vec)
     t_start = time.perf_counter()
-    for idx_num_samples, this_num_samples in enumerate(num_samples_vec):
+    for idx_num_samples, this_num_samples in enumerate(num_samples_vec.tolist()):
         # Generate signal vectors
         t_vec = np.expand_dims(np.arange(this_num_samples)*t_samp, axis=1)
         r0 = np.cos(2*np.pi*f*t_vec)
@@ -617,7 +617,7 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
     iterations_per_row = markers_per_row * iterations_per_marker
     total_iterations = num_mc * len(snr_db_vec) * len(num_samples_vec)
     t_start = time.perf_counter()
-    for idx_num_samples, num_samples in enumerate(num_samples_vec):
+    for idx_num_samples, num_samples in enumerate(num_samples_vec.tolist()):
         # Reference signal
         t_vec = ts*np.arange(num_samples)
         r0 = signal_amp*np.exp(1j*phi0)*np.exp(1j*2*np.pi*f*t_vec)
@@ -633,7 +633,7 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
         noise_base_r = sample_power*(rng.standard_normal(size=noise_shp) + 1j*rng.standard_normal(size=noise_shp))
         noise_base_x = sample_power*(rng.standard_normal(size=noise_shp) + 1j*rng.standard_normal(size=noise_shp))
 
-        for idx_snr, snr_db in enumerate(snr_db_vec):
+        for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):
             # Compute noise power, scale base noise
             noise_pwr = db_to_lin(-snr_db)
 

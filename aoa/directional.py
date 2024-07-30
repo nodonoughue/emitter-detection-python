@@ -138,7 +138,7 @@ def run_example():
     
     # Loop over parameters
     print('Executing Adcock Monte Carlo sweep...')
-    for idx_num_samples, num_samples in enumerate(num_samples_vec):
+    for idx_num_samples, num_samples in enumerate(num_samples_vec.tolist()):
         this_num_mc = num_mc / num_samples
         print('\tnum_samples={}'.format(num_samples))
     
@@ -146,7 +146,7 @@ def run_example():
         noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in np.arange(this_num_mc)]
         
         # Loop over SNR levels
-        for idx_snr, snr_db in enumerate(snr_db_vec):
+        for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):
             print('.')
             
             # Compute noise power, scale base noise
@@ -208,7 +208,7 @@ def run_example():
 
     # Loop over parameters
     print('Executing Adcock Monte Carlo sweep...')
-    for idx_num_samples, num_samples in enumerate(num_samples_vec):
+    for idx_num_samples, num_samples in enumerate(num_samples_vec.tolist()):
         this_num_mc = num_mc / num_samples
         print('\tnum_samples={}'.format(num_samples))
 
@@ -216,11 +216,11 @@ def run_example():
         noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in np.arange(this_num_mc)]
 
         # Loop over SNR levels
-        for idx_snr, snr_db in enumerate(snr_db_vec):
+        for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):
             print('.')
 
             # Compute noise power, scale base noise
-            noise_amp = db_to_lin(-snr_db / 2)
+            noise_amp = db_to_lin(-snr_db/2)
 
             # Generate noisy measurement
             y = [x + noise_amp * this_noise for this_noise in noise_base]

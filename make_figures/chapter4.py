@@ -322,11 +322,11 @@ def make_figure_2b(prefix=None, rng=None):
 
         # Construct the full signals
         signal1 = np.zeros_like(spectral_average1, dtype=complex)
-        for idx, bit in enumerate(code1):
+        for idx, bit in enumerate(code1.tolist()):
             signal1[np.arange(chip_len_code1)+chip_len_code1*idx] = chip1*np.exp(1j*np.pi*bit)*starting_phase1
 
         signal2 = np.zeros_like(spectral_average2, dtype=complex)
-        for idx, bit in enumerate(code2):
+        for idx, bit in enumerate(code2.tolist()):
             signal2[np.arange(chip_len_code2)+chip_len_code2*idx] = chip2*np.exp(1j*np.pi*bit)*starting_phase2
 
         # Take the fourier transform

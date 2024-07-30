@@ -417,7 +417,7 @@ def make_figure_7(prefix):
 
     handle_sensors = plt.scatter(x_sensor[:, 0] / 1e3, x_sensor[:, 1] / 1e3, marker='o', label='Sensors')
     contour_set = ax.contour(x_grid[0] / 1e3, x_grid[1] / 1e3, cep50 / 1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
 
     # Draw Velocity Arrows
     for this_x, this_v in zip(x_sensor, v_sensor):
@@ -446,7 +446,7 @@ def make_figure_7(prefix):
 
     handle_sensors = plt.scatter(x_sensor[:, 0] / 1e3, x_sensor[:, 1] / 1e3, marker='o', label='Sensors')
     contour_set = ax.contour(x_grid[0] / 1e3, x_grid[1] / 1e3, cep50 / 1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
 
     # Draw Velocity Arrows
     for this_x, this_v in zip(x_sensor, v_sensor):
@@ -537,7 +537,7 @@ def make_figure_8(prefix):
 
     handle_sensors = plt.scatter(x_sensor[:, 0] / 1e3, x_sensor[:, 1] / 1e3, marker='o', label='Sensors')
     contour_set = ax.contour(x_grid[0] / 1e3, x_grid[1] / 1e3, cep50 / 1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
 
     # Draw Velocity Arrows
     for this_x, this_v in zip(x_sensor, v_sensor):
@@ -566,7 +566,7 @@ def make_figure_8(prefix):
 
     handle_sensors = plt.scatter(x_sensor[:, 0] / 1e3, x_sensor[:, 1] / 1e3, marker='o', label='Sensors')
     contour_set = ax.contour(x_grid[0] / 1e3, x_grid[1] / 1e3, cep50 / 1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
 
     # Draw Velocity Arrows
     for this_x, this_v in zip(x_sensor, v_sensor):
@@ -648,7 +648,7 @@ def make_figure_9(prefix):
 
     plt.scatter(x_sensor[:, 0] / 1e3, x_sensor[:, 1] / 1e3, marker='o', label='Sensors')
     contour_set = ax.contour(x_grid[0] / 1e3, x_grid[1] / 1e3, cep50 / 1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
 
     # Adjust the Display
     plt.xlabel('Cross-range [km]')

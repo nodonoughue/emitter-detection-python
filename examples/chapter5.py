@@ -46,7 +46,7 @@ def example1():
     prob_det = stats.ncx2.sf(x=threshold, df=2*num_samples, nc=2*num_samples*snr_lin_vec)
 
     fig = plt.figure()
-    for idx, this_thop in enumerate(t_hop):
+    for idx, this_thop in enumerate(t_hop.tolist()):
         plt.plot(snr_db_vec, prob_det[:, idx], label=r'$T_{{hop}}$ = ' + '{:.1f} ms'.format(this_thop*1e3))
 
     plt.xlabel('SNR [dB]')
@@ -78,7 +78,7 @@ def example2():
     bw_receiver = np.maximum(np.expand_dims(bw_signal, axis=1), bw_hop/num_scans)
     
     fig = plt.figure()
-    for idx, this_thop in enumerate(t_hop):
+    for idx, this_thop in enumerate(t_hop.tolist()):
         plt.loglog(bw_signal/1e6, bw_receiver[:, idx]/1e6, label=r'$T_{hop}$' + '={:.2f} ms'.format(this_thop*1e3))
 
     plt.xlabel(r'Frequency Resolution ($\delta_f$) [MHz]')
@@ -112,7 +112,7 @@ def example3():
     bw_receive = np.maximum(np.expand_dims(bw_signal, axis=1), bw_hop/num_scans)
     
     fig = plt.figure()
-    for idx, this_tp in enumerate(pulse_duration):
+    for idx, this_tp in enumerate(pulse_duration.tolist()):
         plt.loglog(bw_signal/1e6, bw_receive[:, idx]/1e6, label='$t_p$={:.0f}'.format(this_tp*1e6) + r'$\mu$s')
 
     plt.xlabel(r'Frequency Resolution ($\delta_f$) [MHz]')

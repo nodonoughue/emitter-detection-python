@@ -501,7 +501,7 @@ def make_figure_6(prefix=None):
 
     plt.plot(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, 'ro', label='Sensors')
     contour_set = ax.contour(x_full/1e3, y_full/1e3, cep50/1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
     plt.legend(loc='upper right')
 
     # Adjust the Display
@@ -531,7 +531,7 @@ def make_figure_6(prefix=None):
 
     plt.plot(x_sensor1[0, :]/1e3, x_sensor1[1, :]/1e3, 'ro', label='Sensors')
     contour_set = ax.contour(x_full/1e3, y_full/1e3, cep50/1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
     plt.legend(loc='upper right')
 
     # Adjust the Display

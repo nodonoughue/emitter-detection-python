@@ -89,7 +89,7 @@ def run_example():
 
     # Loop over parameters
     print('Executing Watson Watt Monte Carlo sweep...')
-    for idx_num_samples, this_num_samples in enumerate(num_samples_vec):
+    for idx_num_samples, this_num_samples in enumerate(num_samples_vec.tolist()):
         this_num_mc = num_mc / this_num_samples
         print('\t {} samples per estimate...'.format(this_num_samples))
 
@@ -106,7 +106,7 @@ def run_example():
                        for _ in np.arange(this_num_mc)]
     
         # Loop over SNR levels
-        for idx_snr, this_snr_db in enumerate(snr_db_vec):
+        for idx_snr, this_snr_db in enumerate(snr_db_vec.tolist()):
             if np.mod(idx_snr, 10) == 0:
                 print('.', end='', flush=True)
     

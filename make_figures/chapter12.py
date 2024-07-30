@@ -279,7 +279,7 @@ def _make_figure3_subfigure(eps, x_vec, y_vec, x_sensor, v_sensor, x_source, sen
     fig, ax = plt.subplots()
 
     # Make the background image using the difference between each pixel's FDOA and the true source's FDOA
-    ax.imshow(10 * np.log10(np.flipud(eps)), extent=[x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]], aspect='auto')
+    ax.imshow(10 * np.log10(np.flipud(eps)), extent=(x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]), aspect='auto')
 
     # Add the sensors and source markers
     handle_sensors = plt.scatter(x_sensor[sensors_to_plot, 0], x_sensor[sensors_to_plot, 1],
@@ -483,7 +483,7 @@ def make_figure_6(prefix):
     # ax=subplot(2,1,1)
     plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors')
     contour_set = ax.contour(x_grid[0]/1e3, x_grid[1]/1e3, cep50/1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
     plt.legend(loc='upper right')
 
     # Adjust the Display
@@ -504,7 +504,7 @@ def make_figure_6(prefix):
     # ax=subplot(2,1,1)
     plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors')
     contour_set = ax.contour(x_grid[0]/1e3, x_grid[1]/1e3, cep50/1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
     plt.legend(loc='upper right')
 
     # Adjust the Display
@@ -534,7 +534,7 @@ def make_figure_6(prefix):
 
     plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors')
     contour_set = ax.contour(x_grid[0]/1e3, x_grid[1]/1e3, cep50/1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
     plt.legend(loc='upper right')
 
     # Adjust the Display
@@ -554,7 +554,7 @@ def make_figure_6(prefix):
 
     plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors')
     contour_set = ax.contour(x_grid[0]/1e3, x_grid[1]/1e3, cep50/1e3, contour_levels)
-    ax.clabel(contour_set, contour_set.levels, inline=True, fmt=fmt, fontsize=10)
+    ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
     plt.legend(loc='upper right')
 
     # Adjust the Display
