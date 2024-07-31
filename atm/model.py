@@ -164,7 +164,7 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     if np.size(rainfall_rate) > 1:
         rainfall_rate = rainfall_rate[..., np.newaxis]
 
-    # Coeffs for kh
+    # Coefficients for kh
     a = np.array([-5.3398, -0.35351, -0.23789, -0.94158])
     b = np.array([-0.10008, 1.26970, 0.86036, 0.64552])
     c = np.array([1.13098, 0.454, 0.15354, 0.16817])
@@ -175,7 +175,7 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
               + (m * np.log10(freq_hz / 1e9) + ck))
     kh = 10**log_kh
     
-    # Coeffs for kv
+    # Coefficients for kv
     a = np.array([-3.80595, -3.44965, -0.39902, 0.50167])
     b = np.array([0.56934, -0.22911, 0.73042, 1.07319])
     c = np.array([0.81061, 0.51059, 0.11899, 0.27195])
@@ -187,7 +187,7 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
               + (m * np.log10(freq_hz / 1e9) + ck))
     kv = 10**log_kv
     
-    # Coeffs for ah
+    # Coefficients for ah
     a = np.array([-0.14318, 0.29591, 0.32177, -5.37610, 16.1721])
     b = np.array([1.82442, 0.77564, 0.63773, -0.96230, -3.29980])
     c = np.array([-0.55187, 0.19822, 0.13164, 1.47828, 3.43990])
@@ -198,7 +198,7 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     ah = (np.sum(a * np.exp(-((np.log10(freq_hz / 1e9) - b) / c) ** 2), axis=-1, keepdims=True)
           + (m * np.log10(freq_hz / 1e9) + ca))
 
-    # Coeffs for av
+    # Coefficients for av
     a = np.array([-0.07771, 0.56727, -0.20238, -48.2991, 48.5833])
     b = np.array([2.33840, 0.95545, 1.14520, 0.791669, 0.791459])
     c = np.array([-0.76284, 0.54039, 0.26809, 0.116226, 0.116479])
@@ -339,18 +339,4 @@ def get_gas_loss_coeff(freq_hz, press, water_vapor_press, temp):
     coeff_ox = .1820*np.multiply(f0, refractivity_oxygen)
     coeff_water = .1820*np.multiply(f0, refractivity_water)
     
-    # Handle all freqs < 1 GHz
-    if np.any(f0 < 1):
-        low_freq_mask = f0 < 1
-        if np.isscalar(coeff_ox):
-            coeff_ox = 0
-        else:
-            _, mask_full = np.broadcast_arrays(coeff_ox, low_freq_mask)
-            np.place(coeff_ox, mask_full, 0)
-
-        if np.isscalar(coeff_water):
-            coeff_water = 0
-        else:
-            _, mask_full = np.broadcast_arrays(coeff_water, low_freq_mask)
-            np.place(coeff_water, mask_full, 0)
     return coeff_ox, coeff_water
