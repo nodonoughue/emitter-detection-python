@@ -56,7 +56,7 @@ def compute_df(s, psi_samples, g, psi_res=0.1, min_psi=-np.pi, max_psi=np.pi):
     :param s: Set of num_samples measurements taken at each of num_steering steering angles.
     :param psi_samples: Steering angles at which measurements were taken [radians]
     :param g: Function handle to gain equation, g(psi)
-    :param psi_res: Desired resolution for output estimate [defualt = .1]
+    :param psi_res: Desired resolution for output estimate [default = .1]
     :param min_psi: Lower bound on valid region for psi [default = -pi]
     :param max_psi: Upper bound on valid region for psi [default = pi]
     :return: Estimated angle of arrival [radians]

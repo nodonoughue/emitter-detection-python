@@ -4,7 +4,7 @@ close_figs = True
 force_recalc = True
 
 print('*****************************************************')
-print('Generating all figures from the ''Emitter Detection and Geolocation for Electronic Warfare'', 2019.')
+print('Generating all figures from ''Emitter Detection and Geolocation for Electronic Warfare'', 2019.')
 print('****************************************************')
 print('close_figs = {}'.format(close_figs))
 print('force_recalc = {}'.format(force_recalc))

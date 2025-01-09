@@ -88,7 +88,7 @@ def compute_rmse_scaling(conf_interval):
     Computes the RMSE scaling factor for the specified confidence
     interval (between 0 and 1).  Defined as the integral limits (-gamma to
     gamma) that contain the desired percentage of random samples from a
-    standard normal distrubtion (mean = 0, standard deviation = 1).
+    standard normal distribution (mean = 0, standard deviation = 1).
 
     It is computed simply with:
        gamma = norminv(.5 + confInterval/2);

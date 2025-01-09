@@ -153,7 +153,7 @@ def example2(rng=None, colors=None):
     #  At each range, compute the received power level.  Conduct a monte carlo trial at each power level to compute
     #  PD and compare to the desired threshold.
 
-    # Tranmsit Parameters
+    # Transmit Parameters
     f0 = 35e9
     tx_pwr = lin_to_db(.035)  # 35 mW / -14.56 dBW
     tx_gain = 34  # dBi
