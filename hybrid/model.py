@@ -143,10 +143,9 @@ def log_likelihood(x_source, zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
         cov_inv = cov
     else:
         if do_resample:
-            # TODO: Test matrix resampling
-            num_aoa_sensors = np.shape(x_aoa)[0]
-            num_tdoa_sensors = np.shape(x_tdoa)[0]
-            num_fdoa_sensors = np.shape(x_fdoa)[0]
+            n_dim1, num_aoa_sensors = utils.safe_2d_shape(x_aoa)
+            n_dim2, num_tdoa_sensors = utils.safe_2d_shape(x_tdoa)
+            n_dim3, num_fdoa_sensors = utils.safe_2d_shape(x_fdoa)
 
             # First, we generate the test and reference index vectors
             test_idx_vec_aoa = np.arange(num_aoa_sensors)

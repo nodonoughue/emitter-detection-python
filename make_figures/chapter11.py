@@ -61,7 +61,7 @@ def make_all_figures(close_figs=False, force_recalc=False):
         return figs
 
 
-def make_figure_1(prefix=None):
+def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     """
     Figure 1a - TOA Circles
     Figure 1b - TDOA Circles
@@ -72,6 +72,9 @@ def make_figure_1(prefix=None):
     8 March 2022
 
     :param prefix: output directory to place generated figure
+    :param cmap: colormap
+    :param do_uncertainty: Boolean flag (default=False). If true, uncertainty intervals will be printed around the TDOA
+                        solution in Figure 1b.
     :return: figure handle
     """
 
@@ -141,30 +144,50 @@ def make_figure_1(prefix=None):
 
     # Figure 1b TDOA Circles
     print('Generating Figure 11.1b...')
+    if cmap is None:
+        cmap = plt.get_cmap("tab10")
 
     # Initialize Detector/Source Locations
     x_sensor1 = np.array([0, 0])
     x_sensor2 = np.array([.8, .2])
     x_sensor3 = np.array([1, 1])
     x_source = np.array([.1, .9])
-    
-    # Compute Ranges
-    r1 = utils.geo.calc_range(x_sensor1, x_source)
-    r2 = utils.geo.calc_range(x_sensor2, x_source)
-    r3 = utils.geo.calc_range(x_sensor3, x_source)
-    
-    # Find Isochrones
-    xy_isochrone1 = tdoa.model.draw_isochrone(x_sensor1, x_sensor2, range_diff=r2 - r1, num_pts=1000, max_ortho=3)
-    xy_isochrone2 = tdoa.model.draw_isochrone(x_sensor2, x_sensor3, range_diff=r3 - r2, num_pts=1000, max_ortho=3)
-    
+
     # Draw Figure
     fig1b = plt.figure()
-    
-    # Isochrones
-    plt.plot(xy_isochrone1[0], xy_isochrone1[1], color='k', linestyle=':', label='Isochrone')
-    plt.plot(xy_isochrone2[0], xy_isochrone2[1], color='k', linestyle=':', label=None)
-    
-    # Isochrone Labels
+
+    this_uc_label='Uncertainty Interval'
+    this_iso_label='Isochrone'
+    for i, (x_test, x_ref) in enumerate(zip((x_sensor1, x_sensor2), (x_sensor2, x_sensor3))):
+        this_color = cmap.colors[i]
+
+        r_test = utils.geo.calc_range(x_test, x_source)
+        r_ref = utils.geo.calc_range(x_ref, x_source)
+        r_diff = r_ref - r_test
+
+        # True isochrone
+        xy_isochrone = tdoa.model.draw_isochrone(x_test, x_ref, range_diff = r_diff, num_pts=1000, max_ortho=3)
+
+        if do_uncertainty:
+            # Uncertainty Interval
+            eps_rdoa = 0.1
+            x_isochrone_err1, y_isochrone_err1 = tdoa.model.draw_isochrone(x_test, x_ref, range_diff=r_diff + eps_rdoa,
+                                                                           num_pts=1000, max_ortho=3)
+            x_isochrone_err2, y_isochrone_err2 = tdoa.model.draw_isochrone(x_test, x_ref, range_diff=r_diff - eps_rdoa,
+                                                                           num_pts=1000, max_ortho=3)
+            unc_x = np.concatenate((x_isochrone_err1, np.flipud(x_isochrone_err2), [x_isochrone_err1[0]]))
+            unc_y = np.concatenate((y_isochrone_err1, np.flipud(y_isochrone_err2), [y_isochrone_err1[0]]))
+
+            plt.fill(unc_x, unc_y, linestyle='--', alpha=.1, edgecolor='k',
+                     facecolor=this_color, label=this_uc_label)
+
+        plt.plot(xy_isochrone[0], xy_isochrone[1], color=this_color, linestyle=':', label=this_iso_label)
+
+        # Clear the labels so the legend is simpler
+        this_iso_label=None
+        this_uc_label=None
+
+    # Manual Isochrone Labels
     plt.text(np.mean([x_sensor1[0], x_sensor2[0]]),
              np.mean([x_sensor1[1], x_sensor2[1]]) - .2, r'$TDOA_{1,2}$')
     plt.text(np.mean([x_sensor2[0], x_sensor3[0]]) + .3,

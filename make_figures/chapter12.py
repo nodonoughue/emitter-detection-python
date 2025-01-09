@@ -57,7 +57,7 @@ def make_all_figures(close_figs=False, force_recalc=False):
         return figs
 
 
-def make_figure_1(prefix=None):
+def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     """
     Figure 1, System Drawing
 
@@ -67,11 +67,15 @@ def make_figure_1(prefix=None):
     28 October 2022
 
     :param prefix: output directory to place generated figure
+    :param do_uncertainty: Boolean flag (default=False). If true, uncertainty intervals will be printed around the FDOA
+                            solution in Figure 1b.
     :return: figure handle
     """
 
     # Figure 1, System Drawing
     print('Generating Figure 12.1...')
+    if cmap is None:
+        cmap = plt.get_cmap("tab10")
 
     x_source = np.array([0., 2.])  # Transmitter/source
     x_sensor = np.array([[-1., 0.], [0., 0.], [2., 0.]])
@@ -93,15 +97,32 @@ def make_figure_1(prefix=None):
 
     # Draw isodoppler lines for S12 and S23
     iso_doppler_label = 'Lines of Constant FDOA'
+    uncertainty_label = 'Uncertainty Interval'
     for idx in np.arange(num_sensors-1):
+        this_color = cmap.colors[idx]  #TODO: reference the existing colormap index, instead of starting over
+
         idx2 = idx+1
         vdiff = utils.geo.calc_doppler_diff(x_source, np.array([0, 0]), x_sensor[idx], v_sensor[idx],
                                             x_sensor[idx2], v_sensor[idx2], utils.constants.speed_of_light)
         x_isodoppler, y_isodoppler = fdoa.model.draw_isodop(x_sensor[idx], v_sensor[idx],
                                                             x_sensor[idx2], v_sensor[idx2], vdiff, 1000, 5)
 
-        plt.plot(x_isodoppler, y_isodoppler, linestyle='-.', label=iso_doppler_label)
+        if do_uncertainty:
+            x_isodoppler_err1, y_isodoppler_err1 = fdoa.model.draw_isodop(x_sensor[idx], v_sensor[idx],
+                                                                          x_sensor[idx2], v_sensor[idx2], vdiff*1.1,
+                                                                          num_pts=1000, max_ortho=5)
+            x_isodoppler_err2, y_isodoppler_err2 = fdoa.model.draw_isodop(x_sensor[idx], v_sensor[idx],
+                                                                          x_sensor[idx2], v_sensor[idx2], vdiff*0.9,
+                                                                          num_pts=1000, max_ortho=5)
+            unc_x = np.concatenate((x_isodoppler_err1, np.flipud(x_isodoppler_err2), [x_isodoppler_err1[0]]))
+            unc_y = np.concatenate((y_isodoppler_err1, np.flipud(y_isodoppler_err2), [y_isodoppler_err1[0]]))
+            plt.fill(unc_x, unc_y, linestyle='--', alpha=.1, edgecolor='k',
+                     facecolor=this_color, label=uncertainty_label)
+
+        plt.plot(x_isodoppler, y_isodoppler, color=this_color, linestyle='-.', label=iso_doppler_label)
+
         iso_doppler_label = None  # Suppress all but the first label
+        uncertainty_label = None
 
     plt.xlim([-2, 3])
     plt.ylim([-1, 4])

@@ -17,7 +17,7 @@ def init_plot_style(dpi=400):
     plt.rcParams['figure.dpi'] = dpi
 
     # Initialize seaborn for pretty plots
-    sns.set()
+    sns.set_theme(context='paper', palette='colorblind')
 
 
 def init_output_dir(subdir=''):
