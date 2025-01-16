@@ -80,7 +80,10 @@ def compute_cep50(covariance):
         else:
             cep[idx_matrix] = np.sqrt(lam_max)*(.67+.8*lam_min/lam_max)
 
-    return np.reshape(cep, newshape=out_shape)
+    if num_matrices == 1:
+        return cep[0]  # convert to a scalar
+    else:
+        return np.reshape(cep, newshape=out_shape)  # reshape to match dimensions 2:end of input size
 
 
 def compute_rmse_scaling(conf_interval):
@@ -215,8 +218,9 @@ def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
     elif conf_interval == 90:
         gamma = 4.601
     elif conf_interval == 95:
-        gamma = 5.991  # 95# CI
+        gamma = 5.991
     else:
+        #TODO handle generic floating point confidence intervals between 0 and 100.
         gamma = 1
         warnings.warn('Confidence Interval not recognized, using 1 standard deviation...')
 
