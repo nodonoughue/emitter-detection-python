@@ -109,4 +109,8 @@ def compute_crlb(x_aoa, x_tdoa, x_fdoa, v_fdoa, x_source, cov, tdoa_ref_idx=None
         else:
             crlb[:, :, idx] = np.linalg.pinv(fisher_matrix)
 
+    if n_source == 1:
+        # There's only one source, trim the third dimension
+        crlb = crlb[:, :, 0]
+
     return crlb

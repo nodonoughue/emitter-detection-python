@@ -143,24 +143,7 @@ def log_likelihood(x_source, zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
         cov_inv = cov
     else:
         if do_resample:
-            n_dim1, num_aoa_sensors = utils.safe_2d_shape(x_aoa)
-            n_dim2, num_tdoa_sensors = utils.safe_2d_shape(x_tdoa)
-            n_dim3, num_fdoa_sensors = utils.safe_2d_shape(x_fdoa)
-
-            # First, we generate the test and reference index vectors
-            test_idx_vec_aoa = np.arange(num_aoa_sensors)
-            ref_idx_vec_aoa = np.nan * np.ones((num_aoa_sensors,))
-            test_idx_vec_tdoa, ref_idx_vec_tdoa = utils.parse_reference_sensor(tdoa_ref_idx, num_tdoa_sensors)
-            test_idx_vec_fdoa, ref_idx_vec_fdoa = utils.parse_reference_sensor(fdoa_ref_idx, num_fdoa_sensors)
-
-            # Second, we assemble them into a single vector
-            test_idx_vec = np.concatenate((test_idx_vec_aoa, num_aoa_sensors + test_idx_vec_tdoa,
-                                           num_aoa_sensors + num_tdoa_sensors + test_idx_vec_fdoa), axis=0)
-            ref_idx_vec = np.concatenate((ref_idx_vec_aoa, num_aoa_sensors + ref_idx_vec_tdoa,
-                                          num_aoa_sensors + num_tdoa_sensors + ref_idx_vec_fdoa), axis=0)
-
-            # Finally, we resample the full covariance matrix using the assembled indices
-            cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+            cov = resample_hybrid_covariance_matrix(cov, x_aoa, x_tdoa, x_fdoa, tdoa_ref_idx, fdoa_ref_idx)
 
         cov_inv = np.linalg.inv(cov)
 
@@ -226,25 +209,7 @@ def error(x_source, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, x_max=1, num_pts=
         cov_inv = cov
     else:
         if do_resample:
-            # TODO: Test matrix resampling
-            num_aoa_sensors = np.shape(x_aoa)[0]
-            num_tdoa_sensors = np.shape(x_tdoa)[0]
-            num_fdoa_sensors = np.shape(x_fdoa)[0]
-
-            # First, we generate the test and reference index vectors
-            test_idx_vec_aoa = np.arange(num_aoa_sensors)
-            ref_idx_vec_aoa = np.nan * np.ones((num_aoa_sensors,))
-            test_idx_vec_tdoa, ref_idx_vec_tdoa = utils.parse_reference_sensor(tdoa_ref_idx, num_tdoa_sensors)
-            test_idx_vec_fdoa, ref_idx_vec_fdoa = utils.parse_reference_sensor(fdoa_ref_idx, num_fdoa_sensors)
-
-            # Second, we assemble them into a single vector
-            test_idx_vec = np.concatenate((test_idx_vec_aoa, num_aoa_sensors + test_idx_vec_tdoa,
-                                           num_aoa_sensors + num_tdoa_sensors + test_idx_vec_fdoa), axis=0)
-            ref_idx_vec = np.concatenate((ref_idx_vec_aoa, num_aoa_sensors + ref_idx_vec_tdoa,
-                                          num_aoa_sensors + num_tdoa_sensors + ref_idx_vec_fdoa), axis=0)
-
-            # Finally, we resample the full covariance matrix using the assembled indices
-            cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+            cov = resample_hybrid_covariance_matrix(cov, x_aoa, x_tdoa, x_fdoa, tdoa_ref_idx, fdoa_ref_idx)
 
         # Pre-invert the covariance matrix, to avoid repeatedly doing the same calculation
         cov_inv = np.linalg.pinv(cov)
@@ -268,3 +233,45 @@ def error(x_source, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, x_max=1, num_pts=
     epsilon_list = [np.conjugate(this_err).T @  cov_inv @ this_err for this_err in err.T]
 
     return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
+
+def resample_hybrid_covariance_matrix(cov, x_aoa=None, x_tdoa=None, x_fdoa=None, tdoa_ref_idx=None, fdoa_ref_idx=None):
+    """
+    Resample a block-diagonal covariance matrix representing AOA, TDOA, and FDOA measurements errors. Original matrix
+    size is square with (num_aoa*aoa_dim + num_tdoa + num_fdoa) rows/columns. Output matrix size will be square with
+    (num_aoa*aoa_dim + num_tdoa_sensor_pairs + num_fdoa_sensor_pairs) rows/columns.
+
+    The covariance matrix is assumed to have AOA measurements first, then TDOA, then FDOA.
+
+    Ported from MATLAB Code.
+
+    Nicholas O'Donoughue
+    21 January 2021
+
+    :param cov: N x N covariance matrix
+    :param x_aoa: nDim x nAOA array of sensor positions
+    :param x_tdoa: nDim x nTDOA array of TDOA sensor positions
+    :param x_fdoa: nDim x nFDOA array of FDOA sensor positions
+    :param tdoa_ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings for TDOA
+    :param fdoa_ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings for FDOA
+    :return cov_out:
+    """
+
+    # Calculate the Number of Sensors in each Data Type
+    n_dim1, num_aoa_sensors = utils.safe_2d_shape(x_aoa)
+    n_dim2, num_tdoa_sensors = utils.safe_2d_shape(x_tdoa)
+    n_dim3, num_fdoa_sensors = utils.safe_2d_shape(x_fdoa)
+
+    # First, we generate the test and reference index vectors
+    test_idx_vec_aoa = np.arange(num_aoa_sensors)
+    ref_idx_vec_aoa = np.nan * np.ones((num_aoa_sensors,))
+    test_idx_vec_tdoa, ref_idx_vec_tdoa = utils.parse_reference_sensor(tdoa_ref_idx, num_tdoa_sensors)
+    test_idx_vec_fdoa, ref_idx_vec_fdoa = utils.parse_reference_sensor(fdoa_ref_idx, num_fdoa_sensors)
+
+    # Second, we assemble them into a single vector
+    test_idx_vec = np.concatenate((test_idx_vec_aoa, num_aoa_sensors + test_idx_vec_tdoa,
+                                   num_aoa_sensors + num_tdoa_sensors + test_idx_vec_fdoa), axis=0)
+    ref_idx_vec = np.concatenate((ref_idx_vec_aoa, num_aoa_sensors + ref_idx_vec_tdoa,
+                                  num_aoa_sensors + num_tdoa_sensors + ref_idx_vec_fdoa), axis=0)
+
+    # Finally, we resample the full covariance matrix using the assembled indices
+    return utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
