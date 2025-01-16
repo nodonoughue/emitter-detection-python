@@ -43,20 +43,20 @@ def make_all_figures(close_figs=False, force_recalc=False):
     fig3 = make_figure_3(prefix)
     fig4 = make_figure_4(prefix)
     fig5, fig6a, fig6b, fig6c, fig6d = make_figures_5_6(prefix, force_recalc)
-    # fig7a, fig7b = make_figure_7(prefix, force_recalc)
-    # fig8a, fig8b = make_figure_8(prefix, force_recalc)
+    fig8a, fig8b = make_figure_8(prefix, force_recalc)
+    fig10a, fig10b = make_figure_10(prefix, force_recalc)
 
-    # figs = [fig1, fig2, fig3, fig4, fig5, fig6a, fig6b, fig6c, fig6d, fig7a, fig7b, fig8a, fig8b]
-    # if close_figs:
-    #     for fig in figs:
-    #         plt.close(fig)
+    figs = [fig1, fig2, fig3, fig4, fig5, fig6a, fig6b, fig6c, fig6d, fig8a, fig8b, fig10a, fig10b]
+    if close_figs:
+        for fig in figs:
+            plt.close(fig)
 
-        # return None
-    # else:
-    #     plt.show()
-    #
-    #     return figs
-    return None
+        return None
+    else:
+        plt.show()
+
+    return figs
+
 
 def make_figure_1(prefix=None):
     """
@@ -179,37 +179,6 @@ def make_figures_5_6(prefix=None, force_recalc=False):
     return figs
 
 
-def make_figure_7(prefix=None, force_recalc=False):
-    """
-    Figure 7
-
-    :param prefix: output directory to place generated figure
-    :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
-    :return: figure handle
-    """
-
-    if not force_recalc:
-        print('Skipping Figures 2.7a and 2.7b (re-run with force_recalc=True to generate)...')
-        return None, None
-
-    print('Generating Figure 2.7a and 2.7b...')
-
-    fig7a, fig7b = chapter2.example2()
-
-    # Display the plot
-    plt.draw()
-
-    # Output to file
-    if prefix is not None:
-        fig7a.savefig(prefix + 'fig7a.svg')
-        fig7a.savefig(prefix + 'fig7a.png')
-
-        fig7b.savefig(prefix + 'fig7b.svg')
-        fig7b.savefig(prefix + 'fig7b.png')
-
-    return fig7a, fig7b
-
-
 def make_figure_8(prefix=None, force_recalc=False):
     """
     Figure 8
@@ -223,19 +192,50 @@ def make_figure_8(prefix=None, force_recalc=False):
         print('Skipping Figures 2.8a and 2.8b (re-run with force_recalc=True to generate)...')
         return None, None
 
-    print('Generating Figures 2.8a and 2.8b (using Example 2.3)...')
+    print('Generating Figure 2.8a and 2.8b...')
 
-    fig8a, fig8b = chapter2.example3()
+    fig8a, fig8b = chapter2.example2()
 
     # Display the plot
     plt.draw()
 
     # Output to file
     if prefix is not None:
-        fig8a.savefig(prefix + 'fig7a.svg')
-        fig8a.savefig(prefix + 'fig7a.png')
+        fig8a.savefig(prefix + 'fig8a.svg')
+        fig8a.savefig(prefix + 'fig8a.png')
 
-        fig8b.savefig(prefix + 'fig7b.svg')
-        fig8b.savefig(prefix + 'fig7b.png')
+        fig8b.savefig(prefix + 'fig8b.svg')
+        fig8b.savefig(prefix + 'fig8b.png')
 
     return fig8a, fig8b
+
+
+def make_figure_10(prefix=None, force_recalc=False):
+    """
+    Figure 10
+
+    :param prefix: output directory to place generated figure
+    :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :return: figure handle
+    """
+
+    if not force_recalc:
+        print('Skipping Figures 2.10a and 2.10b (re-run with force_recalc=True to generate)...')
+        return None, None
+
+    print('Generating Figures 2.10a and 2.10b (using Example 2.3)...')
+
+    fig10a, fig10b = chapter2.example3()
+
+    # Display the plot
+    plt.draw()
+
+    # Output to file
+    if prefix is not None:
+        fig10a.savefig(prefix + 'fig10a.svg')
+        fig10a.savefig(prefix + 'fig10a.png')
+
+        fig10b.savefig(prefix + 'fig10b.svg')
+        fig10b.savefig(prefix + 'fig10b.png')
+
+    return fig10a, fig10b
