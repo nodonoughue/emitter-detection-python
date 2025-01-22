@@ -140,7 +140,7 @@ def parse_reference_sensor(ref_idx, num_sensors):
 
     elif ref_idx == 'full':
         # Generate all possible sensor pairs
-        perm = permutations(np.arange(num_sensors), 2)
+        perm = list(permutations(np.arange(num_sensors), 2))
         test_idx_vec = np.asarray([x[0] for x in perm])
         ref_idx_vec = np.asarray([x[1] for x in perm])
 
