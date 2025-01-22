@@ -19,6 +19,9 @@ def compute_cep50(covariance):
     the error, and we apply the approximation:
        cep = sqrt(lamMax)*(.67+.8*lamMin/lamMax);
 
+    For 3D problems, where covariance is 3x3xN, the smallest eigenvalue is
+    ignored, and the calculations are applied to the two largest eigenvalues.
+
     Ported from MATLAB code.
 
     Nicholas O'Donoughue
@@ -35,8 +38,8 @@ def compute_cep50(covariance):
     in_shape = np.shape(covariance)
     if np.size(in_shape) < 2:
         raise TypeError('Covariance matrix must have at least two dimensions.')
-    elif in_shape[0] != 2 or in_shape[1] != 2:
-        raise TypeError('First two dimensions of input covariance matrix must have size 2.')
+    elif (in_shape[0] != 2 or in_shape[1] != 2) and (in_shape[0] != 3 or in_shape[1] != 3):
+        raise TypeError('First two dimensions of input covariance matrix must have size 2 or 3.')
     elif np.size(in_shape) > 2:
         # Multiple 2x2 matrices, keep track of the input size, and then reshape for easier looping
         out_shape = in_shape[2:]
@@ -65,8 +68,9 @@ def compute_cep50(covariance):
         # Eigenvector analysis to identify independent components of error
         lam, _ = np.linalg.eigh(this_covariance)
         # print('\tEigenvalues: {}'.format(lam))
-        lam_min = np.min(lam)
-        lam_max = np.max(lam)
+        lam_max = lam[-1]  # eigenvalues are returned in ascending order; max is the last entry
+        lam_min = lam[-2]  # use the second-largest as lam_min (ignores smallest eigenvalue in 3D problems)
+
 
         # Check the eigenvalues; they should not be complex or negative
         assert not (np.iscomplex(lam_max) or np.iscomplex(lam_min)), 'Complex eigenvalue encountered; check for errors.'
