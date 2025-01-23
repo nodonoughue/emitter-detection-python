@@ -258,7 +258,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
     x_vec = x_grid[0][0, :]
     y_vec = x_grid[1][:, 0]
 
-    rr_list = measurement(x_sensor=x_sensor, x_source=x_set.T,
+    rr_list = measurement(x_sensor=x_sensor, x_source=x_set,
                           v_sensor=v_sensor, v_source=v_source,
                           ref_idx=ref_idx)
 
@@ -301,7 +301,7 @@ def draw_isodop(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
                                                    max_offset=max_ortho,
                                                    grid_spacing=grid_spacing)
 
-    df_plot = utils.geo.calc_doppler_diff(x_set.T, np.zeros_like(x_set).T, x1, v1, x2, v2, f_0)
+    df_plot = utils.geo.calc_doppler_diff(x_set, np.zeros_like(x_set), x1, v1, x2, v2, f_0)
 
     # Generate Levels
     if np.size(vdiff) > 1:

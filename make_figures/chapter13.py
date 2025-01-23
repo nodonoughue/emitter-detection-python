@@ -401,7 +401,7 @@ def make_figure_7(prefix):
     # Compute CRLB
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
-                                    x_source=x_set.T, cov=covar_rho, do_resample=False)
+                                    x_source=x_set, cov=covar_rho, do_resample=False)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
@@ -437,7 +437,7 @@ def make_figure_7(prefix):
 
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
-                                    x_source=x_set.T, cov=covar_rho, do_resample=False)
+                                    x_source=x_set, cov=covar_rho, do_resample=False)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
@@ -521,7 +521,7 @@ def make_figure_8(prefix):
     # Compute CRLB
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=None, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
-                                    x_source=x_set.T, cov=covar_rho, do_resample=False)
+                                    x_source=x_set, cov=covar_rho, do_resample=False)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
@@ -557,7 +557,7 @@ def make_figure_8(prefix):
 
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=None, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
-                                    x_source=x_set.T, cov=covar_rho, do_resample=False)
+                                    x_source=x_set, cov=covar_rho, do_resample=False)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
@@ -632,7 +632,7 @@ def make_figure_9(prefix):
     # Compute CRLB
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=None, v_fdoa=None,
-                                    x_source=x_set.T, cov=covar_rho, do_resample=False)
+                                    x_source=x_set, cov=covar_rho, do_resample=False)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 

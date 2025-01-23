@@ -87,7 +87,7 @@ def example2():
     covariance = np.array([[10.0, -3.0], [-3.0, 5.0]])
     
     cep50 = errors.compute_cep50(covariance)
-    print('CEP50: {:0.2f}'.format(cep50[0]))
+    print('CEP50: {:0.2f}'.format(cep50))
     
     x_ell, y_ell = errors.draw_error_ellipse(np.array([0, 0]), covariance, num_pts=101, conf_interval=50)
     x_cep, y_cep = errors.draw_cep50(np.array([0, 0]), covariance, num_pts=101)

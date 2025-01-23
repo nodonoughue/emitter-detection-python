@@ -216,12 +216,12 @@ def error(x_source, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, x_max=1, num_pts=
 
     # Set up test points
     grid_res = 2*x_max / (num_pts-1)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0., 0.), max_offset=x_max, grid_spacing=grid_res)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=x_source, max_offset=x_max, grid_spacing=grid_res)
     x_vec = x_grid[0][0, :]
     y_vec = x_grid[1][:, 0]
 
     zeta_list = measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
-                            x_source=x_set.T, v_source=v_source, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+                            x_source=x_set, v_source=v_source, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     err = zeta[:, np.newaxis] - zeta_list
 

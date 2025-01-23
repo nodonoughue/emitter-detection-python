@@ -163,7 +163,7 @@ def make_figure_2(prefix=None):
     vt = np.array([0., 0.])
 
     transmit_freq = 1e9  # Hz
-    ddop = utils.geo.calc_doppler_diff(x_set.T, vt, x_sensor0, v_sensor0,
+    ddop = utils.geo.calc_doppler_diff(x_set, vt, x_sensor0, v_sensor0,
                                        x_sensor1, v_sensor1, transmit_freq)
 
     fig2a, ax2a = plt.subplots()
@@ -199,7 +199,7 @@ def make_figure_2(prefix=None):
     vt = np.array([0., 0.])
 
     transmit_freq = 1e9
-    ddop = utils.geo.calc_doppler_diff(x_set.T, vt, x_sensor0, v_sensor0,
+    ddop = utils.geo.calc_doppler_diff(x_set, vt, x_sensor0, v_sensor0,
                                        x_sensor1, v_sensor1, transmit_freq)
 
     fig2b, ax2b = plt.subplots()
@@ -488,7 +488,7 @@ def make_figure_6(prefix):
     x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0., 0.), grid_spacing=grid_spacing, max_offset=grid_extent)
 
     # Compute CRLB
-    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source.T, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
+    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
 
     # Set up contours
@@ -516,7 +516,7 @@ def make_figure_6(prefix):
 
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
-    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source.T, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
+    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
 
     # Draw Figure
@@ -547,7 +547,7 @@ def make_figure_6(prefix):
     cov_rrdoa = utils.resample_covariance_matrix(cov_rroa, ref_idx)
 
     # Compute CRLB
-    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source.T, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
+    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
 
     # Draw Figure
@@ -567,7 +567,7 @@ def make_figure_6(prefix):
 
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
-    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source.T, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
+    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
 
     # Draw Figure

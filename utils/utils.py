@@ -282,9 +282,13 @@ def ensure_invertible(covariance, epsilon=1e-10):
 
     # Iterate across matrices (dimensions >2)
     cov_out = np.zeros(shape=sz)
+
     for idx_matrix in np.arange(n_matrices):
         # Isolate the current covariance matrix
-        this_cov = np.squeeze(covariance[:, :, idx_matrix])
+        if len(sz) > 2:
+            this_cov = np.squeeze(covariance[:, :, idx_matrix])
+        else:
+            this_cov = covariance
 
         # Eigen-decomposition
         lam, v = np.linalg.eigh(this_cov)
@@ -304,7 +308,10 @@ def ensure_invertible(covariance, epsilon=1e-10):
             d *= 10.0
 
         # Store the modified covariance matrix in the output
-        cov_out[:, :, idx_matrix] = this_cov
+        if len(sz) > 2:
+            cov_out[:, :, idx_matrix] = this_cov
+        else:
+            cov_out = this_cov
 
     return cov_out
 
@@ -455,8 +462,8 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing):
     :param max_offset: scalar or ND array of the extent of the search grid in each dimension, taken as the one-sided
                         maximum offset from x_ctr
     :param grid_spacing: scalar or ND array of grid spacing in each dimension
-    :return x_set: n-tuple of 1D axes for each dimension
-    :return x_grid: n-tuple of ND coordinates for each dimension.
+    :return x_set: n_dim x N numpy array of positions
+    :return x_grid: n_dim-tuple of ND coordinates for each dimension.
     :return out_shape:  tuple with the size of the generated grid
     """
 
@@ -490,7 +497,7 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing):
     x_grid = np.meshgrid(*dims)
 
     # Rearrange to a single 2D array of grid locations (n_dim x N)
-    x_set = np.asarray([x.flatten() for x in x_grid]).T
+    x_set = np.asarray([x.flatten() for x in x_grid])
 
     return x_set, x_grid, n_elements
 

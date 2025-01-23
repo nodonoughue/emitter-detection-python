@@ -283,11 +283,11 @@ def ml_solver(ell, x_ctr, search_size, epsilon):
     x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
 
     # Evaluate the likelihood function at each coordinate in the search space
-    likelihood = ell(x_set.T)
+    likelihood = ell(x_set)
 
     # Find the peak
     idx_pk = likelihood.argmax()
-    x_est = x_set[idx_pk]
+    x_est = x_set[:, idx_pk]
 
     return x_est, likelihood, x_grid
 
@@ -320,7 +320,7 @@ def bestfix(pdfs, x_ctr, search_size, epsilon):
     x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
 
     # Apply each PDF to all input coordinates and then multiply across PDFs
-    result = np.asarray([np.prod(np.asarray([this_pdf(this_x) for this_pdf in pdfs])) for this_x in x_set])
+    result = np.asarray([np.prod(np.asarray([this_pdf(this_x) for this_pdf in pdfs])) for this_x in x_set.T])
 
     # Reshape
     result = np.reshape(result, out_shape)
