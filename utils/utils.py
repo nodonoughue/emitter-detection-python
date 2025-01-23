@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import stats
 from .unit_conversions import lin_to_db
-from itertools import permutations
+from itertools import combinations
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
@@ -138,9 +138,9 @@ def parse_reference_sensor(ref_idx, num_sensors):
         test_idx_vec = np.arange(num_sensors-1)  # np.asarray([i for i in np.arange(num_sensors - 1)])
         ref_idx_vec = (num_sensors - 1) * np.ones_like(test_idx_vec)
 
-    elif ref_idx == 'full':
+    elif isinstance(ref_idx, str) and ref_idx == 'full':
         # Generate all possible sensor pairs
-        perm = list(permutations(np.arange(num_sensors), 2))
+        perm = list(combinations(np.arange(num_sensors), 2))
         test_idx_vec = np.asarray([x[0] for x in perm])
         ref_idx_vec = np.asarray([x[1] for x in perm])
 
@@ -151,6 +151,7 @@ def parse_reference_sensor(ref_idx, num_sensors):
         # Scalar reference index, use all other sensors as test sensors
         test_idx_vec = np.asarray([i for i in np.arange(num_sensors) if i != ref_idx])
         ref_idx_vec = ref_idx * np.ones_like(test_idx_vec)
+
     else:
         # Pair of vectors; first row is test sensors, second is reference
         test_idx_vec = ref_idx[0, :]
