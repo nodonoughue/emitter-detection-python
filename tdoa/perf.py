@@ -3,7 +3,7 @@ import utils
 from . import model
 
 
-def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True):
+def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True, variance_is_toa=True):
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_tdoa (Ndim x N).
@@ -18,6 +18,8 @@ def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True):
     :param cov: Covariance matrix for range rate estimates at the N FDOA sensors [(m/s)^2]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+    it is in m^2
     :return crlb: Lower bound on the error covariance matrix for an unbiased FDOA estimator (Ndim x Ndim)
     """
 
@@ -29,9 +31,14 @@ def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True):
     if n_source == 1:
         x_source = x_source[:, np.newaxis]
 
+    # Correct units for the covariance matrix
+    if variance_is_toa:
+        # Use the speed of light (squared) to covert from TOA or TDOA to ROA or RDOA
+        cov = cov * utils.constants.speed_of_light**2
+
     # Resample the covariance matrix
     if do_resample:
-        # Resample the covariance matrix
+        # Resample the covariance matrix (convert from ROA to RDOA)
         test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
         cov_resample = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
         cov_inv = np.linalg.inv(cov_resample)
