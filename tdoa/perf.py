@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 import utils
 from . import model
 
@@ -40,10 +41,13 @@ def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True, varian
     if do_resample:
         # Resample the covariance matrix (convert from ROA to RDOA)
         test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
-        cov_resample = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
-        cov_inv = np.linalg.inv(cov_resample)
-    else:
-        cov_inv = np.linalg.inv(cov)
+        cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+
+    # Pre-compute the matrix inverse, to speed up repeated calls
+    # TODO: Use Cholesky decomposition to speed this up!
+    # cov_inv = np.linalg.inv(cov)
+    cov = utils.ensure_invertible(cov)
+    cov_lower = np.linalg.cholesky(cov, upper=False)
 
     # Initialize output variable
     crlb = np.zeros((n_dim, n_dim, n_source))
@@ -56,7 +60,8 @@ def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True, varian
         this_jacobian = model.jacobian(x_sensor, this_x, ref_idx)
 
         # Compute the Fisher Information Matrix
-        fisher_matrix = this_jacobian.dot(cov_inv.dot(np.conj(np.transpose(this_jacobian))))
+        A = scipy.linalg.solve(cov_lower, np.conj(np.transpose(this_jacobian)))
+        fisher_matrix = np.conj(np.transpose(A)) @ A
 
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
             # Problem is ill-defined, Fisher Information Matrix cannot be
