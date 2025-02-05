@@ -50,6 +50,13 @@ def example1(rng=None, cmap=None):
     if cmap is None:
         cmap = plt.get_cmap("tab10")
 
+    # Clear the numpy warnings about underflow; we don't care
+    # Underflow warnings can indicate a loss of precision; in our case, these are likely occurring
+    # from positions where our sensors are poorly aligned to determined the target's location. We
+    # can ignore the loss of precision there.
+    np.seterr(under='ignore')
+
+
     # Define sensor positions
     x_sensor = 30*np.array([[-1, 0, 1], [0,  0, 0]])
     num_dims, num_sensors = utils.safe_2d_shape(x_sensor)
@@ -92,20 +99,13 @@ def example1(rng=None, cmap=None):
         plt.fill(lob_fill1[0, :], lob_fill1[1, :], linestyle='--', alpha=.1, edgecolor='k', facecolor=this_color,
                  label=None)
 
-        # Plot the LOB -- removed to simplify the figure a little and better match the textbook version
-        # if idx_sensor == 0:
-        #     this_label = 'AOA Solution'
-        # else:
-        #     this_label = None
-        # plt.plot(lob[0, :], lob[1, :], linestyle='-', color=this_color, label=this_label)
-
     # Position Markers
     plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensors')
 
     # Position Labels
-    plt.text(x_sensor[0, 0] + 2, x_sensor[1, 0] - .1, r'$S_0$')
-    plt.text(x_sensor[0, 1] + 2, x_sensor[1, 1] - .1, r'$S_1$')
-    plt.text(x_sensor[0, 2] + 2, x_sensor[1, 2] - .1, r'$S_2$')
+    plt.text(float(x_sensor[0, 0] + 2), float(x_sensor[1, 0] - .1), r'$S_0$')
+    plt.text(float(x_sensor[0, 1] + 2), float(x_sensor[1, 1] - .1), r'$S_1$')
+    plt.text(float(x_sensor[0, 2] + 2), float(x_sensor[1, 2] - .1), r'$S_2$')
 
     # Plot the points and lobs
     plt.scatter(x_source[0], x_source[1], marker='^', label='Transmitter')
@@ -184,7 +184,7 @@ def example1(rng=None, cmap=None):
     crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linewidth=.5, label='90% Error Ellipse')
     # plt.text(-20, 45, '90% Error Ellipse', fontsize=10) -- commented out to clean up graphic; rely on legend
-    plt.plot([1, 11], [45, 45], linestyle='-', linewidth=.5, label=None)
+    # plt.plot([1, 11], [45, 45], linestyle='-', linewidth=.5, label=None)
 
     plt.xlim([-50, 50])
     plt.ylim([-10, 70])
@@ -255,6 +255,9 @@ def example1(rng=None, cmap=None):
     plt.xlim([1, 150])
     plt.ylim([1, 50])
 
+    # Re-engage the warning for numpy underflow
+    np.seterr(under='warn')
+
     return fig_geo, fig_err
 
 
@@ -279,14 +282,12 @@ def _mc_iteration(args):
                 centroid: Geometric centroid solution
                 incenter: Geometric incenter solution
                 gd: Gradient Descent solution
-                ls: Least Square solution
+                ls: Least Squares solution
 
 
     Nicholas O'Donoughue
     18 March 2022
     """
-
-    # TODO: Find and catch underflow error (np.exp(self.logpdf(x) -- probably in bestfix)
 
     # Generate a random measurement
     rng = args['rng']

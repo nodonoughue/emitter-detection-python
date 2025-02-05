@@ -31,29 +31,24 @@ def run_all_examples():
     return [example1(), example2(), example3()]
 
 
-def _plt_markers(x_s=None, x_a=None, x_t=None, x_f=None, v_f=None, colors=('w', 'k', 'k', 'k')):
+def _plt_markers(do_source=True, do_aoa=False, do_tdoa=False, do_fdoa=False, colors=('w', 'k', 'k', 'k')):
     """
     Add markers for Source, AOA, TDOA, and FDOA sensors to a plot; optionally specify colors
 
     Nicholas O'Donoughue
     16 January 2025
 
-    :param x_s: x/y coordinates for source. Default=None
-    :param x_a: x/y coordinates for AOA. Default=None
-    :param x_t: x/y coordinates for TDOA. Default=None
-    :param x_f: x/y coordinates for FDOA. Default=None
-    :param v_f: x/y velocity for FDOA. Default=None
     :param colors: 4-element Tuple of colors to use for markers (source, aoa, tdoa, fdoa). Default=('w', 'k', 'k', 'k')
     """
-    if x_s is not None:
-        plt.scatter(x_s[0], x_s[1], marker='x', color=colors[0], label='Target', clip_on=False)
-    if x_a is not None:
-        plt.scatter(x_a[0], x_a[1], marker='o', color=colors[1], label='AOA Sensors', clip_on=False)
-    if x_t is not None:
-        plt.scatter(x_t[0], x_t[1], marker='s', color=colors[2], label='TDOA Sensors', clip_on=False)
-    if x_f is not None:
-        plt.scatter(x_f[0], x_f[1], marker='^', color=colors[3], label='FDOA Sensors', clip_on=False)
-        for this_x, this_v in zip(x_f.T, v_f.T):  # transpose so the loop steps over sensors, not dimensions
+    if do_source:
+        plt.scatter(x_source[0], x_source[1], marker='x', color=colors[0], label='Target', clip_on=False)
+    if do_aoa:
+        plt.scatter(x_aoa[0], x_aoa[1], marker='o', color=colors[1], label='AOA Sensors', clip_on=False)
+    if do_tdoa:
+        plt.scatter(x_tdoa[0], x_tdoa[1], marker='s', color=colors[2], label='TDOA Sensors', clip_on=False)
+    if do_fdoa:
+        plt.scatter(x_fdoa[0], x_fdoa[1], marker='^', color=colors[3], label='FDOA Sensors', clip_on=False)
+        for this_x, this_v in zip(x_fdoa.T, v_fdoa.T):  # transpose so the loop steps over sensors, not dimensions
             plt.arrow(x=this_x[0], y=this_x[1],
                       dx=this_v[0], dy=this_v[1],
                       width=.01e3, head_width=.05e3,
@@ -121,7 +116,7 @@ def example1(colors=None):
 
     # Draw Geometry
     fig1 = plt.figure()
-    _plt_markers(x_s=x_source, x_a=x_aoa, x_t=x_tdoa, x_f=x_fdoa, v_f=v_fdoa, colors=colors)
+    _plt_markers(do_aoa=True, do_tdoa=True, do_fdoa=True, colors=colors)
 
     # True Measurements
     psi_act = triang.model.measurement(x_sensor=x_aoa, x_source=x_source)
@@ -192,7 +187,7 @@ def example1(colors=None):
         _fig, _ax = plt.subplots()
         plt.imshow(ell, extent=grid_extent, origin='lower', cmap=cm['viridis_r'], vmin=-20, vmax=0)
         plt.colorbar()
-        _plt_markers(x_s=x_source, x_a=x_aoa, x_t=x_tdoa, x_f=x_fdoa, v_f=v_fdoa)
+        _plt_markers(do_aoa=do_aoa, do_tdoa=do_tdoa, do_fdoa=do_fdoa)
 
         plt.ylim([0, 4e3])
         plt.xlim([-.5e3, 5.5e3])
@@ -301,7 +296,7 @@ def example2(colors=None):
     # ---- Plot Results ----
     def _make_plot():
         fig, _ = plt.subplots()
-        _plt_markers(x_s=x_source, x_a=x_aoa, x_t=x_tdoa, x_f=x_fdoa, v_f=v_fdoa, colors=colors)
+        _plt_markers(do_aoa=True, do_tdoa=True, do_fdoa=True, colors=colors)
 
         # Plot Closed-Form Solution
         plt.scatter(x_ml[0], x_ml[1], marker='v', label='Maximum Likelihood')
@@ -405,7 +400,7 @@ def example3(rng=np.random.default_rng(), colors=None):
 
     def _make_plot():
         fig, _ = plt.subplots()
-        _plt_markers(x_s=x_source, x_a=x_aoa, x_t=x_tdoa, x_f=x_fdoa, v_f=v_fdoa, colors=colors)
+        _plt_markers(do_aoa=True, do_tdoa=True, do_fdoa=True, colors=colors)
 
         # Plot Closed-Form Solution
         plt.scatter(x_ml[0], x_ml[1], marker='v', label='Maximum Likelihood')
@@ -547,7 +542,7 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
 
     def _make_plot():
         fig, _ = plt.subplots()
-        _plt_markers(x_s=x_source, x_a=x_aoa, x_t=x_tdoa, x_f=x_fdoa, v_f=v_fdoa, colors=colors)
+        _plt_markers(do_aoa=True, do_tdoa=True, do_fdoa=True, colors=colors)
 
         # Plot Closed-Form Solution
         plt.scatter(x_ml[0], x_ml[1], marker='v', label='Maximum Likelihood')

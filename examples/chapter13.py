@@ -39,6 +39,12 @@ def example1(rng=np.random.default_rng()):
     :return fig_err: figure handle for error as a function of iteration
     """
 
+    # Clear the numpy warnings about underflow; we don't care
+    # Underflow warnings can indicate a loss of precision; in our case, these are likely occurring
+    # from positions where our sensors are poorly aligned to determined the target's location. We
+    # can ignore the loss of precision there.
+    np.seterr(under='ignore')
+
     #  Set up receiver system
     baseline = 10e3
     std_velocity = 100
@@ -142,6 +148,9 @@ def example1(rng=np.random.default_rng()):
     args['x_source'] = x_source  # Add the true source position, for plotting
     args['x_sensor'] = x_sensor  # Set the 'x_sensor' flag, to plot all three sensors as a single type
     fig_geo, fig_err = _plot_mc_iteration_result(args, results)
+
+    # Re-engage the warning for numpy underflow
+    np.seterr(under='warn')
 
     return fig_geo, fig_err
 
@@ -289,7 +298,7 @@ def _mc_iteration(args):
                 ml: Maximum Likelihood solution
                 bf: Bestfix solution
                 gd: Gradient Descent solution
-                ls: Least Square solution
+                ls: Least Squares solution
 
     Nicholas O'Donoughue
     18 March 2022

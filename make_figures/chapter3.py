@@ -353,7 +353,7 @@ def make_figure_8(prefix=None):
     loss_prop = prop.model.get_path_loss(range_m=range_vec, freq_hz=f0, tx_ht_m=ht, rx_ht_m=hr, include_atm_loss=False)
 
     # Noise Power
-    bandwidth = 2e6  # channel bandwidth [Hz]
+    bandwidth = 2e5  # channel bandwidth [Hz]
     noise_figure = 5  # noise figure [dB]
     noise_pwr = lin_to_db(utils.constants.kT*bandwidth)+noise_figure
 

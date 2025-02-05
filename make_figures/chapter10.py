@@ -121,10 +121,10 @@ def make_figure_1(prefix=None, cmap=None):
         plt.plot(lob[0, :], lob[1, :], linestyle='-', color=this_color, label=this_lob_label)
 
     # Position Markers
-    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensors')
+    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensors', zorder=3)
 
     # Plot the points and lobs
-    plt.scatter(x_source[0], x_source[1], marker='^', label='Transmitter')
+    plt.scatter(x_source[0], x_source[1], marker='^', label='Transmitter', zorder=3)
 
     # Position Labels
     for idx_sensor in np.arange(np.shape(x_sensor)[1]):
@@ -213,10 +213,10 @@ def make_figure_2(prefix=None, cmap=None):
         plt.text(this_x[0] + angle_rad, this_x[1] + .6*angle_rad*np.sign(this_psi), r"$\psi_{:d}$".format(idx_sensor))
 
     # Position Markers
-    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensors')
+    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensors', zorder=3)
 
     # Plot the points and lobs
-    plt.scatter(x_source[0], x_source[1], marker='^', label='Transmitter')
+    plt.scatter(x_source[0], x_source[1], marker='^', label='Transmitter', zorder=3)
 
     # Position Labels
     for idx_sensor in np.arange(np.shape(x_sensor)[1]):

@@ -1,6 +1,5 @@
 import numpy as np
 from scipy import stats
-import warnings
 
 
 def compute_cep50(covariance):
@@ -193,6 +192,7 @@ def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
                          50 -- 50 percent
                          90 -- 90 percent
                          95 -- 95 percent
+                         99 -- 99 percent
     :return x: x-coordinate defining error ellipse
     :return y: y-coordinate defining error ellipse
     """

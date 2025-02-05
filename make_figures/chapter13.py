@@ -154,7 +154,7 @@ def make_figure_2(prefix=None):
     4 December 2022
 
     :param prefix: output directory to place generated figure
-    :return: figure handles
+    :return: handles
     """
 
     # Figure 2 -- FDOA Error
@@ -358,7 +358,7 @@ def make_figure_7(prefix):
     4 December 2022
 
     :param prefix: output directory to place generated figure
-    :return: figure handle
+    :return: handle
     """
 
     print('Generating Figure 13.7...')
@@ -600,7 +600,7 @@ def make_figure_9(prefix):
     4 December 2022
 
     :param prefix: output directory to place generated figure
-    :return: figure handle
+    :return: handle
     """
 
     print('Generating Figure 13.9...')

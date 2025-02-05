@@ -175,9 +175,9 @@ def example1(rng=np.random.default_rng()):
     plt.scatter(x_source[0] / 1e3,
                 x_source[1] / 1e3, color='k', marker='^', label='Transmitter')
     plt.plot(x_ls_full[0, :num_iter_to_plot, 0] / 1e3,
-             x_ls_full[1, :num_iter_to_plot, 0] / 1e3, '--x', label='LS')
+             x_ls_full[1, :num_iter_to_plot, 0] / 1e3, ':', marker='x', label='Least Squares', markevery=[-1])
     plt.plot(x_grad_full[0, :num_iter_to_plot, 0] / 1e3,
-             x_grad_full[1, :num_iter_to_plot, 0] / 1e3, '-.+', label='Grad Descent')
+             x_grad_full[1, :num_iter_to_plot, 0] / 1e3, '-.', marker='+', label='Gradient Descent', markevery=[-1])
     plt.scatter(x_chan_ho[0, 0] / 1e3, x_chan_ho[1, 0] / 1e3, marker='*', label='Chan-Ho')
     plt.scatter(x_bf[0, 0] / 1e3, x_bf[1, 0] / 1e3, marker='o', label='BestFix')
     plt.scatter(x_ml[0, 0] / 1e3, x_ml[1, 0] / 1e3, marker='v', label='Maximum Likelihood')
@@ -247,8 +247,6 @@ def example1(rng=np.random.default_rng()):
     plt.xlabel('Iteration Number')
     plt.ylabel('$CEP_{50}$ [km]')
     plt.legend(loc='upper right')
-    # plt.xlim([1, 150])
-    # plt.ylim([1, 50])
 
     return fig_geo_a, fig_geo_b, fig_err
 
@@ -273,7 +271,7 @@ def _mc_iteration(args):
                 ml: Maximum Likelihood solution
                 bf: Bestfix solution
                 gd: Gradient Descent solution
-                ls: Least Square solution
+                ls: Least Squares solution
 
     Nicholas O'Donoughue
     18 March 2022

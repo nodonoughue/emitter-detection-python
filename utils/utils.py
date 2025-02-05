@@ -13,10 +13,11 @@ def init_plot_style(dpi=400):
     Initialize plotting styles, including output resolution
     """
 
-    # Specify dpi for figure saving; matplotlib default is 200. It's pretty low-res, so we're using a default of 300
+    # Specify dpi for figure saving; matplotlib default is 200. It's pretty low-res, so we're using a default of 400
+    # unless a different value is specified when calling this function.
     plt.rcParams['figure.dpi'] = dpi
 
-    # Initialize seaborn for pretty plots
+    # Initialize seaborn for pretty plots; use a colorblind palette for accessibility
     sns.set_theme(context='paper', palette='colorblind')
 
 

@@ -58,7 +58,7 @@ def example1(rng=None, colors=None):
                                                 include_atm_loss=False)
     
     # Noise Power
-    bandwidth = 2e6         # channel bandwidth [Hz]
+    bandwidth = 2e5         # channel bandwidth [Hz]
     noise_figure = 5        # noise figure [dB]
     noise_pwr = lin_to_db(utils.constants.kT*bandwidth)+noise_figure
     

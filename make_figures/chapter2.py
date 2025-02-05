@@ -244,19 +244,19 @@ def make_figure_4(prefix=None):
 
     # Compute the PD according to the simplified erf equation and its inverse
     prob_det = .5*(1-erf(erfinv(1-2*prob_fa)-xi_lin/np.sqrt(2)))
-    
+
     # Plot the ROC curve
     fig4 = plt.figure()
     for idx, this_pfa in enumerate(prob_fa[0, :]):
-        plt.plot(xi, prob_det[:, idx], label='$P_{{FA}}$ = {:.2f}'.format(this_pfa))
-    
+        plt.plot(xi, prob_det[:, idx], label='$P_{{FA}} = 10^{{{:.0f}}}$'.format(np.log10(this_pfa)))
+
     # Axes Labels
     plt.ylabel('$P_D$')
     plt.xlabel('SNR [dB]')
-    
+
     # Legend
     plt.legend(loc='upper left')
-    
+
     # Draw the figure
     plt.draw()
 

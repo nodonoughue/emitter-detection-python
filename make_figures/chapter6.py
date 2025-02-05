@@ -238,7 +238,7 @@ def make_figure_4(prefix=None):
 
     # Plot Result
     fig4 = plt.figure()
-    plt.scatter(x0[0], x0[1], marker='o')
+    plt.scatter(x0[0], x0[1], marker='o', zorder=3)
     plt.fill(x0[0] + np.array([0, length*np.cos(aoa_lwr_rad), length*np.cos(aoa_rad), length*np.cos(aoa_up_rad), 0]),
              x0[1] + np.array([0, length*np.sin(aoa_lwr_rad), length*np.sin(aoa_rad), length*np.sin(aoa_up_rad), 0]),
              color=[.8, .8, .8])

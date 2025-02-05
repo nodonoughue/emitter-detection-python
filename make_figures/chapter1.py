@@ -107,7 +107,7 @@ def make_figure_1(prefix=None, rng=None):
     plt.text(index_spike-10, threshold+4, 'False Alarm', fontsize=12)
 
     # Add legend
-    plt.legend(loc='upper right')
+    plt.legend(loc='upper left')
     
     # Display the plot
     plt.draw()
@@ -161,12 +161,13 @@ def make_figure_2(prefix=None):
     plt.fill(lob_fill1[0, :], lob_fill1[1, :], linestyle='--', alpha=.1, edgecolor='k', label='Uncertainty Interval')
 
     # Position Markers
-    plt.scatter(x1[0], x1[1], marker='o', label='Sensor')
-    plt.scatter(xs[0], xs[1], marker='^', label='Transmitter')
+    plt.scatter(x1[0], x1[1], marker='o', label='Sensor', zorder=3)
+    plt.scatter(xs[0], xs[1], marker='^', label='Transmitter', zorder=3)
 
     # Adjust Axes
     plt.legend(loc='lower right')
     plt.ylim([-.5, 1.5])
+    plt.xlim([-.5, .5])
     plt.axis('off')
 
     # Draw the figure
@@ -238,8 +239,8 @@ def make_figure_3(prefix=None):
     plt.fill(lob_fill2[0, :], lob_fill2[1, :], facecolor='k', alpha=.1, linestyle='--', label=None)
     
     # Position Markers
-    plt.scatter(np.array([x1[0], x2[0]]), np.array([x1[1], x2[1]]), marker='o', label='Sensors')
-    plt.scatter(xs[0], xs[1], marker='^', label='Transmitter')
+    plt.scatter(np.array([x1[0], x2[0]]), np.array([x1[1], x2[1]]), marker='o', label='Sensors', zorder=3)
+    plt.scatter(xs[0], xs[1], marker='^', label='Transmitter', zorder=3)
     
     # Position Labels
     plt.text(x1[0]+.05, x1[1]-.1, '$S_1$')

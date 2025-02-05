@@ -84,7 +84,7 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
 
     # Draw Geometry
     fig1 = plt.figure()
-    plt.scatter(x_source[0], x_source[1], marker='^', label='Transmitter')
+    plt.scatter(x_source[0], x_source[1], marker='^', label='Transmitter', zorder=3)
     sensor_markers = plt.scatter(x_sensor[:, 0], x_sensor[:, 1], marker='o', label='Sensors')
     for this_x, this_v in zip(x_sensor, v_sensor):
         plt.arrow(x=this_x[0], y=this_x[1],
@@ -168,8 +168,8 @@ def make_figure_2(prefix=None):
 
     fig2a, ax2a = plt.subplots()
     ax2a.contour(x_grid[0], x_grid[1], np.reshape(ddop, newshape=grid_shape), levels=20)
-    handle0 = plt.scatter(x_sensor0[0], x_sensor0[1], marker='o', s=10, color='k')
-    handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k')
+    handle0 = plt.scatter(x_sensor0[0], x_sensor0[1], marker='o', s=10, color='k', zorder=3)
+    handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k', zorder=3)
 
     # Draw Velocity Arrows
     plt.arrow(x=x_sensor0[0], y=x_sensor0[1],
@@ -204,8 +204,8 @@ def make_figure_2(prefix=None):
 
     fig2b, ax2b = plt.subplots()
     ax2b.contour(x_grid[0], x_grid[1], np.reshape(ddop, newshape=grid_shape), levels=11)
-    handle0 = plt.scatter(x_sensor0[0], x_sensor0[1], marker='o', s=10, color='k')
-    handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k')
+    handle0 = plt.scatter(x_sensor0[0], x_sensor0[1], marker='o', s=10, color='k', zorder=3)
+    handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k', zorder=3)
 
     # Draw Velocity Arrows
     plt.arrow(x=x_sensor0[0], y=x_sensor0[1],
@@ -502,7 +502,7 @@ def make_figure_6(prefix):
     fig6a, ax = plt.subplots()
 
     # ax=subplot(2,1,1)
-    plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors')
+    plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors', zorder=3)
     contour_set = ax.contour(x_grid[0]/1e3, x_grid[1]/1e3, cep50/1e3, contour_levels)
     ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
     plt.legend(loc='upper right')
@@ -523,7 +523,7 @@ def make_figure_6(prefix):
     fig6b, ax = plt.subplots()
 
     # ax=subplot(2,1,1)
-    plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors')
+    plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors', zorder=3)
     contour_set = ax.contour(x_grid[0]/1e3, x_grid[1]/1e3, cep50/1e3, contour_levels)
     ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
     plt.legend(loc='upper right')
@@ -553,7 +553,7 @@ def make_figure_6(prefix):
     # Draw Figure
     fig6c, ax = plt.subplots()
 
-    plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors')
+    plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors', zorder=3)
     contour_set = ax.contour(x_grid[0]/1e3, x_grid[1]/1e3, cep50/1e3, contour_levels)
     ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
     plt.legend(loc='upper right')
@@ -573,7 +573,7 @@ def make_figure_6(prefix):
     # Draw Figure
     fig6d, ax = plt.subplots()
 
-    plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors')
+    plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors', zorder=3)
     contour_set = ax.contour(x_grid[0]/1e3, x_grid[1]/1e3, cep50/1e3, contour_levels)
     ax.clabel(contour_set, contour_levels, inline=True, fmt=fmt, fontsize=10)
     plt.legend(loc='upper right')

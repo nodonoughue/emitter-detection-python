@@ -252,7 +252,7 @@ def make_figure_6(prefix=None):
     plt.annotate(text='', xy=(u1, -16.5), xytext=(u2, -16.5), arrowprops=dict(arrowstyle='<->', color='k'))
     plt.text(-.02, -18, r'$\delta_u$', fontsize=11)
 
-    plt.ylabel('Array Factor [linear]')
+    plt.ylabel('Array Factor [dB]')  # Printed figure in text shows [linear], but units are in fact [dB]
     plt.xlabel(r'$u=sin(\theta)$')
     plt.ylim([-20, 0])
     plt.xlim([-.3, .3])

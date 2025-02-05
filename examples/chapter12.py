@@ -153,10 +153,6 @@ def example1(rng=np.random.default_rng()):
 
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
-    # wd = 7 * baseline / 1e3
-    # ht = wd * 9 / 16
-    # plt.xlim([-wd, wd])
-    # plt.ylim(np.array([-1, 1]) * ht + x_source[1] / 1e3 / 2)
     plt.legend()
     plt.show()
 
@@ -167,9 +163,9 @@ def example1(rng=np.random.default_rng()):
     plt.scatter(x_source[0] / 1e3,
                 x_source[1] / 1e3, color='k', marker='^', label='Transmitter')
     plt.plot(x_ls_full[0, :num_iter_to_plot, 0] / 1e3,
-             x_ls_full[1, :num_iter_to_plot, 0] / 1e3, '--x', label='LS')
+             x_ls_full[1, :num_iter_to_plot, 0] / 1e3, '--x', label='LS', markevery=[-1])
     plt.plot(x_grad_full[0, :num_iter_to_plot, 0] / 1e3,
-             x_grad_full[1, :num_iter_to_plot, 0] / 1e3, '-.+', label='Grad Descent')
+             x_grad_full[1, :num_iter_to_plot, 0] / 1e3, '-.+', label='Grad Descent', markevery=[-1])
     plt.scatter(x_bf[0, 0] / 1e3, x_bf[1, 0] / 1e3, marker='o', label='BestFix')
     plt.scatter(x_ml[0, 0] / 1e3, x_ml[1, 0] / 1e3, marker='v', label='Maximum Likelihood')
 
@@ -254,7 +250,7 @@ def _mc_iteration(args):
                 ml: Maximum Likelihood solution
                 bf: Bestfix solution
                 gd: Gradient Descent solution
-                ls: Least Square solution
+                ls: Least Squares solution
 
     Nicholas O'Donoughue
     18 March 2022

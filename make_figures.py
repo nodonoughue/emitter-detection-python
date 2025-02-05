@@ -7,9 +7,9 @@ do_book_1 = True
 do_book_2 = True
 
 if do_book_1:
-    print('*****************************************************')
+    print('************************************************************************************************')
     print('Generating all figures from ''Emitter Detection and Geolocation for Electronic Warfare'', 2019.')
-    print('*****************************************************')
+    print('************************************************************************************************')
     print('close_figs = {}'.format(close_figs))
     print('force_recalc = {}'.format(force_recalc))
 
@@ -47,27 +47,27 @@ if do_book_1:
     make_figures.appendixD.make_all_figures(close_figs=close_figs)
     print('Figure generation complete.')
 else:
-    print('*****************************************************')
+    print('************************************************************************************************')
     print('Skipping ''Emitter Detection and Geolocation for Electronic Warfare'', 2019.')
     print('Re-run with ''do_book_1 = True'' to generate all figures.')
-    print('*****************************************************')
+    print('************************************************************************************************')
 
 if do_book_2:
-    print('*****************************************************')
+    print('************************************************************************************************')
     print('Generating all figures from ''Practical Geolocation for Electronic Warfare using MATLAB'', 2022.')
-    print('*****************************************************')
+    print('************************************************************************************************')
     print('close_figs = {}'.format(close_figs))
     print('force_recalc = {}'.format(force_recalc))
 
-    print('***Chapter 1 ***')
+    print('*** Chapter 1 ***')
     make_figures.practical_geo.chapter1.make_all_figures(close_figs=close_figs)
-    print('***Chapter 2 ***')
+    print('*** Chapter 2 ***')
     make_figures.practical_geo.chapter2.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
-    print('***Chapter 3 ***')
+    print('*** Chapter 3 ***')
     make_figures.practical_geo.chapter3.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
     print('Figure generation complete.')
 else:
-    print('*****************************************************')
+    print('************************************************************************************************')
     print('Skipping ''Practical Geolocation for Electronic Warfare using MATLAB'', 2022.')
-    print('*****************************************************')
+    print('************************************************************************************************')
     print('Re-run with ''do_book_1 = True'' to generate all figures.')
