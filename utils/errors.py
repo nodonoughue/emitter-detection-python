@@ -224,9 +224,9 @@ def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
     elif conf_interval == 95:
         gamma = 5.991
     else:
-        #TODO handle generic floating point confidence intervals between 0 and 100.
-        gamma = 1
-        warnings.warn('Confidence Interval not recognized, using 1 standard deviation...')
+        assert 0<conf_interval<1, (
+            'Attempted to parse confidence interval as number between 0 and 1, but found {}'.format(conf_interval))
+        gamma = -2 * np.log(1-conf_interval)
 
     # Define Error Ellipse in rotated coordinate frame
     th = np.linspace(start=0, stop=2*np.pi, num=num_pts)  # Angle from center point, in rotated frame
