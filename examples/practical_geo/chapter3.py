@@ -186,6 +186,98 @@ def example4(colors=None):
     return None
 
 
+    # CEP50
+    cep50_crlb = utils.errors.compute_cep50(crlb_common)
+    cep50_crlb_full = utils.errors.compute_cep50(crlb_full)
+    print('CEP50: {:.2f} km ({:.2f} km using full set)'.format(cep50_crlb / 1e3, cep50_crlb_full / 1e3))
+
+    # 90% Error Ellipse
+    conf_interval = 90
+    crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source[:, -1], covariance=crlb_common, num_pts=101,
+                                                   conf_interval=conf_interval)
+    # crlb_ellipse_full = utils.errors.draw_error_ellipse(x=x_source[:, -1], covariance=crlb_full, num_pts=101,
+    #                                                     conf_interval=conf_interval)
+
+    # ---- Plot Results from the final Monte Carlo iteration----
+    # x_init = gd_ls_args['x_init']
+    x_ml = res['ml']
+    x_ls = res['ls']
+    x_gd = res['gd']
+    x_ml_full = res['ml_full']
+    x_ls_full = res['ls_full']
+    x_gd_full = res['gd_full']
+
+    fig_full = plt.figure()
+    plt.scatter(x_source[0, -1], x_source[1, -1], marker='x', color='k', label='Target', clip_on=False, zorder=3)
+    # plt.scatter(x_tdoa[0], x_tdoa[1], marker='s', color='k', label='Sensors', clip_on=False, zorder=3)
+
+    # Plot Closed-Form Solution
+    plt.scatter(x_ml[0], x_ml[1], marker='v', label='Maximum Likelihood', zorder=3)
+    plt.scatter(x_ml_full[0], x_ml_full[1], marker='^', label='Maximum Likelihood (full)', zorder=3)
+
+    # Plot Iterative Solutions
+    # plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
+    plt.plot(x_gd[0], x_gd[1], linestyle='-.', marker='+', markevery=[-1], label='Grad Descent')
+    plt.plot(x_gd_full[0], x_gd_full[1], linestyle='-.', marker='+', markevery=[-1], label='Grad Descent (full)')
+    plt.plot(x_ls[0], x_ls[1], linestyle='-.', marker='*', markevery=[-1], label='Least Squares')
+    plt.plot(x_ls_full[0], x_ls_full[1], linestyle='-.', marker='*', markevery=[-1], label='Least Squares (full)')
+
+
+    # Overlay Error Ellipse
+    plt.plot(crlb_ellipse[0], crlb_ellipse[1], linestyle='--', color='k',
+             label='{:d}% Error Ellipse'.format(conf_interval))
+    plt.legend(loc='best')
+
+    plt.xlim([0.5e3, 5.5e3])
+    plt.ylim([3.2e3, 4.8e3])
+
+    return fig_err, fig_full
+
+
+def _mc_iteration(x_tdoa, zeta_common, zeta_full, cov_z_common, cov_z_full, ml_args, gd_ls_args):
+    """
+    Executes a single iteration of the Monte Carlo simulation in Example 3.4.
+
+    :return estimates: Dictionary with estimated target position using several algorithms.  Fields are:
+                ml:         Maximum Likelihood solution with default common sensor
+                gd:         Gradient Descent solution with default common sensor
+                ls:         Least Squares solution with default common sensor
+                ml_full     Maximum Likelihood solution with 'full' sensor pairs
+                gd_full     Gradient Descent solution with 'full' sensor pairs
+                ls_full:    Least Squares solution with 'full' sensor pairs
+
+    Nicholas O'Donoughue
+    28 January 2025
+    """
+
+    # ---- Apply Various Solvers ----
+    # ML Solution
+    x_ml, _, _ = tdoa.solvers.max_likelihood(rho=zeta_common, cov=cov_z_common, x_sensor=x_tdoa, ref_idx=None,
+                                             do_resample=False, **ml_args)
+
+    # GD Solution
+    _, x_gd = tdoa.solvers.gradient_descent(rho=zeta_common, cov=cov_z_common, x_sensor=x_tdoa, ref_idx=None,
+                                            do_resample=False, **gd_ls_args)
+
+    # LS Solution
+    _, x_ls = tdoa.solvers.least_square(rho=zeta_common, cov=cov_z_common, x_sensor=x_tdoa, ref_idx=None,
+                                        do_resample=False, **gd_ls_args)
+
+    # ML Solution -- Full Sensor Pairs
+    x_ml_full, _, _ = tdoa.solvers.max_likelihood(rho=zeta_full, cov=cov_z_full, x_sensor=x_tdoa, ref_idx='full',
+                                                  do_resample=False, **ml_args)
+
+    # GD Solution -- Full Sensor Pairs
+    _, x_gd_full = tdoa.solvers.gradient_descent(rho=zeta_full, cov=cov_z_full, x_sensor=x_tdoa, ref_idx='full',
+                                                 do_resample=False, **gd_ls_args)
+
+    # LS Solution -- Full Sensor Pairs
+    _, x_ls_full = tdoa.solvers.least_square(rho=zeta_full, cov=cov_z_full, x_sensor=x_tdoa, ref_idx='full',
+                                             do_resample=False, ** gd_ls_args)
+
+    return {'ml': x_ml, 'ls': x_ls, 'gd': x_gd, 'ml_full':x_ml_full, 'ls_full': x_ls_full, 'gd_full': x_gd_full}
+
+
 def _plot_contourf(x_grid, extent, grid_shape_2d, z, x_sensors, v_sensors, levels, colors):
     this_fig = plt.figure()
     hdl = plt.imshow(np.reshape(z, grid_shape_2d), origin='lower', cmap=colors, extent=extent,

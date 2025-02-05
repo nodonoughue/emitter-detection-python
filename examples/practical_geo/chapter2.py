@@ -135,8 +135,8 @@ def example1(colors=None):
 
     # Draw isodoppler line
     # Transpose the x_fdoa|v_fdoa arrays before indexing; so [0] and [1] refer to sensors, not dimensions
-    xy_isodoppler = fdoa.model.draw_isodop(x1=x_fdoa.T[1], v1=v_fdoa.T[1], x2=x_fdoa.T[0], v2=v_fdoa.T[0],
-                                                        vdiff=velocity_diff, num_pts=1000, max_ortho=5e3)
+    xy_isodoppler = fdoa.model.draw_isodoppler(x1=x_fdoa.T[1], v1=v_fdoa.T[1], x2=x_fdoa.T[0], v2=v_fdoa.T[0],
+                                               vdiff=velocity_diff, num_pts=1000, max_ortho=5e3)
     plt.plot(xy_isodoppler[0], xy_isodoppler[1], color=colors[3], linestyle='-.', label='FDOA Solution')
 
     # Adjust Plot Display

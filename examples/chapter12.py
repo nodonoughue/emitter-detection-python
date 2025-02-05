@@ -121,7 +121,6 @@ def example1(rng=np.random.default_rng()):
     t_elapsed = time.perf_counter() - t_start
     utils.print_elapsed(t_elapsed)
 
-    # TODO: Adjust plotting commands to align with chapter 12 output --- this is pasted from chapter 11
     fig_geo_a, ax = plt.subplots()
     sensor_handle = plt.scatter(x_sensor[0, :] / 1e3, x_sensor[1, :] / 1e3,
                                 marker='o', label='Sensors')

@@ -124,8 +124,8 @@ def make_figure_1(prefix=None, colors=None):
     plt.plot(xy_isochrone[0], xy_isochrone[1], color=colors(3), linestyle=':', label='Isochrone')
 
     # Draw isodoppler line
-    x_isodoppler, y_isodoppler = fdoa.model.draw_isodop(x1=x_sensor[0], v1=v_sensor[0], x2=x_sensor[1], v2=v_sensor[1],
-                                                        vdiff=velocity_diff, num_pts=1000, max_ortho=5)
+    x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x1=x_sensor[0], v1=v_sensor[0], x2=x_sensor[1], v2=v_sensor[1],
+                                                            vdiff=velocity_diff, num_pts=1000, max_ortho=5)
 
     plt.plot(x_isodoppler, y_isodoppler, color=colors(4), linestyle='-.', label='Lines of Constant FDOA')
 
@@ -480,7 +480,7 @@ def make_figure_8(prefix):
     4 December 2022
 
     :param prefix: output directory to place generated figure
-    :return: figure handle
+    :return: handle
     """
 
     print('Generating Figure 13.8...')

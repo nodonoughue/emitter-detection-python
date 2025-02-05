@@ -104,16 +104,16 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
         idx2 = idx+1
         vdiff = utils.geo.calc_doppler_diff(x_source, np.array([0, 0]), x_sensor[idx], v_sensor[idx],
                                             x_sensor[idx2], v_sensor[idx2], utils.constants.speed_of_light)
-        x_isodoppler, y_isodoppler = fdoa.model.draw_isodop(x_sensor[idx], v_sensor[idx],
-                                                            x_sensor[idx2], v_sensor[idx2], vdiff, 1000, 5)
+        x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x_sensor[idx], v_sensor[idx],
+                                                                x_sensor[idx2], v_sensor[idx2], vdiff, 1000, 5)
 
         if do_uncertainty:
-            x_isodoppler_err1, y_isodoppler_err1 = fdoa.model.draw_isodop(x_sensor[idx], v_sensor[idx],
-                                                                          x_sensor[idx2], v_sensor[idx2], vdiff*1.1,
-                                                                          num_pts=1000, max_ortho=5)
-            x_isodoppler_err2, y_isodoppler_err2 = fdoa.model.draw_isodop(x_sensor[idx], v_sensor[idx],
-                                                                          x_sensor[idx2], v_sensor[idx2], vdiff*0.9,
-                                                                          num_pts=1000, max_ortho=5)
+            x_isodoppler_err1, y_isodoppler_err1 = fdoa.model.draw_isodoppler(x_sensor[idx], v_sensor[idx],
+                                                                              x_sensor[idx2], v_sensor[idx2], vdiff * 1.1,
+                                                                              num_pts=1000, max_ortho=5)
+            x_isodoppler_err2, y_isodoppler_err2 = fdoa.model.draw_isodoppler(x_sensor[idx], v_sensor[idx],
+                                                                              x_sensor[idx2], v_sensor[idx2], vdiff * 0.9,
+                                                                              num_pts=1000, max_ortho=5)
             unc_x = np.concatenate((x_isodoppler_err1, np.flipud(x_isodoppler_err2), [x_isodoppler_err1[0]]))
             unc_y = np.concatenate((y_isodoppler_err1, np.flipud(y_isodoppler_err2), [y_isodoppler_err1[0]]))
             plt.fill(unc_x, unc_y, linestyle='--', alpha=.1, edgecolor='k',
@@ -377,9 +377,9 @@ def make_figure_4(prefix):
                                             x1=x_now[0], v1=v_sensor[0],
                                             x2=x_now[1], v2=v_sensor[1],
                                             f=utils.constants.speed_of_light)
-        x_isodoppler, y_isodoppler = fdoa.model.draw_isodop(x1=x_now[0], v1=v_sensor[0],
-                                                            x2=x_now[1], v2=v_sensor[1],
-                                                            vdiff=vdiff, num_pts=1000, max_ortho=20)
+        x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x1=x_now[0], v1=v_sensor[0],
+                                                                x2=x_now[1], v2=v_sensor[1],
+                                                                vdiff=vdiff, num_pts=1000, max_ortho=20)
         plt.plot(x_isodoppler, y_isodoppler, linestyle='-.', label=None, color=this_color)
 
     # Add Transmitter to plot -- use zorder=3 to ensure the marker is above the lines

@@ -269,7 +269,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
     return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
 
 
-def draw_isodop(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
+def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
     """
     # Finds the isochrone with the stated range rate difference from points x1
     # and x2.  Generates an arc with 2*numPts-1 points, that spans up to

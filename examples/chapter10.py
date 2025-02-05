@@ -58,7 +58,7 @@ def example1(rng=None, cmap=None):
 
 
     # Define sensor positions
-    x_sensor = 30*np.array([[-1, 0, 1], [0,  0, 0]])
+    x_sensor = 30.0*np.array([[-1., 0., 1.], [0.,  0., 0.]])
     num_dims, num_sensors = utils.safe_2d_shape(x_sensor)
     
     # Define source position
