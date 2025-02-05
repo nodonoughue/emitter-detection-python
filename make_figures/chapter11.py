@@ -508,7 +508,7 @@ def make_figure_6(prefix=None):
     x_source = np.array([np.ravel(x_full), np.ravel(y_full)])  # shape=(2 x num_grid_points**2)
 
     # Compute CRLB
-    crlb = tdoa.perf.compute_crlb(x_sensor, x_source, cov_roa, do_resample=True)  # Ndim x Ndim x M^2
+    crlb = tdoa.perf.compute_crlb(x_sensor, x_source, cov_roa, variance_is_toa=False, do_resample=True)  # Ndim x Ndim x M^2
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), (num_grid_points, num_grid_points))
 
     # Set up contours
@@ -545,7 +545,7 @@ def make_figure_6(prefix=None):
     # automatically resample the covariance matrix.
     # cov_tdoa = timing_error**2 * (1 + np.eye(num_sensors-1))
 
-    crlb2 = tdoa.perf.compute_crlb(x_sensor1, x_source, cov_roa, do_resample=True)  # Ndim x Ndim x M**2
+    crlb2 = tdoa.perf.compute_crlb(x_sensor1, x_source, cov_roa, variance_is_toa=False, do_resample=True)  # Ndim x Ndim x M**2
     cep50 = np.reshape(utils.errors.compute_cep50(crlb2), [num_grid_points, num_grid_points])
 
     # Draw the figure
