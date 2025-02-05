@@ -141,7 +141,7 @@ def parse_reference_sensor(ref_idx, num_sensors):
         test_idx_vec = np.arange(num_sensors-1)  # np.asarray([i for i in np.arange(num_sensors - 1)])
         ref_idx_vec = (num_sensors - 1) * np.ones_like(test_idx_vec)
 
-    elif isinstance(ref_idx, str) and ref_idx == 'full':
+    elif isinstance(ref_idx, str) and ref_idx.lower() == 'full':
         # Generate all possible sensor pairs
         perm = list(combinations(np.arange(num_sensors), 2))
         test_idx_vec = np.asarray([x[0] for x in perm])
