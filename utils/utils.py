@@ -1,5 +1,7 @@
 import numpy as np
 from scipy import stats
+
+import utils
 from .unit_conversions import lin_to_db
 from itertools import combinations
 import seaborn as sns
@@ -252,6 +254,75 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
         return res
     cov_out = np.fromfunction(element_func, (n_pair_out, n_pair_out), dtype=float)
     return cov_out
+
+
+def resample_noise(noise, test_idx_vec, ref_idx_vec=None, test_weights=None, ref_weights=None):
+    # Parse Inputs
+    n_sensor, n_sample = utils.safe_2d_shape(noise)
+    if test_idx_vec is None:
+        # Default behavior, if not specified, is to use the final sensor as the reference
+        test_idx_vec = n_sensor - 1
+
+    # Parse reference and test index vector
+    if ref_idx_vec is None:
+        # Only one was provided; it must be fed to parse_reference_sensor to generate the matched pair of vectors
+        test_idx_vec, ref_idx_vec = parse_reference_sensor(test_idx_vec, n_sensor)
+
+    # Determine output size
+    n_test = np.size(test_idx_vec)
+    n_ref = np.size(ref_idx_vec)
+    n_pair_out = np.fmax(n_test, n_ref)
+
+    # Error Checking
+    if 1 < n_test != n_ref > 1:
+        raise TypeError("Error calling covariance matrix resample.  "
+                        "Reference and test vectors must have the same shape.")
+
+    if np.any(test_idx_vec >= n_sensor) or np.any(ref_idx_vec >= n_sensor):
+        raise TypeError("Error calling covariance matrix resample.  "
+                        "Indices exceed the dimensions of the covariance matrix.")
+
+    # Parse sensor weights
+    shp_test_wt = 1
+    if test_weights:
+        shp_test_wt = np.size(test_weights)
+
+    shp_ref_wt = 1
+    if ref_weights:
+        shp_ref_wt = np.size(ref_weights)
+
+    # Function to execute at each entry of output covariance matrix
+    def element_func(idx_row):
+        idx_row = idx_row.astype(int)
+        a_i = test_idx_vec[idx_row % n_test]
+        b_i = ref_idx_vec[idx_row % n_ref]
+
+        if test_weights:
+            a_i_wt = test_weights[idx_row % shp_test_wt]
+        else:
+            a_i_wt = 1.
+        if ref_weights:
+            b_i_wt = ref_weights[idx_row % shp_ref_wt]
+        else:
+            b_i_wt = 1.
+
+        noise_ai = noise[a_i, :]
+        noise_bi = np.zeros_like(noise_ai)
+
+        mask_bi = ~np.isnan(b_i)
+
+        if not np.all(mask_bi):
+            noise_bi[mask_bi] = noise[b_i[mask_bi].astype(int), :]
+        else:
+            noise_bi = noise[b_i.astype(int), :]
+
+        res = b_i_wt * noise_bi - \
+              a_i_wt * noise_ai
+        # raise ValueError('mo')
+        return res
+
+    noise_out = np.fromfunction(element_func, (n_pair_out, ), dtype=float)
+    return noise_out
 
 
 def ensure_invertible(covariance, epsilon=1e-10):
