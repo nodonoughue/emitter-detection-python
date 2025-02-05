@@ -5,7 +5,7 @@ import utils
 
 
 def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iterations=10e3, force_full_calc=False,
-              plot_progress=False):
+              plot_progress=False, cov_is_inverted=False):
     """
     Computes the least square solution for geolocation processing.
     
@@ -38,8 +38,13 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
     x_prev = x_init
     x_full[:, current_iteration] = x_prev
 
-    # Find the lower triangular cholesky decomposition of the covariance matrix
-    covariance_lower = np.linalg.cholesky(covariance)
+    # Pre-compute covariance matrix inverses
+    if cov_is_inverted:
+        covariance_inverse = covariance
+        covariance_lower = None
+    else:
+        covariance_lower = np.linalg.cholesky(covariance)
+        covariance_inverse = None
 
     # Initialize Plotting
     if plot_progress:
@@ -62,20 +67,26 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use the squeeze command to drop the third dim (n_source = 1)
 
         # Compute delta_x^(i), according to 10.20
-        # Using Cholesky decomposition:
-        #    C = L@L', we solved for L outside the loop
-        # [J @ C^{-1} @ J.T]^{-1} @ J @ C^{-1} @ y is
-        # rewritten
-        # [ a.T @ a ] ^{-1} @ a.T @ b
-        # where a and b are solved via forward substitution
-        # from the lower triangular matrix L.
-        #   L @ a = J.T
-        #   L @ b = y
-        a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
-        b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
-        # Then, we solve the system
-        #  (a.T @ a) @ delta_x = a.T @ b
-        delta_x, _, _, _ = np.linalg.lstsq(a.T @ a, a.T @ b, rcond=None)
+        if cov_is_inverted:
+            jc = jacobian_i @ covariance_inverse
+            jcj = jc @ jacobian_i.T
+            jcy = jc @ y_i
+            delta_x, _, _, _ = np.linalg.lstsq(jcj, jcy, rcond=None)
+        else:
+            # Using Cholesky decomposition:
+            #    C = L@L.T, we solved for L outside the loop
+            # [J @ C^{-1} @ J.T]^{-1} @ J @ C^{-1} @ y is
+            # rewritten
+            # [ a.T @ a ] ^{-1} @ a.T @ b
+            # where a and b are solved via forward substitution
+            # from the lower triangular matrix L.
+            #   L @ a = J.T
+            #   L @ b = y
+            a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
+            b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
+            # Then, we solve the system
+            #  (a.T @ a) @ delta_x = a.T @ b
+            delta_x, _, _, _ = np.linalg.lstsq(a.T @ a, a.T @ b, rcond=None)
 
         # Update predicted location
         x_full[:, current_iteration] = x_prev + np.squeeze(delta_x)
@@ -109,7 +120,7 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
 
 
 def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6, max_num_iterations=10e3,
-              force_full_calc=False, plot_progress=False):
+              force_full_calc=False, plot_progress=False, cov_is_inverted=False):
     """
     Computes the gradient descent solution for localization given the provided measurement and Jacobian function 
     handles, and measurement error covariance.
@@ -145,13 +156,21 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
     x_full[:, current_iteration] = x_prev
     
     # Pre-compute covariance matrix inverses
-    covariance_lower = np.linalg.cholesky(covariance)
+    if cov_is_inverted:
+        covariance_inverse = covariance
+        covariance_lower = None
+    else:
+        covariance_lower = np.linalg.cholesky(covariance)
+        covariance_inverse = None
 
     # Cost Function for Gradient Descent
     def cost_fxn(z):
         this_y = y(z)
-        l_inv_y = scipy.linalg.solve_triangular(covariance_lower, this_y, lower=True)
-        return np.conj(l_inv_y.T) @ l_inv_y
+        if cov_is_inverted:
+            return this_y.T @ covariance_inverse @ this_y
+        else:
+            l_inv_y = scipy.linalg.solve_triangular(covariance_lower, this_y, lower=True)
+            return np.conj(l_inv_y.T) @ l_inv_y
     
     # Initialize Plotting
     if plot_progress:
@@ -180,9 +199,12 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use squeeze to remove third dimension (n_source=1)
         
         # Compute Gradient and Cost function
-        a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
-        b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
-        grad = -2 * a.T @ b
+        if cov_is_inverted:
+            grad = -2 * jacobian_i @ covariance_inverse @ y_i
+        else:
+            a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
+            b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
+            grad = -2 * a.T @ b
         
         # Descent direction is the negative of the gradient
         del_x = -np.squeeze(grad/np.linalg.norm(grad))
@@ -327,6 +349,6 @@ def bestfix(pdfs, x_ctr, search_size, epsilon):
 
     # Find the highest scoring position
     idx_pk = result.argmax()
-    x_est = x_set[idx_pk]
+    x_est = x_set[:, idx_pk]
 
     return x_est, result, x_grid

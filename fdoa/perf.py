@@ -2,9 +2,10 @@ import numpy as np
 import utils
 from utils.unit_conversions import db_to_lin
 from . import model
+from scipy.linalg import solve_triangular, pinvh
 
 
-def compute_crlb(x_sensor, v_sensor, x_source, cov, ref_idx=None, do_resample=True):
+def compute_crlb(x_sensor, v_sensor, x_source, cov, ref_idx=None, do_resample=True, cov_is_inverted=False):
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_fdoa (Ndim x N) with velocity v_fdoa.
@@ -22,10 +23,10 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov, ref_idx=None, do_resample=Tr
     :param cov: Covariance matrix for range rate estimates at the N FDOA sensors [(m/s)^2]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return crlb: Lower bound on the error covariance matrix for an unbiased FDOA estimator (Ndim x Ndim)
     """
-
-    # TODO: Profile and speed up
 
     # Parse inputs
     n_dim, n_sensor = np.shape(x_sensor)
@@ -35,14 +36,23 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov, ref_idx=None, do_resample=Tr
     if n_source == 1:
         x_source = x_source[:, np.newaxis]
 
-    # Resample the covariance matrix
-    if do_resample:
-        # Resample the covariance matrix
-        test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
-        cov_resample = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
-        cov_inv = np.linalg.inv(cov_resample)
+    # Pre-process the covariance matrix
+    if cov_is_inverted:
+        # The covariance matrix was pre-inverted, use it directly
+        cov_inv = cov
+        cov_lower = None  # pre-define to avoid a 'use before defined' error
     else:
-        cov_inv = np.linalg.inv(cov)
+        # The covariance matrix was not pre-inverted, resample if necessary and then use
+        # cholesky decomposition to improve stability and speed for repeated calculation of
+        # the Fisher Information Matrix
+        if do_resample:
+            # Resample the covariance matrix
+            cov = utils.resample_covariance_matrix(cov, ref_idx)
+            cov = utils.ensure_invertible(cov)
+
+        # Pre-compute the matrix inverse, to speed up repeated calls
+        cov_lower = np.linalg.cholesky(cov)
+        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Initialize output variable
     crlb = np.zeros((n_dim, n_dim, n_source))
@@ -56,19 +66,21 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov, ref_idx=None, do_resample=Tr
                                        x_source=this_x, v_source=None,
                                        ref_idx=ref_idx)
 
-        # Squeeze the jacobian -- the third dimension is singleton, and doesn't matter here 
-        # LAZ: doesn't matter in matlab but matters in NP
-        # this_jacobian = np.squeeze(this_jacobian)
-
         # Compute the Fisher Information Matrix
-        fisher_matrix = this_jacobian.dot(cov_inv.dot(np.conjugate(this_jacobian).T))
+        if cov_is_inverted:
+            fisher_matrix = this_jacobian.dot(cov_inv.dot(np.conjugate(this_jacobian.T)))
+        else:
+            # Use cholesky decomposition
+            cov_jacob = solve_triangular(cov_lower, np.conj(np.transpose(this_jacobian)), lower=True)
+            fisher_matrix = cov_jacob.T @ cov_jacob
 
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
-            # Problem is ill defined, Fisher Information Matrix cannot be
+            # Problem is ill-defined, Fisher Information Matrix cannot be
             # inverted
             crlb[:, :, idx] = np.nan
         else:
-            crlb[:, :, idx] = np.linalg.pinv(fisher_matrix)
+            # crlb[:, :, idx] = np.linalg.pinv(fisher_matrix)
+            crlb[:, :, idx] = np.real(pinvh(fisher_matrix))
 
     return crlb
 

@@ -4,7 +4,8 @@ from . import model
 import numpy as np
 
 
-def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx=None, do_resample=False):
+def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx=None, do_resample=False,
+                   cov_is_inverted=False):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -26,7 +27,7 @@ def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=Non
     """
 
     # Resample the covariance matrix
-    if do_resample:
+    if do_resample and not cov_is_inverted:
         # Do it here, instead of passing on to model.log_likelihood, in order to avoid repeatedly resampling
         # the same covariance matrix for every test point.
         cov = utils.resample_covariance_matrix(cov, ref_idx)
@@ -34,7 +35,8 @@ def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=Non
     # Set up function handle
     def ell(x):
         return model.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor, rho_dot=rho, cov=cov,
-                                    x_source=x, v_source=None, ref_idx=ref_idx, do_resample=False)
+                                    x_source=x, v_source=None, ref_idx=ref_idx, do_resample=False,
+                                    cov_is_inverted=cov_is_inverted)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon)

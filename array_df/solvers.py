@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 
 
 def beamscan(x, v, psi_max=np.pi/2, num_points=101):
@@ -64,7 +65,7 @@ def beamscan_mvdr(x, v, psi_max=np.pi/2, num_points=101):
     covariance = np.cov(x)
 
     # Pre-compute covariance matrix inverses
-    c_pinv = np.linalg.pinv(covariance)
+    c_pinv = np.real(scipy.linalg.pinvh(covariance))
 
     # Steer each of the M data samples
     p = np.zeros(shape=(num_points, ))
@@ -100,8 +101,6 @@ def music(x, steer, num_sig_dims=0, max_psi=np.pi / 2, num_points=101):
     :return p: Power image (1 x N_pts) in linear units
     :return psi_vec: Vector of scan angles computed (in radians)
     """
-
-    # TODO: Double check.  The second MC simulation showed a loss w.r.t. CRB and beamscan.
 
     # Compute the sample covariance matrix
     n, m = np.shape(x)

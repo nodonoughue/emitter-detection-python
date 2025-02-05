@@ -3,6 +3,7 @@ import triang
 import tdoa
 import fdoa
 import utils
+from scipy.linalg import solve_triangular
 
 
 def measurement(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None, tdoa_ref_idx=None,
@@ -141,11 +142,14 @@ def log_likelihood(x_source, zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
     # Pre-compute covariance matrix inverses
     if cov_is_inverted:
         cov_inv = cov
+        cov_lower = None  # pre-define to avoid a 'use before defined' error
     else:
         if do_resample:
             cov = resample_hybrid_covariance_matrix(cov, x_aoa, x_tdoa, x_fdoa, tdoa_ref_idx, fdoa_ref_idx)
+            cov = utils.ensure_invertible(cov)
 
-        cov_inv = np.linalg.inv(cov)
+        cov_lower = np.linalg.cholesky(cov)
+        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Loop across source positions
     for idx_source in np.arange(n_source_pos):
@@ -163,7 +167,12 @@ def log_likelihood(x_source, zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
         err = (zeta_dot - zeta)
 
         # Compute the scaled log likelihood
-        ell[idx_source] = -err.dot(cov_inv).dot(err)
+        if cov_is_inverted:
+            ell[idx_source] = -err.dot(cov_inv).dot(err)
+        else:
+            # Use Cholesky decomposition
+            cov_err = solve_triangular(cov_lower, err, lower=True)
+            ell[idx_source] = np.sum(cov_err**2)
 
     return ell
 
@@ -207,12 +216,19 @@ def error(x_source, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, x_max=1, num_pts=
     # Resample the covariance matrix
     if cov_is_inverted:
         cov_inv = cov
+        cov_lower = None  # pre-define to avoid a 'use before defined' error
     else:
+        # The covariance matrix was not pre-inverted, resample if necessary and then use
+        # cholesky decomposition to improve stability and speed for repeated calculation of
+        # the Fisher Information Matrix
         if do_resample:
+            # Resample the covariance matrix
             cov = resample_hybrid_covariance_matrix(cov, x_aoa, x_tdoa, x_fdoa, tdoa_ref_idx, fdoa_ref_idx)
 
-        # Pre-invert the covariance matrix, to avoid repeatedly doing the same calculation
-        cov_inv = np.linalg.pinv(cov)
+        # Pre-compute the matrix inverse, to speed up repeated calls
+        cov = utils.ensure_invertible(cov)
+        cov_lower = np.linalg.cholesky(cov)
+        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Set up test points
     grid_res = 2*x_max / (num_pts-1)
@@ -230,7 +246,14 @@ def error(x_source, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, x_max=1, num_pts=
         for idx_aoa in np.arange(utils.safe_2d_shape(x_aoa)[1]):
             err[idx_aoa, :] = utils.modulo2pi(err[idx_aoa, :])
 
-    epsilon_list = [np.conjugate(this_err).T @  cov_inv @ this_err for this_err in err.T]
+    if cov_is_inverted:
+        epsilon_list = [np.conjugate(this_err).T @  cov_inv @ this_err for this_err in err.T]
+    else:
+        def compute_epsilon(this_err):
+            cov_err = solve_triangular(cov_lower, this_err, lower=True)
+            return np.sum(cov_err**2)
+
+        epsilon_list = [compute_epsilon(this_err) for this_err in err.T]
 
     return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
 

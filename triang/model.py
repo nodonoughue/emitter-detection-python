@@ -136,7 +136,7 @@ def jacobian(x_sensor, x_source, do_2d_aoa=False):
     return j
 
 
-def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False):
+def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False, cov_is_inverted=False):
     """
     Computes the Log Likelihood for AOA sensor measurement, given the
     received measurement vector psi, covariance matrix cov,
@@ -156,6 +156,8 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False):
     :param cov: FDOA measurement error covariance matrix
     :param x_source: Candidate source positions
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -169,12 +171,18 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False):
     if n_source_pos == 1:
         x_source = np.expand_dims(x_source, axis=1)
 
-    # Pre-invert covariance matrix for speedup
-    if np.isscalar(cov):
-        # cov_lower = 1/cov
-        cov = np.array([[cov]])
-    
-    cov_lower = np.linalg.cholesky(cov)
+    # Pre-process the covariance matrix
+    if cov_is_inverted:
+        # The covariance matrix was pre-inverted, use it directly
+        cov_inv = cov
+        cov_lower = None  # pre-define to avoid a 'use before defined' error
+    else:
+        # The covariance matrix was not pre-inverted, use cholesky decomposition
+        # to improve stability and speed for repeated calculation of
+        # the Fisher Information Matrix
+        cov = utils.ensure_invertible(cov)
+        cov_lower = np.linalg.cholesky(cov)
+        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Initialize Output
     ell = np.zeros(shape=(n_source_pos, ))
@@ -189,8 +197,11 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False):
         err = utils.modulo2pi(psi - this_psi)
 
         # Compute the scaled log likelihood
-        a = solve_triangular(cov_lower, err)
-        ell[idx_source] = - np.conj(a.T) @ a
+        if cov_is_inverted:
+            ell[idx_source] = err.T @ cov_inv @ err
+        else:
+            a = solve_triangular(cov_lower, err, lower=True)
+            ell[idx_source] = - np.sum(a**2)
 
     return ell
 
@@ -251,8 +262,8 @@ def error(x_sensor, cov, x_source, x_max, num_pts, do_2d_aoa):
         err = utils.modulo2pi(psi - psi_i)
 
         # Evaluate the scaled log likelihood
-        a = solve_triangular(cov_lower, err)
-        epsilon[idx_pt] = np.conj(a.T) @ a
+        a = solve_triangular(cov_lower, err, lower=True)
+        epsilon[idx_pt] = np.sum(a**2)
 
     return epsilon
 

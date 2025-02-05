@@ -1,11 +1,10 @@
 import numpy as np
-import scipy
-
+from scipy.linalg import solve_triangular, pinvh
 import utils
 from . import model
 
 
-def compute_crlb(x_aoa, xs, cov):
+def compute_crlb(x_aoa, xs, cov, cov_is_inverted=False):
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_aoa (Ndim x N).  C is an NxN matrix of TOA
@@ -19,6 +18,8 @@ def compute_crlb(x_aoa, xs, cov):
     :param x_aoa: (Ndim x N) array of AOA sensor positions
     :param xs: (Ndim x M) array of source positions over which to calculate CRLB
     :param cov: Covariance matrix for range rate estimates at the N FDOA sensors [(m/s)^2]
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return crlb: Lower bound on the error covariance matrix for an unbiased FDOA estimator (Ndim x Ndim)
     """
 
@@ -32,10 +33,13 @@ def compute_crlb(x_aoa, xs, cov):
     if len(np.shape(xs)) == 1:
         xs = np.expand_dims(xs, axis=1)
 
-    if np.isscalar(cov):
-        cov = np.array([[cov]])
-    # Pre-compute the covariance matrix inverse for speed
-    cov_lower = np.linalg.pinv(cov)  # np.linalg.cholesky(cov)
+    if cov_is_inverted:
+        cov_inv = cov
+        cov_lower = None  # pre-define to avoid a 'use before defined' error
+    else:
+        cov = utils.ensure_invertible(cov)
+        cov_lower = np.linalg.cholesky(cov)
+        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Initialize output variable
     crlb = np.zeros((num_dimension, num_dimension, num_sources))
@@ -54,15 +58,18 @@ def compute_crlb(x_aoa, xs, cov):
             continue
 
         # Compute the Fisher Information Matrix
-        # a = scipy.linalg.solve_triangular(cov_lower, this_jacobian.T)
-        # fisher_matrix = a.T @ a
-        fisher_matrix = this_jacobian.dot(cov_lower.dot(np.conjugate(this_jacobian.T)))
+        if cov_is_inverted:
+            fisher_matrix = this_jacobian.dot(cov_inv.dot(np.conjugate(this_jacobian.T)))
+        else:
+            cov_jacobian = solve_triangular(cov_lower, this_jacobian.T, lower=True)
+            fisher_matrix = cov_jacobian.T @ cov_jacobian
+        # fisher_matrix = this_jacobian.dot(cov_lower.dot(np.conjugate(this_jacobian.T)))
 
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
             # Problem is ill-defined, Fisher Information Matrix cannot be
             # inverted
             crlb[:, :, idx] = np.nan
         else:
-            crlb[:, :, idx] = np.real(scipy.linalg.pinvh(fisher_matrix))
+            crlb[:, :, idx] = np.real(pinvh(fisher_matrix))
 
     return crlb

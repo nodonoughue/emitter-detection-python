@@ -1,6 +1,7 @@
 import numpy as np
 import utils
 import matplotlib.pyplot as plt
+from scipy.linalg import solve_triangular
 
 
 def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
@@ -22,44 +23,22 @@ def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     """
 
     # Parse inputs
-    if v_sensor is None and v_source is None:
-        raise ValueError('At least one of either v_sensor or v_source must be defined to use FDOA.')
-    elif v_sensor is None:
-        v_sensor = np.zeros_like(x_sensor)
-    elif v_source is None:
-        v_source = np.zeros_like(x_source)
-
-    n_dim1, n_sensor1 = utils.safe_2d_shape(x_sensor)
-    n_dim2, n_sensor2 = utils.safe_2d_shape(v_sensor)
-    n_dim3, n_source1 = utils.safe_2d_shape(x_source)
-    n_dim4, n_source2 = utils.safe_2d_shape(v_source)
-
-    if n_dim1 != n_dim2 or n_dim1 != n_dim3 or n_dim1 != n_dim4:
-        raise TypeError('First dimension of all inputs must match')
-
-    if not utils.is_broadcastable(x_sensor, v_sensor):
-        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
-
-    if not utils.is_broadcastable(x_source, v_source):
-        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
-
-    n_sensor = np.amax((n_sensor1, n_sensor2))
-    n_source = np.amax((n_source1, n_source2))
-    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor2)
+    n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
     
     # Compute distance from each source position to each sensor
-    dx = np.reshape(x_source, (n_dim1, 1, n_source1)) - np.reshape(x_sensor, (n_dim1, n_sensor1, 1))
+    dx = np.reshape(x_source, (n_dim, 1, n_source)) - np.reshape(x_sensor, (n_dim, n_sensor, 1))
     r = np.sqrt(np.sum(dx**2, axis=0))  # 1 x nSensor1 x n_source1
     
     # Compute range rate from range and velocity
-    dv = np.reshape(v_sensor, (n_dim1, n_sensor2, 1)) - np.reshape(v_source, (n_dim1, 1, n_source2))
+    dv = np.reshape(v_sensor, (n_dim, n_sensor, 1)) - np.reshape(v_source, (n_dim, 1, n_source))
     rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor, n_source))  # nSensor x n_source
     
     # Apply reference sensors to compute range rate difference for each sensor
     # pair
-    if n_source1 > 1 or n_source2 > 1:
+    if n_source > 1:
         # There are multiple sources; they must traverse the second dimension
-        out_dims = (np.size(test_idx_vec), np.amax((n_source1, n_source2)))
+        out_dims = (np.size(test_idx_vec), n_source)
     else:
         # Single source, make it an array
         out_dims = (np.size(test_idx_vec), )
@@ -89,43 +68,19 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     """
 
     # Parse inputs
-    if v_sensor is None and v_source is None:
-        raise ValueError('At least one of either v_sensor or v_source must be defined to use FDOA.')
-    elif v_sensor is None:
-        v_sensor = np.zeros_like(x_sensor)
-    elif v_source is None:
-        v_source = np.zeros_like(x_source)
-
-    n_dim1, n_sensor1 = utils.safe_2d_shape(x_sensor)
-    n_dim2, n_sensor2 = utils.safe_2d_shape(v_sensor)
-    n_dim3, n_source1 = utils.safe_2d_shape(x_source)
-    n_dim4, n_source2 = utils.safe_2d_shape(v_source)
-
-    if n_dim1 != n_dim2 or n_dim1 != n_dim3 or n_dim1 != n_dim4:
-        raise TypeError('First dimension of all inputs must match')
-
-    if not utils.is_broadcastable(x_sensor, v_sensor):
-        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
-
-    if not utils.is_broadcastable(x_source, v_source):
-        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
-
-    n_dim = n_dim1
-    n_source = np.amax((n_source1, n_source2))
-    n_sensor = np.amax((n_sensor1, n_sensor2))
-
-    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor1)
+    n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
 
     # Compute the Offset Vectors
-    dx = x_sensor[:, :, np.newaxis] - np.reshape(x_source, (n_dim, 1, n_source1))  # n_dim x n_sensor x n_source
-    rn = np.reshape(np.sqrt(np.sum(dx**2, axis=0)), (1, n_sensor1, n_source1))  # Euclidean norm for each offset vector
+    dx = x_sensor[:, :, np.newaxis] - np.reshape(x_source, (n_dim, 1, n_source))  # n_dim x n_sensor x n_source
+    rn = np.reshape(np.sqrt(np.sum(dx**2, axis=0)), (1, n_sensor, n_source))  # Euclidean norm for each offset vector
     dx_norm = dx / rn  # n_dim x n_sensor x n_source
-    px = np.reshape(dx_norm, (n_dim, 1, n_sensor1, n_source1)) * np.reshape(dx_norm, (1, n_dim, n_sensor1, n_source1))
+    px = np.reshape(dx_norm, (n_dim, 1, n_sensor, n_source)) * np.reshape(dx_norm, (1, n_dim, n_sensor, n_source))
     # n_dim x n_dim x n_sensor x n_source
     
     # Compute the gradient of R_n
-    dv = (np.reshape(v_sensor, (n_dim, n_sensor2, 1))
-          - np.reshape(v_source, (n_dim, 1, n_source2)))  # n_dim x n_sensor x n_source
+    dv = (np.reshape(v_sensor, (n_dim, n_sensor, 1))
+          - np.reshape(v_source, (n_dim, 1, n_source)))  # n_dim x n_sensor x n_source
     dv_norm = dv/rn  # n_dim x n_sensor x n_source
     # Iterate the matmul over the number of sensors and sources
     nabla_rn = np.asarray([[np.dot(np.eye(n_dim) - px[:, :, idx_sen, idx_src],
@@ -136,11 +91,11 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     nabla_rn = np.moveaxis(nabla_rn, source=2, destination=0)
 
     # Compute test/reference differences and reshape output
-    n_msmt = test_idx_vec.size
+    num_measurements = test_idx_vec.size
     if n_source > 1:
-        out_dims = (n_dim, n_msmt, n_source)
+        out_dims = (n_dim, num_measurements, n_source)
     else:
-        out_dims = (n_dim, n_msmt)
+        out_dims = (n_dim, num_measurements)
 
     result = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], newshape=out_dims)
     # result = np.delete(result, np.unique(ref_idx_vec), axis=1) # rm ref_sensor column b/c all zeros
@@ -148,7 +103,8 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     return result  # n_dim x nPair x n_source
 
 
-def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=None, ref_idx=None, do_resample=False):
+def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=None, ref_idx=None, do_resample=False,
+                   cov_is_inverted=False):
     """
     # Computes the Log Likelihood for FDOA sensor measurement, given the
     # received measurement vector rho_dot, covariance matrix C,
@@ -167,6 +123,8 @@ def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=Non
     :param v_source: n_dim x n_source vector of source velocities
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -178,19 +136,24 @@ def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=Non
     # Handle vector input
     if n_source_pos == 1 and len(x_source.shape) == 1:
         # x_source is a vector; 2D indexing below will fail.
-        # Let's add a newaxis
+        # Let's add a new axis
         x_source = x_source[:, np.newaxis]
 
-    # Resample the covariance matrix
-    if do_resample:
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
+    if cov_is_inverted:
+        cov_inv = cov
+        cov_lower = None  # pre-define to avoid a 'use before defined' error
+    else:
+        # The covariance matrix was not pre-inverted, resample if necessary and then use
+        # cholesky decomposition to improve stability and speed for repeated calculation of
+        # the Fisher Information Matrix
+        if do_resample:
+            # Resample the covariance matrix
+            cov = utils.resample_covariance_matrix(cov, ref_idx)
+            cov = utils.ensure_invertible(cov)
 
-    if np.isscalar(cov):
-        # cov_lower = 1/cov
-        cov = np.array([[cov]])
-    # Pre-invert the covariance matrix; to avoid repeatedly redoing the same work in the
-    # for loop over source positions
-    cov_inv = np.linalg.pinv(cov)
+        # Pre-compute the matrix inverse, to speed up repeated calls
+        cov_lower = np.linalg.cholesky(cov)
+        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Initialize output
     ell = np.zeros((n_source_pos, ))
@@ -205,14 +168,20 @@ def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=Non
         
         # Evaluate the measurement error
         err = (rho_dot - r_dot)
-        
+
         # Compute the scaled log likelihood
-        ell[idx_source] = -np.squeeze(err.T @ cov_inv @ err)
+        if cov_is_inverted:
+            ell[idx_source] = -err.dot(cov_inv).dot(err)
+        else:
+            # Use Cholesky decomposition
+            cov_err = solve_triangular(cov_lower, err, lower=True)
+            ell[idx_source] = np.sum(cov_err**2)
 
     return ell
 
 
-def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None, ref_idx=None, do_resample=False):
+def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None, ref_idx=None, do_resample=False,
+          cov_is_inverted=False):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each
     dimension.  For each point, compute the FDOA solution for each sensor
@@ -233,6 +202,8 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
     :param v_source: nDim x 1 matrix of true emitter velocity
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return epsilon: 2-D plot of FDOA error
     :return x_vec:
     :return y_vec:
@@ -245,12 +216,18 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
                      v_sensor=v_sensor, v_source=v_source,
                      ref_idx=ref_idx)
 
-    # Resample the covariance matrix
-    if do_resample:
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
+    if cov_is_inverted:
+        cov_inv = cov
+        cov_lower = None  # pre-define to avoid a 'use before defined' error
+    else:
+        # Resample the covariance matrix
+        if do_resample:
+            cov = utils.resample_covariance_matrix(cov, ref_idx)
+            cov = utils.ensure_invertible(cov)
 
-    # Pre-invert the covariance matrix, to avoid repeatedly doing the same calculation
-    cov_inv = np.linalg.pinv(cov)
+        # Pre-process the covariance matrix, to avoid repeatedly doing the same calculation
+        cov_lower = np.linalg.cholesky(cov)
+        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Set up test points
     grid_res = 2*x_max / (num_pts-1)
@@ -264,7 +241,14 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
 
     err = rr[:, np.newaxis] - rr_list
 
-    epsilon_list = [np.conjugate(this_err).T @  cov_inv @ this_err for this_err in err.T]
+    if cov_is_inverted:
+        epsilon_list = [np.conjugate(this_err).T @ cov_inv @ this_err for this_err in err.T]
+    else:
+        def compute_epsilon(this_err):
+            cov_err = solve_triangular(cov_lower, this_err, lower=True)
+            return np.sum(cov_err**2)
+
+        epsilon_list = [compute_epsilon(this_err) for this_err in err.T]
 
     return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
 
@@ -367,3 +351,35 @@ def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
         y_iso = y_iso[unsort_idx]
 
     return x_iso, y_iso
+
+
+def _check_inputs(x_source, v_source, x_sensor, v_sensor):
+    if v_sensor is None and v_source is None:
+        raise ValueError('At least one of either v_sensor or v_source must be defined to use FDOA.')
+    elif v_sensor is None:
+        v_sensor = np.zeros_like(x_sensor)
+    elif v_source is None:
+        v_source = np.zeros_like(x_source)
+
+    n_dim1, n_sensor1 = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_sensor2 = utils.safe_2d_shape(v_sensor)
+    n_dim3, n_source1 = utils.safe_2d_shape(x_source)
+    n_dim4, n_source2 = utils.safe_2d_shape(v_source)
+
+    if n_dim1 != n_dim2 or n_dim1 != n_dim3 or n_dim1 != n_dim4:
+        raise TypeError('First dimension of all inputs must match')
+
+    if not utils.is_broadcastable(x_sensor, v_sensor):
+        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
+
+    if not utils.is_broadcastable(x_source, v_source):
+        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
+
+    n_sensor = np.amax((n_sensor1, n_sensor2))
+    n_source = np.amax((n_source1, n_source2))
+
+    # Handle any nones (make them zeros of the appropriate size)
+    if v_source is None: v_source = np.zeros_like(x_source)
+    if v_sensor is None: v_sensor = np.zeros_like(x_sensor)
+
+    return n_dim1, n_source, n_sensor, v_source, v_sensor

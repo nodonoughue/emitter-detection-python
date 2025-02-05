@@ -1,6 +1,7 @@
 import numpy as np
 # from utils import unit_conversions, geo
 import utils
+from scipy.linalg import solve_triangular
 unit_conversions = utils.unit_conversions
 geo = utils.geo
 
@@ -79,19 +80,19 @@ def jacobian(x_sensor, x_source, ref_idx=None):
     j = (dx[:, test_idx_vec, :] / r[:, test_idx_vec, :]) - (dx[:, ref_idx_vec, :] / r[:, ref_idx_vec, :])
 
     # Reshape
-    n_msmt = test_idx_vec.size
+    num_measurements = test_idx_vec.size
     if n_source > 1:
-        out_dims = (n_dim, n_msmt, n_source)
+        out_dims = (n_dim, num_measurements, n_source)
     else:
-        out_dims = (n_dim, n_msmt)
+        out_dims = (n_dim, num_measurements)
 
     j = np.reshape(j, newshape=out_dims)
-    # j = np.delete(j, np.unique(ref_idx_vec), axis=1) # remove reference id b/c its all zeros
+    # j = np.delete(j, np.unique(ref_idx_vec), axis=1) # remove reference id b/c it is all zeros
     # not needed when parse_ref_sensors is fixed
     return j
 
 
-def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False):
+def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False, cov_is_inverted=False):
     """
     Computes the Log Likelihood for TDOA sensor measurement, given the received range difference measurement vector
     rho, covariance matrix cov, and set of candidate source positions x_source.
@@ -107,6 +108,8 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
     :param x_source: Candidate source positions
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -119,17 +122,18 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
 
     # Parse the TDOA sensor pairs
     _, n_tdoa = utils.safe_2d_shape(x_sensor)
-    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_tdoa)
 
-    # Resample the covariance matrices
-    if do_resample:
-        cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+    # Pre-process the covariance matrix
+    if cov_is_inverted:
+        cov_inv = cov
+        cov_lower = None  # pre-define to avoid a 'use before defined' error
+    else:
+        if do_resample:
+            cov = utils.resample_covariance_matrix(cov, ref_idx)
+            cov = utils.ensure_invertible(cov)
 
-    if np.isscalar(cov):
-        # cov_lower = 1/cov
-        cov = np.array([[cov]])
-    # Pre-compute covariance matrix inverse
-    cov_inv = np.linalg.inv(cov)
+        cov_lower = np.linalg.cholesky(cov)
+        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     for idx_source in np.arange(n_source_pos):
         x_i = x_source[:, idx_source]
@@ -141,12 +145,17 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
         err = (rho_dot - rho)
 
         # Compute the scaled log likelihood
-        ell[idx_source] = -err.dot(cov_inv).dot(err)
+        if cov_is_inverted:
+            ell[idx_source] = -err.dot(cov_inv).dot(err)
+        else:
+            # Use Cholesky decomposition
+            cov_err = solve_triangular(cov_lower, err, lower=True)
+            ell[idx_source] = -np.sum(cov_err**2)
 
     return ell
 
 
-def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=False):
+def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=False, cov_is_inverted=False):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each
     dimension.  For each point, compute the TDOA solution for each sensor
@@ -165,6 +174,8 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=Fal
     :param num_pts: Number of test points along each dimension
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return epsilon: 2-D plot of FDOA error
     :return x_vec:
     :return y_vec:
@@ -176,13 +187,18 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=Fal
     r = measurement(x_sensor, x_source, ref_idx)
 
     _, num_sensors = np.shape(x_sensor)
-    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
 
-    # Resample the covariance matrix
-    if do_resample:
-        cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+    # Pre-process the covariance matrix
+    if cov_is_inverted:
+        cov_inv = cov
+        cov_lower = None  # pre-define to avoid a 'use before defined' error
+    else:
+        if do_resample:
+            cov = utils.resample_covariance_matrix(cov, ref_idx)
+            cov = utils.ensure_invertible(cov)
 
-    cov_inv = np.linalg.pinv(cov)
+        cov_lower = np.linalg.cholesky(cov)
+        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Set up test points
     xx_vec = x_max.flatten() * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))
@@ -202,7 +218,11 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=Fal
         err = r - rr_i
 
         # Evaluate the scaled log likelihood
-        epsilon[idx_pt] = err.H.dot(cov_inv).dot(err)
+        if cov_is_inverted:
+            epsilon[idx_pt] = err.H.dot(cov_inv).dot(err)
+        else:
+            cov_err = solve_triangular(cov_lower, err, lower=True)
+            epsilon[idx_pt] = np.sum(cov_err**2)
 
     return epsilon
 

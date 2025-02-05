@@ -70,8 +70,8 @@ def example1(rng=np.random.default_rng()):
     covar_rrdoa = utils.resample_covariance_matrix(covar_rroa, fdoa_ref_idx)
 
     covar_rho = block_diag(covar_ang, covar_rdoa, covar_rrdoa)
-    covar_lower = np.linalg.cholesky(covar_rho)
-    covar_inv = np.linalg.inv(covar_rho)
+    covar_lower = np.linalg.cholesky(np.asarray(covar_rho))  # The array shouldn't be needed,
+    covar_inv = np.linalg.inv(np.asarray(covar_rho))         # but it placated PyCharm
 
     # Initialize Transmitter Position
     x_source = np.ones((2,)) * 30e3
@@ -196,8 +196,8 @@ def example2(rng=np.random.default_rng()):
     covar_rrdoa = utils.resample_covariance_matrix(covar_rroa, fdoa_ref_idx)
 
     covar_rho = block_diag(covar_ang, covar_rdoa, covar_rrdoa)
-    covar_lower = np.linalg.cholesky(covar_rho)
-    covar_inv = np.linalg.inv(covar_rho)
+    covar_lower = np.linalg.cholesky(np.asarray(covar_rho))  # The array shouldn't be needed,
+    covar_inv = np.linalg.inv(np.asarray(covar_rho))         # but it placated PyCharm
 
     # Initialize Transmitter Position
     x_source = np.ones((2,)) * 30e3
@@ -303,7 +303,6 @@ def _mc_iteration(args):
     Nicholas O'Donoughue
     18 March 2022
     """
-    # TODO: Profile MC iteration, and attempt to speed up
 
     # TODO: Check for divergent case and set a flag to ignore this iteration
 
@@ -329,13 +328,13 @@ def _mc_iteration(args):
                                                       fdoa_ref_idx=args['fdoa_ref_idx'])
     _, res_ls = hybrid.solvers.least_square(x_aoa=args['x_aoa'], x_tdoa=args['x_tdoa'],
                                             x_fdoa=args['x_fdoa'], v_fdoa=args['v_fdoa'],
-                                            zeta=zeta, cov=args['covar_rho'],
+                                            zeta=zeta, cov=args['covar_inv'], cov_is_inverted=True,
                                             x_init=args['x_init'], max_num_iterations=args['num_iterations'],
                                             tdoa_ref_idx=args['tdoa_ref_idx'], fdoa_ref_idx=args['fdoa_ref_idx'],
                                             force_full_calc=True)
     _, res_gd = hybrid.solvers.gradient_descent(x_aoa=args['x_aoa'], x_tdoa=args['x_tdoa'],
                                                 x_fdoa=args['x_fdoa'], v_fdoa=args['v_fdoa'],
-                                                zeta=zeta, cov=args['covar_rho'],
+                                                zeta=zeta, cov=args['covar_inv'], cov_is_inverted=True,
                                                 x_init=args['x_init'], max_num_iterations=args['num_iterations'],
                                                 alpha=args['gd_alpha'], beta=args['gd_beta'],
                                                 tdoa_ref_idx=args['tdoa_ref_idx'], fdoa_ref_idx=args['fdoa_ref_idx'],

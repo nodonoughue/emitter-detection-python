@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 import matplotlib.pyplot as plt
 import time
 import utils
@@ -37,8 +38,6 @@ def example1(rng=np.random.default_rng()):
     :return fig_err: figure handle for error as a function of iteration
     """
 
-    # TODO: Debug solvers -- not working correctly (ML works, but not GD or LS; not sure about BF -- is it plotting?)
-
     #  Set up FDOA Receiver system
     #  Spacing of 10 km at 120 degree intervals around origin
     baseline = 10e3     # m
@@ -61,6 +60,7 @@ def example1(rng=np.random.default_rng()):
     covar_sensor = rng_rate_standard_deviation**2 * np.eye(num_sensors)
     covar_rho = rng_rate_standard_deviation**2 * (1 + np.eye(num_sensors-1))
     covar_lower = np.linalg.cholesky(covar_rho)
+    covar_inv = np.real(scipy.linalg.pinvh(covar_rho))
 
     # Initialize Transmitter Position
     th = rng.random()*2*np.pi
@@ -95,6 +95,7 @@ def example1(rng=np.random.default_rng()):
             'covar_sensor': covar_sensor,
             'covar_rho': covar_rho,
             'covar_lower': covar_lower,
+            'covar_inv': covar_inv,
             'epsilon': epsilon,
             'grid_res': grid_res,
             'num_iterations': num_iterations,
@@ -254,7 +255,6 @@ def _mc_iteration(args):
     Nicholas O'Donoughue
     18 March 2022
     """
-    # TODO: Profile MC iteration, and attempt to speed up
 
     # Generate a random measurement
     rng = args['rng']
@@ -262,7 +262,7 @@ def _mc_iteration(args):
 
     # Generate solutions
     res_ml, ml_surf, ml_grid = fdoa.solvers.max_likelihood(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
-                                                           rho=rho, cov=args['covar_rho'],
+                                                           rho=rho, cov=args['covar_inv'], cov_is_inverted=True,
                                                            x_ctr=args['x_init'], search_size=args['x_extent'],
                                                            epsilon=args['grid_res'], do_resample=False)
     res_bf, bf_surf, bf_grid = fdoa.solvers.bestfix(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
@@ -270,11 +270,11 @@ def _mc_iteration(args):
                                                     x_ctr=args['x_init'], search_size=args['x_extent'],
                                                     epsilon=args['grid_res'], do_resample=False)
     _, res_ls = fdoa.solvers.least_square(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
-                                          rho=rho, cov=args['covar_rho'],
+                                          rho=rho, cov=args['covar_inv'], cov_is_inverted=True,
                                           x_init=args['x_init'], max_num_iterations=args['num_iterations'],
                                           force_full_calc=True, do_resample=False)
     _, res_gd = fdoa.solvers.gradient_descent(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
-                                              rho=rho, cov=args['covar_rho'],
+                                              rho=rho, cov=args['covar_inv'], cov_is_inverted=True,
                                               x_init=args['x_init'], max_num_iterations=args['num_iterations'],
                                               alpha=args['gd_alpha'], beta=args['gd_beta'],
                                               force_full_calc=True, do_resample=False)

@@ -5,7 +5,8 @@ import numpy as np
 solvers = utils.solvers
 
 
-def max_likelihood(x_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx=None, do_resample=False):
+def max_likelihood(x_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx=None, do_resample=False,
+                   cov_is_inverted=False):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -26,14 +27,15 @@ def max_likelihood(x_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx
     """
 
     # Resample the covariance matrix
-    if do_resample:
+    if do_resample and not cov_is_inverted:
         # Do it here, instead of passing on to model.log_likelihood, in order to avoid repeatedly resampling
         # the same covariance matrix for every test point.
         cov = utils.resample_covariance_matrix(cov, ref_idx)
+        cov = utils.ensure_invertible(cov)
 
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_sensor, rho, cov, x, ref_idx, do_resample=False)
+        return model.log_likelihood(x_sensor, rho, cov, x, ref_idx, do_resample=False, cov_is_inverted=cov_is_inverted)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon)
@@ -41,7 +43,7 @@ def max_likelihood(x_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, **kwargs):
+def gradient_descent(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, cov_is_inverted=False, **kwargs):
     """
     Computes the gradient descent solution for tdoa processing.
 
@@ -67,16 +69,17 @@ def gradient_descent(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
 
-    if do_resample:
+    if do_resample and not cov_is_inverted:
         cov = utils.resample_covariance_matrix(cov, ref_idx)
+        cov = utils.ensure_invertible(cov)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
+    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, cov_is_inverted=cov_is_inverted, **kwargs)
 
     return x, x_full
 
 
-def least_square(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, **kwargs):
+def least_square(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, cov_is_inverted=False, **kwargs):
     """
     Computes the least square solution for tdoa processing.
 
@@ -102,11 +105,13 @@ def least_square(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, **
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
 
-    if do_resample:
+    # TODO: Make sure FDOA, Triang, and Hybrid solvers can accept cov_is_inverted
+    if do_resample and not cov_is_inverted:
         cov = utils.resample_covariance_matrix(cov, ref_idx)
+        cov = utils.ensure_invertible(cov)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
+    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, covariance=cov, x_init=x_init, cov_is_inverted=cov_is_inverted, **kwargs)
 
     return x, x_full
 
@@ -152,6 +157,7 @@ def bestfix(x_sensor, rho, cov, x_ctr, search_size, epsilon, ref_idx=None, pdf_t
     # Resample the covariance matrix
     if do_resample:
         cov = utils.resample_covariance_matrix(cov, ref_idx)
+        cov = utils.ensure_invertible(cov)
 
     pdfs = utils.make_pdfs(measurement, rho, pdf_type, cov)
 
@@ -292,7 +298,7 @@ def _chan_ho_theta(cov, b, g, y):
     cov_mod = b.dot(cov).dot(np.transpose(np.conjugate(b)))  # BCB', eq 11.28
     cov_mod_inv = np.linalg.inv(cov_mod)
 
-    # Assemble matrix products g'*w_inv*g, and g'*w_inv*y
+    # Assemble matrix products g^H*w_inv*g, and g^H*w_inv*y
     gw = np.transpose(np.conjugate(g)).dot(cov_mod_inv)
     gwg = gw.dot(g)
     gwy = gw.dot(y)

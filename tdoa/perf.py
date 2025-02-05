@@ -1,10 +1,10 @@
 import numpy as np
-import scipy
+from scipy.linalg import solve_triangular, pinvh
 import utils
 from . import model
 
 
-def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True, variance_is_toa=True):
+def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True, variance_is_toa=True, cov_is_inverted=False):
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_tdoa (Ndim x N).
@@ -21,6 +21,8 @@ def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True, varian
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
     it is in m^2
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix.
     :return crlb: Lower bound on the error covariance matrix for an unbiased FDOA estimator (Ndim x Ndim)
     """
 
@@ -32,22 +34,28 @@ def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True, varian
     if n_source == 1:
         x_source = x_source[:, np.newaxis]
 
-    # Correct units for the covariance matrix
-    if variance_is_toa:
-        # Use the speed of light (squared) to covert from TOA or TDOA to ROA or RDOA
-        cov = cov * utils.constants.speed_of_light**2
+    # Pre-process the covariance matrix
+    if cov_is_inverted:
+        # The covariance matrix was pre-inverted, use it directly
+        cov_inv = cov
+        cov_lower = None  # pre-define to avoid a 'use before defined' error
+    else:
+        # Correct units for the covariance matrix
+        if variance_is_toa:
+            # Use the speed of light (squared) to covert from TOA or TDOA to ROA or RDOA
+            cov = cov * utils.constants.speed_of_light ** 2
 
-    # Resample the covariance matrix
-    if do_resample:
-        # Resample the covariance matrix (convert from ROA to RDOA)
-        test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
-        cov = utils.resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec)
+        # The covariance matrix was not pre-inverted, resample if necessary and then use
+        # cholesky decomposition to improve stability and speed for repeated calculation of
+        # the Fisher Information Matrix
+        if do_resample:
+            # Resample the covariance matrix
+            cov = utils.resample_covariance_matrix(cov, ref_idx)
+            cov = utils.ensure_invertible(cov)
 
-    # Pre-compute the matrix inverse, to speed up repeated calls
-    # TODO: Use Cholesky decomposition to speed this up!
-    # cov_inv = np.linalg.inv(cov)
-    cov = utils.ensure_invertible(cov)
-    cov_lower = np.linalg.cholesky(cov, upper=False)
+        # Pre-compute the matrix inverse, to speed up repeated calls
+        cov_lower = np.linalg.cholesky(cov)
+        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Initialize output variable
     crlb = np.zeros((n_dim, n_dim, n_source))
@@ -60,14 +68,19 @@ def compute_crlb(x_sensor, x_source, cov, ref_idx=None, do_resample=True, varian
         this_jacobian = model.jacobian(x_sensor, this_x, ref_idx)
 
         # Compute the Fisher Information Matrix
-        A = scipy.linalg.solve(cov_lower, np.conj(np.transpose(this_jacobian)))
-        fisher_matrix = np.conj(np.transpose(A)) @ A
+        if cov_is_inverted:
+            fisher_matrix = this_jacobian.dot(cov_inv.dot(np.conjugate(this_jacobian.T)))
+        else:
+            # Use cholesky decomposition
+            cov_jacob = solve_triangular(cov_lower, np.conj(np.transpose(this_jacobian)), lower=True)
+            fisher_matrix = cov_jacob.T @ cov_jacob
 
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
             # Problem is ill-defined, Fisher Information Matrix cannot be
             # inverted
             crlb[:, :, idx] = np.nan
         else:
-            crlb[:, :, idx] = np.linalg.pinv(fisher_matrix)
+            # crlb[:, :, idx] = np.linalg.pinv(fisher_matrix)
+            crlb[:, :, idx] = np.real(pinvh(fisher_matrix))
 
     return crlb

@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 import matplotlib.pyplot as plt
 import time
 import utils
@@ -59,6 +60,7 @@ def example1(rng=np.random.default_rng()):
     # Decompose the covariance matrix, using Cholesky Decomposition, into a lower triangular matrix, for generating
     # correlated random variables
     covar_lower = np.linalg.cholesky(covar_rho)
+    covar_inv = np.real(scipy.linalg.pinvh(covar_rho))
 
     # Initialize Transmitter Position
     th = rng.random()*2*np.pi
@@ -102,6 +104,7 @@ def example1(rng=np.random.default_rng()):
             'covar_sensor': covar_roa,
             'covar_rho': covar_rho,
             'covar_lower': covar_lower,
+            'covar_inv': covar_inv,
             'epsilon': epsilon,
             'grid_res': grid_res,
             'num_iterations': num_iterations,
@@ -145,19 +148,10 @@ def example1(rng=np.random.default_rng()):
     plt.ylabel('[km]')
 
     # Compute and Plot CRLB and Error Ellipse Expectations
-    err_crlb = np.squeeze(tdoa.perf.compute_crlb(x_sensor, x_source, cov=covar_rho, do_resample=False))
+    err_crlb = np.squeeze(tdoa.perf.compute_crlb(x_sensor, x_source, cov=covar_rho, variance_is_toa=False, do_resample=False))
     crlb_cep50 = utils.errors.compute_cep50(err_crlb)/1e3  # [km]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :]/1e3, crlb_ellipse[1, :]/1e3, linewidth=.5, label='90% Error Ellipse')
-    # plt.text(-20, 45, '90% Error Ellipse', fontsize=10)
-    # plt.plot([1, 11], [45, 45], linestyle='-', linewidth=.5, label=None)
-
-    # Label Solutions
-    # plt.text(x_init[0]/1e3+2, x_init[1]/1e3, 'Initial Guess', fontsize=12)
-    # plt.text(np.mean(x_ls_full[0, 0:1, 0])/1e3+5,
-    #          np.mean(x_ls_full[1, 0:1, 0])/1e3, 'Least Squares', fontsize=12)
-    # plt.text(x_grad_full[0, 1, 0]/1e3-40,
-    #          x_grad_full[1, 1, 0]/1e3, 'Gradient Descent', fontsize=12)
 
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
@@ -276,25 +270,24 @@ def _mc_iteration(args):
     Nicholas O'Donoughue
     18 March 2022
     """
-    # TODO: Profile MC iteration, and attempt to speed up
 
     # Generate a random measurement
     rng = args['rng']
     rho = args['rho_act'] + args['covar_lower'] @ rng.standard_normal(size=(args['num_measurements'], ))
 
     # Generate solutions
-    res_ml, _, _ = tdoa.solvers.max_likelihood(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_rho'],
+    res_ml, _, _ = tdoa.solvers.max_likelihood(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_inv'],
                                                x_ctr=args['x_init'], search_size=args['x_extent'],
-                                               epsilon=args['grid_res'])
+                                               epsilon=args['grid_res'], cov_is_inverted=True)
     res_bf, _, _ = tdoa.solvers.bestfix(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_rho'],
                                         x_ctr=args['x_init'], search_size=args['x_extent'], epsilon=args['grid_res'])
-    _, res_ls = tdoa.solvers.least_square(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_rho'],
+    _, res_ls = tdoa.solvers.least_square(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_inv'],
                                           x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                          force_full_calc=True)
-    _, res_gd = tdoa.solvers.gradient_descent(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_rho'],
+                                          force_full_calc=True, cov_is_inverted=True)
+    _, res_gd = tdoa.solvers.gradient_descent(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_inv'],
                                               x_init=args['x_init'], max_num_iterations=args['num_iterations'],
                                               alpha=args['gd_alpha'], beta=args['gd_beta'],
-                                              force_full_calc=True)
+                                              force_full_calc=True, cov_is_inverted=True)
     res_chan_ho = tdoa.solvers.chan_ho(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_rho'])
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf, 'chan_ho': res_chan_ho}

@@ -334,12 +334,13 @@ def example2():
     # Define measurement accuracy
     sigma_psi = 2.5*np.pi/180
     covar_psi = sigma_psi**2 * np.eye(num_sensors)  # N x N identity matrix
-    
+    covar_inv = (1/sigma_psi**2) * np.eye(num_sensors)  # the inverse of the covariance matrix
+
     # Find maximum cross-range position at 100 km downrange
     cross_range_vec = np.arange(start=-100, stop=101)
     down_range_vec = 100 * np.ones(shape=np.shape(cross_range_vec))
     x_source = np.concatenate((cross_range_vec[np.newaxis, :], down_range_vec[np.newaxis, :]), axis=0)
-    crlb = triang.perf.compute_crlb(x_sensor*1e3, x_source*1e3, cov=covar_psi)
+    crlb = triang.perf.compute_crlb(x_sensor*1e3, x_source*1e3, cov=covar_inv, cov_is_inverted=True)
     cep50 = utils.errors.compute_cep50(crlb)
     
     good_points = np.argwhere(cep50 <= 25e3)
@@ -353,7 +354,7 @@ def example2():
     x0 = np.stack((x_mesh.flatten(), y_mesh.flatten()), axis=1).T
 
     # Compute CRLB
-    crlb = triang.perf.compute_crlb(x_sensor*1e3, x0*1e3, covar_psi)
+    crlb = triang.perf.compute_crlb(x_sensor*1e3, x0*1e3, covar_inv, cov_is_inverted=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=x_mesh.shape)
 
     # Blank out y=0
