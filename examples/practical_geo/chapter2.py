@@ -255,9 +255,9 @@ def example2(colors=None):
                                             tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Generate Random Noise
-    cov_lower = np.linalg.cholesky(cov_z_out, upper=False)
-    num_msmt, _ = utils.safe_2d_shape(cov_lower)
-    noise = cov_lower @ np.random.randn(num_msmt, )
+    cov_lower = np.linalg.cholesky(cov_z_out)
+    num_measurements, _ = utils.safe_2d_shape(cov_lower)
+    noise = cov_lower @ np.random.randn(num_measurements, )
 
     # Combine Noise with Perfect Measurement
     zeta = z + noise
@@ -355,8 +355,8 @@ def example3(rng=np.random.default_rng(), colors=None):
                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Generate Random Noise
-    cov_lower = np.linalg.cholesky(cov_z_out, upper=False)
-    num_msmt, _ = utils.safe_2d_shape(cov_lower)
+    cov_lower = np.linalg.cholesky(cov_z_out)
+    num_measurements, _ = utils.safe_2d_shape(cov_lower)
 
     # ---- Set Up Solution Parameters ----
     # ML Search Parameters
@@ -371,7 +371,7 @@ def example3(rng=np.random.default_rng(), colors=None):
                   'force_full_calc' : True,
                   'plot_progress' : False}
 
-    res = _mc_iteration(z, num_msmt, tdoa_ref_idx, fdoa_ref_idx, cov_z_out, cov_lower, rng, ml_args, gd_ls_args)
+    res = _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, cov_z_out, cov_lower, rng, ml_args, gd_ls_args)
 
     # ---- Estimate Error Bounds ----
     # CRLB
@@ -462,8 +462,8 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Pre-compute covariance matrix decomposition for noise generation
-    cov_lower = np.linalg.cholesky(cov_z_out, upper=False)
-    num_msmt, _ = utils.safe_2d_shape(cov_lower)
+    cov_lower = np.linalg.cholesky(cov_z_out)
+    num_measurements, _ = utils.safe_2d_shape(cov_lower)
 
     # ---- Set Up Solution Parameters ----
     # ML Search Parameters
@@ -490,10 +490,11 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
+    res = {}
     for idx in np.arange(num_mc_trials):
         utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        res = _mc_iteration(z, num_msmt, tdoa_ref_idx, fdoa_ref_idx, cov_z_out, cov_lower, rng, ml_args, gd_ls_args)
+        res = _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, cov_z_out, cov_lower, rng, ml_args, gd_ls_args)
 
         rmse_ml[idx] = np.linalg.norm(res['ml']-x_source)
         rmse_gd[idx, :] = np.linalg.norm(res['gd']-x_source[:, np.newaxis], axis=0)
@@ -572,7 +573,7 @@ def _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, covar, covar_
     :return estimates: Dictionary with estimated target position using several algorithms.  Fields are:
                 ml: Maximum Likelihood solution
                 gd: Gradient Descent solution
-                ls: Least Square solution
+                ls: Least Squares solution
 
     Nicholas O'Donoughue
     16 January 2025

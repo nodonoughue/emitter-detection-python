@@ -14,17 +14,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import tdoa
-
 from examples.practical_geo import chapter3
-from make_figures.chapter13 import make_figures_3_4
 
 
 def make_all_figures(close_figs=False, force_recalc=False):
     """
     Call all the figure generators for this chapter
 
-    :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
-                 Default=False
+    :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
+                       Default=False
+    :param force_recalc: optional flag (default=True), if False then the example does not run
     :return: List of figure handles
     """
 
@@ -38,12 +37,12 @@ def make_all_figures(close_figs=False, force_recalc=False):
     # Generate all figures
     fig1 = make_figure_1(prefix)
     fig2 = make_figure_2(prefix)
-    figs3_4 = make_figures_3_4(prefix)
+    figs4_5 = make_figures_4_5(prefix)
     figs6_7 = make_figures_6_7(prefix)
-    # figs_9_10 = make_figures_9_10(prefix)
-    # figs_11_12 = make_figures_11_12(prefix, force_recalc)
+    figs_9_10 = make_figures_9_10(prefix)
+    figs_11_12 = make_figures_11_12(prefix, force_recalc)
 
-    figs = [fig1, fig2] + list(figs3_4) + list(figs6_7) # + list(figs_9_10) + list(figs_11_12)
+    figs = [fig1, fig2] + list(figs4_5) + list(figs6_7) + list(figs_9_10) + list(figs_11_12)
     if close_figs:
         for fig in figs:
             plt.close(fig)
@@ -60,7 +59,7 @@ def make_figure_1(prefix=None):
     Figure 1
 
     :param prefix: output directory to place generated figure
-    :return: figure handle
+    :return: handle
     """
 
     print('Generating Figure 3.1...')
@@ -71,8 +70,8 @@ def make_figure_1(prefix=None):
 
     # Plot sensor / source positions
     fig = plt.figure()
-    plt.scatter(x_source[0], x_source[1], marker='^', label='Source', clip_on=False)
-    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensor', clip_on=False)
+    plt.scatter(x_source[0], x_source[1], marker='^', label='Source', clip_on=False, zorder=3)
+    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensor', clip_on=False, zorder=3)
 
     # Generate Isochrones
     isochrone_label = 'Isochrones'
@@ -106,7 +105,7 @@ def make_figure_2(prefix=None):
     Figure 2
 
     :param prefix: output directory to place generated figure
-    :return: figure handle
+    :return: handle
     """
 
     print('Generating Figure 3.2...')
@@ -117,8 +116,8 @@ def make_figure_2(prefix=None):
 
     # Plot sensor / source positions
     fig = plt.figure()
-    plt.scatter(x_source[0], x_source[1], marker='^', label='Source', clip_on=False)
-    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensor', clip_on=False)
+    plt.scatter(x_source[0], x_source[1], marker='^', label='Source', clip_on=False, zorder=3)
+    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensor', clip_on=False, zorder=3)
 
     # Generate Isochrones
     isochrone_label = 'Isochrones'
@@ -145,12 +144,12 @@ def make_figure_2(prefix=None):
     return fig
 
 
-def make_figure_4_5(prefix=None):
+def make_figures_4_5(prefix=None):
     """
     Figure 3.4 and 3.5
 
     :param prefix: output directory to place generated figure
-    :return: figure handle
+    :return: handle
     """
 
     print('Generating Figures 3.4a, 3.4b, 3.5...')
@@ -178,7 +177,7 @@ def make_figures_6_7(prefix=None):
     Figure 3.6 & 3.7
 
     :param prefix: output directory to place generated figure
-    :return: figure handle
+    :return: handle
     """
 
     print('Generating Figures 3.6, 3.7a, 3.7b, 3.7c, 3.7d, 3.7e...')
@@ -206,7 +205,7 @@ def make_figures_9_10(prefix=None):
     Figures 3.9 & 3.10
 
     :param prefix: output directory to place generated figure
-    :return: figure handle
+    :return: handle
     """
 
     print('Generating Figures 3.9, 3.10a, 3.10b, 3.10c...')
