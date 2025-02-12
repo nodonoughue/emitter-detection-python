@@ -36,6 +36,11 @@ def compute_crlb(x_aoa, xs, cov, cov_is_inverted=False):
     if cov_is_inverted:
         cov_inv = cov
         cov_lower = None  # pre-define to avoid a 'use before defined' error
+    elif np.isscalar(cov):
+        # The covariance matrix is a scalar, this is easy, go ahead and invert it
+        cov_inv = 1. / cov
+        cov_lower = None
+        cov_is_inverted = True
     else:
         cov = utils.ensure_invertible(cov)
         cov_lower = np.linalg.cholesky(cov)

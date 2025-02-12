@@ -344,6 +344,9 @@ def ensure_invertible(covariance, epsilon=1e-10):
     """
 
     # Check input dimensions
+    if np.isscalar(covariance):
+        return covariance  # Input is a scalar; it is invertible by definition
+
     sz = np.shape(covariance)
     assert len(sz) > 1, 'Input must have at least two dimensions.'
     assert sz[0] == sz[1], 'First two dimensions of input matrix must be equal.'

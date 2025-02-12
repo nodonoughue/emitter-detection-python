@@ -44,7 +44,8 @@ def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=Non
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, v_sensor, rho, cov, x_init, v_source=None, ref_idx=None, do_resample=False, **kwargs):
+def gradient_descent(x_sensor, v_sensor, rho, cov, x_init, v_source=None, ref_idx=None, do_resample=False,
+                     cov_is_inverted=False, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -76,16 +77,17 @@ def gradient_descent(x_sensor, v_sensor, rho, cov, x_init, v_source=None, ref_id
                               ref_idx=ref_idx)
 
     # Resample the covariance matrix
-    if do_resample:
+    if do_resample and not cov_is_inverted:
         cov = utils.resample_covariance_matrix(cov, ref_idx)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, **kwargs)
+    x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, cov_is_inverted=cov_is_inverted, **kwargs)
 
     return x, x_full
 
 
-def least_square(x_sensor, v_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, **kwargs):
+def least_square(x_sensor, v_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, cov_is_inverted=False,
+                 **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -117,11 +119,11 @@ def least_square(x_sensor, v_sensor, rho, cov, x_init, ref_idx=None, do_resample
                               ref_idx=ref_idx)
 
     # Resample the covariance matrix
-    if do_resample:
+    if do_resample and not cov_is_inverted:
         cov = utils.resample_covariance_matrix(cov, ref_idx)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, **kwargs)
+    x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, cov_is_inverted=cov_is_inverted, **kwargs)
 
     return x, x_full
 

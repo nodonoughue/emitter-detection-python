@@ -132,8 +132,15 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
             cov = utils.resample_covariance_matrix(cov, ref_idx)
             cov = utils.ensure_invertible(cov)
 
-        cov_lower = np.linalg.cholesky(cov)
-        cov_inv = None  # pre-define to avoid a 'use before defined' error
+        if np.isscalar(cov):
+            # The covariance matrix is a scalar, this is easy, go ahead and invert it
+            cov_inv = 1. / cov
+            cov_lower = None
+            cov_is_inverted = True
+        else:
+            # Use the Cholesky decomposition to speed things up
+            cov_lower = np.linalg.cholesky(cov)
+            cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     for idx_source in np.arange(n_source_pos):
         x_i = x_source[:, idx_source]
@@ -147,10 +154,14 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
         # Compute the scaled log likelihood
         if cov_is_inverted:
             ell[idx_source] = -err.dot(cov_inv).dot(err)
+            if np.isscalar(cov_inv):
+                ell[idx_source] = - cov_inv * (err ** 2)
+            else:
+                ell[idx_source] = - err.T @ cov_inv @ err
         else:
             # Use Cholesky decomposition
             cov_err = solve_triangular(cov_lower, err, lower=True)
-            ell[idx_source] = -np.sum(cov_err**2)
+            ell[idx_source] = - np.sum(cov_err**2)
 
     return ell
 
@@ -197,8 +208,15 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=Fal
             cov = utils.resample_covariance_matrix(cov, ref_idx)
             cov = utils.ensure_invertible(cov)
 
-        cov_lower = np.linalg.cholesky(cov)
-        cov_inv = None  # pre-define to avoid a 'use before defined' error
+        if np.isscalar(cov):
+            # The covariance matrix is a scalar, this is easy, go ahead and invert it
+            cov_inv = 1. / cov
+            cov_lower = None
+            cov_is_inverted = True
+        else:
+            # Use the Cholesky decomposition to speed things up
+            cov_lower = np.linalg.cholesky(cov)
+            cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Set up test points
     xx_vec = x_max.flatten() * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))

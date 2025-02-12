@@ -50,9 +50,15 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov, ref_idx=None, do_resample=Tr
             cov = utils.resample_covariance_matrix(cov, ref_idx)
             cov = utils.ensure_invertible(cov)
 
-        # Pre-compute the matrix inverse, to speed up repeated calls
-        cov_lower = np.linalg.cholesky(cov)
-        cov_inv = None  # pre-define to avoid a 'use before defined' error
+        if np.isscalar(cov):
+            # The covariance matrix is a scalar, this is easy, go ahead and invert it
+            cov_inv = 1. / cov
+            cov_lower = None
+            cov_is_inverted = True
+        else:
+            # Use the Cholesky decomposition to speed things up
+            cov_lower = np.linalg.cholesky(cov)
+            cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Initialize output variable
     crlb = np.zeros((n_dim, n_dim, n_source))

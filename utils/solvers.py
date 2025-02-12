@@ -42,6 +42,11 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
     if cov_is_inverted:
         covariance_inverse = covariance
         covariance_lower = None
+    elif np.isscalar(covariance):
+        # It's a scalar, do the easy inversion
+        covariance_inverse = 1/covariance
+        covariance_lower = None
+        cov_is_inverted = True
     else:
         covariance_lower = np.linalg.cholesky(covariance)
         covariance_inverse = None
@@ -159,6 +164,11 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
     if cov_is_inverted:
         covariance_inverse = covariance
         covariance_lower = None
+    elif np.isscalar(covariance):
+        # It's a scalar, do the easy inversion
+        covariance_inverse = 1/covariance
+        covariance_lower = None
+        cov_is_inverted = True
     else:
         covariance_lower = np.linalg.cholesky(covariance)
         covariance_inverse = None

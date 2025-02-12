@@ -176,6 +176,11 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False, cov_is_inverted=F
         # The covariance matrix was pre-inverted, use it directly
         cov_inv = cov
         cov_lower = None  # pre-define to avoid a 'use before defined' error
+    elif np.isscalar(cov):
+        # The covariance matrix is a scalar, this is easy, go ahead and invert it
+        cov_inv = 1./cov
+        cov_lower = None
+        cov_is_inverted = True
     else:
         # The covariance matrix was not pre-inverted, use cholesky decomposition
         # to improve stability and speed for repeated calculation of
@@ -198,7 +203,10 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False, cov_is_inverted=F
 
         # Compute the scaled log likelihood
         if cov_is_inverted:
-            ell[idx_source] = err.T @ cov_inv @ err
+            if np.isscalar(cov_inv):
+                ell[idx_source] = - cov_inv * (err**2)
+            else:
+                ell[idx_source] = - err.T @ cov_inv @ err
         else:
             a = solve_triangular(cov_lower, err, lower=True)
             ell[idx_source] = - np.sum(a**2)

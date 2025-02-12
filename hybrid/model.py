@@ -148,8 +148,15 @@ def log_likelihood(x_source, zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
             cov = resample_hybrid_covariance_matrix(cov, x_aoa, x_tdoa, x_fdoa, tdoa_ref_idx, fdoa_ref_idx)
             cov = utils.ensure_invertible(cov)
 
-        cov_lower = np.linalg.cholesky(cov)
-        cov_inv = None  # pre-define to avoid a 'use before defined' error
+        if np.isscalar(cov):
+            # The covariance matrix is a scalar, this is easy, go ahead and invert it
+            cov_inv = 1. / cov
+            cov_lower = None
+            cov_is_inverted = True
+        else:
+            # Use the Cholesky decomposition to speed things up
+            cov_lower = np.linalg.cholesky(cov)
+            cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Loop across source positions
     for idx_source in np.arange(n_source_pos):
@@ -168,11 +175,14 @@ def log_likelihood(x_source, zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
 
         # Compute the scaled log likelihood
         if cov_is_inverted:
-            ell[idx_source] = -err.dot(cov_inv).dot(err)
+            if np.isscalar(cov_inv):
+                ell[idx_source] = - cov_inv * (err ** 2)
+            else:
+                ell[idx_source] = - err.T @ cov_inv @ err
         else:
             # Use Cholesky decomposition
             cov_err = solve_triangular(cov_lower, err, lower=True)
-            ell[idx_source] = np.sum(cov_err**2)
+            ell[idx_source] = - np.sum(cov_err**2)
 
     return ell
 
@@ -224,11 +234,17 @@ def error(x_source, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, x_max=1, num_pts=
         if do_resample:
             # Resample the covariance matrix
             cov = resample_hybrid_covariance_matrix(cov, x_aoa, x_tdoa, x_fdoa, tdoa_ref_idx, fdoa_ref_idx)
+            cov = utils.ensure_invertible(cov)
 
-        # Pre-compute the matrix inverse, to speed up repeated calls
-        cov = utils.ensure_invertible(cov)
-        cov_lower = np.linalg.cholesky(cov)
-        cov_inv = None  # pre-define to avoid a 'use before defined' error
+        if np.isscalar(cov):
+            # The covariance matrix is a scalar, this is easy, go ahead and invert it
+            cov_inv = 1. / cov
+            cov_lower = None
+            cov_is_inverted = True
+        else:
+            # Use the Cholesky decomposition to speed things up
+            cov_lower = np.linalg.cholesky(cov)
+            cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Set up test points
     grid_res = 2*x_max / (num_pts-1)
