@@ -432,9 +432,9 @@ def make_figure_5(prefix):
     fig5 = plt.figure()
     for idx_bt, this_bt in enumerate(time_bw_product):
         line = plt.plot(snr_db, 2*sigma_f[idx_bt, :], linestyle='-.', linewidth=2-idx_bt/2,
-                        label='$\\sigma_f$, BT={}'.format(this_bt))
+                        label='$\\sigma_f$, BT={:.0f}'.format(this_bt))
         plt.plot(snr_db, sigma_fd[idx_bt, :], linestyle='--', linewidth=2-idx_bt/2,
-                 label='$\\sigma_{{fd}}$, BT={}'.format(this_bt), color=line[0].get_color())
+                 label='$\\sigma_{{fd}}$, BT={:.0f}'.format(this_bt), color=line[0].get_color())
 
     plt.yscale('log')
     plt.legend(loc='lower left')

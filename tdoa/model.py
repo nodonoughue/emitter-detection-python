@@ -153,7 +153,6 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
 
         # Compute the scaled log likelihood
         if cov_is_inverted:
-            ell[idx_source] = -err.dot(cov_inv).dot(err)
             if np.isscalar(cov_inv):
                 ell[idx_source] = - cov_inv * (err ** 2)
             else:
