@@ -314,7 +314,7 @@ def _make_figure3_subfigure(eps, x_vec, y_vec, x_sensor, v_sensor, x_source, sen
         this_v = v_sensor[sensor_num]
 
         # Velocity Arrow
-        plt.arrow(x=this_x[0], y=this_x[1], dx=this_v[0] / 2, dy=this_v[1] / 2,
+        plt.arrow(x=this_x[0], y=this_x[1], dx=this_v[0] / 4, dy=this_v[1] / 4,
                   width=.01, head_width=.05, color=handle_sensors.get_edgecolor())
 
         # Annotation Text

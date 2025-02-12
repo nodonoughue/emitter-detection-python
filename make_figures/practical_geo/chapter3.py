@@ -37,12 +37,12 @@ def make_all_figures(close_figs=False, force_recalc=False):
     # Generate all figures
     fig1 = make_figure_1(prefix)
     fig2 = make_figure_2(prefix)
-    figs4_5 = make_figures_4_5(prefix)
-    figs6_7 = make_figures_6_7(prefix)
+    figs_4_5 = make_figures_4_5(prefix)
+    figs_6_7 = make_figures_6_7(prefix)
     figs_9_10 = make_figures_9_10(prefix)
     figs_11_12 = make_figures_11_12(prefix, force_recalc)
 
-    figs = [fig1, fig2] + list(figs4_5) + list(figs6_7) + list(figs_9_10) + list(figs_11_12)
+    figs = [fig1, fig2] + list(figs_4_5) + list(figs_6_7) + list(figs_9_10) + list(figs_11_12)
     if close_figs:
         for fig in figs:
             plt.close(fig)

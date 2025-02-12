@@ -303,8 +303,10 @@ def example2(colors=None):
 
         # Plot Iterative Solutions
         plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
-        plt.plot(x_ls_full[0, :], x_ls_full[1, :], linestyle=':', label='Least Squares')
-        plt.plot(x_gd_full[0, :], x_gd_full[1, :], linestyle='--', label='Grad Descent')
+        plt.plot(x_ls_full[0, :], x_ls_full[1, :], linestyle=':', marker='o', markevery=[-1],
+                 label='Least Squares')
+        plt.plot(x_gd_full[0, :], x_gd_full[1, :], linestyle='--', marker='s', markevery=[-1],
+                 label='Grad Descent')
 
         plt.legend(loc='best')
 
@@ -312,7 +314,7 @@ def example2(colors=None):
 
     fig_full = _make_plot()
     plt.xlim([-.5e3, 5.5e3])
-    plt.ylim([0, 4e3])
+    plt.ylim([-.5e3, 4e3])
 
     fig_zoom = _make_plot()
     plt.xlim([2e3, 3.5e3])
@@ -407,8 +409,8 @@ def example3(rng=np.random.default_rng(), colors=None):
 
         # Plot Iterative Solutions
         plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
-        plt.plot(x_ls[0, :], x_ls[1, :], linestyle=':', label='Least Squares')
-        plt.plot(x_gd[0, :], x_gd[1, :], linestyle='--', label='Grad Descent')
+        plt.plot(x_ls[0, :], x_ls[1, :], linestyle=':', marker='o', markevery=[-1], label='Least Squares')
+        plt.plot(x_gd[0, :], x_gd[1, :], linestyle='--', marker='s', markevery=[-1], label='Grad Descent')
 
         # Overlay Error Ellipse
         plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linestyle='--', color='k',
