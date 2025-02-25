@@ -27,9 +27,6 @@ def make_all_figures(close_figs=False):
     :return: List of figure handles
     """
 
-    # Reset the random number generator, to ensure reproducibility
-    rng = np.random.default_rng()
-
     # Find the output directory
     prefix = utils.init_output_dir('practical_geo/chapter1')
     utils.init_plot_style()

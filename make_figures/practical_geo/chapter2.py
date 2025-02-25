@@ -124,6 +124,7 @@ def make_figure_3(prefix=None):
 
     return fig3
 
+
 def make_figure_4(prefix=None):
     """
     Figure 4

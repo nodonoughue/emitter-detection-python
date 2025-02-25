@@ -238,11 +238,9 @@ def example2(colors=None):
         colormap = plt.get_cmap("tab10")
         colors = (colormap(0), colormap(1), colormap(2), colormap(3))
 
-
-
     # Take Hybrid measurement and Define combined covariance matrix
-    tdoa_ref_idx=1
-    fdoa_ref_idx=1
+    tdoa_ref_idx = 1
+    fdoa_ref_idx = 1
     z = hybrid.model.measurement(x_source=x_source, x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
@@ -429,6 +427,7 @@ def example3(rng=np.random.default_rng(), colors=None):
 
     return fig_full, fig_zoom
 
+
 def example3_mc(rng=np.random.default_rng(), colors=None):
     """
     Executes a modified version of Example 2.3 with Monte-Carlo trials, as discussed in the video walkthrough of
@@ -568,6 +567,7 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
 
     return fig_err, fig_full
 
+
 def _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, covar, covar_lower, rng, ml_args, gd_ls_args):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 2.3.
@@ -602,6 +602,5 @@ def _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, covar, covar_
                                           x_fdoa=x_fdoa, v_fdoa=v_fdoa, do_resample=False,
                                           tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
                                           **gd_ls_args)
-
 
     return {'ml': x_ml, 'ls': x_ls, 'gd': x_gd}

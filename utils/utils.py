@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.special import erfcinv
 from scipy import stats
 
 import utils
@@ -306,18 +307,23 @@ def resample_noise(noise, test_idx_vec, ref_idx_vec=None, test_weights=None, ref
         else:
             b_i_wt = 1.
 
-        noise_ai = noise[a_i, :]
+        noise_ai = np.zeros((len(a_i), np.size(noise, 1)))
         noise_bi = np.zeros_like(noise_ai)
 
+        mask_ai = ~np.isnan(a_i)
         mask_bi = ~np.isnan(b_i)
+
+        if not np.all(mask_ai):
+            noise_ai[mask_ai] = noise[a_i[mask_ai].astype(int), :]
+        else:
+            noise_ai = noise[a_i.astype(int), :]
 
         if not np.all(mask_bi):
             noise_bi[mask_bi] = noise[b_i[mask_bi].astype(int), :]
         else:
             noise_bi = noise[b_i.astype(int), :]
 
-        res = b_i_wt * noise_bi - \
-              a_i_wt * noise_ai
+        res = b_i_wt * noise_bi - a_i_wt * noise_ai
         # raise ValueError('mo')
         return res
 
@@ -627,3 +633,45 @@ def modulo2pi(x):
     result = x_modulo - np.pi
 
     return result
+
+
+def remove_outliers(data, axis=0, remove_nan=False):
+    """
+    Remove outliers from a dataset.  If it is a vector, the outliers are individual datapoints. If it is an array,
+    then outlier detection is run across the specified dimension (default=0), and any sub-arrays containing an outlier
+    are excised.
+    
+    Behavior is built to reflect MATLAB's rmoutliers, with the default (median) processing type.
+    
+    Outliers are defined as those that are more than three scaled MAD from the median. MAD is defined:
+    
+    c * median(abs(data - median(data))), where c = -1/(sqrt(2)*erfcinv(1.5))
+    
+    Nicholas O'Donoughue
+    19 February 2025
+    """
+
+    # Compute the median
+    median = np.nanmedian(data, axis=axis, keepdims=True)  # ignore nans
+    median_distance = np.abs(data - median)
+
+    # Compute the scale factor
+    c = -1 / (np.sqrt(2) * erfcinv(1.5))
+
+    # Compute the MAD
+    mad = c * np.nanmedian(median_distance, axis=axis, keepdims=True)
+    mad[mad == 0] = 1.  # if there's no variation along the text axis, scaled_distance will all equal zero; avoid that
+    scaled_distance = median_distance / mad
+
+    # Threshold
+    outlier_mask = np.abs(scaled_distance) >= 3
+    if remove_nan:
+        outlier_mask = outlier_mask or np.isnan(data)
+
+    # Flag any subarrays with at least one outlier for deletion
+    deletion_mask = np.any(outlier_mask, axis=tuple(x for x in range(data.ndim) if x != axis))  # should be 1D
+
+    # Remove outlier subarrays
+    data_out = np.delete(data, deletion_mask, axis=axis)
+
+    return data_out

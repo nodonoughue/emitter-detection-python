@@ -65,6 +65,8 @@ if do_book_2:
     make_figures.practical_geo.chapter2.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
     print('*** Chapter 3 ***')
     make_figures.practical_geo.chapter3.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    print('*** Chapter 4 ***')
+    make_figures.practical_geo.chapter4.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
     print('Figure generation complete.')
 else:
     print('************************************************************************************************')

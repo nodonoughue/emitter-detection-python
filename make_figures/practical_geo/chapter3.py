@@ -66,7 +66,7 @@ def make_figure_1(prefix=None):
 
     # Define source and sensor positions
     x_source = np.array([2, 3])
-    x_sensor = np.array([[0, -1, 0, 1],[0, -.5, 1, -.5]])
+    x_sensor = np.array([[0, -1, 0, 1], [0, -.5, 1, -.5]])
 
     # Plot sensor / source positions
     fig = plt.figure()
@@ -112,7 +112,7 @@ def make_figure_2(prefix=None):
 
     # Define source and sensor positions
     x_source = np.array([2, 3])
-    x_sensor = np.array([[0, -1, 0, 1],[0, -.5, 1, -.5]])
+    x_sensor = np.array([[0, -1, 0, 1], [0, -.5, 1, -.5]])
 
     # Plot sensor / source positions
     fig = plt.figure()

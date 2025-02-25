@@ -172,7 +172,7 @@ def example3(colors=None):
     heading_2 = 110 * _deg2rad  # CCW from +x; heading for sensors 2 and 3
     v_sensors = np.kron(np.array([np.cos([heading_1, heading_2]),    # Use heading to define cartesian velocity.
                                  np.sin([heading_1, heading_2])]),
-                        np.ones((1,2))) * velocity                  # Use kronecker product to duplicate velocity for
+                        np.ones((1, 2))) * velocity                  # Use kronecker product to duplicate velocity for
                                                                     # each sensor in FDOA pairs (sensor pairs moving in
                                                                     # formation).
     # 3D Version -- from video; uncomment to use
@@ -210,7 +210,8 @@ def example3(colors=None):
     x_ctr = np.zeros((num_dims, ))
     max_offset = 50e3
     search_size = max_offset * np.ones((num_dims,))
-    if num_dims > 2: search_size[2:] = 0  # only search the first two dimensions, even if a third is defined
+    if num_dims > 2:
+        search_size[2:] = 0  # only search the first two dimensions, even if a third is defined
 
     num_grid_points_per_axis = 301
     grid_res = 2 * max_offset / num_grid_points_per_axis
@@ -244,6 +245,7 @@ def example3(colors=None):
         figs.append(this_fig)
 
     return figs
+
 
 def example4(rng=np.random.default_rng()):
     """
@@ -502,6 +504,6 @@ def _plot_contourf(x_grid, extent, grid_shape_2d, z, x_sensors, v_sensors, level
                       dx=this_v[0]*10, dy=this_v[1]*10,
                       width=.05e3, head_width=.2e3,
                       color=hdl3.get_edgecolor(), label=None)
-    plt.grid('off')
+    plt.grid(False)
 
     return this_fig
