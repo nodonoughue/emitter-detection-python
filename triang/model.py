@@ -41,7 +41,7 @@ def measurement(x_sensor, x_source, do_2d_aoa=False):
 
     # Elevation angle, if desired
     if do_2d_aoa and n_dim1 == 3:
-        ground_rng = np.expand_dims(np.sqrt(np.sum(dx[0:1, :, :]**2, axis=0)), axis=0)
+        ground_rng = np.expand_dims(np.sqrt(np.sum(dx[0:2, :, :]**2, axis=0)), axis=0)
         el = np.reshape(np.arctan2(dx[2, :, :], ground_rng), newshape=out_dims)
 
         # Stack az/el along the first dimension
@@ -119,13 +119,15 @@ def jacobian(x_sensor, x_source, do_2d_aoa=False):
         # del_x(phi_n(x)) = -(x-xn)(z-zn)/ ground_range * slant_range^2
         # del_y(phi_n(x)) = -(y-yn)(z-zn)/ ground_range * slant_range^2
         # del_z(phi_n(x)) = ground_range / slant_range^2
-        j_el = np.concatenate((-dxx*dxz/np.sqrt(ground_range_sq),
-                               -dxy*dxz/np.sqrt(ground_range_sq),
-                               np.sqrt(ground_range_sq)), axis=0)/slant_range_sq
+        j_el = np.concatenate((-dxx[np.newaxis, :]*dxz[np.newaxis, :]/np.sqrt(ground_range_sq[np.newaxis, :]),
+                               -dxy*dxz/np.sqrt(ground_range_sq[np.newaxis, :]),
+                               np.sqrt(ground_range_sq[np.newaxis, :])), axis=0)/slant_range_sq[np.newaxis, :]
+        # 1 x n_sensor x n_source
 
         # The elevation measurements are concatenated after the azimuth
         # measurements, so the Jacobian is concatenated in the second (nSensor)
         # dimension
+        j_el = np.reshape(j_el, (n_dim, n_sensor, n_source))
         j = np.concatenate((j, j_el), axis=1)
 
     # Reactive warning
