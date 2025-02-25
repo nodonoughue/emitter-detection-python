@@ -160,7 +160,7 @@ def run_example():
 
     # Set up the parameter sweep
     num_samples_vec = np.asarray([10, 100, 1000])   # Number of temporal samples at each antenna test point
-    snr_db_vec = np.arange(start=-10, step=2, stop=22)   # signal to noise ratio
+    snr_db_vec = np.arange(start=-10, step=2, stop=22)   # signal-to-noise ratio
     num_mc = 1.e6                       # number of monte carlo trials at each parameter setting
 
     # Set up output variables

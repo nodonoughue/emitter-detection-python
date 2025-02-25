@@ -67,6 +67,7 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     28 October 2022
 
     :param prefix: output directory to place generated figure
+    :param cmap: colormap
     :param do_uncertainty: Boolean flag (default=False). If true, uncertainty intervals will be printed around the FDOA
                             solution in Figure 1b.
     :return: figure handle
@@ -99,7 +100,7 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     iso_doppler_label = 'Lines of Constant FDOA'
     uncertainty_label = 'Uncertainty Interval'
     for idx in np.arange(num_sensors-1):
-        this_color = cmap.colors[idx]  #TODO: reference the existing colormap index, instead of starting over
+        this_color = cmap.colors[idx]  # TODO: reference the existing colormap index, instead of starting over
 
         idx2 = idx+1
         vdiff = utils.geo.calc_doppler_diff(x_source, np.array([0, 0]), x_sensor[idx], v_sensor[idx],
@@ -109,10 +110,12 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
 
         if do_uncertainty:
             x_isodoppler_err1, y_isodoppler_err1 = fdoa.model.draw_isodoppler(x_sensor[idx], v_sensor[idx],
-                                                                              x_sensor[idx2], v_sensor[idx2], vdiff * 1.1,
+                                                                              x_sensor[idx2], v_sensor[idx2],
+                                                                              vdiff * 1.1,
                                                                               num_pts=1000, max_ortho=5)
             x_isodoppler_err2, y_isodoppler_err2 = fdoa.model.draw_isodoppler(x_sensor[idx], v_sensor[idx],
-                                                                              x_sensor[idx2], v_sensor[idx2], vdiff * 0.9,
+                                                                              x_sensor[idx2], v_sensor[idx2],
+                                                                              vdiff * 0.9,
                                                                               num_pts=1000, max_ortho=5)
             unc_x = np.concatenate((x_isodoppler_err1, np.flipud(x_isodoppler_err2), [x_isodoppler_err1[0]]))
             unc_y = np.concatenate((y_isodoppler_err1, np.flipud(y_isodoppler_err2), [y_isodoppler_err1[0]]))

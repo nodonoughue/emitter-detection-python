@@ -156,8 +156,8 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     # Draw Figure
     fig1b = plt.figure()
 
-    this_uc_label='Uncertainty Interval'
-    this_iso_label='Isochrone'
+    this_uc_label = 'Uncertainty Interval'
+    this_iso_label = 'Isochrone'
     for i, (x_test, x_ref) in enumerate(zip((x_sensor1, x_sensor2), (x_sensor2, x_sensor3))):
         this_color = cmap.colors[i]
 
@@ -166,7 +166,7 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
         r_diff = r_ref - r_test
 
         # True isochrone
-        xy_isochrone = tdoa.model.draw_isochrone(x_test, x_ref, range_diff = r_diff, num_pts=1000, max_ortho=3)
+        xy_isochrone = tdoa.model.draw_isochrone(x_test, x_ref, range_diff=r_diff, num_pts=1000, max_ortho=3)
 
         if do_uncertainty:
             # Uncertainty Interval
@@ -184,8 +184,8 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
         plt.plot(xy_isochrone[0], xy_isochrone[1], color=this_color, linestyle=':', label=this_iso_label)
 
         # Clear the labels so the legend is simpler
-        this_iso_label=None
-        this_uc_label=None
+        this_iso_label = None
+        this_uc_label = None
 
     # Manual Isochrone Labels
     plt.text(np.mean([x_sensor1[0], x_sensor2[0]]),
@@ -508,7 +508,7 @@ def make_figure_6(prefix=None):
     x_source = np.array([np.ravel(x_full), np.ravel(y_full)])  # shape=(2 x num_grid_points**2)
 
     # Compute CRLB
-    crlb = tdoa.perf.compute_crlb(x_sensor, x_source, cov_roa, variance_is_toa=False, do_resample=True)  # Ndim x Ndim x M^2
+    crlb = tdoa.perf.compute_crlb(x_sensor, x_source, cov_roa, variance_is_toa=False, do_resample=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), (num_grid_points, num_grid_points))
 
     # Set up contours
@@ -545,7 +545,7 @@ def make_figure_6(prefix=None):
     # automatically resample the covariance matrix.
     # cov_tdoa = timing_error**2 * (1 + np.eye(num_sensors-1))
 
-    crlb2 = tdoa.perf.compute_crlb(x_sensor1, x_source, cov_roa, variance_is_toa=False, do_resample=True)  # Ndim x Ndim x M**2
+    crlb2 = tdoa.perf.compute_crlb(x_sensor1, x_source, cov_roa, variance_is_toa=False, do_resample=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb2), [num_grid_points, num_grid_points])
 
     # Draw the figure

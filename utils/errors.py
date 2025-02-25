@@ -70,7 +70,6 @@ def compute_cep50(covariance):
         lam_max = lam[-1]  # eigenvalues are returned in ascending order; max is the last entry
         lam_min = lam[-2]  # use the second-largest as lam_min (ignores smallest eigenvalue in 3D problems)
 
-
         # Check the eigenvalues; they should not be complex or negative
         assert not (np.iscomplex(lam_max) or np.iscomplex(lam_min)), 'Complex eigenvalue encountered; check for errors.'
 
@@ -97,10 +96,10 @@ def compute_rmse_scaling(conf_interval):
     standard normal distribution (mean = 0, standard deviation = 1).
 
     It is computed simply with:
-       gamma = norminv(.5 + confInterval/2);
+       gamma = norm_inv(.5 + conf_interval/2);
 
     and returns a value gamma such that
-       normcdf(gamma) - normcdf(-gamma) = confInterval
+       norm_cdf(gamma) - norm_cdf(-gamma) = conf_interval
 
     Ported from MATLAB Code.
 
@@ -126,7 +125,7 @@ def compute_rmse_confidence_interval(gamma):
     within the bounds -gamma to gamma.
 
     Computed simply with:
-       confInterval = normcdf(gamma) - normcdf(-gamma)
+       confInterval = norm_cdf(gamma) - norm_cdf(-gamma)
 
     Ported from MATLAB Code.
 
