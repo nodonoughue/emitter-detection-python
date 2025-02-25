@@ -204,8 +204,8 @@ def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
     idx_sort = np.argsort(lam)  # Sorted in ascending order by default
 
     # Major Axis
-    v_max = v[:, idx_sort[1]]
-    lam_max = lam[idx_sort[1]]
+    v_max = v[:, idx_sort[-1]]
+    lam_max = lam[idx_sort[-1]]
 
     # Minor Axis
     lam_min = lam[idx_sort[0]]
@@ -224,7 +224,7 @@ def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
     elif conf_interval == 95:
         gamma = 5.991
     else:
-        assert 0<conf_interval<1, (
+        assert 0 < conf_interval < 1, (
             'Attempted to parse confidence interval as number between 0 and 1, but found {}'.format(conf_interval))
         gamma = -2 * np.log(1-conf_interval)
 
