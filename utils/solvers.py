@@ -24,6 +24,8 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
     :param max_num_iterations: Maximum number of LS iterations to perform
     :param force_full_calc: Forces all max_num_iterations to be calculated
     :param plot_progress: Binary flag indicating whether to plot error/pos est over time
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix. [default=False]
     :return x: Estimated source position.
     :return x_full: Iteration-by-iteration estimated source positions
     """
@@ -138,7 +140,7 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
     :param y: Measurement vector function handle (accepts n_dim vector of source position estimate, responds with error 
               between received and modeled data vector)
     :param jacobian: Jacobian matrix function handle (accepts n_dim vector of source position estimate, and responds 
-                     with n_dim x n_sensor Jacobian matrix
+                     with n_dim x n_sensor Jacobian matrix)
     :param covariance: Measurement error covariance matrix
     :param x_init: Initial estimate of source position
     :param alpha: Backtracking line search parameter
@@ -147,6 +149,8 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
     :param max_num_iterations: Maximum number of LS iterations to perform
     :param force_full_calc: Forces all max_num_iterations to be executed
     :param plot_progress: Binary flag indicating whether to plot error/pos est over time
+    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
+                            inverse of the covariance matrix. [default=False]
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """

@@ -129,17 +129,9 @@ def parse_reference_sensor(ref_idx, num_sensors):
     :return ref_idx_vec:
     """
 
-    # Debug info
-    # print('Parsing reference sensor...')
-    # print('\tref_idx: {}'.format(ref_idx))
-    # print('\tnum_sensors: {}'.format(num_sensors))
-
     if ref_idx is None:
         # Default behavior is to use the last sensor as a common reference
-        # test_idx_vec = np.arange(num_sensors)#np.asarray([i for i in np.arange(num_sensors - 1)])
-
-        # do num_sensors=1 b/c we don't want to compare ref sensor to ref sensor
-        test_idx_vec = np.arange(num_sensors-1)  # np.asarray([i for i in np.arange(num_sensors - 1)])
+        test_idx_vec = np.arange(num_sensors-1)
         ref_idx_vec = (num_sensors - 1) * np.ones_like(test_idx_vec)
 
     elif isinstance(ref_idx, str) and ref_idx.lower() == 'full':
