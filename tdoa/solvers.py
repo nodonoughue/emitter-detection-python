@@ -318,11 +318,6 @@ def _chan_ho_theta_hat(cov_mod, b2, g1, g2, y2):
     :return cov_mod: modified covariance matrix (eq 11.28)
     """
 
-    g1wg1 = np.transpose(np.conjugate(g1)).dot(cov_mod).dot(g1)
-    w2 = np.linalg.pinv(np.conjugate(np.transpose(b2))).dot(g1wg1).dot(np.linalg.pinv(b2))
-    g2w = np.transpose(np.conjugate(g2)).dot(w2)
-    g2wg2 = g2w.dot(g2)
-    g2wy = g2w.dot(y2)
     g1wg1 = np.transpose(np.conjugate(g1)) @ cov_mod @ g1
     w2 = np.linalg.pinv(np.conjugate(np.transpose(b2))) @ g1wg1 @ np.linalg.pinv(b2)
     g2w = np.transpose(np.conjugate(g2)) @ w2

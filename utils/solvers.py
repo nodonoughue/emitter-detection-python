@@ -201,8 +201,6 @@ def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, e
         t = backtracking_line_search(cost_fxn, x_prev, grad, del_x, alpha, beta)
         
         # Update x position
-        x_full[:, current_iteration] = x_prev + t*del_x
-        
         x_update = x_prev + t*del_x
 
         # Update variables
