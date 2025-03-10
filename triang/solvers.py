@@ -164,35 +164,14 @@ def angle_bisector(x_sensor, psi):
     """
 
     # Parse Inputs
-    num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
-
-    if num_dim != 2:
-        raise TypeError("Angle Bisector Solution only works in x/y space.")
-
-    # Set up all possible permutations of 3 elements
-    if num_sensors <= 15:
-        # Get all possible sets of 3 sensors
-        sensor_sets = combinations(np.arange(num_sensors), 3)
-        num_sets = math.factorial(num_sensors) / (math.factorial(3)*math.factorial(num_sensors-3))
-    else:
-        # If there are more than ~15 rows, nchoosek returns an extremely large
-        # set.
-        #
-        # Instead, just make sequential groups of three
-        sensor_sets = [(i, i+1, i+2) for i in np.arange(num_sensors-2)]
-        num_sets = len(sensor_sets)
+    sensor_sets, num_sets = _parse_sensor_triplets(x_sensor)
 
     # Loop over sets -- adding each estimate to x_est
     x_est = np.zeros((2, ))
 
     for sensor_set in sensor_sets:
-        this_x = x_sensor[:, sensor_set]  # 2 x 3 array
-        this_psi = psi[sensor_set, ]  # 3 x 1 array
-
         # Find vertices
-        v0 = utils.geo.find_intersect(this_x[:, 0], this_psi[0], this_x[:, 1], this_psi[1])
-        v1 = utils.geo.find_intersect(this_x[:, 1], this_psi[1], this_x[:, 2], this_psi[2])
-        v2 = utils.geo.find_intersect(this_x[:, 2], this_psi[2], this_x[:, 0], this_psi[0])
+        v0, v1, v2 = _find_vertices(x_sensor[:, np.asarray(sensor_set)], psi[np.asarray(sensor_set)])
 
         # Find angle bisectors
         th_fwd0 = np.arctan2(v1[1]-v0[1], v1[0]-v0[0])
@@ -240,6 +219,27 @@ def centroid(x_sensor, psi):
     """
 
     # Parse Inputs
+    sensor_sets, num_sets = _parse_sensor_triplets(x_sensor)
+
+    # Loop over sets -- adding each estimate to x_est
+    x_est = np.zeros(shape=(2, ))
+
+    for sensor_set in sensor_sets:
+        # Find vertices
+        v0, v1, v2 = _find_vertices(x_sensor[:, np.asarray(sensor_set)], psi[np.asarray(sensor_set)])
+
+        # Find Centroid by averaging the three vertices
+        this_cntr = (v0 + v1 + v2) / 3
+
+        # Accumulate the estimates, we'll divide by num_sets later to make it an average.
+        x_est += this_cntr
+
+    return x_est/num_sets
+
+
+def _parse_sensor_triplets(x_sensor):
+
+    # Parse Inputs
     num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
 
     if num_dim != 2:
@@ -249,31 +249,20 @@ def centroid(x_sensor, psi):
     if num_sensors <= 15:
         # Get all possible sets of 3 sensors
         sensor_sets = combinations(np.arange(num_sensors), 3)
-        num_sets = math.factorial(num_sensors) / (math.factorial(3)*math.factorial(num_sensors-3))
+        num_sets = math.factorial(num_sensors) / (math.factorial(3) * math.factorial(num_sensors - 3))
     else:
-        # If there are more than ~15 rows, nchoosek returns an extremely large
-        # set.
-        #
+        # If there are more than ~15 rows, combinations returns an extremely large set.
         # Instead, just make sequential groups of three
         sensor_sets = [(i, i + 1, i + 2) for i in np.arange(num_sensors - 2)]
         num_sets = len(sensor_sets)
 
-    # Loop over sets -- adding each estimate to x_est
-    x_est = np.zeros(shape=(2, ))
+    return sensor_sets, num_sets
 
-    for sensor_set in sensor_sets:
-        this_x = x_sensor[:, sensor_set]  # 2 x 3 array
-        this_psi = psi[sensor_set, ]  # 3 x 1 array
 
-        # Find vertices
-        v0 = utils.geo.find_intersect(this_x[:, 0], this_psi[0], this_x[:, 1], this_psi[1])
-        v1 = utils.geo.find_intersect(this_x[:, 1], this_psi[1], this_x[:, 2], this_psi[2])
-        v2 = utils.geo.find_intersect(this_x[:, 2], this_psi[2], this_x[:, 0], this_psi[0])
+def _find_vertices(x: np.ndarray, psi: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray):
+    # Find vertices
+    v0 = utils.geo.find_intersect(x[:, 0], psi[0], x[:, 1], psi[1])
+    v1 = utils.geo.find_intersect(x[:, 1], psi[1], x[:, 2], psi[2])
+    v2 = utils.geo.find_intersect(x[:, 2], psi[2], x[:, 0], psi[0])
 
-        # Find Centroid by averaging the three vertices
-        this_cntr = (v0 + v1 + v2) / 3
-
-        # Accumulate the estimates, we'll divide by num_sets later to make it an average.
-        x_est += this_cntr
-
-    return x_est/num_sets
+    return v0, v1, v2
