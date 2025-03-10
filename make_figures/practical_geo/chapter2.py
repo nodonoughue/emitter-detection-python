@@ -25,7 +25,7 @@ def make_all_figures(close_figs=False, force_recalc=False):
     """
     Call all the figure generators for this chapter
 
-    :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
+    :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
     :return: List of figure handles
     """
@@ -62,7 +62,7 @@ def make_figure_1(prefix=None):
     """
     Figure 1
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -84,7 +84,7 @@ def make_figure_2(prefix=None):
     """
     Figure 2, TDOA Example. A reprint of Figure 11.1b from the 2019 text.
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -107,7 +107,7 @@ def make_figure_3(prefix=None):
     """
     Figure 3, FDOA Example. Recreation of Figure 12.1 from 2019 text.
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -129,7 +129,7 @@ def make_figure_4(prefix=None):
     """
     Figure 4
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 

@@ -1,7 +1,7 @@
 import numpy as np
 import utils
+from utils.covariance import CovarianceMatrix
 import matplotlib.pyplot as plt
-from scipy.linalg import solve_triangular
 
 
 def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
@@ -103,8 +103,8 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     return result  # n_dim x nPair x n_source
 
 
-def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=None, ref_idx=None, do_resample=False,
-                   cov_is_inverted=False):
+def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
+                   v_sensor=None, v_source=None, ref_idx=None, do_resample=False):
     """
     # Computes the Log Likelihood for FDOA sensor measurement, given the
     # received measurement vector rho_dot, covariance matrix C,
@@ -117,14 +117,12 @@ def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=Non
 
     :param x_sensor: Sensor positions [m]
     :param rho_dot: FDOA measurement vector
-    :param cov: FDOA measurement error covariance matrix
+    :param cov: CovarianceMatrix object
     :param x_source: Candidate source positions
     :param v_sensor: Sensor velocities [m/s]
     :param v_source: n_dim x n_source vector of source velocities
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
-    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
-                            inverse of the covariance matrix.
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -139,27 +137,8 @@ def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=Non
         # Let's add a new axis
         x_source = x_source[:, np.newaxis]
 
-    if cov_is_inverted:
-        cov_inv = cov
-        cov_lower = None  # pre-define to avoid a 'use before defined' error
-    else:
-        # The covariance matrix was not pre-inverted, resample if necessary and then use
-        # cholesky decomposition to improve stability and speed for repeated calculation of
-        # the Fisher Information Matrix
-        if do_resample:
-            # Resample the covariance matrix
-            cov = utils.resample_covariance_matrix(cov, ref_idx)
-            cov = utils.ensure_invertible(cov)
-
-        if np.isscalar(cov):
-            # The covariance matrix is a scalar, this is easy, go ahead and invert it
-            cov_inv = 1. / cov
-            cov_lower = None
-            cov_is_inverted = True
-        else:
-            # Use the Cholesky decomposition to speed things up
-            cov_lower = np.linalg.cholesky(cov)
-            cov_inv = None  # pre-define to avoid a 'use before defined' error
+    if do_resample:
+        cov = cov.resample(ref_idx)
 
     # Initialize output
     ell = np.zeros((n_source_pos, ))
@@ -176,21 +155,13 @@ def log_likelihood(x_sensor, rho_dot, cov, x_source, v_sensor=None, v_source=Non
         err = (rho_dot - r_dot)
 
         # Compute the scaled log likelihood
-        if cov_is_inverted:
-            if np.isscalar(cov_inv):
-                ell[idx_source] = - cov_inv * (err ** 2)
-            else:
-                ell[idx_source] = - err.T @ cov_inv @ err
-        else:
-            # Use Cholesky decomposition
-            cov_err = solve_triangular(cov_lower, err, lower=True)
-            ell[idx_source] = - np.sum(cov_err**2)
+        ell[idx_source] = - cov.solve_aca(err)
 
     return ell
 
 
-def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None, ref_idx=None, do_resample=False,
-          cov_is_inverted=False):
+def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts,
+          v_sensor=None, v_source=None, ref_idx=None, do_resample=False):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each
     dimension.  For each point, compute the FDOA solution for each sensor
@@ -203,7 +174,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
     21 January 2021
 
     :param x_sensor: nDim x N matrix of sensor positions
-    :param cov: N x N covariance matrix
+    :param cov: Covariance Matrix object
     :param x_source: nDim x 1 matrix of true emitter position
     :param x_max: nDim x 1 (or scalar) vector of maximum offset from origin for plotting
     :param num_pts: Number of test points along each dimension
@@ -211,8 +182,6 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
     :param v_source: nDim x 1 matrix of true emitter velocity
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
-    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
-                            inverse of the covariance matrix.
     :return epsilon: 2-D plot of FDOA error
     :return x_vec:
     :return y_vec:
@@ -225,24 +194,8 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
                      v_sensor=v_sensor, v_source=v_source,
                      ref_idx=ref_idx)
 
-    if cov_is_inverted:
-        cov_inv = cov
-        cov_lower = None  # pre-define to avoid a 'use before defined' error
-    else:
-        # Resample the covariance matrix
-        if do_resample:
-            cov = utils.resample_covariance_matrix(cov, ref_idx)
-            cov = utils.ensure_invertible(cov)
-
-        if np.isscalar(cov):
-            # The covariance matrix is a scalar, this is easy, go ahead and invert it
-            cov_inv = 1. / cov
-            cov_lower = None
-            cov_is_inverted = True
-        else:
-            # Use the Cholesky decomposition to speed things up
-            cov_lower = np.linalg.cholesky(cov)
-            cov_inv = None  # pre-define to avoid a 'use before defined' error
+    if do_resample:
+        cov = cov.resample(ref_idx)
 
     # Set up test points
     grid_res = 2*x_max / (num_pts-1)
@@ -256,14 +209,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, v_sensor=None, v_source=None,
 
     err = rr[:, np.newaxis] - rr_list
 
-    if cov_is_inverted:
-        epsilon_list = [np.conjugate(this_err).T @ cov_inv @ this_err for this_err in err.T]
-    else:
-        def compute_epsilon(this_err):
-            cov_err = solve_triangular(cov_lower, this_err, lower=True)
-            return np.sum(cov_err**2)
-
-        epsilon_list = [compute_epsilon(this_err) for this_err in err.T]
+    epsilon_list = [cov.solve_aca(this_err) for this_err in err.T]
 
     return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
 

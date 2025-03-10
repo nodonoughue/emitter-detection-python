@@ -1,10 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-
-from scipy.linalg import block_diag
-
 import utils
+from utils.covariance import CovarianceMatrix
 import hybrid
 
 
@@ -63,15 +61,13 @@ def example1(rng=np.random.default_rng()):
     # Measurement Error Covariance
     tdoa_ref_idx = num_sensors - 1
     fdoa_ref_idx = num_sensors - 1  # Use the last sensor as our reference sensor (the one at the origin)
-    covar_ang = ang_err**2 * np.eye(num_sensors)
-    covar_roa = rng_err**2 * np.eye(num_sensors)
-    covar_rroa = rng_rate_err**2 * np.eye(num_sensors)
-    covar_rdoa = utils.resample_covariance_matrix(covar_roa, tdoa_ref_idx)
-    covar_rrdoa = utils.resample_covariance_matrix(covar_rroa, fdoa_ref_idx)
+    covar_ang = CovarianceMatrix(ang_err**2 * np.eye(num_sensors))
+    covar_roa = CovarianceMatrix(rng_err**2 * np.eye(num_sensors))
+    covar_rroa = CovarianceMatrix(rng_rate_err**2 * np.eye(num_sensors))
+    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
+    covar_rrdoa = covar_rroa.resample(fdoa_ref_idx)
 
-    covar_rho = block_diag(covar_ang, covar_rdoa, covar_rrdoa)
-    covar_lower = np.linalg.cholesky(np.asarray(covar_rho))  # The array shouldn't be needed,
-    covar_inv = np.linalg.inv(np.asarray(covar_rho))         # but it placated PyCharm
+    covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
 
     # Initialize Transmitter Position
     x_source = np.ones((2,)) * 30e3
@@ -84,9 +80,9 @@ def example1(rng=np.random.default_rng()):
                                           tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Initialize Solvers
-    num_mc_trials = int(1000)
+    num_mc_trials = int(100)   # ToDo: restore to 1000
     x_extent = 5 * baseline
-    num_iterations = int(1000)
+    num_iterations = int(1000)  # ToDo: restore to 1000
     alpha = .3
     beta = .8
     epsilon = 100  # [m] desired iterative search stopping condition
@@ -99,25 +95,43 @@ def example1(rng=np.random.default_rng()):
     x_ls_full = np.zeros(shape=out_iterative_shp)
     x_grad_full = np.zeros(shape=out_iterative_shp)
 
+    rx_args = {'x_aoa': x_sensor,
+               'x_tdoa': x_sensor,
+               'tdoa_ref_idx': tdoa_ref_idx,
+               'x_fdoa': x_sensor,
+               'v_fdoa': v_sensor,
+               'fdoa_ref_idx': fdoa_ref_idx,
+               'cov': covar_rho,
+               'do_resample': False
+               }
+
+    ml_args = {'x_ctr': x_init,
+               'search_size': x_extent,
+               'epsilon': grid_res
+               }
+
+    ls_args = {'x_init': x_init,
+               'max_num_iterations': num_iterations,
+               'epsilon': epsilon,
+               'force_full_calc': True
+               }
+
+    gd_args = {'x_init': x_init,
+               'max_num_iterations': num_iterations,
+               'epsilon': epsilon,
+               'force_full_calc': True,
+               'alpha': alpha,
+               'beta': beta
+               }
+
     args = {'rho_act': rho_actual,
             'num_measurements': rho_actual.size,
-            'x_aoa': x_sensor,
-            'x_tdoa': x_sensor,
-            'tdoa_ref_idx': tdoa_ref_idx,
-            'x_fdoa': x_sensor,
-            'v_fdoa': v_sensor,
-            'fdoa_ref_idx': fdoa_ref_idx,
-            'x_init': x_init,
-            'x_extent': x_extent,
-            'covar_rho': covar_rho,
-            'covar_lower': covar_lower,
-            'covar_inv': covar_inv,
-            'epsilon': epsilon,
-            'grid_res': grid_res,
-            'num_iterations': num_iterations,
             'rng': rng,
-            'gd_alpha': alpha,
-            'gd_beta': beta}
+            'rx_args': rx_args,
+            'ml_args': ml_args,
+            'gd_args': gd_args,
+            'ls_args': ls_args,
+            }
 
     print('Performing Monte Carlo simulation for Hybrid AOA/TDOA/FDOA performance...')
     t_start = time.perf_counter()
@@ -145,9 +159,11 @@ def example1(rng=np.random.default_rng()):
                'grad': x_grad_full}
 
     # Call the common plot generator for both examples
-    args['x_source'] = x_source  # Add the true source position, for plotting
-    args['x_sensor'] = x_sensor  # Set the 'x_sensor' flag, to plot all three sensors as a single type
-    fig_geo, fig_err = _plot_mc_iteration_result(args, results)
+    rx_args['x_init'] = x_init  # Add the initial position estimate, for plotting
+    rx_args['x_source'] = x_source  # Add the true source position, for plotting
+    rx_args['x_sensor'] = x_sensor  # Set the 'x_sensor' flag, to plot all three sensors as a single type
+    rx_args['num_iterations'] = num_iterations
+    fig_geo, fig_err = _plot_mc_iteration_result(rx_args, results)
 
     # Re-engage the warning for numpy underflow
     np.seterr(under='warn')
@@ -189,15 +205,13 @@ def example2(rng=np.random.default_rng()):
     # Measurement Error Covariance
     tdoa_ref_idx = num_time_freq - 1
     fdoa_ref_idx = num_time_freq - 1
-    covar_ang = ang_err**2 * np.eye(num_aoa)
-    covar_roa = rng_err**2 * np.eye(num_time_freq)
-    covar_rroa = rng_rate_err**2 * np.eye(num_time_freq)
-    covar_rdoa = utils.resample_covariance_matrix(covar_roa, tdoa_ref_idx)
-    covar_rrdoa = utils.resample_covariance_matrix(covar_rroa, fdoa_ref_idx)
+    covar_ang = CovarianceMatrix(ang_err**2 * np.eye(num_aoa))
+    covar_roa = CovarianceMatrix(rng_err**2 * np.eye(num_time_freq))
+    covar_rroa = CovarianceMatrix(rng_rate_err**2 * np.eye(num_time_freq))
+    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
+    covar_rrdoa = covar_rroa.resample(fdoa_ref_idx)
 
-    covar_rho = block_diag(covar_ang, covar_rdoa, covar_rrdoa)
-    covar_lower = np.linalg.cholesky(np.asarray(covar_rho))  # The array shouldn't be needed,
-    covar_inv = np.linalg.inv(np.asarray(covar_rho))         # but it placated PyCharm
+    covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
 
     # Initialize Transmitter Position
     x_source = np.ones((2,)) * 30e3
@@ -210,7 +224,7 @@ def example2(rng=np.random.default_rng()):
                                           tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Initialize Solvers
-    num_mc_trials = int(1000)
+    num_mc_trials = int(100)  # ToDo: increase to 1000
     x_extent = 5 * baseline
     num_iterations = int(1000)
     alpha = .3
@@ -225,25 +239,42 @@ def example2(rng=np.random.default_rng()):
     x_ls_full = np.zeros(shape=out_iterative_shp)
     x_grad_full = np.zeros(shape=out_iterative_shp)
 
-    args = {'rho_act': rho_actual,
+    rx_args = {'x_aoa': x_aoa,
+               'x_tdoa': x_time_freq,
+               'tdoa_ref_idx': tdoa_ref_idx,
+               'x_fdoa': x_time_freq,
+               'v_fdoa': v_time_freq,
+               'fdoa_ref_idx': fdoa_ref_idx,
+               'cov': covar_rho
+               }
+
+    ml_args = {'x_ctr': x_init,
+               'search_size': x_extent,
+               'epsilon': grid_res
+               }
+
+    ls_args = {'x_init': x_init,
+               'max_num_iterations': num_iterations,
+               'epsilon': epsilon,
+               'force_full_calc': True
+               }
+
+    gd_args = {'x_init': x_init,
+               'max_num_iterations': num_iterations,
+               'epsilon': epsilon,
+               'force_full_calc': True,
+               'alpha': alpha,
+               'beta': beta
+               }
+
+    args = {'rx_args': rx_args,  # arguments to pass on to solvers that represent the receiver system
+            'ml_args': ml_args,  # arguments to pass on to ML solver
+            'ls_args': ls_args,  # arguments to pass on to LS solver
+            'gd_args': gd_args,  # arguments to pass on to GD solver
+            'rho_act': rho_actual,
             'num_measurements': num_aoa + 2 * (num_time_freq - 1),
-            'x_aoa': x_aoa,
-            'x_tdoa': x_time_freq,
-            'tdoa_ref_idx': tdoa_ref_idx,
-            'x_fdoa': x_time_freq,
-            'v_fdoa': v_time_freq,
-            'fdoa_ref_idx': fdoa_ref_idx,
-            'x_init': x_init,
-            'x_extent': x_extent,
-            'covar_rho': covar_rho,
-            'covar_lower': covar_lower,
-            'covar_inv': covar_inv,
-            'epsilon': epsilon,
-            'grid_res': grid_res,
-            'num_iterations': num_iterations,
-            'rng': rng,
-            'gd_alpha': alpha,
-            'gd_beta': beta}
+            'rng': rng
+            }
 
     print('Performing Monte Carlo simulation for FDOA performance...')
     t_start = time.perf_counter()
@@ -271,9 +302,9 @@ def example2(rng=np.random.default_rng()):
                'grad': x_grad_full}
 
     # Call the common plot generator for both examples
-    args['x_source'] = x_source  # Add the true source position, for plotting
-    args['x_sensor'] = None  # Set the 'x_sensor' flag to none, so that AOA and TDOA/FDOA sensors are plotted separately
-    fig_geo, fig_err = _plot_mc_iteration_result(args, results)
+    rx_args['x_source'] = x_source  # Add the true source position, for plotting
+    rx_args['x_sensor'] = None  # Set the 'x_sensor' flag to none, so that AOA and T/FDOA sensors are plotted separately
+    fig_geo, fig_err = _plot_mc_iteration_result(rx_args, results)
 
     return fig_geo, fig_err
 
@@ -309,36 +340,14 @@ def _mc_iteration(args):
     # Generate a random measurement
     rng = args['rng']
     zeta_act = args['rho_act']
-    zeta = zeta_act + args['covar_lower'] @ rng.standard_normal(size=(args['num_measurements'], ))
+    cov_lower = args['rx_args']['cov'].lower
+    zeta = zeta_act + cov_lower @ rng.standard_normal(size=(args['num_measurements'], ))
 
     # Generate solutions
-    res_ml, ml_surf, ml_grid = hybrid.solvers.max_likelihood(x_aoa=args['x_aoa'], x_tdoa=args['x_tdoa'],
-                                                             x_fdoa=args['x_fdoa'], v_fdoa=args['v_fdoa'],
-                                                             zeta=zeta, cov=args['covar_inv'], cov_is_inverted=True,
-                                                             x_ctr=args['x_init'], search_size=args['x_extent'],
-                                                             tdoa_ref_idx=args['tdoa_ref_idx'],
-                                                             fdoa_ref_idx=args['fdoa_ref_idx'],
-                                                             epsilon=args['grid_res'])
-    res_bf, bf_surf, bf_grid = hybrid.solvers.bestfix(x_aoa=args['x_aoa'], x_tdoa=args['x_tdoa'],
-                                                      x_fdoa=args['x_fdoa'], v_fdoa=args['v_fdoa'],
-                                                      zeta=zeta, cov=args['covar_rho'],
-                                                      x_ctr=args['x_init'], search_size=args['x_extent'],
-                                                      epsilon=args['grid_res'],
-                                                      tdoa_ref_idx=args['tdoa_ref_idx'],
-                                                      fdoa_ref_idx=args['fdoa_ref_idx'])
-    _, res_ls = hybrid.solvers.least_square(x_aoa=args['x_aoa'], x_tdoa=args['x_tdoa'],
-                                            x_fdoa=args['x_fdoa'], v_fdoa=args['v_fdoa'],
-                                            zeta=zeta, cov=args['covar_inv'], cov_is_inverted=True,
-                                            x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                            tdoa_ref_idx=args['tdoa_ref_idx'], fdoa_ref_idx=args['fdoa_ref_idx'],
-                                            force_full_calc=True)
-    _, res_gd = hybrid.solvers.gradient_descent(x_aoa=args['x_aoa'], x_tdoa=args['x_tdoa'],
-                                                x_fdoa=args['x_fdoa'], v_fdoa=args['v_fdoa'],
-                                                zeta=zeta, cov=args['covar_inv'], cov_is_inverted=True,
-                                                x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                                alpha=args['gd_alpha'], beta=args['gd_beta'],
-                                                tdoa_ref_idx=args['tdoa_ref_idx'], fdoa_ref_idx=args['fdoa_ref_idx'],
-                                                force_full_calc=True)
+    res_ml, ml_surf, ml_grid = hybrid.solvers.max_likelihood(**args['rx_args'], **args['ml_args'], zeta=zeta)
+    res_bf, bf_surf, bf_grid = hybrid.solvers.bestfix(**args['rx_args'], **args['ml_args'], zeta=zeta)
+    _, res_ls = hybrid.solvers.least_square(**args['rx_args'], **args['ls_args'], zeta=zeta)
+    _, res_gd = hybrid.solvers.gradient_descent(**args['rx_args'], **args['gd_args'], zeta=zeta)
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf}
 
@@ -380,9 +389,10 @@ def _plot_mc_iteration_result(args, results):
     # Compute and Plot CRLB and Error Ellipse Expectations
     err_crlb = np.squeeze(hybrid.perf.compute_crlb(x_aoa=args['x_aoa'], x_tdoa=args['x_tdoa'],
                                                    x_fdoa=args['x_fdoa'], v_fdoa=args['v_fdoa'],
-                                                   cov=args['covar_inv'], x_source=args['x_source'],
-                                                   cov_is_inverted=True, tdoa_ref_idx=args['tdoa_ref_idx'],
-                                                   fdoa_ref_idx=args['fdoa_ref_idx']))
+                                                   cov=args['cov'], x_source=args['x_source'],
+                                                   tdoa_ref_idx=args['tdoa_ref_idx'],
+                                                   fdoa_ref_idx=args['fdoa_ref_idx'],
+                                                   do_resample=args['do_resample']))
     crlb_cep50 = utils.errors.compute_cep50(err_crlb)/1e3  # [m]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=args['x_source'], covariance=err_crlb,
                                                    num_pts=100, conf_interval=90)

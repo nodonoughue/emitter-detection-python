@@ -5,6 +5,7 @@ import scipy
 import utils
 import hybrid
 import time
+from utils.covariance import CovarianceMatrix
 
 
 _rad2deg = utils.unit_conversions.convert(1, "rad", "deg")
@@ -89,7 +90,8 @@ def example1(rng=np.random.default_rng()):
     cov_r = (err_tdoa_s*utils.constants.speed_of_light)**2 * np.eye(num_tdoa)  # m^2
     cov_rr = (err_fdoa_hz*utils.constants.speed_of_light/f_source_hz)**2 * np.eye(num_fdoa)  # m^2/s^2
 
-    cov_x = scipy.linalg.block_diag(cov_psi, cov_r, cov_rr)
+    cov_x = CovarianceMatrix(scipy.linalg.block_diag(cov_psi, cov_r, cov_rr))
+    cov_z = cov_x.resample(ref_idx, test_idx)
 
     # Generate Noise
     num_mc = 1000  # TODO: raise to 10,000
@@ -97,8 +99,8 @@ def example1(rng=np.random.default_rng()):
     noise_white = rng.standard_normal(size=(num_measurements, num_mc))
 
     # Generate sensor level (num_aoa + num_tdoa + num_fdoa) noise with proper errors
-    cov_low = scipy.linalg.cholesky(cov_x, lower=True)
-    noise_sensor = cov_low @ noise_white
+    # cov_low = scipy.linalg.cholesky(cov_x, lower=True)
+    noise_sensor = cov_x.lower @ noise_white
 
     # Resample to account for reference sensors used in TDOA and FDOA
     noise_measurement = utils.resample_noise(noise_sensor, test_idx, ref_idx)
@@ -145,8 +147,8 @@ def example1(rng=np.random.default_rng()):
         # TDOA, AOA, and FDOA Error
 
         # LS Solution
-        _, x_ls_iters = hybrid.solvers.least_square(zeta=zeta[:, idx], cov=cov_x, cov_is_inverted=False,
-                                                    do_resample=True,  **rx_args, **ls_args)
+        _, x_ls_iters = hybrid.solvers.least_square(zeta=zeta[:, idx], cov=cov_z,
+                                                    do_resample=False,  **rx_args, **ls_args)
 
         error[idx] = np.sqrt(np.sum(np.abs(x_ls_iters-x_source_enu[:, np.newaxis])**2, 0))
 
@@ -167,7 +169,7 @@ def example1(rng=np.random.default_rng()):
     plt.legend(loc='upper right')
 
     # Compute the CRLB
-    crlb = hybrid.perf.compute_crlb(x_source=x_source_enu, cov=cov_x, cov_is_inverted=False, do_resample=True,
+    crlb = hybrid.perf.compute_crlb(x_source=x_source_enu, cov=cov_z, do_resample=False,
                                     **rx_args)
 
     # Compute and display the RMSE
@@ -274,26 +276,17 @@ def example2(colors=None):
     ref_tdoa = n_tdoa - 1
     ref_fdoa = n_fdoa - 1
 
-    # Manually do a reference/text index set
-    # # 1:n_aoa are AOA sensors
-    # # n_aoa + (1:n_tdoa) are TDOA sensors
-    # # n_aoa + n_tdoa + (1:n_fdoa) are FDOA sensors
-    # tdoa_ref_vec, tdoa_test_vec = utils.parse_reference_sensor(ref_tdoa, n_tdoa)
-    # fdoa_ref_vec, fdoa_test_vec = utils.parse_reference_sensor(ref_fdoa, n_fdoa)
-    # ref_idx =  np.concatenate((np.arange(2*n_aoa), 2*n_aoa + tdoa_ref_vec,  2*n_aoa + n_tdoa + fdoa_ref_vec))
-    # test_idx = np.concatenate((np.full(2*n_aoa, np.nan), 2*n_aoa + tdoa_test_vec, 2*n_aoa + n_tdoa + fdoa_test_vec))
-
     # Error Covariance Matrix
-    cov_psi = (err_aoa_deg * _deg2rad)**2 * np.eye(2*n_aoa)  # rad^2
-    cov_r = (err_tdoa_s*utils.constants.speed_of_light)**2 * np.eye(n_tdoa)  # m^2
-    cov_rr = (err_fdoa_hz*utils.constants.speed_of_light/f_source_hz)**2 * np.eye(n_fdoa)  # m^2/s^2
+    cov_psi = CovarianceMatrix((err_aoa_deg * _deg2rad)**2 * np.eye(2*n_aoa))  # rad^2
+    cov_r = CovarianceMatrix((err_tdoa_s*utils.constants.speed_of_light)**2 * np.eye(n_tdoa))  # m^2
+    cov_rr = CovarianceMatrix((err_fdoa_hz*utils.constants.speed_of_light/f_source_hz)**2 * np.eye(n_fdoa))  # m^2/s^2
 
-    cov_x = scipy.linalg.block_diag(cov_psi, cov_r, cov_rr)
+    cov_x = CovarianceMatrix.block_diagonal(cov_psi, cov_r, cov_rr)
 
     # Compute the CRLB
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor_enu, x_tdoa=x_sensor_enu, x_fdoa=x_sensor_enu,
                                     v_fdoa=v_sensor_enu - v_source_enu[:, np.newaxis], x_source=x_source_enu,
-                                    cov=cov_x, do_2d_aoa=True, cov_is_inverted=False, do_resample=True,
+                                    cov=cov_x, do_2d_aoa=True, do_resample=True,
                                     tdoa_ref_idx=ref_tdoa, fdoa_ref_idx=ref_fdoa, print_progress=True)
 
     # Compute and display the RMSE

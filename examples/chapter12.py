@@ -1,9 +1,9 @@
 import numpy as np
-import scipy
 import matplotlib.pyplot as plt
 import time
 import utils
 import fdoa
+from utils.covariance import CovarianceMatrix
 
 
 def run_all_examples():
@@ -38,6 +38,12 @@ def example1(rng=np.random.default_rng()):
     :return fig_err: figure handle for error as a function of iteration
     """
 
+    # Clear the numpy warnings about underflow; we don't care
+    # Underflow warnings can indicate a loss of precision; in our case, these are likely occurring
+    # from positions where our sensors are poorly aligned to determined the target's location. We
+    # can ignore the loss of precision there.
+    np.seterr(under='ignore')
+
     #  Set up FDOA Receiver system
     #  Spacing of 10 km at 120 degree intervals around origin
     baseline = 10e3     # m
@@ -57,10 +63,8 @@ def example1(rng=np.random.default_rng()):
     transmit_freq = 1e9             # Hz
     fdoa_ref_idx = num_sensors - 1  # Use the last sensor as our reference sensor (the one at the origin)
     rng_rate_standard_deviation = freq_error*utils.constants.speed_of_light/transmit_freq
-    covar_sensor = rng_rate_standard_deviation**2 * np.eye(num_sensors)
-    covar_rho = rng_rate_standard_deviation**2 * (1 + np.eye(num_sensors-1))
-    covar_lower = np.linalg.cholesky(covar_rho)
-    covar_inv = np.real(scipy.linalg.pinvh(covar_rho))
+    covar_sensor = CovarianceMatrix(rng_rate_standard_deviation**2 * np.eye(num_sensors))
+    covar_rho = covar_sensor.resample(fdoa_ref_idx)
 
     # Initialize Transmitter Position
     th = rng.random()*2*np.pi
@@ -70,10 +74,10 @@ def example1(rng=np.random.default_rng()):
     rho_actual = fdoa.model.measurement(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, ref_idx=fdoa_ref_idx)
 
     # Initialize Solvers
-    num_mc_trials = int(1000)
+    num_mc_trials = int(100)  # ToDo: reset to 1000
     x_init = baseline * x_source / np.abs(x_source)
     x_extent = 5 * baseline
-    num_iterations = int(1000)
+    num_iterations = int(100)  # ToDo: reset to 1000
     alpha = .3
     beta = .8
     epsilon = 100  # [m] desired iterative search stopping condition
@@ -86,22 +90,39 @@ def example1(rng=np.random.default_rng()):
     x_ls_full = np.zeros(shape=out_iterative_shp)
     x_grad_full = np.zeros(shape=out_iterative_shp)
 
+    rx_args = {'x_sensor': x_sensor,
+               'v_sensor': v_sensor,
+               'cov': covar_rho,
+               'do_resample': False
+               }
+
+    ml_args = {'x_ctr': x_init,
+               'search_size': x_extent,
+               'epsilon': grid_res
+               }
+
+    ls_args = {'max_num_iterations': num_iterations,
+               'force_full_calc': True,
+               'epsilon': epsilon,
+               'x_init': x_init
+               }
+
+    gd_args = {'max_num_iterations': num_iterations,
+               'force_full_calc': True,
+               'epsilon': epsilon,
+               'x_init': x_init,
+               'alpha': alpha,
+               'beta': beta
+               }
+
     args = {'rho_act': rho_actual,
             'num_measurements': num_sensors - 1,
-            'x_sensor': x_sensor,
-            'v_sensor': v_sensor,
-            'x_init': x_init,
-            'x_extent': x_extent,
-            'covar_sensor': covar_sensor,
-            'covar_rho': covar_rho,
-            'covar_lower': covar_lower,
-            'covar_inv': covar_inv,
-            'epsilon': epsilon,
-            'grid_res': grid_res,
-            'num_iterations': num_iterations,
             'rng': rng,
-            'gd_alpha': alpha,
-            'gd_beta': beta}
+            'rx_args': rx_args,
+            'ml_args': ml_args,
+            'ls_args': ls_args,
+            'gd_args': gd_args,
+            'covar_sensor': covar_sensor}
 
     print('Performing Monte Carlo simulation for FDOA performance...')
     t_start = time.perf_counter()
@@ -225,7 +246,11 @@ def example1(rng=np.random.default_rng()):
 
     plt.xlabel('Iteration Number')
     plt.ylabel('$CEP_{50}$ [km]')
+    plt.ylim(1, 30)
     plt.legend(loc='upper right')
+
+    # Re-engage the warning for numpy underflow
+    np.seterr(under='warn')
 
     return fig_geo_a, fig_geo_b, fig_err
 
@@ -258,25 +283,13 @@ def _mc_iteration(args):
 
     # Generate a random measurement
     rng = args['rng']
-    rho = args['rho_act'] + args['covar_lower'] @ rng.standard_normal(size=(args['num_measurements'], ))
+    covar_lower = args['rx_args']['cov'].lower
+    rho = args['rho_act'] + covar_lower @ rng.standard_normal(size=(args['num_measurements'], ))
 
     # Generate solutions
-    res_ml, ml_surf, ml_grid = fdoa.solvers.max_likelihood(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
-                                                           rho=rho, cov=args['covar_inv'], cov_is_inverted=True,
-                                                           x_ctr=args['x_init'], search_size=args['x_extent'],
-                                                           epsilon=args['grid_res'], do_resample=False)
-    res_bf, bf_surf, bf_grid = fdoa.solvers.bestfix(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
-                                                    rho=rho, cov=args['covar_rho'],
-                                                    x_ctr=args['x_init'], search_size=args['x_extent'],
-                                                    epsilon=args['grid_res'], do_resample=False)
-    _, res_ls = fdoa.solvers.least_square(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
-                                          rho=rho, cov=args['covar_inv'], cov_is_inverted=True,
-                                          x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                          force_full_calc=True, do_resample=False)
-    _, res_gd = fdoa.solvers.gradient_descent(x_sensor=args['x_sensor'], v_sensor=args['v_sensor'],
-                                              rho=rho, cov=args['covar_inv'], cov_is_inverted=True,
-                                              x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                              alpha=args['gd_alpha'], beta=args['gd_beta'],
-                                              force_full_calc=True, do_resample=False)
+    res_ml, ml_surf, ml_grid = fdoa.solvers.max_likelihood(**args['rx_args'], **args['ml_args'], rho=rho)
+    res_bf, bf_surf, bf_grid = fdoa.solvers.bestfix(**args['rx_args'], **args['ml_args'], rho=rho)
+    _, res_ls = fdoa.solvers.least_square(**args['rx_args'], **args['ls_args'], rho=rho)
+    _, res_gd = fdoa.solvers.gradient_descent(**args['rx_args'], **args['gd_args'], rho=rho)
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf}

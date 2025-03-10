@@ -2,10 +2,11 @@ import utils
 from utils import solvers
 from . import model
 import numpy as np
+from utils.covariance import CovarianceMatrix
 
 
-def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx=None, do_resample=False,
-                   cov_is_inverted=False):
+def max_likelihood(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon=None, ref_idx=None,
+                   do_resample=False):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -27,16 +28,13 @@ def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=Non
     """
 
     # Resample the covariance matrix
-    if do_resample and not cov_is_inverted:
-        # Do it here, instead of passing on to model.log_likelihood, in order to avoid repeatedly resampling
-        # the same covariance matrix for every test point.
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
+    if do_resample:
+        cov = cov.resample(ref_idx)
 
     # Set up function handle
     def ell(x):
         return model.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor, rho_dot=rho, cov=cov,
-                                    x_source=x, v_source=None, ref_idx=ref_idx, do_resample=False,
-                                    cov_is_inverted=cov_is_inverted)
+                                    x_source=x, v_source=None, ref_idx=ref_idx, do_resample=False)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon)
@@ -44,8 +42,8 @@ def max_likelihood(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon=Non
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, v_sensor, rho, cov, x_init, v_source=None, ref_idx=None, do_resample=False,
-                     cov_is_inverted=False, **kwargs):
+def gradient_descent(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, v_source=None, ref_idx=None,
+                     do_resample=False, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -77,16 +75,16 @@ def gradient_descent(x_sensor, v_sensor, rho, cov, x_init, v_source=None, ref_id
                               ref_idx=ref_idx)
 
     # Resample the covariance matrix
-    if do_resample and not cov_is_inverted:
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
+    if do_resample:
+        cov = cov.resample(ref_idx)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, cov_is_inverted=cov_is_inverted, **kwargs)
+    x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, **kwargs)
 
     return x, x_full
 
 
-def least_square(x_sensor, v_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, cov_is_inverted=False,
+def least_square(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
                  **kwargs):
     """
     Computes the least square solution for FDOA processing.
@@ -119,16 +117,17 @@ def least_square(x_sensor, v_sensor, rho, cov, x_init, ref_idx=None, do_resample
                               ref_idx=ref_idx)
 
     # Resample the covariance matrix
-    if do_resample and not cov_is_inverted:
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
+    if do_resample:
+        cov = cov.resample(ref_idx)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, cov_is_inverted=cov_is_inverted, **kwargs)
+    x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, **kwargs)
 
     return x, x_full
 
 
-def bestfix(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon, ref_idx=None, pdf_type=None, do_resample=False):
+def bestfix(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon, ref_idx=None, pdf_type=None,
+            do_resample=False):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
     a series of coordinates, and returning the index of the maximum.
@@ -165,7 +164,7 @@ def bestfix(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon, ref_idx=N
 
     # Resample the covariance matrix
     if do_resample:
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
+        cov = cov.resample(ref_idx)
 
     # Make sure that rho is a vector -- the pdf functions choke if the mean value
     # is an Nx1 matrix
@@ -177,7 +176,7 @@ def bestfix(x_sensor, v_sensor, rho, cov, x_ctr, search_size, epsilon, ref_idx=N
         return np.squeeze(model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
                                             x_source=x, v_source=None, ref_idx=ref_idx))
 
-    pdfs = utils.make_pdfs(msmt, rho, pdf_type, cov)
+    pdfs = utils.make_pdfs(msmt, rho, pdf_type, cov.cov)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.bestfix(pdfs, x_ctr, search_size, epsilon)

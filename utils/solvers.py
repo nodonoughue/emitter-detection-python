@@ -1,11 +1,11 @@
 import numpy as np
-import scipy
 import matplotlib.pyplot as plt
 import utils
+from utils.covariance import CovarianceMatrix
 
 
-def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iterations=10e3, force_full_calc=False,
-              plot_progress=False, cov_is_inverted=False):
+def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_num_iterations=10e3,
+              force_full_calc=False, plot_progress=False):
     """
     Computes the least square solution for geolocation processing.
     
@@ -18,14 +18,12 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
                  error between received and modeled data vector)
     :param jacobian: Jacobian matrix function handle (accepts n_dim vector of source position estimate, and responds 
                      with n_dim x n_sensor Jacobian matrix)
-    :param covariance: Measurement error covariance matrix
+    :param cov: Measurement error covariance matrix
     :param x_init: Initial estimate of source position
     :param epsilon: Desired position error tolerance (stopping condition)
     :param max_num_iterations: Maximum number of LS iterations to perform
     :param force_full_calc: Forces all max_num_iterations to be calculated
     :param plot_progress: Binary flag indicating whether to plot error/pos est over time
-    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
-                            inverse of the covariance matrix. [default=False]
     :return x: Estimated source position.
     :return x_full: Iteration-by-iteration estimated source positions
     """
@@ -39,19 +37,6 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
     x_full = np.zeros(shape=(n_dims, max_num_iterations))
     x_prev = x_init
     x_full[:, current_iteration] = x_prev
-
-    # Pre-compute covariance matrix inverses
-    if cov_is_inverted:
-        covariance_inverse = covariance
-        covariance_lower = None
-    elif np.isscalar(covariance):
-        # It's a scalar, do the easy inversion
-        covariance_inverse = 1/covariance
-        covariance_lower = None
-        cov_is_inverted = True
-    else:
-        covariance_lower = np.linalg.cholesky(covariance)
-        covariance_inverse = None
 
     # Initialize Plotting
     if plot_progress:
@@ -74,26 +59,27 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use the squeeze command to drop the third dim (n_source = 1)
 
         # Compute delta_x^(i), according to 10.20
-        if cov_is_inverted:
-            jc = jacobian_i @ covariance_inverse
-            jcj = jc @ jacobian_i.T
-            jcy = jc @ y_i
-            delta_x, _, _, _ = np.linalg.lstsq(jcj, jcy, rcond=None)
-        else:
-            # Using Cholesky decomposition:
-            #    C = L@L.T, we solved for L outside the loop
-            # [J @ C^{-1} @ J.T]^{-1} @ J @ C^{-1} @ y is
-            # rewritten
-            # [ a.T @ a ] ^{-1} @ a.T @ b
-            # where a and b are solved via forward substitution
-            # from the lower triangular matrix L.
-            #   L @ a = J.T
-            #   L @ b = y
-            a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
-            b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
-            # Then, we solve the system
-            #  (a.T @ a) @ delta_x = a.T @ b
-            delta_x, _, _, _ = np.linalg.lstsq(a.T @ a, a.T @ b, rcond=None)
+        delta_x = cov.solve_lstsq(y_i, jacobian_i)  # ToDo: debug and verify
+        # if cov_is_inverted:
+        #     jc = jacobian_i @ covariance_inverse
+        #     jcj = jc @ jacobian_i.T
+        #     jcy = jc @ y_i
+        #     delta_x, _, _, _ = np.linalg.lstsq(jcj, jcy, rcond=None)
+        # else:
+        #     # Using Cholesky decomposition:
+        #     #    C = L@L.T, we solved for L outside the loop
+        #     # [J @ C^{-1} @ J.T]^{-1} @ J @ C^{-1} @ y is
+        #     # rewritten
+        #     # [ a.T @ a ] ^{-1} @ a.T @ b
+        #     # where a and b are solved via forward substitution
+        #     # from the lower triangular matrix L.
+        #     #   L @ a = J.T
+        #     #   L @ b = y
+        #     a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
+        #     b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
+        #     # Then, we solve the system
+        #     #  (a.T @ a) @ delta_x = a.T @ b
+        #     delta_x, _, _, _ = np.linalg.lstsq(a.T @ a, a.T @ b, rcond=None)
 
         # Update predicted location
         x_full[:, current_iteration] = x_prev + np.squeeze(delta_x)
@@ -117,17 +103,17 @@ def ls_solver(zeta, jacobian, covariance, x_init, epsilon=1e-6, max_num_iteratio
                 
         prev_error = error
 
+    x = x_full[:, current_iteration]
+
     # Bookkeeping
     if not force_full_calc:
-        x_full[:, current_iteration+1:] = x_full[:, :current_iteration]
-
-    x = x_full[:, -1]
+        x_full[:, current_iteration+1:] = x[:, np.newaxis]
 
     return x, x_full
 
 
-def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6, max_num_iterations=10e3,
-              force_full_calc=False, plot_progress=False, cov_is_inverted=False):
+def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6, max_num_iterations=10e3,
+              force_full_calc=False, plot_progress=False):
     """
     Computes the gradient descent solution for localization given the provided measurement and Jacobian function 
     handles, and measurement error covariance.
@@ -141,7 +127,7 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
               between received and modeled data vector)
     :param jacobian: Jacobian matrix function handle (accepts n_dim vector of source position estimate, and responds 
                      with n_dim x n_sensor Jacobian matrix)
-    :param covariance: Measurement error covariance matrix
+    :param cov: Measurement error covariance matrix
     :param x_init: Initial estimate of source position
     :param alpha: Backtracking line search parameter
     :param beta: Backtracking line search parameter
@@ -149,8 +135,6 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
     :param max_num_iterations: Maximum number of LS iterations to perform
     :param force_full_calc: Forces all max_num_iterations to be executed
     :param plot_progress: Binary flag indicating whether to plot error/pos est over time
-    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
-                            inverse of the covariance matrix. [default=False]
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
@@ -164,27 +148,16 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
     x_prev = x_init
     x_full[:, current_iteration] = x_prev
     
-    # Pre-compute covariance matrix inverses
-    if cov_is_inverted:
-        covariance_inverse = covariance
-        covariance_lower = None
-    elif np.isscalar(covariance):
-        # It's a scalar, do the easy inversion
-        covariance_inverse = 1/covariance
-        covariance_lower = None
-        cov_is_inverted = True
-    else:
-        covariance_lower = np.linalg.cholesky(covariance)
-        covariance_inverse = None
-
     # Cost Function for Gradient Descent
     def cost_fxn(z):
         this_y = y(z)
-        if cov_is_inverted:
-            return this_y.T @ covariance_inverse @ this_y
-        else:
-            l_inv_y = scipy.linalg.solve_triangular(covariance_lower, this_y, lower=True)
-            return np.conj(l_inv_y.T) @ l_inv_y
+        # ToDo: debug and verify
+        return cov.solve_aca(this_y.T)
+        # if cov_is_inverted:
+        #     return this_y.T @ covariance_inverse @ this_y
+        # else:
+        #     l_inv_y = scipy.linalg.solve_triangular(covariance_lower, this_y, lower=True)
+        #     return np.conj(l_inv_y.T) @ l_inv_y
     
     # Initialize Plotting
     if plot_progress:
@@ -213,12 +186,13 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use squeeze to remove third dimension (n_source=1)
         
         # Compute Gradient and Cost function
-        if cov_is_inverted:
-            grad = -2 * jacobian_i @ covariance_inverse @ y_i
-        else:
-            a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
-            b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
-            grad = -2 * a.T @ b
+        grad = -2 * cov.solve_acb(jacobian_i, y_i)  # ToDo: debug and verify
+        # if cov_is_inverted:
+        #     grad = -2 * jacobian_i @ covariance_inverse @ y_i
+        # else:
+        #     a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
+        #     b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
+        #     grad = -2 * a.T @ b
         
         # Descent direction is the negative of the gradient
         del_x = -np.squeeze(grad/np.linalg.norm(grad))
@@ -229,8 +203,11 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
         # Update x position
         x_full[:, current_iteration] = x_prev + t*del_x
         
+        x_update = x_prev + t*del_x
+
         # Update variables
-        x_prev = x_full[:, current_iteration]
+        x_full[:, current_iteration] = x_update
+        x_prev = x_update
         error = t
         
         if plot_progress:
@@ -249,11 +226,11 @@ def gd_solver(y, jacobian, covariance, x_init, alpha=0.3, beta=0.8, epsilon=1.e-
 
         prev_error = error
 
+    x = x_full[:, current_iteration]
+
     # Bookkeeping
     if not force_full_calc:
-        x_full[:, current_iteration+1:] = x_full[:, :current_iteration]
-
-    x = x_full[:, -1]
+        x_full[:, current_iteration + 1:] = x[:, np.newaxis]
 
     return x, x_full
         

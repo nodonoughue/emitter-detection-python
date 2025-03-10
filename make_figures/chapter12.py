@@ -10,6 +10,7 @@ Nicholas O'Donoughue
 """
 
 import utils
+from utils.covariance import CovarianceMatrix
 import matplotlib.pyplot as plt
 import numpy as np
 import fdoa
@@ -94,7 +95,7 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
                   color=sensor_markers.get_edgecolor())
 
     for idx in np.arange(num_sensors):
-        plt.text(x_sensor[idx, 0]-.2, x_sensor[idx, 1]-.2, '$S_{}$'.format(idx+1), fontsize=10)
+        plt.text(float(x_sensor[idx, 0]-.2), float(x_sensor[idx, 1]-.2), '$S_{}$'.format(idx+1), fontsize=10)
 
     # Draw isodoppler lines for S12 and S23
     iso_doppler_label = 'Lines of Constant FDOA'
@@ -150,7 +151,7 @@ def make_figure_2(prefix=None):
     Nicholas O'Donoughue
     28 October 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handles
     """
 
@@ -175,18 +176,18 @@ def make_figure_2(prefix=None):
     handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k', zorder=3)
 
     # Draw Velocity Arrows
-    plt.arrow(x=x_sensor0[0], y=x_sensor0[1],
-              dx=v_sensor0[0]/2, dy=v_sensor0[1]/2,
+    plt.arrow(x=float(x_sensor0[0]), y=float(x_sensor0[1]),
+              dx=float(v_sensor0[0]/2), dy=float(v_sensor0[1]/2),
               width=.01, head_width=.1,
               color=handle0.get_edgecolor())
-    plt.arrow(x=x_sensor1[0], y=x_sensor1[1],
-              dx=v_sensor1[0]/2, dy=v_sensor1[1]/2,
+    plt.arrow(x=float(x_sensor1[0]), y=float(x_sensor1[1]),
+              dx=float(v_sensor1[0]/2), dy=float(v_sensor1[1]/2),
               width=.01, head_width=.1,
               color=handle1.get_edgecolor())
 
     # Annotation Text
-    plt.text(x_sensor0[0]-1, x_sensor0[1], '$S_0$', fontsize=12)
-    plt.text(x_sensor1[0]-1, x_sensor1[1], '$S_1$', fontsize=12)
+    plt.text(float(x_sensor0[0]-1), float(x_sensor0[1]), '$S_0$', fontsize=12)
+    plt.text(float(x_sensor1[0]-1), float(x_sensor1[1]), '$S_1$', fontsize=12)
     plt.text(3.5,  0, '$f_1 = f_0$', fontsize=12)
     plt.text(-5,   0, '$f_1 = f_0$', fontsize=12)
     plt.text(-.75, 0, '$f_1 > f_0$', fontsize=12)
@@ -211,18 +212,18 @@ def make_figure_2(prefix=None):
     handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k', zorder=3)
 
     # Draw Velocity Arrows
-    plt.arrow(x=x_sensor0[0], y=x_sensor0[1],
-              dx=v_sensor0[0]/2, dy=v_sensor0[1]/2,
+    plt.arrow(x=float(x_sensor0[0]), y=float(x_sensor0[1]),
+              dx=float(v_sensor0[0]/2), dy=float(v_sensor0[1]/2),
               width=.01, head_width=.1,
               color=handle0.get_edgecolor())
-    plt.arrow(x=x_sensor1[0], y=x_sensor1[1],
-              dx=v_sensor1[0]/2, dy=v_sensor1[1]/2,
+    plt.arrow(x=float(x_sensor1[0]), y=float(x_sensor1[1]),
+              dx=float(v_sensor1[0]/2), dy=float(v_sensor1[1]/2),
               width=.01, head_width=.1,
               color=handle1.get_edgecolor())
 
     # Annotation Text
-    plt.text(x_sensor0[0], x_sensor0[1]-1, '$S_0$', fontsize=12)
-    plt.text(x_sensor1[0], x_sensor1[1]-1, '$S_1$', fontsize=12)
+    plt.text(float(x_sensor0[0]), float(x_sensor0[1]-1), '$S_0$', fontsize=12)
+    plt.text(float(x_sensor1[0]), float(x_sensor1[1]-1), '$S_1$', fontsize=12)
     plt.text(3,  3, '$f_1 > f_0$', fontsize=12)
     plt.text(-3,  3, '$f_1 < f_0$', fontsize=12)
     plt.text(-3, -3, '$f_1 > f_0$', fontsize=12)
@@ -250,7 +251,7 @@ def make_figure_3(prefix):
     Nicholas O'Donoughue
     28 October 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handles
     """
 
@@ -262,13 +263,15 @@ def make_figure_3(prefix):
     x_source = np.array([1., 3.])
     # f0 = 1e9
 
+    cov_2 = CovarianceMatrix(np.eye(2))
+    cov_3 = CovarianceMatrix(np.eye(3))
     eps1, x_vec1,  y_vec1 = fdoa.model.error(x_sensor=x_sensor[[0, 1], :].T, v_sensor=v_sensor[[0, 1], :].T,
-                                             cov=np.eye(2), x_source=x_source, x_max=4., num_pts=1001, do_resample=True)
+                                             cov=cov_2, x_source=x_source, x_max=4., num_pts=1001, do_resample=True)
     eps2, x_vec2, y_vec2 = fdoa.model.error(x_sensor=x_sensor[[0, 2], :].T, v_sensor=v_sensor[[0, 2], :].T,
-                                            cov=np.eye(2), x_source=x_source, x_max=4, num_pts=1001, do_resample=True)
+                                            cov=cov_2, x_source=x_source, x_max=4, num_pts=1001, do_resample=True)
     eps3, x_vec3, y_vec3 = fdoa.model.error(x_sensor=x_sensor[[1, 2], :].T, v_sensor=v_sensor[[1, 2], :].T,
-                                            cov=np.eye(2), x_source=x_source, x_max=4, num_pts=1001, do_resample=True)
-    eps4, x_vec4, y_vec4 = fdoa.model.error(x_sensor=x_sensor.T, v_sensor=v_sensor.T, cov=np.eye(3),
+                                            cov=cov_2, x_source=x_source, x_max=4, num_pts=1001, do_resample=True)
+    eps4, x_vec4, y_vec4 = fdoa.model.error(x_sensor=x_sensor.T, v_sensor=v_sensor.T, cov=cov_3,
                                             x_source=x_source, x_max=4, num_pts=1001, do_resample=True)
 
     # Generate Plots
@@ -338,7 +341,7 @@ def make_figure_4(prefix):
     Nicholas O'Donoughue
     28 October 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -411,7 +414,7 @@ def make_figure_5(prefix):
     Nicholas O'Donoughue
     28 October 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -460,7 +463,7 @@ def make_figure_6(prefix):
     Nicholas O'Donoughue
     28 October 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
     # Figure 6a
@@ -480,9 +483,9 @@ def make_figure_6(prefix):
     freq_error = 10  # 1 Hz resolution
     f0 = 1e9
     rng_rate_std_dev = freq_error*utils.constants.speed_of_light/f0
-    cov_rroa = rng_rate_std_dev**2 * np.eye(num_sensors)  # covariance matrix structure
+    cov_rroa = CovarianceMatrix(rng_rate_std_dev**2 * np.eye(num_sensors))  # covariance matrix structure
     ref_idx = None
-    cov_rrdoa = utils.resample_covariance_matrix(cov_rroa, ref_idx)
+    cov_rrdoa = cov_rroa.resample(ref_idx)
 
     # Define source positions
     num_grid_points = 501
@@ -491,7 +494,7 @@ def make_figure_6(prefix):
     x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0., 0.), grid_spacing=grid_spacing, max_offset=grid_extent)
 
     # Compute CRLB
-    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
+    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
 
     # Set up contours
@@ -519,7 +522,7 @@ def make_figure_6(prefix):
 
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
-    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
+    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
 
     # Draw Figure
@@ -545,12 +548,12 @@ def make_figure_6(prefix):
     v_sensor = np.concatenate((v_sensor, np.array([1, 0])[:, np.newaxis]), axis=1)
 
     # Regenerate covariance matrix
-    cov_rroa = rng_rate_std_dev**2 * np.eye(num_sensors)  # covariance matrix structure
+    cov_rroa = CovarianceMatrix(rng_rate_std_dev**2 * np.eye(num_sensors))  # covariance matrix structure
     ref_idx = None
-    cov_rrdoa = utils.resample_covariance_matrix(cov_rroa, ref_idx)
+    cov_rrdoa = cov_rroa.resample(ref_idx)
 
     # Compute CRLB
-    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
+    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
 
     # Draw Figure
@@ -570,7 +573,7 @@ def make_figure_6(prefix):
 
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
-    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False)  # Ndim x Ndim x M^2
+    crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
 
     # Draw Figure

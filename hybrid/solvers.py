@@ -1,11 +1,12 @@
 import utils
 from utils import solvers
+from utils.covariance import CovarianceMatrix
 from . import model
 
 
-def max_likelihood(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
+def max_likelihood(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
                    x_ctr=0., search_size=1., epsilon=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None,
-                   do_resample=False, cov_is_inverted=False):
+                   do_resample=False):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -26,8 +27,6 @@ def max_likelihood(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
-    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
-                            inverse of the covariance matrix.
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions
@@ -39,8 +38,7 @@ def max_likelihood(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
                                     x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                     zeta=zeta, x_source=x, v_source=v_source,
                                     cov=cov, do_2d_aoa=do_2d_aoa,
-                                    tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx, do_resample=do_resample,
-                                    cov_is_inverted=cov_is_inverted)
+                                    tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx, do_resample=do_resample)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon)
@@ -48,8 +46,8 @@ def max_likelihood(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                     do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False, **kwargs):
+def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
+                     v_source=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -87,15 +85,16 @@ def gradient_descent(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_
 
     # Re-sample the covariance matrix, if needed
     if do_resample:
-        cov = model.resample_hybrid_covariance_matrix(cov, x_aoa, x_tdoa, x_fdoa, do_2d_aoa, tdoa_ref_idx, fdoa_ref_idx)
+        cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa,
+                            do_2d_aoa=do_2d_aoa, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
+    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 
 
-def least_square(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
+def least_square(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
                  do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False, **kwargs):
     """
     Computes the least square solution for FDOA processing.
@@ -134,16 +133,18 @@ def least_square(zeta, cov, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa
 
     # Re-sample the covariance matrix, if needed
     if do_resample:
-        cov = model.resample_hybrid_covariance_matrix(cov, x_aoa, x_tdoa, x_fdoa, do_2d_aoa, tdoa_ref_idx, fdoa_ref_idx)
+        cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
+                            tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
+    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 
 
-def bestfix(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None, x_ctr=0., search_size=1.,
-            epsilon=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False, pdf_type=None):
+def bestfix(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None, x_ctr=0.,
+            search_size=1., epsilon=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
+            pdf_type=None):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
     a series of coordinates, and returning the index of the maximum.
@@ -191,9 +192,10 @@ def bestfix(zeta, cov, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_sour
 
     # Re-sample the covariance matrix, if needed
     if do_resample:
-        cov = model.resample_hybrid_covariance_matrix(cov, x_aoa, x_tdoa, x_fdoa, do_2d_aoa, tdoa_ref_idx, fdoa_ref_idx)
+        cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
+                            tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
-    pdfs = utils.make_pdfs(measurement, zeta, pdf_type, cov)
+    pdfs = utils.make_pdfs(measurement, zeta, pdf_type, cov.cov)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.bestfix(pdfs, x_ctr, search_size, epsilon)

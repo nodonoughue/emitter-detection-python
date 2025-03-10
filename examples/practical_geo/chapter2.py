@@ -8,6 +8,7 @@ import tdoa
 import fdoa
 import hybrid
 import time
+from utils.covariance import CovarianceMatrix
 
 _rad2deg = 180.0/np.pi
 _deg2rad = np.pi/180.0
@@ -75,23 +76,58 @@ def _make_err_covariance(err_aoa=None, err_time=None, err_freq=None, f0=1.0, tdo
     # Define Error Covariance Matrix
     cov_arr = []  # list for keeping track of which covariance matrices are defined
     if err_aoa is not None:
-        cov_psi = (err_aoa * _deg2rad) ** 2.0 * np.eye(num_aoa) # rad ^ 2
+        cov_psi = (err_aoa * _deg2rad) ** 2.0 * np.eye(num_aoa)  # rad ^ 2
         cov_arr.append(cov_psi)  # Add to cov_arr, for use in block_diag
+        arg_x_aoa = x_aoa
+    else:
+        arg_x_aoa = None
 
     if err_time is not None:
         err_r = err_time * utils.constants.speed_of_light
         cov_r = (err_r ** 2.0) * np.eye(num_tdoa)  # m ^ 2
         cov_arr.append(cov_r)
+        arg_x_tdoa = x_tdoa
+    else:
+        arg_x_tdoa = None
 
     if err_freq is not None:
         rr_err = err_freq * utils.constants.speed_of_light / f0  # (m/s)
         cov_rr = (rr_err ** 2) * np.eye(num_fdoa)  # (m/s)^2
         cov_arr.append(cov_rr)
+        arg_x_fdoa = x_fdoa
+    else:
+        arg_x_fdoa = None
 
-    cov_z = block_diag(*cov_arr)  # Sensor-level errors. Note the *cov_arr tells python to unpack the list
-    cov_z_out = hybrid.model.resample_hybrid_covariance_matrix(cov_z, x_aoa, x_tdoa, x_fdoa, tdoa_ref_idx, fdoa_ref_idx)
+    # Sensor-level error covariance. Note the *cov_arr tells python to unpack the list
+    cov_z = CovarianceMatrix(block_diag(*cov_arr))
+
+    # Copy it and resample
+    cov_z_out = cov_z.copy().resample_hybrid(x_aoa=arg_x_aoa, x_tdoa=arg_x_tdoa, x_fdoa=arg_x_fdoa, do_2d_aoa=False,
+                                             tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     return cov_z, cov_z_out
+
+
+def _make_plot(x_ml, x_ls, x_gd, x_init, colors=None, crlb_ellipse=None, conf_interval=None):
+    fig, _ = plt.subplots()
+    _plt_markers(do_aoa=True, do_tdoa=True, do_fdoa=True, colors=colors)
+
+    # Plot Closed-Form Solution
+    plt.scatter(x_ml[0], x_ml[1], marker='v', label='Maximum Likelihood')
+
+    # Plot Iterative Solutions
+    plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
+    plt.plot(x_ls[0], x_ls[1], linestyle=':', marker='o', markevery=[-1], label='Least Squares')
+    plt.plot(x_gd[0], x_gd[1], linestyle='--', marker='s', markevery=[-1], label='Grad Descent')
+
+    # Overlay Error Ellipse
+    if crlb_ellipse is not None:
+        plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linestyle='--', color='k',
+                 label='{:d}% Error Ellipse'.format(conf_interval))
+
+    plt.legend(loc='best')
+
+    return fig
 
 
 def example1(colors=None):
@@ -130,7 +166,8 @@ def example1(colors=None):
 
     # Draw isochrone
     # Transpose the x_tdoa array before indexing; so [0] and [1] refer to sensors, not dimensions
-    xy_isochrone = tdoa.model.draw_isochrone(x_tdoa.T[1], x_tdoa.T[0], range_diff=range_diff, num_pts=1000, max_ortho=5e3)
+    xy_isochrone = tdoa.model.draw_isochrone(x_tdoa.T[1], x_tdoa.T[0],
+                                             range_diff=range_diff, num_pts=1000, max_ortho=5e3)
     plt.plot(xy_isochrone[0], xy_isochrone[1], color=colors[2], linestyle=':', label='TDOA Solution')
 
     # Draw isodoppler line
@@ -148,39 +185,35 @@ def example1(colors=None):
     plt.axis('off')
 
     # --- Compute Variances and Print ---
-    c = utils.constants.speed_of_light
     err_aoa = 3  # deg
-    cov_psi = (err_aoa * _deg2rad) ** 2  # rad^2
+    cov_psi, _ = _make_err_covariance(err_aoa=err_aoa)
     print('AOA Measurement: {:.2f} deg'.format(psi_act[0] * _rad2deg))
-    print('AOA Covariance: {:.4f} rad^2'.format(cov_psi))
+    print('AOA Covariance: {} rad^2'.format(cov_psi.cov))
 
     err_time = 1e-7  # 100 ns timing error
-    err_r = err_time * c
     _, num_tdoa = utils.safe_2d_shape(x_tdoa)
-    cov_r = err_r ** 2 * np.eye(num_tdoa)  # m^2
+    cov_r, _ = _make_err_covariance(err_time=err_time)
     print('TDOA Measurement: {:.2f} m'.format(range_diff[0]))
     print('TDOA Covariance:')
-    print('{} m^2'.format(np.matrix(cov_r)))
+    print('{} m^2'.format(np.matrix(cov_r.cov)))
 
-    freq_err = 10  # Hz
+    err_freq = 10  # Hz
     f0 = 1e9  # Hz
-    rr_err = freq_err * c / f0  # (m/s)
     _, num_fdoa = utils.safe_2d_shape(x_fdoa)
-    cov_rr = rr_err ** 2 * np.eye(num_fdoa)  # (m/s)^2
+    cov_rr, _ = _make_err_covariance(err_freq=err_freq, f0=f0)
     print('FDOA Measurement: {:.2f} m/s'.format(velocity_diff[0]))
     print('FDOA Covariance:')
-    print('{} m^2/s^2'.format(np.matrix(cov_rr)))
+    print('{} m^2/s^2'.format(np.matrix(cov_rr.cov)))
 
     z = hybrid.model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa, x_source=x_source)
-    # cov_z = block_diag([cov_psi], cov_r, cov_rr)
-    cov_z, _ = _make_err_covariance(err_aoa, err_time, freq_err, f0)
+    cov_z, cov_z_resample = _make_err_covariance(err_aoa=err_aoa, err_time=err_time, err_freq=err_freq, f0=f0)
 
     # Set Up Search Grid
     x_grid = np.arange(-0.5, 5.5, 0.02) * 1e3
     y_grid = np.arange(0, 4, 0.02) * 1e3
     xx, yy = np.meshgrid(x_grid, y_grid)
     x_test_pos = np.vstack((xx.ravel(), yy.ravel()))
-    grid_extent=(float(x_grid[0]), float(x_grid[-1]), float(y_grid[0]), float(y_grid[-1]))
+    grid_extent = (float(x_grid[0]), float(x_grid[-1]), float(y_grid[0]), float(y_grid[-1]))
 
     # Log-Likelihood Figure Generator
     def _make_subfigure(ell, do_aoa=False, do_tdoa=False, do_fdoa=False):
@@ -203,7 +236,7 @@ def example1(colors=None):
 
     # TDOA
     ell_tdoa = tdoa.model.log_likelihood(x_sensor=x_tdoa, rho=range_diff, cov=cov_r,
-                                         x_source=x_test_pos, do_resample=True).reshape(xx.shape)
+                                         x_source=x_test_pos, do_resample=True, variance_is_toa=False).reshape(xx.shape)
     fig3 = _make_subfigure(ell_tdoa, do_tdoa=True)
 
     # FDOA
@@ -249,72 +282,61 @@ def example2(colors=None):
     err_time = 1e-7  # 100 ns timing error
     err_freq = 10  # Hz
     f0 = 1e9  # Hz
-    cov_z, cov_z_out = _make_err_covariance(err_aoa, err_time, err_freq, f0,
+    cov_z, cov_z_out = _make_err_covariance(err_aoa=err_aoa, err_time=err_time, err_freq=err_freq, f0=f0,
                                             tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Generate Random Noise
-    cov_lower = np.linalg.cholesky(cov_z_out)
+    cov_lower = cov_z_out.lower
     num_measurements, _ = utils.safe_2d_shape(cov_lower)
     noise = cov_lower @ np.random.randn(num_measurements, )
 
     # Combine Noise with Perfect Measurement
     zeta = z + noise
 
+    # Receiver System Args
+    rx_args = {'zeta': zeta,
+               'x_aoa': x_aoa,
+               'x_tdoa': x_tdoa,
+               'x_fdoa': x_fdoa,
+               'v_fdoa': v_fdoa,
+               'cov': cov_z_out,
+               'do_resample': False}
+
     # ---- Set Up Solution Parameters ----
     # ML Search Parameters
-    x_ctr = np.array([2.5, 2.5]) * 1e3
-    grid_size = np.array([5, 5]) * 1e3
-    grid_res = 25  # meters, grid resolution
+    ml_args = {
+        'x_ctr': np.array([2.5, 2.5]) * 1e3,
+        'search_size': np.array([5, 5]) * 1e3,
+        'epsilon': 25  # meters, grid resolution
+    }
 
     # GD and LS Search Parameters
     x_init = np.array([1, 1]) * 1e3
-    epsilon = grid_res  # desired convergence step size, same as grid resolution
-    max_num_iterations = 100
-    force_full_calc = True
-    plot_progress = False
-
+    gd_ls_args = {
+        'x_init': x_init,
+        'epsilon': ml_args['epsilon'],  # desired convergence step size, same as grid resolution
+        'max_num_iterations': 100,
+        'force_full_calc': True,
+        'plot_progress': False
+    }
     # ---- Apply Various Solvers ----
     # ML Solution
-    x_ml, _, _ = hybrid.solvers.max_likelihood(zeta=zeta, cov=cov_z_out, x_aoa=x_aoa, x_tdoa=x_tdoa,
-                                               x_fdoa=x_fdoa, v_fdoa=v_fdoa, x_ctr=x_ctr, search_size=grid_size,
-                                               epsilon=epsilon, do_resample=False, cov_is_inverted=False)
+    x_ml, _, _ = hybrid.solvers.max_likelihood(**rx_args, **ml_args)
 
     # GD Solution
-    x_gd, x_gd_full = hybrid.solvers.gradient_descent(zeta=zeta, cov=cov_z_out, x_aoa=x_aoa, x_tdoa=x_tdoa,
-                                                      x_fdoa=x_fdoa, v_fdoa=v_fdoa, x_init=x_init, epsilon=epsilon,
-                                                      max_num_iterations=max_num_iterations, do_resample=False,
-                                                      force_full_calc=force_full_calc, plot_progress=plot_progress)
+    x_gd, x_gd_full = hybrid.solvers.gradient_descent(**rx_args, **gd_ls_args)
 
     # LS Solution
-    x_ls, x_ls_full = hybrid.solvers.least_square(zeta=zeta, cov=cov_z_out, x_aoa=x_aoa, x_tdoa=x_tdoa,
-                                                  x_fdoa=x_fdoa, v_fdoa=v_fdoa, x_init=x_init, epsilon=epsilon,
-                                                  max_num_iterations=max_num_iterations, do_resample=False,
-                                                  force_full_calc=force_full_calc, plot_progress=plot_progress)
+    x_ls, x_ls_full = hybrid.solvers.least_square(**rx_args, **gd_ls_args)
 
     # ---- Plot Results ----
-    def _make_plot():
-        fig, _ = plt.subplots()
-        _plt_markers(do_aoa=True, do_tdoa=True, do_fdoa=True, colors=colors)
-
-        # Plot Closed-Form Solution
-        plt.scatter(x_ml[0], x_ml[1], marker='v', label='Maximum Likelihood')
-
-        # Plot Iterative Solutions
-        plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
-        plt.plot(x_ls_full[0, :], x_ls_full[1, :], linestyle=':', marker='o', markevery=[-1],
-                 label='Least Squares')
-        plt.plot(x_gd_full[0, :], x_gd_full[1, :], linestyle='--', marker='s', markevery=[-1],
-                 label='Grad Descent')
-
-        plt.legend(loc='best')
-
-        return fig
-
-    fig_full = _make_plot()
+    fig_full = _make_plot(x_ml=x_ml, x_ls=x_ls, x_gd=x_gd, x_init=x_init, colors=colors,
+                          crlb_ellipse=None)
     plt.xlim([-.5e3, 5.5e3])
     plt.ylim([-.5e3, 4e3])
 
-    fig_zoom = _make_plot()
+    fig_zoom = _make_plot(x_ml=x_ml, x_ls=x_ls, x_gd=x_gd, x_init=x_init, colors=colors,
+                          crlb_ellipse=None)
     plt.xlim([2e3, 3.5e3])
     plt.ylim([2e3, 3.5e3])
 
@@ -347,7 +369,7 @@ def example3(rng=np.random.default_rng(), colors=None):
     f0 = 1e9  # Hz
     tdoa_ref_idx = 1
     fdoa_ref_idx = 1
-    cov_z, cov_z_out = _make_err_covariance(err_aoa, err_time, err_freq, f0,
+    cov_z, cov_z_out = _make_err_covariance(err_aoa=err_aoa, err_time=err_time, err_freq=err_freq, f0=f0,
                                             tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Take Hybrid measurement
@@ -355,28 +377,28 @@ def example3(rng=np.random.default_rng(), colors=None):
                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Generate Random Noise
-    cov_lower = np.linalg.cholesky(cov_z_out)
+    cov_lower = cov_z_out.lower
     num_measurements, _ = utils.safe_2d_shape(cov_lower)
 
     # ---- Set Up Solution Parameters ----
     # ML Search Parameters
-    ml_args = {'x_ctr' : np.array([2.5, 2.5]) * 1e3,
-               'search_size' : np.array([5, 5]) * 1e3,
-               'epsilon' : 25}  # meters, grid resolution
+    ml_args = {'x_ctr': np.array([2.5, 2.5]) * 1e3,
+               'search_size': np.array([5, 5]) * 1e3,
+               'epsilon': 25}  # meters, grid resolution
 
     # GD and LS Search Parameters
-    gd_ls_args = {'x_init' : np.array([1, 1]) * 1e3,
-                  'epsilon' : ml_args['epsilon'],  # desired convergence step size, same as grid resolution
-                  'max_num_iterations' : 50,
-                  'force_full_calc' : True,
-                  'plot_progress' : False}
+    gd_ls_args = {'x_init': np.array([1, 1]) * 1e3,
+                  'epsilon': ml_args['epsilon'],  # desired convergence step size, same as grid resolution
+                  'max_num_iterations': 50,
+                  'force_full_calc': True,
+                  'plot_progress': False}
 
-    res = _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, cov_z_out, cov_lower, rng, ml_args, gd_ls_args)
+    res = _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, cov_z_out, rng, ml_args, gd_ls_args)
 
     # ---- Estimate Error Bounds ----
     # CRLB
     crlb = hybrid.perf.compute_crlb(x_source=x_source, x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
-                                    cov=cov_z_out, cov_is_inverted=False, do_resample=False)
+                                    cov=cov_z_out, do_resample=False)
     print('CRLB: {}'.format(crlb))
 
     # RMSE
@@ -398,30 +420,13 @@ def example3(rng=np.random.default_rng(), colors=None):
     x_ls = res['ls']
     x_gd = res['gd']
 
-    def _make_plot():
-        fig, _ = plt.subplots()
-        _plt_markers(do_aoa=True, do_tdoa=True, do_fdoa=True, colors=colors)
-
-        # Plot Closed-Form Solution
-        plt.scatter(x_ml[0], x_ml[1], marker='v', label='Maximum Likelihood')
-
-        # Plot Iterative Solutions
-        plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
-        plt.plot(x_ls[0, :], x_ls[1, :], linestyle=':', marker='o', markevery=[-1], label='Least Squares')
-        plt.plot(x_gd[0, :], x_gd[1, :], linestyle='--', marker='s', markevery=[-1], label='Grad Descent')
-
-        # Overlay Error Ellipse
-        plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linestyle='--', color='k',
-                 label='{:d}% Error Ellipse'.format(conf_interval))
-        plt.legend(loc='best')
-
-        return fig
-
-    fig_full = _make_plot()
+    fig_full = _make_plot(x_ml=x_ml, x_ls=x_ls, x_gd=x_gd, x_init=x_init, colors=colors,
+                          crlb_ellipse=crlb_ellipse, conf_interval=conf_interval)
     plt.xlim([-.5e3, 5.5e3])
     plt.ylim([0, 4e3])
 
-    fig_zoom = _make_plot()
+    fig_zoom = _make_plot(x_ml=x_ml, x_ls=x_ls, x_gd=x_gd, x_init=x_init, colors=colors,
+                          crlb_ellipse=crlb_ellipse, conf_interval=conf_interval)
     plt.xlim([2e3, 3.5e3])
     plt.ylim([2e3, 3.5e3])
 
@@ -443,7 +448,7 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
     :return: figure handle to generated graphic
     """
 
-# For the initial laydown plot, borrow code from Figure 13.1 of the 2019 text
+    # For the initial laydown plot, borrow code from Figure 13.1 of the 2019 text
     if colors is None:
         colormap = plt.get_cmap("tab10")
         colors = (colormap(0), colormap(1), colormap(2), colormap(3))
@@ -463,21 +468,21 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Pre-compute covariance matrix decomposition for noise generation
-    cov_lower = np.linalg.cholesky(cov_z_out)
+    cov_lower = cov_z_out.lower
     num_measurements, _ = utils.safe_2d_shape(cov_lower)
 
     # ---- Set Up Solution Parameters ----
     # ML Search Parameters
-    ml_args = {'x_ctr' : np.array([2.5, 2.5]) * 1e3,
-               'search_size' : np.array([5, 5]) * 1e3,
-               'epsilon' : 25}  # meters, grid resolution
+    ml_args = {'x_ctr': np.array([2.5, 2.5]) * 1e3,
+               'search_size': np.array([5, 5]) * 1e3,
+               'epsilon': 25}  # meters, grid resolution
 
     # GD and LS Search Parameters
-    gd_ls_args = {'x_init' : np.array([1, 1]) * 1e3,
-                  'epsilon' : ml_args['epsilon'],  # desired convergence step size, same as grid resolution
-                  'max_num_iterations' : 50,
-                  'force_full_calc' : True,
-                  'plot_progress' : False}
+    gd_ls_args = {'x_init': np.array([1, 1]) * 1e3,
+                  'epsilon': ml_args['epsilon'],  # desired convergence step size, same as grid resolution
+                  'max_num_iterations': 50,
+                  'force_full_calc': True,
+                  'plot_progress': False}
 
     # Monte Carlo Iteration
     num_mc_trials = 100
@@ -495,7 +500,8 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
     for idx in np.arange(num_mc_trials):
         utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        res = _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, cov_z_out, cov_lower, rng, ml_args, gd_ls_args)
+        res = _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx,
+                            cov_z_out, rng, ml_args, gd_ls_args)
 
         rmse_ml[idx] = np.linalg.norm(res['ml']-x_source)
         rmse_gd[idx, :] = np.linalg.norm(res['gd']-x_source[:, np.newaxis], axis=0)
@@ -523,7 +529,7 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
     # ---- Estimate Error Bounds ----
     # CRLB
     crlb = hybrid.perf.compute_crlb(x_source=x_source, x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
-                                    cov=cov_z_out, cov_is_inverted=False, do_resample=False)
+                                    cov=cov_z_out, do_resample=False)
     rmse_crlb = np.sqrt(np.trace(crlb))
     plt.plot(x_arr, rmse_crlb*np.ones_like(x_arr), '--', color='k', label='CRLB')
 
@@ -542,33 +548,15 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
     x_ls = res['ls']
     x_gd = res['gd']
 
-    def _make_plot():
-        fig, _ = plt.subplots()
-        _plt_markers(do_aoa=True, do_tdoa=True, do_fdoa=True, colors=colors)
-
-        # Plot Closed-Form Solution
-        plt.scatter(x_ml[0], x_ml[1], marker='v', label='Maximum Likelihood')
-
-        # Plot Iterative Solutions
-        plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
-        plt.plot(x_ls[0, :], x_ls[1, :], linestyle=':', label='Least Squares')
-        plt.plot(x_gd[0, :], x_gd[1, :], linestyle='--', label='Grad Descent')
-
-        # Overlay Error Ellipse
-        plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linestyle='--', color='k',
-                 label='{:d}% Error Ellipse'.format(conf_interval))
-        plt.legend(loc='best')
-
-        return fig
-
-    fig_full = _make_plot()
+    fig_full = _make_plot(x_ml=x_ml, x_ls=x_ls, x_gd=x_gd, x_init=x_init, colors=colors,
+                          crlb_ellipse=crlb_ellipse, conf_interval=conf_interval)
     plt.xlim([-.5e3, 5.5e3])
     plt.ylim([0, 4e3])
 
     return fig_err, fig_full
 
 
-def _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, covar, covar_lower, rng, ml_args, gd_ls_args):
+def _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, covar: CovarianceMatrix, rng, ml_args, gd_ls_args):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 2.3.
 
@@ -582,13 +570,13 @@ def _mc_iteration(z, num_measurements, tdoa_ref_idx, fdoa_ref_idx, covar, covar_
     """
 
     # Generate a random measurement
-    zeta = z + covar_lower @ rng.standard_normal(size=(num_measurements, ))
+    zeta = z + covar.lower @ rng.standard_normal(size=(num_measurements, ))
 
     # ---- Apply Various Solvers ----
     # ML Solution
     x_ml, _, _ = hybrid.solvers.max_likelihood(zeta=zeta, cov=covar, x_aoa=x_aoa, x_tdoa=x_tdoa,
                                                x_fdoa=x_fdoa, v_fdoa=v_fdoa, tdoa_ref_idx=tdoa_ref_idx,
-                                               fdoa_ref_idx=fdoa_ref_idx, do_resample=False, cov_is_inverted=False,
+                                               fdoa_ref_idx=fdoa_ref_idx, do_resample=False,
                                                **ml_args)
 
     # GD Solution

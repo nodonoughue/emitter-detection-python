@@ -621,7 +621,7 @@ def modulo2pi(x):
     x_modulo = x_shift % (2*np.pi)
 
     # Undo the shift, so that a zero input is now a zero output.
-    # Result is on the interval [-pi, pi)
+    # Result is on the interval [-pi, pi]
     result = x_modulo - np.pi
 
     return result

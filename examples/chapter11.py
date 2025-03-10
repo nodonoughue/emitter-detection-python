@@ -1,8 +1,8 @@
 import numpy as np
-import scipy
 import matplotlib.pyplot as plt
 import time
 import utils
+from utils.covariance import CovarianceMatrix
 import tdoa
 
 
@@ -38,6 +38,12 @@ def example1(rng=np.random.default_rng()):
     :return fig_err: figure handle for error as a function of iteration
     """
 
+    # Clear the numpy warnings about underflow; we don't care
+    # Underflow warnings can indicate a loss of precision; in our case, these are likely occurring
+    # from positions where our sensors are poorly aligned to determined the target's location. We
+    # can ignore the loss of precision there.
+    np.seterr(under='ignore')
+
     #  Set up TDOA Receiver system
     #  Spacing of 1 km at 60 degree intervals around origin
 
@@ -54,13 +60,8 @@ def example1(rng=np.random.default_rng()):
     # Define Sensor Performance
     time_measurement_standard_deviation = 1e-7
     rng_measurement_standard_deviation = time_measurement_standard_deviation * utils.constants.speed_of_light
-    covar_roa = rng_measurement_standard_deviation**2 * np.eye(num_sensors)
-    covar_rho = rng_measurement_standard_deviation**2 * (1 + np.eye(num_sensors-1))
-
-    # Decompose the covariance matrix, using Cholesky Decomposition, into a lower triangular matrix, for generating
-    # correlated random variables
-    covar_lower = np.linalg.cholesky(covar_rho)
-    covar_inv = np.real(scipy.linalg.pinvh(covar_rho))
+    # covar_roa = CovarianceMatrix(rng_measurement_standard_deviation**2 * np.eye(num_sensors))
+    covar_rho = CovarianceMatrix(rng_measurement_standard_deviation**2 * (1 + np.eye(num_sensors-1)))
 
     # Initialize Transmitter Position
     th = rng.random()*2*np.pi
@@ -76,8 +77,8 @@ def example1(rng=np.random.default_rng()):
     # x_isochrone3 = tdoa.model.draw_isochrone(x_sensor[:, -1], x_sensor[:, 2], dR[2], 1000, 5*baseline)
 
     # Set up the Monte Carlo Trial
-    num_mc_trials = int(1000)
-    num_iterations = int(1000)
+    num_mc_trials = int(100)  # ToDo: raise to 1000
+    num_iterations = int(100)  # ToDo: raise to 1000
     alpha = .3
     beta = .8
     epsilon = 100  # [m] desired iterative search stopping condition
@@ -96,21 +97,32 @@ def example1(rng=np.random.default_rng()):
     print('Performing Monte Carlo simulation for TDOA performance...')
     t_start = time.perf_counter()
 
-    args = {'rho_act': rho_actual,
-            'num_measurements': num_sensors-1,
-            'x_sensor': x_sensor,
-            'x_init': x_init,
-            'x_extent': x_extent,
-            'covar_sensor': covar_roa,
-            'covar_rho': covar_rho,
-            'covar_lower': covar_lower,
-            'covar_inv': covar_inv,
-            'epsilon': epsilon,
-            'grid_res': grid_res,
-            'num_iterations': num_iterations,
-            'rng': rng,
-            'gd_alpha': alpha,
-            'gd_beta': beta}
+    rx_args = {'x_sensor': x_sensor,
+               'cov': covar_rho,
+               'do_resample': False
+               }
+
+    ml_args = {'x_ctr': x_init,
+               'search_size': x_extent,
+               'epsilon': grid_res
+               }
+
+    ls_args = {'x_init': x_init,
+               'max_num_iterations': num_iterations,
+               'epsilon': epsilon
+               }
+
+    gd_args = {'x_init': x_init,
+               'max_num_iterations': num_iterations,
+               'epsilon': epsilon,
+               'alpha': alpha,
+               'beta': beta
+               }
+
+    mc_args = {'rho_act': rho_actual,
+               'num_measurements': num_sensors-1,
+               'rng': rng
+               }
 
     iterations_per_marker = 1
     markers_per_row = 40
@@ -118,7 +130,7 @@ def example1(rng=np.random.default_rng()):
     for idx in np.arange(num_mc_trials):
         utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        result = _mc_iteration(args)
+        result = _mc_iteration(rx_args, ml_args, ls_args, gd_args, mc_args)
         x_ml[:, idx] = result['ml']
         x_bf[:, idx] = result['bf']
         x_ls_full[:, :, idx] = result['ls']
@@ -148,7 +160,8 @@ def example1(rng=np.random.default_rng()):
     plt.ylabel('[km]')
 
     # Compute and Plot CRLB and Error Ellipse Expectations
-    err_crlb = np.squeeze(tdoa.perf.compute_crlb(x_sensor, x_source, cov=covar_rho, variance_is_toa=False, do_resample=False))
+    err_crlb = np.squeeze(tdoa.perf.compute_crlb(x_sensor, x_source, cov=covar_rho, variance_is_toa=False,
+                                                 do_resample=False))
     crlb_cep50 = utils.errors.compute_cep50(err_crlb)/1e3  # [km]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :]/1e3, crlb_ellipse[1, :]/1e3, linewidth=.5, label='90% Error Ellipse')
@@ -242,10 +255,13 @@ def example1(rng=np.random.default_rng()):
     plt.ylabel('$CEP_{50}$ [km]')
     plt.legend(loc='upper right')
 
+    # Re-engage the warning for numpy underflow
+    np.seterr(under='warn')
+
     return fig_geo_a, fig_geo_b, fig_err
 
 
-def _mc_iteration(args):
+def _mc_iteration(rx_args: dict, ml_args: dict, ls_args: dict, gd_args: dict, mc_args: dict):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 11.1.
 
@@ -272,22 +288,14 @@ def _mc_iteration(args):
     """
 
     # Generate a random measurement
-    rng = args['rng']
-    rho = args['rho_act'] + args['covar_lower'] @ rng.standard_normal(size=(args['num_measurements'], ))
+    rng = mc_args['rng']
+    rho = mc_args['rho_act'] + rx_args['cov'].lower @ rng.standard_normal(size=(mc_args['num_measurements'], ))
 
     # Generate solutions
-    res_ml, _, _ = tdoa.solvers.max_likelihood(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_inv'],
-                                               x_ctr=args['x_init'], search_size=args['x_extent'],
-                                               epsilon=args['grid_res'], cov_is_inverted=True)
-    res_bf, _, _ = tdoa.solvers.bestfix(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_rho'],
-                                        x_ctr=args['x_init'], search_size=args['x_extent'], epsilon=args['grid_res'])
-    _, res_ls = tdoa.solvers.least_square(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_inv'],
-                                          x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                          force_full_calc=True, cov_is_inverted=True)
-    _, res_gd = tdoa.solvers.gradient_descent(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_inv'],
-                                              x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                              alpha=args['gd_alpha'], beta=args['gd_beta'],
-                                              force_full_calc=True, cov_is_inverted=True)
-    res_chan_ho = tdoa.solvers.chan_ho(x_sensor=args['x_sensor'], rho=rho, cov=args['covar_rho'])
+    res_ml, _, _ = tdoa.solvers.max_likelihood(**rx_args, **ml_args, rho=rho)
+    res_bf, _, _ = tdoa.solvers.bestfix(**rx_args, **ml_args, rho=rho)
+    _, res_ls = tdoa.solvers.least_square(**rx_args, **ls_args, rho=rho)
+    _, res_gd = tdoa.solvers.gradient_descent(**rx_args, **gd_args, rho=rho)
+    res_chan_ho = tdoa.solvers.chan_ho(x_sensor=rx_args['x_sensor'], rho=rho, cov=rx_args['cov'])
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf, 'chan_ho': res_chan_ho}

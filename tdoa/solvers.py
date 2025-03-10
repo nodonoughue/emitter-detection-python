@@ -2,11 +2,13 @@ import utils
 # from ..utils import solvers
 from . import model
 import numpy as np
+from utils.covariance import CovarianceMatrix
+from scipy.linalg import pinvh
 solvers = utils.solvers
 
 
-def max_likelihood(x_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx=None, do_resample=False,
-                   cov_is_inverted=False):
+def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon=None, ref_idx=None,
+                   do_resample=False):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -27,15 +29,12 @@ def max_likelihood(x_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx
     """
 
     # Resample the covariance matrix
-    if do_resample and not cov_is_inverted:
-        # Do it here, instead of passing on to model.log_likelihood, in order to avoid repeatedly resampling
-        # the same covariance matrix for every test point.
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
-        cov = utils.ensure_invertible(cov)
+    if do_resample:
+        cov = cov.resample(ref_idx)
 
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_sensor, rho, cov, x, ref_idx, do_resample=False, cov_is_inverted=cov_is_inverted)
+        return model.log_likelihood(x_sensor, rho, cov, x, ref_idx, do_resample=False, variance_is_toa=False)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon)
@@ -43,7 +42,7 @@ def max_likelihood(x_sensor, rho, cov, x_ctr, search_size, epsilon=None, ref_idx
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, cov_is_inverted=False, **kwargs):
+def gradient_descent(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False, **kwargs):
     """
     Computes the gradient descent solution for tdoa processing.
 
@@ -69,17 +68,16 @@ def gradient_descent(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
 
-    if do_resample and not cov_is_inverted:
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
-        cov = utils.ensure_invertible(cov)
+    if do_resample:
+        cov = cov.resample(ref_idx)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, cov_is_inverted=cov_is_inverted, **kwargs)
+    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 
 
-def least_square(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, cov_is_inverted=False, **kwargs):
+def least_square(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False, **kwargs):
     """
     Computes the least square solution for tdoa processing.
 
@@ -105,18 +103,17 @@ def least_square(x_sensor, rho, cov, x_init, ref_idx=None, do_resample=False, co
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
 
-    # TODO: Make sure FDOA, Triang, and Hybrid solvers can accept cov_is_inverted
-    if do_resample and not cov_is_inverted:
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
-        cov = utils.ensure_invertible(cov)
+    if do_resample:
+        cov = cov.resample(ref_idx)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, covariance=cov, x_init=x_init, cov_is_inverted=cov_is_inverted, **kwargs)
+    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 
 
-def bestfix(x_sensor, rho, cov, x_ctr, search_size, epsilon, ref_idx=None, pdf_type=None, do_resample=False):
+def bestfix(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon, ref_idx=None, pdf_type=None,
+            do_resample=False):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
     a series of coordinates, and returning the index of the maximum.
@@ -156,10 +153,9 @@ def bestfix(x_sensor, rho, cov, x_ctr, search_size, epsilon, ref_idx=None, pdf_t
 
     # Resample the covariance matrix
     if do_resample:
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
-        cov = utils.ensure_invertible(cov)
+        cov = cov.resample(ref_idx)
 
-    pdfs = utils.make_pdfs(measurement, rho, pdf_type, cov)
+    pdfs = utils.make_pdfs(measurement, rho, pdf_type, cov.cov)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.bestfix(pdfs, x_ctr, search_size, epsilon)
@@ -167,7 +163,7 @@ def bestfix(x_sensor, rho, cov, x_ctr, search_size, epsilon, ref_idx=None, pdf_t
     return x_est, likelihood, x_grid
 
 
-def chan_ho(x_sensor, rho, cov, ref_idx=None, do_resample=False):
+def chan_ho(x_sensor, rho, cov: CovarianceMatrix, ref_idx=None, do_resample=False):
     """
     Computes the Chan-Ho solution for TDOA processing.
 
@@ -208,7 +204,7 @@ def chan_ho(x_sensor, rho, cov, ref_idx=None, do_resample=False):
 
     # Resample the covariance matrix
     if do_resample:
-        cov = utils.resample_covariance_matrix(cov, ref_idx)
+        cov = cov.resample(ref_idx)
 
     # Stage 1: Initial Position Estimate
     # Compute system matrix overline(A) according to 11.23
@@ -282,7 +278,7 @@ def chan_ho(x_sensor, rho, cov, ref_idx=None, do_resample=False):
     return x
 
 
-def _chan_ho_theta(cov, b, g, y):
+def _chan_ho_theta(cov: CovarianceMatrix, b, g, y):
     """
     Compute position estimate overline(theta) according to 11.25.
     This is an internal function called by chan_ho.
@@ -295,13 +291,13 @@ def _chan_ho_theta(cov, b, g, y):
     :return cov_mod: modified covariance matrix (eq 11.28)
     """
 
-    cov_mod = b.dot(cov).dot(np.transpose(np.conjugate(b)))  # BCB', eq 11.28
-    cov_mod_inv = np.linalg.inv(cov_mod)
+    cov_mod = b @ cov.cov @ np.transpose(np.conjugate(b))  # BCB', eq 11.28
+    cov_mod_inv = pinvh(cov_mod)
 
     # Assemble matrix products g^H*w_inv*g, and g^H*w_inv*y
-    gw = np.transpose(np.conjugate(g)).dot(cov_mod_inv)
-    gwg = gw.dot(g)
-    gwy = gw.dot(y)
+    gw = np.transpose(np.conjugate(g)) @ cov_mod_inv
+    gwg = gw @ g
+    gwy = gw @ y
 
     theta = np.linalg.lstsq(gwg, gwy, rcond=None)[0]
 
@@ -315,8 +311,8 @@ def _chan_ho_theta_hat(cov_mod, b2, g1, g2, y2):
 
     :param cov_mod: measurement-level covariance matrix
     :param b2:
-    :param g1: system matrix
-    :param g2: system matrix
+    :param g1:
+    :param g2:
     :param y2: shifted measurement vector
     :return theta: parameter vector (eq 11.26)
     :return cov_mod: modified covariance matrix (eq 11.28)
@@ -327,6 +323,11 @@ def _chan_ho_theta_hat(cov_mod, b2, g1, g2, y2):
     g2w = np.transpose(np.conjugate(g2)).dot(w2)
     g2wg2 = g2w.dot(g2)
     g2wy = g2w.dot(y2)
+    g1wg1 = np.transpose(np.conjugate(g1)) @ cov_mod @ g1
+    w2 = np.linalg.pinv(np.conjugate(np.transpose(b2))) @ g1wg1 @ np.linalg.pinv(b2)
+    g2w = np.transpose(np.conjugate(g2)) @ w2
+    g2wg2 = g2w @ g2
+    g2wy = g2w @ y2
 
     theta = np.linalg.lstsq(g2wg2, g2wy, rcond=None)[0]
 

@@ -15,6 +15,7 @@ import numpy as np
 import scipy
 import tdoa
 from examples import chapter11
+from utils.covariance import CovarianceMatrix
 
 
 def make_all_figures(close_figs=False, force_recalc=False):
@@ -110,9 +111,9 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     plt.plot(toa3[0, :], toa3[1, :], linestyle=':', label=None)
     
     # Overlay plt.text
-    plt.text(x_sensor1[0] + .05, x_sensor1[1] - .1, r'$S_1$')
-    plt.text(x_sensor2[0] + .05, x_sensor2[1] - .1, r'$S_2$')
-    plt.text(x_sensor3[0] + .05, x_sensor3[1] + .1, r'$S_3$')
+    plt.text(float(x_sensor1[0] + .05), float(x_sensor1[1] - .1), r'$S_1$')
+    plt.text(float(x_sensor2[0] + .05), float(x_sensor2[1] - .1), r'$S_2$')
+    plt.text(float(x_sensor3[0] + .05), float(x_sensor3[1] + .1), r'$S_3$')
     
     # plt.text(x_source[0] + .1, x_source[1] + .1, r'$T_1$')
     
@@ -188,10 +189,10 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
         this_uc_label = None
 
     # Manual Isochrone Labels
-    plt.text(np.mean([x_sensor1[0], x_sensor2[0]]),
-             np.mean([x_sensor1[1], x_sensor2[1]]) - .2, r'$TDOA_{1,2}$')
-    plt.text(np.mean([x_sensor2[0], x_sensor3[0]]) + .3,
-             np.mean([x_sensor2[1], x_sensor3[1]]), r'$TDOA_{2,3}$')
+    plt.text(float(np.mean([x_sensor1[0], x_sensor2[0]])),
+             float(np.mean([x_sensor1[1], x_sensor2[1]]) - .2), r'$TDOA_{1,2}$')
+    plt.text(float(np.mean([x_sensor2[0], x_sensor3[0]]) + .3),
+             float(np.mean([x_sensor2[1], x_sensor3[1]])), r'$TDOA_{2,3}$')
     
     # Position Markers
     plt.scatter([x_sensor1[0], x_sensor2[0], x_sensor3[0]],
@@ -201,9 +202,9 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     plt.scatter(x_source[0], x_source[1], marker='^', label='Transmitter')
     
     # Position Labels
-    plt.text(x_sensor1[0]+.05, x_sensor1[1]-.1, r'$S_1$')
-    plt.text(x_sensor2[0]+.05, x_sensor2[1]-.1, r'$S_2$')
-    plt.text(x_sensor3[0]+.05, x_sensor3[1]-.1, r'$S_3$')
+    plt.text(float(x_sensor1[0]+.05), float(x_sensor1[1]-.1), r'$S_1$')
+    plt.text(float(x_sensor2[0]+.05), float(x_sensor2[1]-.1), r'$S_2$')
+    plt.text(float(x_sensor3[0]+.05), float(x_sensor3[1]-.1), r'$S_3$')
     
     # Adjust Axes
     plt.xlim([-2, 3])
@@ -230,7 +231,7 @@ def make_figure_2(prefix=None):
     Nicholas O'Donoughue
     8 March 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
     # Figure 2, Isochrones Plots
@@ -257,8 +258,8 @@ def make_figure_2(prefix=None):
     plt.plot([x_sensor1[0], x_sensor2[0]], [x_sensor1[1], x_sensor2[1]], marker='o', color='black', label='Sensors')
 
     # Label the sensors
-    plt.text(x_sensor1[0]-.1, x_sensor1[1]-.05, r'$S_1$')
-    plt.text(x_sensor2[0]+.05, x_sensor2[1]-.05, r'$S_2$')
+    plt.text(float(x_sensor1[0]-.1), float(x_sensor1[1]-.05), r'$S_1$')
+    plt.text(float(x_sensor2[0]+.05), float(x_sensor2[1]-.05), r'$S_2$')
 
     # Label the regimes
     plt.text(.24, 1.2, r'$R_1 < R_2$')
@@ -424,7 +425,7 @@ def make_figure_5(prefix=None):
     Nicholas O'Donoughue
     8 March 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -482,7 +483,7 @@ def make_figure_6(prefix=None):
     Nicholas O'Donoughue
     8 March 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -495,7 +496,7 @@ def make_figure_6(prefix=None):
     # Define Sensor Performance
     timing_error = 1e-7
     range_error = utils.constants.speed_of_light * timing_error
-    cov_roa = range_error**2 * np.eye(num_sensors)
+    cov_roa = CovarianceMatrix(range_error**2 * np.eye(num_sensors))
     # In the book, we manually resampled.  But we now have a utility that will
     # automatically resample the covariance matrix.
     # cov_tdoa = timing_error**2 * (1 + np.eye(num_sensors-1))
@@ -540,7 +541,7 @@ def make_figure_6(prefix=None):
     # Adjust Sensor Performance Vector
     timing_error = 1e-7
     range_error = utils.constants.speed_of_light * timing_error
-    cov_roa = range_error**2 * np.eye(num_sensors)
+    cov_roa = CovarianceMatrix(range_error**2 * np.eye(num_sensors))
     # In the book, we manually resampled.  But we now have a utility that will
     # automatically resample the covariance matrix.
     # cov_tdoa = timing_error**2 * (1 + np.eye(num_sensors-1))
@@ -617,7 +618,7 @@ def make_figure_9(prefix=None):
     Nicholas O'Donoughue
     8 March 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -648,11 +649,11 @@ def make_figure_9(prefix=None):
     plt.plot([x_source1[0], x_source2[0]], [x_source1[1], x_source2[1]], '^', markersize=8, label='Transmitters')
 
     # Transmitter/Sensor Labels
-    plt.text(x_sensor1[0]-.4, x_sensor1[1]-.1, '$S_1$')
-    plt.text(x_sensor2[0]+.1, x_sensor2[1]-.1, '$S_2$')
+    plt.text(float(x_sensor1[0]-.4), float(x_sensor1[1]-.1), '$S_1$')
+    plt.text(float(x_sensor2[0]+.1), float(x_sensor2[1]-.1), '$S_2$')
 
-    plt.text(x_source1[0]+.1, x_source1[1]+.1, '$T_a$')
-    plt.text(x_source2[0]+.1, x_source2[1]+.2, '$T_b$')
+    plt.text(float(x_source1[0]+.1), float(x_source1[1]+.1), '$T_a$')
+    plt.text(float(x_source2[0]+.1), float(x_source2[1]+.2), '$T_b$')
 
     # Isochrones
     plt.plot(xy_isochrone1[0], xy_isochrone1[1], '--', label=None)
@@ -695,7 +696,7 @@ def make_figure_10(prefix=None):
     Nicholas O'Donoughue
     8 March 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -737,12 +738,12 @@ def make_figure_10(prefix=None):
              [x_source1[1], x_source2[1]], '^', markersize=8, label='Transmitters')
 
     # Transmitter/Sensor Labels
-    plt.text(x_sensor1[0]+.05, x_sensor1[1]+.1, r'$S_1$')
-    plt.text(x_sensor2[0]+.05, x_sensor2[1]+.1, r'$S_2$')
-    plt.text(x_sensor3[0]+.05, x_sensor3[1]+.1, r'$S_3$')
+    plt.text(float(x_sensor1[0]+.05), float(x_sensor1[1]+.1), r'$S_1$')
+    plt.text(float(x_sensor2[0]+.05), float(x_sensor2[1]+.1), r'$S_2$')
+    plt.text(float(x_sensor3[0]+.05), float(x_sensor3[1]+.1), r'$S_3$')
 
-    plt.text(x_source1[0]+.1, x_source1[1], r'$T_a$')
-    plt.text(x_source2[0]+.1, x_source2[1], r'$T_b$')
+    plt.text(float(x_source1[0]+.1), float(x_source1[1]), r'$T_a$')
+    plt.text(float(x_source2[0]+.1), float(x_source2[1]), r'$T_b$')
 
     # False Isochrones
     plt.plot(x_isochrone1, y_isochrone1, '--', label=None)

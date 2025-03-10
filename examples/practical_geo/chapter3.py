@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-import scipy
 
 import utils
+from utils.covariance import CovarianceMatrix
 import tdoa
 import hybrid
 import time
@@ -11,6 +11,7 @@ import time
 
 _rad2deg = 180.0/np.pi
 _deg2rad = np.pi/180.0
+
 
 def run_all_examples():
     """
@@ -39,28 +40,28 @@ def example1(colors=None):
         colors = plt.get_cmap("viridis")
 
     # Initialize Measurement Covariance Matrix
-    cov = np.diag(np.array([1, 3, 2, 3, 5])**2)
+    cov = CovarianceMatrix(np.diag(np.array([1, 3, 2, 3, 5])**2))
     c_max = 5**2 + 3**2
 
     # Generate common reference sets
-    cov_first = utils.resample_covariance_matrix(cov, test_idx_vec=0)
-    cov_last = utils.resample_covariance_matrix(cov, test_idx_vec=4)
+    cov_first = cov.resample(0)
+    cov_last = cov.resample(4)
 
     fig_a = plt.figure()
-    plt.imshow(cov_first, vmin=0, vmax=c_max, cmap=colors)
+    plt.imshow(cov_first.cov, vmin=0, vmax=c_max, cmap=colors)
     plt.colorbar()
     plt.title('Ref Index = 0')
 
     fig_b = plt.figure()
-    plt.imshow(cov_last, vmin=0, vmax=c_max, cmap=colors)
+    plt.imshow(cov_last.cov, vmin=0, vmax=c_max, cmap=colors)
     plt.colorbar()
     plt.title('Ref Index = 4')
 
     # Generate a full measurement set example
-    cov_full = utils.resample_covariance_matrix(cov, test_idx_vec='full')
+    cov_full = cov.resample('full')
 
     fig_c = plt.figure()
-    plt.imshow(cov_full, vmin=0, vmax=c_max, cmap=colors)
+    plt.imshow(cov_full.cov, vmin=0, vmax=c_max, cmap=colors)
     plt.colorbar()
     plt.title('Ref Index = ''full''')
 
@@ -96,7 +97,8 @@ def example2(colors=None):
 
     # Define Covariance Matrix
     err_time = 100e-9
-    cov_full = err_time**2 * np.eye(num_sensors)
+    cov_full = CovarianceMatrix(err_time**2 * np.eye(num_sensors))
+    # cov_full.multiply(utils.constants.speed_of_light**2)  # Convert from TOA to ROA
 
     # Plot geometry
     fig = plt.figure()
@@ -132,7 +134,7 @@ def example2(colors=None):
     for this_ref_set in ref_set:
         # Compute CRLB
         this_crlb = tdoa.perf.compute_crlb(x_sensor=x_sensors, x_source=x_source, cov=cov_full, variance_is_toa=True,
-                                           ref_idx=this_ref_set)
+                                           ref_idx=this_ref_set, print_progress=True)
         # Response should be N x N x 3, where grid_shape = N x N x 1
 
         # Compute CEP50
@@ -161,20 +163,21 @@ def example3(colors=None):
     :param colors:
     :return: figure handle to generated graphic
     """
+    # TODO: Look for underflow and ignore warning
 
     if colors is None:
         colors = plt.get_cmap("viridis")
 
     # Initialize sensor coordinates
-    x_sensors = np.array([[-17.5, -12.5, 12.5, 17.5],[0, 0, 0, 0]]) * 1e3  # m
+    x_sensors = np.array([[-17.5, -12.5, 12.5, 17.5], [0, 0, 0, 0]]) * 1e3  # m
     velocity = 100   # m/s
     heading_1 = 70 * _deg2rad   # CCW from +x; heading for sensors 0 and 1
     heading_2 = 110 * _deg2rad  # CCW from +x; heading for sensors 2 and 3
     v_sensors = np.kron(np.array([np.cos([heading_1, heading_2]),    # Use heading to define cartesian velocity.
                                  np.sin([heading_1, heading_2])]),
-                        np.ones((1, 2))) * velocity                  # Use kronecker product to duplicate velocity for
-                                                                    # each sensor in FDOA pairs (sensor pairs moving in
-                                                                    # formation).
+                        np.ones((1, 2))) * velocity
+    # Use kronecker product to duplicate velocity for each sensor in FDOA pairs (sensor pairs moving in formation).
+
     # 3D Version -- from video; uncomment to use
     # alt = 10e3
     # zz_sensors = alt*np.ones((num_sensors, ))
@@ -188,9 +191,9 @@ def example3(colors=None):
     freq_err = 100     # 10 Hz
     rng_err = utils.constants.speed_of_light * time_err  # meters (ROA)
     rng_rate_err = lam * freq_err                        # meters/second (RROA)
-    cov_toa = rng_err ** 2 * np.eye(num_sensors)
-    cov_foa = rng_rate_err **2 * np.eye(num_sensors)
-    cov_full = scipy.linalg.block_diag(cov_toa, cov_foa)  # Measurement level error (ROA/RROA)
+    cov_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
+    cov_foa = CovarianceMatrix(rng_rate_err ** 2 * np.eye(num_sensors))
+    cov_full = CovarianceMatrix.block_diagonal(cov_roa, cov_foa)  # Measurement level error (ROA/RROA)
 
     # Plot geometry
     fig = plt.figure()
@@ -204,7 +207,7 @@ def example3(colors=None):
     plt.ylim([-10e3, 10e3])
 
     # Define Sensor Pairs
-    ref_set = (np.array([[0, 2],[1, 3]]), np.array([[0, 1, 2],[1, 2, 3]]), 'full')
+    ref_set = (np.array([[0, 2], [1, 3]]), np.array([[0, 1, 2], [1, 2, 3]]), 'full')
 
     # Define search grid for CRLB (targets up to 200 km away from center of TDOA constellation)
     x_ctr = np.zeros((num_dims, ))
@@ -235,9 +238,8 @@ def example3(colors=None):
 
         # Use the same sensors and reference indices for both TDOA and FDOA; set AOA to none
         this_crlb = hybrid.perf.compute_crlb(x_aoa=None, x_tdoa=x_sensors, x_fdoa=x_sensors, v_fdoa=v_sensors,
-                                             x_source=x_source,
-                                             cov=cov_full, do_resample=True, cov_is_inverted=False,
-                                             tdoa_ref_idx=this_ref, fdoa_ref_idx=this_ref)
+                                             x_source=x_source, cov=cov_full, do_resample=True,
+                                             tdoa_ref_idx=this_ref, fdoa_ref_idx=this_ref, print_progress=True)
 
         this_rmse = np.sqrt(np.trace(this_crlb, axis1=0, axis2=1))
 
@@ -266,28 +268,24 @@ def example4(rng=np.random.default_rng()):
     offset = 1e2   # Maximum distance from center to a single instance of the source position (per dimension)
     x_source = x_source_ctr[:, np.newaxis] + offset * (-1 + 2 * rng.standard_normal(size=(2, num_mc)))
 
-    x_tdoa = np.array([[1., 3., 4., 5., 2.],[0., .5, 0., .5, -1.]]) * 1e3
+    x_tdoa = np.array([[1., 3., 4., 5., 2.], [0., .5, 0., .5, -1.]]) * 1e3
     _, num_tdoa = utils.safe_2d_shape(x_tdoa)
 
     # Initialize error covariance matrix
     time_err = 1e-7         # 100 ns time of arrival error per sensor
-    cov_toa = (time_err**2) * np.eye(num_tdoa)
-    cov_roa = cov_toa * (utils.constants.speed_of_light**2)
+    cov_toa = CovarianceMatrix((time_err**2) * np.eye(num_tdoa))
+    cov_roa = cov_toa.multiply(utils.constants.speed_of_light**2)
 
     # TDOA Measurement and Combined Covariance Matrix
     # TODO: Align test_idx and ref_idx among all usages
     z_common = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_source, ref_idx=None)  # num_tdoa x num_mc
     z_full = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_source, ref_idx='full')
 
-    cov_z_common = utils.resample_covariance_matrix(cov_roa, test_idx_vec=None)  # RDOA
-    cov_z_full = utils.resample_covariance_matrix(cov_roa, test_idx_vec='full')  # RDOA
-
-    # Make sure the covariance matrices are invertible (positive definite)
-    cov_z_common = utils.ensure_invertible(cov_z_common)
-    cov_z_full = utils.ensure_invertible(cov_z_full)
+    cov_z_common = cov_roa.copy().resample(None)  # RDOA
+    cov_z_full = cov_roa.copy().resample('full')  # RDOA
 
     # Generate random noise
-    noise_sensor = np.linalg.cholesky(cov_roa) @ rng.standard_normal(size=(num_tdoa, num_mc))
+    noise_sensor = cov_roa.lower @ rng.standard_normal(size=(num_tdoa, num_mc))
     noise_common = utils.resample_noise(noise_sensor, test_idx_vec=None)
     noise_full = utils.resample_noise(noise_sensor, test_idx_vec='full')
 
@@ -303,15 +301,6 @@ def example4(rng=np.random.default_rng()):
     # GD and LS Search Parameters
     gd_ls_args = dict(x_init=np.array([1, 1]) * 1e3, epsilon=ml_args['epsilon'], max_num_iterations=200,
                       force_full_calc=True, plot_progress=False)
-
-    # This section differs from the MATLAB code. Profiling shows a speedup if we
-    # compute the pseudoinverse of the covariance matrix once, rather than pass in
-    # the regular covariance matrix.
-    # TODO: Think of a better way to pass in both the inverted and regular covariance matrices; perhaps a custom data structure.
-    ml_args['cov_is_inverted'] = True
-    gd_ls_args['cov_is_inverted'] = True
-    cov_z_common_inv = np.real(scipy.linalg.pinvh(cov_z_common))
-    cov_z_full_inv = np.real(scipy.linalg.pinvh(cov_z_full))
 
     rmse_ml = np.zeros((num_mc,))
     rmse_gd = np.zeros((num_mc, gd_ls_args['max_num_iterations']))
@@ -335,7 +324,7 @@ def example4(rng=np.random.default_rng()):
         this_zeta_common = zeta_common[:, idx]
         this_zeta_full = zeta_full[:, idx]
 
-        res = _mc_iteration(x_tdoa, this_zeta_common, this_zeta_full, cov_z_common_inv, cov_z_full_inv, ml_args, gd_ls_args)
+        res = _mc_iteration(x_tdoa, this_zeta_common, this_zeta_full, cov_z_common, cov_z_full, ml_args, gd_ls_args)
 
         rmse_ml[idx] = np.linalg.norm(res['ml'] - this_source)
         rmse_gd[idx, :] = np.linalg.norm(res['gd'] - this_source[:, np.newaxis], axis=0)
@@ -358,16 +347,15 @@ def example4(rng=np.random.default_rng()):
 
     fig_err = plt.figure()
     x_arr = np.arange(gd_ls_args['max_num_iterations'])
-    hdl_ml = plt.plot(x_arr, rmse_avg_ml * np.ones_like(x_arr), label='Maximum Likelihood')
-    hdl_gd = plt.plot(x_arr, rmse_avg_gd, label='Gradient Descent')
-    hdl_ls = plt.plot(x_arr, rmse_avg_ls, label='Least Square')
+    plt.plot(x_arr, rmse_avg_ml * np.ones_like(x_arr), label='Maximum Likelihood')
+    plt.plot(x_arr, rmse_avg_gd, label='Gradient Descent')
+    plt.plot(x_arr, rmse_avg_ls, label='Least Square')
     plt.plot(x_arr, rmse_avg_ml_full * np.ones_like(x_arr), '--', label='Maximum Likelihood (full)',
              marker='o', markevery=10)
     plt.plot(x_arr, rmse_avg_gd_full, '-.', label='Gradient Descent (full)',
              marker='o', markevery=10)
     plt.plot(x_arr, rmse_avg_ls_full, '-.', label='Least Square (full)',
              marker='o', markevery=10)
-
 
     plt.xlabel('Number of Iterations')
     plt.ylabel('RMSE [m]')
@@ -430,7 +418,6 @@ def example4(rng=np.random.default_rng()):
     plt.plot(x_ls[0], x_ls[1], linestyle='-.', marker='*', markevery=[-1], label='Least Squares')
     plt.plot(x_ls_full[0], x_ls_full[1], linestyle='-.', marker='*', markevery=[-1], label='Least Squares (full)')
 
-
     # Overlay Error Ellipse
     plt.plot(crlb_ellipse[0], crlb_ellipse[1], linestyle='--', color='k',
              label='{:d}% Error Ellipse'.format(conf_interval))
@@ -442,7 +429,8 @@ def example4(rng=np.random.default_rng()):
     return fig_err, fig_full
 
 
-def _mc_iteration(x_tdoa, zeta_common, zeta_full, cov_z_common, cov_z_full, ml_args, gd_ls_args):
+def _mc_iteration(x_tdoa, zeta_common, zeta_full, cov_z_common: CovarianceMatrix, cov_z_full: CovarianceMatrix,
+                  ml_args, gd_ls_args):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 3.4.
 
@@ -483,7 +471,7 @@ def _mc_iteration(x_tdoa, zeta_common, zeta_full, cov_z_common, cov_z_full, ml_a
     _, x_ls_full = tdoa.solvers.least_square(rho=zeta_full, cov=cov_z_full, x_sensor=x_tdoa, ref_idx='full',
                                              do_resample=False, ** gd_ls_args)
 
-    return {'ml': x_ml, 'ls': x_ls, 'gd': x_gd, 'ml_full':x_ml_full, 'ls_full': x_ls_full, 'gd_full': x_gd_full}
+    return {'ml': x_ml, 'ls': x_ls, 'gd': x_gd, 'ml_full': x_ml_full, 'ls_full': x_ls_full, 'gd_full': x_gd_full}
 
 
 def _plot_contourf(x_grid, extent, grid_shape_2d, z, x_sensors, v_sensors, levels, colors):
@@ -494,8 +482,8 @@ def _plot_contourf(x_grid, extent, grid_shape_2d, z, x_sensors, v_sensors, level
 
     # Unlike in MATLAB, contourf does not draw contour edges. Manually add contours
     hdl2 = plt.contour(x_grid[0], x_grid[1], np.reshape(z, grid_shape_2d), levels=levels,
-                      origin='lower', colors='k')
-    plt.clabel(hdl2, fontsize=10, colors='w')#, fmt=matplotlib.ticker.LogFormatterExponent)#, fmt=lambda x: f"{x:.1f} km")
+                       origin='lower', colors='k')
+    plt.clabel(hdl2, fontsize=10, colors='w')
 
     hdl3 = plt.scatter(x_sensors[0, :], x_sensors[1, :], color='w', facecolors='none', marker='o', label='Sensors')
     if v_sensors is not None:

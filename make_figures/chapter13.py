@@ -12,12 +12,12 @@ Nicholas O'Donoughue
 import utils
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy
 import triang
 import tdoa
 import fdoa
 import hybrid
 from examples import chapter13
+from utils.covariance import CovarianceMatrix
 
 
 def make_all_figures(close_figs=False, force_recalc=False):
@@ -186,20 +186,20 @@ def make_figure_2(prefix=None):
     rng_rate_err = freq_err * utils.constants.speed_of_light / transmit_freq  # m / s
 
     # Error Covariance Matrices
-    covar_ang = ang_err ** 2 * np.eye(num_sensors)
-    covar_roa = rng_err ** 2 * np.eye(num_sensors)
-    covar_rroa = rng_rate_err ** 2 * np.eye(num_sensors)
-    covar_rdoa = utils.resample_covariance_matrix(covar_roa, tdoa_ref_idx)
-    covar_rrdoa = utils.resample_covariance_matrix(covar_rroa, fdoa_ref_idx)
-    covar_rho = scipy.linalg.block_diag(covar_ang, covar_rdoa, covar_rrdoa)
+    covar_ang = CovarianceMatrix(ang_err ** 2 * np.eye(num_sensors))
+    covar_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
+    covar_rroa = CovarianceMatrix(rng_rate_err ** 2 * np.eye(num_sensors))
+    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
+    covar_rrdoa = covar_rroa.resample(fdoa_ref_idx)
+    covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
 
     fig2a = _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_pts)
 
     # Figure 12.3b -- Better DF
     print('Generating Figure 13.2b...')
     ang_err_highres = .02  # rad
-    covar_ang_highres = ang_err_highres ** 2 * np.eye(num_sensors)
-    covar_rho = scipy.linalg.block_diag(covar_ang_highres, covar_rdoa, covar_rrdoa)
+    covar_ang_highres = CovarianceMatrix(ang_err_highres ** 2 * np.eye(num_sensors))
+    covar_rho = CovarianceMatrix.block_diagonal(covar_ang_highres, covar_rdoa, covar_rrdoa)
 
     fig2b = _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_pts)
 
@@ -207,9 +207,9 @@ def make_figure_2(prefix=None):
     print('Generating Figure 13.2c...')
     time_err_highres = 100e-9  # sec
     rng_err_highres = utils.constants.speed_of_light * time_err_highres
-    covar_roa_highres = rng_err_highres ** 2 * np.eye(num_sensors)
-    covar_rdoa_highres = utils.resample_covariance_matrix(covar_roa_highres, tdoa_ref_idx)
-    covar_rho = scipy.linalg.block_diag(covar_ang, covar_rdoa_highres, covar_rrdoa)
+    covar_roa_highres = CovarianceMatrix(rng_err_highres ** 2 * np.eye(num_sensors))
+    covar_rdoa_highres = covar_roa_highres.resample(tdoa_ref_idx)
+    covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa_highres, covar_rrdoa)
 
     fig2c = _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_pts)
 
@@ -217,9 +217,9 @@ def make_figure_2(prefix=None):
     print('Generating Figure 13.2d...')
     freq_err_highres = 10  # Hz
     rng_rate_err_highres = freq_err_highres * utils.constants.speed_of_light / transmit_freq  # m / s
-    covar_rroa_highres = rng_rate_err_highres ** 2 * np.eye(num_sensors)
-    covar_rrdoa_highres = utils.resample_covariance_matrix(covar_rroa_highres, fdoa_ref_idx)
-    covar_rho = scipy.linalg.block_diag(covar_ang, covar_rdoa, covar_rrdoa_highres)
+    covar_rroa_highres = CovarianceMatrix(rng_rate_err_highres ** 2 * np.eye(num_sensors))
+    covar_rrdoa_highres = covar_rroa_highres.resample(fdoa_ref_idx)
+    covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa_highres)
 
     fig2d = _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_pts)
 
@@ -239,7 +239,7 @@ def make_figure_2(prefix=None):
     return fig2a, fig2b, fig2c, fig2d
 
 
-def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_pts):
+def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho: CovarianceMatrix, x_max, num_pts):
 
     # Generate the likelihood; for plotting
     # Alternatively, we could plot the error (eps)
@@ -382,12 +382,12 @@ def make_figure_7(prefix):
     rng_rate_err = freq_err * utils.constants.speed_of_light / transmit_freq  # m/s
 
     # Error Covariance Matrices
-    covar_ang = ang_err ** 2 * np.eye(num_sensors)
-    covar_roa = rng_err ** 2 * np.eye(num_sensors)
-    covar_rroa = rng_rate_err ** 2 * np.eye(num_sensors)
-    covar_rdoa = utils.resample_covariance_matrix(covar_roa, tdoa_ref_idx)
-    covar_rrdoa = utils.resample_covariance_matrix(covar_rroa, fdoa_ref_idx)
-    covar_rho = scipy.linalg.block_diag(covar_ang, covar_rdoa, covar_rrdoa)
+    covar_ang = CovarianceMatrix(ang_err ** 2 * np.eye(num_sensors))
+    covar_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
+    covar_rroa = CovarianceMatrix(rng_rate_err ** 2 * np.eye(num_sensors))
+    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
+    covar_rrdoa = covar_rroa.resample(fdoa_ref_idx)
+    covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
 
     # Define source positions
     x_ctr = np.array([0., 0.])
@@ -503,11 +503,11 @@ def make_figure_8(prefix):
     rng_rate_err = freq_err * utils.constants.speed_of_light / transmit_freq  # m/s
 
     # Error Covariance Matrices
-    covar_roa = rng_err ** 2 * np.eye(num_sensors)
-    covar_rroa = rng_rate_err ** 2 * np.eye(num_sensors)
-    covar_rdoa = utils.resample_covariance_matrix(covar_roa, tdoa_ref_idx)
-    covar_rrdoa = utils.resample_covariance_matrix(covar_rroa, fdoa_ref_idx)
-    covar_rho = scipy.linalg.block_diag(covar_rdoa, covar_rrdoa)
+    covar_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
+    covar_rroa = CovarianceMatrix(rng_rate_err ** 2 * np.eye(num_sensors))
+    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
+    covar_rrdoa = covar_rroa.resample(fdoa_ref_idx)
+    covar_rho = CovarianceMatrix.block_diagonal(covar_rdoa, covar_rrdoa)
 
     # Define source positions
     x_ctr = np.array([0., 0.])
@@ -618,10 +618,10 @@ def make_figure_9(prefix):
     rng_err = utils.constants.speed_of_light * time_err  # m
 
     # Error Covariance Matrices
-    covar_ang = ang_err ** 2 * np.eye(num_sensors)
-    covar_roa = rng_err ** 2 * np.eye(num_sensors)
-    covar_rdoa = utils.resample_covariance_matrix(covar_roa, tdoa_ref_idx)
-    covar_rho = scipy.linalg.block_diag(covar_ang, covar_rdoa)
+    covar_ang = CovarianceMatrix(ang_err ** 2 * np.eye(num_sensors))
+    covar_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
+    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
+    covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa)
 
     # Define source positions
     x_ctr = np.array([0., 0.])

@@ -1,7 +1,6 @@
 import numpy as np
-# from utils import unit_conversions, geo
 import utils
-from scipy.linalg import solve_triangular
+from utils.covariance import CovarianceMatrix
 unit_conversions = utils.unit_conversions
 geo = utils.geo
 
@@ -92,7 +91,8 @@ def jacobian(x_sensor, x_source, ref_idx=None):
     return j
 
 
-def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False, cov_is_inverted=False):
+def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None, do_resample=False,
+                   variance_is_toa=True):
     """
     Computes the Log Likelihood for TDOA sensor measurement, given the received range difference measurement vector
     rho, covariance matrix cov, and set of candidate source positions x_source.
@@ -108,8 +108,8 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
     :param x_source: Candidate source positions
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
-    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
-                            inverse of the covariance matrix.
+    :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+    it is in m^2
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -123,24 +123,12 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
     # Parse the TDOA sensor pairs
     _, n_tdoa = utils.safe_2d_shape(x_sensor)
 
-    # Pre-process the covariance matrix
-    if cov_is_inverted:
-        cov_inv = cov
-        cov_lower = None  # pre-define to avoid a 'use before defined' error
-    else:
-        if do_resample:
-            cov = utils.resample_covariance_matrix(cov, ref_idx)
-            cov = utils.ensure_invertible(cov)
+    if variance_is_toa:
+        # Convert from TOA/TDOA to ROA/RDOA -- copy to a new object for sanity's sake
+        cov = cov.copy().multiply(utils.constants.speed_of_light ** 2)
 
-        if np.isscalar(cov):
-            # The covariance matrix is a scalar, this is easy, go ahead and invert it
-            cov_inv = 1. / cov
-            cov_lower = None
-            cov_is_inverted = True
-        else:
-            # Use the Cholesky decomposition to speed things up
-            cov_lower = np.linalg.cholesky(cov)
-            cov_inv = None  # pre-define to avoid a 'use before defined' error
+    if do_resample:
+        cov = cov.resample(ref_idx)
 
     for idx_source in np.arange(n_source_pos):
         x_i = x_source[:, idx_source]
@@ -152,20 +140,13 @@ def log_likelihood(x_sensor, rho, cov, x_source, ref_idx=None, do_resample=False
         err = (rho_dot - rho)
 
         # Compute the scaled log likelihood
-        if cov_is_inverted:
-            if np.isscalar(cov_inv):
-                ell[idx_source] = - cov_inv * (err ** 2)
-            else:
-                ell[idx_source] = - err.T @ cov_inv @ err
-        else:
-            # Use Cholesky decomposition
-            cov_err = solve_triangular(cov_lower, err, lower=True)
-            ell[idx_source] = - np.sum(cov_err**2)
+        ell[idx_source] = - cov.solve_aca(err)
 
     return ell
 
 
-def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=False, cov_is_inverted=False):
+def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, ref_idx=None, do_resample=False,
+          variance_is_toa=True):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each
     dimension.  For each point, compute the TDOA solution for each sensor
@@ -184,8 +165,8 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=Fal
     :param num_pts: Number of test points along each dimension
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
-    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
-                            inverse of the covariance matrix.
+    :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+    it is in m^2
     :return epsilon: 2-D plot of FDOA error
     :return x_vec:
     :return y_vec:
@@ -198,24 +179,12 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=Fal
 
     _, num_sensors = np.shape(x_sensor)
 
-    # Pre-process the covariance matrix
-    if cov_is_inverted:
-        cov_inv = cov
-        cov_lower = None  # pre-define to avoid a 'use before defined' error
-    else:
-        if do_resample:
-            cov = utils.resample_covariance_matrix(cov, ref_idx)
-            cov = utils.ensure_invertible(cov)
+    if variance_is_toa:
+        # Convert from TOA/TDOA to ROA/RDOA
+        cov = cov.copy().multiply(utils.constants.speed_of_light ** 2)
 
-        if np.isscalar(cov):
-            # The covariance matrix is a scalar, this is easy, go ahead and invert it
-            cov_inv = 1. / cov
-            cov_lower = None
-            cov_is_inverted = True
-        else:
-            # Use the Cholesky decomposition to speed things up
-            cov_lower = np.linalg.cholesky(cov)
-            cov_inv = None  # pre-define to avoid a 'use before defined' error
+    if do_resample:
+        cov = cov.resample(ref_idx)
 
     # Set up test points
     xx_vec = x_max.flatten() * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))
@@ -235,11 +204,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, ref_idx=None, do_resample=Fal
         err = r - rr_i
 
         # Evaluate the scaled log likelihood
-        if cov_is_inverted:
-            epsilon[idx_pt] = err.H.dot(cov_inv).dot(err)
-        else:
-            cov_err = solve_triangular(cov_lower, err, lower=True)
-            epsilon[idx_pt] = np.sum(cov_err**2)
+        epsilon[idx_pt] = cov.solve_aca(err)
 
     return epsilon
 

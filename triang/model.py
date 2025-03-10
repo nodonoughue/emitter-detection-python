@@ -1,6 +1,6 @@
 import numpy as np
-from scipy.linalg import solve_triangular
 import utils
+from utils.covariance import CovarianceMatrix
 
 
 def measurement(x_sensor, x_source, do_2d_aoa=False):
@@ -138,7 +138,7 @@ def jacobian(x_sensor, x_source, do_2d_aoa=False):
     return j
 
 
-def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False, cov_is_inverted=False):
+def log_likelihood(x_aoa, psi, cov: CovarianceMatrix, x_source, do_2d_aoa=False):
     """
     Computes the Log Likelihood for AOA sensor measurement, given the
     received measurement vector psi, covariance matrix cov,
@@ -155,11 +155,9 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False, cov_is_inverted=F
 
     :param x_aoa: Sensor positions [m]
     :param psi: AOA measurement vector
-    :param cov: FDOA measurement error covariance matrix
+    :param cov: AOA measurement error covariance matrix; object of the CovarianceMatrix class
     :param x_source: Candidate source positions
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
-    :param cov_is_inverted: Boolean flag, if false then cov is the covariance matrix. If true, then it is the
-                            inverse of the covariance matrix.
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -172,24 +170,6 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False, cov_is_inverted=F
 
     if n_source_pos == 1:
         x_source = np.expand_dims(x_source, axis=1)
-
-    # Pre-process the covariance matrix
-    if cov_is_inverted:
-        # The covariance matrix was pre-inverted, use it directly
-        cov_inv = cov
-        cov_lower = None  # pre-define to avoid a 'use before defined' error
-    elif np.isscalar(cov):
-        # The covariance matrix is a scalar, this is easy, go ahead and invert it
-        cov_inv = 1./cov
-        cov_lower = None
-        cov_is_inverted = True
-    else:
-        # The covariance matrix was not pre-inverted, use cholesky decomposition
-        # to improve stability and speed for repeated calculation of
-        # the Fisher Information Matrix
-        cov = utils.ensure_invertible(cov)
-        cov_lower = np.linalg.cholesky(cov)
-        cov_inv = None  # pre-define to avoid a 'use before defined' error
 
     # Initialize Output
     ell = np.zeros(shape=(n_source_pos, ))
@@ -204,19 +184,12 @@ def log_likelihood(x_aoa, psi, cov, x_source, do_2d_aoa=False, cov_is_inverted=F
         err = utils.modulo2pi(psi - this_psi)
 
         # Compute the scaled log likelihood
-        if cov_is_inverted:
-            if np.isscalar(cov_inv):
-                ell[idx_source] = - cov_inv * (err**2)
-            else:
-                ell[idx_source] = - err.T @ cov_inv @ err
-        else:
-            a = solve_triangular(cov_lower, err, lower=True)
-            ell[idx_source] = - np.sum(a**2)
+        ell[idx_source] = - cov.solve_aca(err)
 
     return ell
 
 
-def error(x_sensor, cov, x_source, x_max, num_pts, do_2d_aoa):
+def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, do_2d_aoa=False):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each
     dimension.  For each point, compute the AOA solution for each sensor, and
@@ -232,7 +205,7 @@ def error(x_sensor, cov, x_source, x_max, num_pts, do_2d_aoa):
     5 September 2021
 
     :param x_sensor: nDim x N matrix of sensor positions
-    :param cov: N x N covariance matrix
+    :param cov: AOA measurement error covariance matrix; object of the CovarianceMatrix class
     :param x_source: nDim x 1 matrix of true emitter position
     :param x_max: nDim x 1 (or scalar) vector of maximum offset from origin for plotting
     :param num_pts: Number of test points along each dimension
@@ -250,9 +223,6 @@ def error(x_sensor, cov, x_source, x_max, num_pts, do_2d_aoa):
 
     # Compute the True AOA measurement
     psi = measurement(x_sensor, x_source, do_2d_aoa)
-
-    # Decompose the covariance matrix for speedup
-    cov_lower = np.linalg.cholesky(cov)
 
     # Set up test points
     xx_vec = np.expand_dims(x_max, axis=1) * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))
@@ -272,8 +242,9 @@ def error(x_sensor, cov, x_source, x_max, num_pts, do_2d_aoa):
         err = utils.modulo2pi(psi - psi_i)
 
         # Evaluate the scaled log likelihood
-        a = solve_triangular(cov_lower, err, lower=True)
-        epsilon[idx_pt] = np.sum(a**2)
+        # a = solve_triangular(cov_lower, err, lower=True)
+        # epsilon[idx_pt] = np.sum(a**2)
+        epsilon[idx_pt] = cov.solve_aca(err)
 
     return epsilon
 

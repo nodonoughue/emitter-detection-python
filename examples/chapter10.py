@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import utils
+from utils.covariance import CovarianceMatrix
 import triang
 import time
 
@@ -54,8 +55,7 @@ def example1(rng=None, cmap=None):
     # Underflow warnings can indicate a loss of precision; in our case, these are likely occurring
     # from positions where our sensors are poorly aligned to determined the target's location. We
     # can ignore the loss of precision there.
-    np.seterr(under='ignore')
-
+    np.seterr(all='ignore')
 
     # Define sensor positions
     x_sensor = 30.0*np.array([[-1., 0., 1.], [0.,  0., 0.]])
@@ -66,13 +66,13 @@ def example1(rng=None, cmap=None):
     
     # Grab a noisy measurement
     psi_act = triang.model.measurement(x_sensor, x_source)
-    covar_psi = (2*np.pi/180)**2 * np.eye(num_sensors)
+    covar_psi = CovarianceMatrix((2*np.pi/180)**2 * np.eye(num_sensors))
 
     # Compute Ranges
     range_act = utils.geo.calc_range(x_sensor, x_source)
 
     # Error Values
-    angle_error = 3*np.sqrt(np.diag(covar_psi))
+    angle_error = 3*np.sqrt(np.diag(covar_psi.cov))
 
     # Start first figure; geometry
     fig_geo = plt.figure()
@@ -112,12 +112,8 @@ def example1(rng=None, cmap=None):
 
     # Iterative Methods
     epsilon = .5  # km
-    num_mc_trials = 1000
+    num_mc_trials = 100  # ToDo: Reset to 1000, if needed
     num_iterations = 50
-
-    # Decompose the covariance matrix, using Cholesky Decomposition, into a lower triangular matrix, for generating
-    # correlated random variables
-    covar_lower = np.linalg.cholesky(covar_psi)
 
     out_shp = (2, num_mc_trials)
     out_iterative_shp = (2, num_iterations, num_mc_trials)
@@ -140,7 +136,6 @@ def example1(rng=None, cmap=None):
             'x_init': x_init,
             'x_extent': x_extent,
             'covar_psi': covar_psi,
-            'covar_lower': covar_lower,
             'epsilon': epsilon,
             'num_iterations': num_iterations,
             'rng': rng}
@@ -183,9 +178,6 @@ def example1(rng=None, cmap=None):
     crlb_cep50 = utils.errors.compute_cep50(err_crlb)  # [km]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linewidth=.5, label='90% Error Ellipse')
-    # plt.text(-20, 45, '90% Error Ellipse', fontsize=10) -- commented out to clean up graphic; rely on legend
-    # plt.plot([1, 11], [45, 45], linestyle='-', linewidth=.5, label=None)
-
     plt.xlim([-50, 50])
     plt.ylim([-10, 70])
     plt.legend(loc='upper left')
@@ -256,7 +248,7 @@ def example1(rng=None, cmap=None):
     plt.ylim([1, 50])
 
     # Re-engage the warning for numpy underflow
-    np.seterr(under='warn')
+    np.seterr(all='warn')
 
     return fig_geo, fig_err
 
@@ -269,7 +261,6 @@ def _mc_iteration(args):
                 rng: random number generator
                 psi_act: true angle of arrival (radians)
                 covar_psi: measurement error covariance matrix
-                covar_lower: lower triangular Cholesky decomposition of the measurement error covariance matrix
                 num_sensors: number of AOA sensors
                 x_sensor: position of AOA sensors
                 x_init: initial solution guess (also used as center of search grid for ML and Bestfix)
@@ -291,7 +282,7 @@ def _mc_iteration(args):
 
     # Generate a random measurement
     rng = args['rng']
-    psi = args['psi_act'] + args['covar_lower'] @ rng.standard_normal(size=(args['num_sensors'], ))
+    psi = args['psi_act'] + args['covar_psi'].lower @ rng.standard_normal(size=(args['num_sensors'], ))
 
     # Generate solutions
     res_ml, _, _ = triang.solvers.max_likelihood(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
@@ -333,14 +324,13 @@ def example2():
 
     # Define measurement accuracy
     sigma_psi = 2.5*np.pi/180
-    covar_psi = sigma_psi**2 * np.eye(num_sensors)  # N x N identity matrix
-    covar_inv = (1/sigma_psi**2) * np.eye(num_sensors)  # the inverse of the covariance matrix
+    covar_psi = CovarianceMatrix(sigma_psi**2 * np.eye(num_sensors))  # N x N identity matrix
 
     # Find maximum cross-range position at 100 km downrange
     cross_range_vec = np.arange(start=-100, stop=101)
     down_range_vec = 100 * np.ones(shape=np.shape(cross_range_vec))
     x_source = np.concatenate((cross_range_vec[np.newaxis, :], down_range_vec[np.newaxis, :]), axis=0)
-    crlb = triang.perf.compute_crlb(x_sensor*1e3, x_source*1e3, cov=covar_inv, cov_is_inverted=True)
+    crlb = triang.perf.compute_crlb(x_sensor*1e3, x_source*1e3, cov=covar_psi)
     cep50 = utils.errors.compute_cep50(crlb)
     
     good_points = np.argwhere(cep50 <= 25e3)
@@ -348,13 +338,14 @@ def example2():
     print('Maximum cross range position at 100 km downrange that satisfies CEP < 25 km is {:.2f} km'
           .format(max_cross_range/1e3))
 
+    # TODO: Re-write to use utils.make_nd_grid
     x_max = 100
     x_vec = np.arange(start=-x_max, step=.25, stop=x_max)
     x_mesh, y_mesh = np.meshgrid(x_vec, x_vec)
     x0 = np.stack((x_mesh.flatten(), y_mesh.flatten()), axis=1).T
 
     # Compute CRLB
-    crlb = triang.perf.compute_crlb(x_sensor*1e3, x0*1e3, covar_inv, cov_is_inverted=True)
+    crlb = triang.perf.compute_crlb(x_sensor*1e3, x0*1e3, cov=covar_psi)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=x_mesh.shape)
 
     # Blank out y=0
@@ -403,10 +394,10 @@ def example3():
     
     # Define measurement accuracy
     sigma_psi = 2.5*np.pi/180
-    covar_psi = sigma_psi**2 * np.eye(num_sensors)  # N x N identity matrix
+    covar_psi = CovarianceMatrix(sigma_psi**2 * np.eye(num_sensors))  # N x N identity matrix
     
     # Compute CRLB
-    crlb = triang.perf.compute_crlb(x_sensor*1e3, x0*1e3, covar_psi)
+    crlb = triang.perf.compute_crlb(x_sensor*1e3, x0*1e3, cov=covar_psi)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=np.shape(x_mesh))  # m
     
     good_point = cep50 <= 25e3

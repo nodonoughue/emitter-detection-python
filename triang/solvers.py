@@ -1,12 +1,13 @@
 import utils
 from utils import solvers
+from utils.covariance import CovarianceMatrix
 from . import model
 import numpy as np
 import math
 from itertools import combinations
 
 
-def max_likelihood(x_sensor, psi, cov, x_ctr, search_size, epsilon=None):
+def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon=None):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -39,7 +40,7 @@ def max_likelihood(x_sensor, psi, cov, x_ctr, search_size, epsilon=None):
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, psi, cov, x_init, **kwargs):
+def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -64,12 +65,12 @@ def gradient_descent(x_sensor, psi, cov, x_init, **kwargs):
         return model.jacobian(x_sensor, this_x)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
+    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 
 
-def least_square(x_sensor, psi, cov, x_init, **kwargs):
+def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -94,12 +95,12 @@ def least_square(x_sensor, psi, cov, x_init, **kwargs):
         return model.jacobian(x_sensor, this_x)
 
     # Call the generic Least Square solver
-    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, covariance=cov, x_init=x_init, **kwargs)
+    x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 
 
-def bestfix(x_sensor, psi, cov, x_ctr, search_size, epsilon, pdf_type=None):
+def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, pdf_type=None):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
     a series of coordinates, and returning the index of the maximum.
@@ -135,7 +136,7 @@ def bestfix(x_sensor, psi, cov, x_ctr, search_size, epsilon, pdf_type=None):
     def measurement(x):
         return model.measurement(x_sensor, x)
 
-    pdfs = utils.make_pdfs(measurement, psi, pdf_type, cov)
+    pdfs = utils.make_pdfs(measurement, psi, pdf_type, cov.cov)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.bestfix(pdfs, x_ctr, search_size, epsilon)
