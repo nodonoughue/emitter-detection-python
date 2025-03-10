@@ -192,6 +192,25 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
     if ref_weights:
         shp_ref_wt = np.size(ref_weights)
 
+    def _populate_2d_entries(arr_in, idx_i, idx_j):
+        """
+        Use the indices idx_i and idx_j to reference the two dimensions of the input
+        arr_in.
+
+        Any nans in idx_i and idx_j should be ignored
+        """
+        arr_out = np.zeros_like(idx_i)
+
+        mask_i = np.isnan(idx_i)
+        mask_j = np.isnan(idx_j)
+        mask = ~np.logical_or(mask_i, mask_j)
+
+        if not np.all(mask):
+            arr_out[mask] = arr_in[idx_i[mask].astype(int), idx_j[mask].astype(int)]
+        else:
+            arr_out = arr_in[idx_i.astype(int), idx_j.astype(int)]
+        return arr_out
+
     # Function to execute at each entry of output covariance matrix
     def element_func(idx_row, idx_col):
         idx_row = idx_row.astype(int)
@@ -211,39 +230,16 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
         else:
             b_i_wt = b_j_wt = 1.
 
-        cov_aiaj = cov[a_i, a_j]
-        cov_aibj = np.zeros_like(cov_aiaj)
-        cov_biaj = cov_aibj.copy()
-        cov_bibj = cov_aibj.copy() 
-        
-        mask_ai = np.isnan(a_i)
-        mask_aj = np.isnan(a_j)
-        mask_bi = np.isnan(b_i)
-        mask_bj = np.isnan(b_j)
+        cov_ai_aj = _populate_2d_entries(cov, a_i, a_j)
+        cov_bi_bj = _populate_2d_entries(cov, b_i, b_j)
+        cov_ai_bj = _populate_2d_entries(cov, a_i, b_j)
+        cov_bi_aj = _populate_2d_entries(cov, b_i, a_j)
 
-        mask_bibj = ~np.logical_or(mask_bi, mask_bj)
-        if not np.all(mask_bibj):
-            cov_bibj[mask_bibj] = cov[b_i[mask_bibj].astype(int), b_j[mask_bibj].astype(int)]
-        else: 
-            cov_bibj = cov[b_i.astype(int), b_j.astype(int)]
-            
-        mask_aibj = ~np.logical_or(mask_ai, mask_bj)
-        if not np.all(mask_aibj):
-            cov_aibj[mask_aibj] = cov[a_i[mask_aibj].astype(int), b_j[mask_aibj].astype(int)]
-        else:
-            cov_aibj = cov[a_i.astype(int), b_j.astype(int)]
+        res = b_i_wt * b_j_wt * cov_bi_bj + \
+            a_i_wt * a_j_wt * cov_ai_aj - \
+            a_i_wt * b_j_wt * cov_ai_bj - \
+            b_i_wt * a_j_wt * cov_bi_aj
 
-        mask_biaj = ~np.logical_or(mask_bi, mask_aj)
-        if not np.all(mask_biaj):
-            cov_biaj[mask_biaj] = cov[b_i[mask_biaj].astype(int), a_j[mask_biaj].astype(int)]
-        else:
-            cov_biaj = cov[b_i.astype(int), a_j.astype(int)]
-
-        res = b_i_wt * b_j_wt * cov_bibj + \
-            a_i_wt * a_j_wt * cov_aiaj - \
-            a_i_wt * b_j_wt * cov_aibj - \
-            b_i_wt * a_j_wt * cov_biaj
-        # raise ValueError('mo')
         return res
     cov_out = np.fromfunction(element_func, (n_pair_out, n_pair_out), dtype=float)
     return cov_out
@@ -390,7 +386,7 @@ def ensure_invertible(covariance, epsilon=1e-10):
     return cov_out
 
 
-def make_pdfs(measurement_function, measurements, pdf_type='MVN', covariance=1):
+def make_pdfs(measurement_function, measurements, pdf_type='MVN', covariance: np.ndarray = 1):
     """
     Generate a joint PDF or set of unitary PDFs representing the measurements, given the measurement_function,
     covariance matrix and pdf_type
@@ -460,7 +456,7 @@ def print_predicted(t_elapsed, pct_elapsed, do_elapsed=False):
         hrs_elapsed = np.floor(t_elapsed / 3600)
         minutes_elapsed = (t_elapsed - 3600 * hrs_elapsed) / 60
 
-        print('Elapsed Time: {} hrs, {:.2f} min. '.format(hrs_elapsed, minutes_elapsed), end='')
+        print('Elapsed Time: {:.0f} hrs, {:.2f} min. '.format(hrs_elapsed, minutes_elapsed), end='')
 
     t_remaining = t_elapsed * (1 - pct_elapsed) / pct_elapsed
 
@@ -508,7 +504,7 @@ def safe_2d_shape(x: np.array) -> np.array:
     """
 
     if x is None:
-        return [0, 0]
+        return 0, 0
         
     # Wrap x in an array, in case it's a scalar or list
     x = np.asarray(x)
@@ -573,6 +569,7 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing):
     # Rearrange to a single 2D array of grid locations (n_dim x N)
     x_set = np.asarray([x.flatten() for x in x_grid])
 
+    # ToDo: Ensure that x_set, x_grid, and n_elements match what the documentation says they are
     return x_set, x_grid, n_elements
 
 
