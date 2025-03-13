@@ -144,8 +144,8 @@ def log_likelihood(x_source, zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=Non
     # Pre-compute covariance matrix inverses
     if do_resample:
         # Use the hybrid-specific covariance matrix resampler, which handles the assumed structure.
-        cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
-                            tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+        cov = cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
+                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Loop across source positions
     for idx_source in np.arange(n_source_pos):

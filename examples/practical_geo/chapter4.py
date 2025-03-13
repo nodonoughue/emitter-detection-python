@@ -91,7 +91,7 @@ def example1(rng=np.random.default_rng()):
     cov_rr = (err_fdoa_hz*utils.constants.speed_of_light/f_source_hz)**2 * np.eye(num_fdoa)  # m^2/s^2
 
     cov_x = CovarianceMatrix(scipy.linalg.block_diag(cov_psi, cov_r, cov_rr))
-    cov_z = cov_x.resample(ref_idx, test_idx)
+    cov_z = cov_x.resample(ref_idx_vec=ref_idx, test_idx_vec=test_idx)
 
     # Generate Noise
     num_mc = 1000  # TODO: raise to 10,000

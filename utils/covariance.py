@@ -272,20 +272,53 @@ class CovarianceMatrix:
 
         return val
 
-    def resample(self, test_idx, ref_idx=None) -> 'CovarianceMatrix':
+    def resample(self, ref_idx=None, ref_idx_vec: np.ndarray = None, test_idx_vec: np.ndarray = None) \
+            -> 'CovarianceMatrix':
+        """
+        Resample the covariance matrix. Users may specify the reference index in one of three ways:
 
+        resample(self, ref_idx=None)
+            The function utils.parse_reference_sensor will be used to generate paired reference and test indices using
+            the default common reference sensor (the N-1th sensor).
+
+        resample(self, ref_idx: int)
+            The function utils.parse_reference_sensor will be used to generate paired reference and test indices using
+            the specified sensor number as a common reference.
+
+        resample(self, 'Full')
+            The function utils.parse_reference_sensor will be used to generate paired reference and test indices using
+            the full set of possible sensor pairs.
+
+        resample(self, ref_idx_vec: numpy.ndarray, test_idx_vec: numpy.ndarray)
+            The specified reference and test index vectors will be used directly to resample the covariance matrix.
+            Both must be 1D numpy.ndarray vectors populated with integers.
+
+        """
         assert self._cov is not None, f"Covariance matrix not initialized."
 
-        new_cov = utils.resample_covariance_matrix(self._cov, test_idx, ref_idx)
+        # Parse the inputs
+        if ref_idx_vec is not None and test_idx_vec is not None:
+            # Make sure they're both 1D arrays
+            num_ref, dim1 = utils.safe_2d_shape(ref_idx_vec)
+            num_test, dim2 = utils.safe_2d_shape(test_idx_vec)
+
+            assert num_ref == num_test, 'Inputs ref_idx_vec and test_idx_vec must match shape.'
+            assert dim1 == dim2 == 1, 'Inputs ref_idx_vec and test_idx_vec must be vectors.'
+        else:
+            # Only the reference index was provided; use parse_reference sensor to generate paired test and reference
+            # indices. That function will handle testing for valid inputs.
+            test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx=ref_idx, num_sensors=self._cov.shape[0])
+
+        new_cov = utils.resample_covariance_matrix(self._cov, test_idx=test_idx_vec, ref_idx=ref_idx_vec)
 
         return CovarianceMatrix(new_cov)
 
     def resample_hybrid(self, x_aoa=None, x_tdoa=None, x_fdoa=None, do_2d_aoa=False,
                         tdoa_ref_idx=None, fdoa_ref_idx=None) -> 'CovarianceMatrix':
         """
-        Resample a block-diagonal covariance matrix representing AOA, TDOA, and FDOA measurements errors. Original matrix
-        size is square with (num_aoa*aoa_dim + num_tdoa + num_fdoa) rows/columns. Output matrix size will be square with
-        (num_aoa*aoa_dim + num_tdoa_sensor_pairs + num_fdoa_sensor_pairs) rows/columns.
+        Resample a block-diagonal covariance matrix representing AOA, TDOA, and FDOA measurements errors. Original
+        matrix size is square with (num_aoa*aoa_dim + num_tdoa + num_fdoa) rows/columns. Output matrix size will be
+        square with (num_aoa*aoa_dim + num_tdoa_sensor_pairs + num_fdoa_sensor_pairs) rows/columns.
 
         The covariance matrix is assumed to have AOA measurements first, then TDOA, then FDOA.
 
@@ -323,9 +356,9 @@ class CovarianceMatrix:
                                       num_aoa + num_tdoa + ref_idx_vec_fdoa), axis=0)
 
         # Finally, call the generic resampler and return the result
-        return self.resample(test_idx_vec, ref_idx_vec)
+        return self.resample(test_idx_vec=test_idx_vec, ref_idx_vec=ref_idx_vec)
 
-    def multiply(self, val):
+    def multiply(self, val, overwrite=True):
         """
         Multiply the covariance matrix by a given value. val must be a finite number.
 
@@ -335,6 +368,16 @@ class CovarianceMatrix:
 
         assert np.isfinite(val) and (np.isscalar(val) or np.size(val) <= 1), \
             'Input to the CovarianceMatrix multiply command must be a finite scalar.'
+
+        if not overwrite:
+            # Make a new instance of self
+            obj = self.copy()
+
+            # Perform the multiplication on the new instance
+            obj.multiply(val)
+
+            # Return an object handle
+            return obj
 
         if self._cov is not None:
             self._cov = self._cov * val

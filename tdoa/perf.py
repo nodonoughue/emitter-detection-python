@@ -36,10 +36,10 @@ def compute_crlb(x_sensor, x_source, cov: CovarianceMatrix, ref_idx=None, do_res
 
     if variance_is_toa:
         # Multiply by the speed of light squared, unless it is inverted (then divide)
-        cov.multiply(utils.constants.speed_of_light ** 2)
+        cov = cov.multiply(utils.constants.speed_of_light ** 2, overwrite=False)
 
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Define a wrapper for the jacobian matrix that accepts only the position 'x'
     def jacobian(x):

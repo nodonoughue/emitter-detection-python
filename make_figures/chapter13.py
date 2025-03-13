@@ -189,8 +189,8 @@ def make_figure_2(prefix=None):
     covar_ang = CovarianceMatrix(ang_err ** 2 * np.eye(num_sensors))
     covar_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
     covar_rroa = CovarianceMatrix(rng_rate_err ** 2 * np.eye(num_sensors))
-    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
-    covar_rrdoa = covar_rroa.resample(fdoa_ref_idx)
+    covar_rdoa = covar_roa.resample(ref_idx=tdoa_ref_idx)
+    covar_rrdoa = covar_rroa.resample(ref_idx=fdoa_ref_idx)
     covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
 
     fig2a = _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_pts)
@@ -208,7 +208,7 @@ def make_figure_2(prefix=None):
     time_err_highres = 100e-9  # sec
     rng_err_highres = utils.constants.speed_of_light * time_err_highres
     covar_roa_highres = CovarianceMatrix(rng_err_highres ** 2 * np.eye(num_sensors))
-    covar_rdoa_highres = covar_roa_highres.resample(tdoa_ref_idx)
+    covar_rdoa_highres = covar_roa_highres.resample(ref_idx=tdoa_ref_idx)
     covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa_highres, covar_rrdoa)
 
     fig2c = _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_pts)
@@ -218,7 +218,7 @@ def make_figure_2(prefix=None):
     freq_err_highres = 10  # Hz
     rng_rate_err_highres = freq_err_highres * utils.constants.speed_of_light / transmit_freq  # m / s
     covar_rroa_highres = CovarianceMatrix(rng_rate_err_highres ** 2 * np.eye(num_sensors))
-    covar_rrdoa_highres = covar_rroa_highres.resample(fdoa_ref_idx)
+    covar_rrdoa_highres = covar_rroa_highres.resample(ref_idx=fdoa_ref_idx)
     covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa_highres)
 
     fig2d = _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho, x_max, num_pts)
@@ -385,8 +385,8 @@ def make_figure_7(prefix):
     covar_ang = CovarianceMatrix(ang_err ** 2 * np.eye(num_sensors))
     covar_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
     covar_rroa = CovarianceMatrix(rng_rate_err ** 2 * np.eye(num_sensors))
-    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
-    covar_rrdoa = covar_rroa.resample(fdoa_ref_idx)
+    covar_rdoa = covar_roa.resample(ref_idx=tdoa_ref_idx)
+    covar_rrdoa = covar_rroa.resample(ref_idx=fdoa_ref_idx)
     covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
 
     # Define source positions
@@ -505,8 +505,8 @@ def make_figure_8(prefix):
     # Error Covariance Matrices
     covar_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
     covar_rroa = CovarianceMatrix(rng_rate_err ** 2 * np.eye(num_sensors))
-    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
-    covar_rrdoa = covar_rroa.resample(fdoa_ref_idx)
+    covar_rdoa = covar_roa.resample(ref_idx=tdoa_ref_idx)
+    covar_rrdoa = covar_rroa.resample(ref_idx=fdoa_ref_idx)
     covar_rho = CovarianceMatrix.block_diagonal(covar_rdoa, covar_rrdoa)
 
     # Define source positions
@@ -620,7 +620,7 @@ def make_figure_9(prefix):
     # Error Covariance Matrices
     covar_ang = CovarianceMatrix(ang_err ** 2 * np.eye(num_sensors))
     covar_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
-    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
+    covar_rdoa = covar_roa.resample(ref_idx=tdoa_ref_idx)
     covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa)
 
     # Define source positions

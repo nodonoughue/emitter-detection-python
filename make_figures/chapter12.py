@@ -485,7 +485,7 @@ def make_figure_6(prefix):
     rng_rate_std_dev = freq_error*utils.constants.speed_of_light/f0
     cov_rroa = CovarianceMatrix(rng_rate_std_dev**2 * np.eye(num_sensors))  # covariance matrix structure
     ref_idx = None
-    cov_rrdoa = cov_rroa.resample(ref_idx)
+    cov_rrdoa = cov_rroa.resample(ref_idx=ref_idx)
 
     # Define source positions
     num_grid_points = 501
@@ -550,7 +550,7 @@ def make_figure_6(prefix):
     # Regenerate covariance matrix
     cov_rroa = CovarianceMatrix(rng_rate_std_dev**2 * np.eye(num_sensors))  # covariance matrix structure
     ref_idx = None
-    cov_rrdoa = cov_rroa.resample(ref_idx)
+    cov_rrdoa = cov_rroa.resample(ref_idx=ref_idx)
 
     # Compute CRLB
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)

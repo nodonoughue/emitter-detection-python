@@ -30,7 +30,7 @@ def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, eps
 
     # Resample the covariance matrix
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Set up function handle
     def ell(x):
@@ -69,7 +69,7 @@ def gradient_descent(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None,
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
 
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Call generic Gradient Descent solver
     x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
@@ -104,7 +104,7 @@ def least_square(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None, do_
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
 
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Call the generic Least Square solver
     x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
@@ -153,7 +153,7 @@ def bestfix(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon, r
 
     # Resample the covariance matrix
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     pdfs = utils.make_pdfs(measurement, rho, pdf_type, cov.cov)
 
@@ -204,7 +204,7 @@ def chan_ho(x_sensor, rho, cov: CovarianceMatrix, ref_idx=None, do_resample=Fals
 
     # Resample the covariance matrix
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Stage 1: Initial Position Estimate
     # Compute system matrix overline(A) according to 11.23

@@ -138,7 +138,7 @@ def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
         x_source = x_source[:, np.newaxis]
 
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Initialize output
     ell = np.zeros((n_source_pos, ))
@@ -195,7 +195,7 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts,
                      ref_idx=ref_idx)
 
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Set up test points
     grid_res = 2*x_max / (num_pts-1)

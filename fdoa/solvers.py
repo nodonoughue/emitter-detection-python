@@ -29,7 +29,7 @@ def max_likelihood(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search
 
     # Resample the covariance matrix
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Set up function handle
     def ell(x):
@@ -76,7 +76,7 @@ def gradient_descent(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, v_s
 
     # Resample the covariance matrix
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Call generic Gradient Descent solver
     x, x_full = solvers.gd_solver(y, jacobian, cov, x_init, **kwargs)
@@ -118,7 +118,7 @@ def least_square(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx
 
     # Resample the covariance matrix
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Call the generic Least Square solver
     x, x_full = solvers.ls_solver(y, jacobian, cov, x_init, **kwargs)
@@ -164,7 +164,7 @@ def bestfix(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, 
 
     # Resample the covariance matrix
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Make sure that rho is a vector -- the pdf functions choke if the mean value
     # is an Nx1 matrix

@@ -64,8 +64,8 @@ def example1(rng=np.random.default_rng()):
     covar_ang = CovarianceMatrix(ang_err**2 * np.eye(num_sensors))
     covar_roa = CovarianceMatrix(rng_err**2 * np.eye(num_sensors))
     covar_rroa = CovarianceMatrix(rng_rate_err**2 * np.eye(num_sensors))
-    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
-    covar_rrdoa = covar_rroa.resample(fdoa_ref_idx)
+    covar_rdoa = covar_roa.resample(ref_idx=tdoa_ref_idx)
+    covar_rrdoa = covar_rroa.resample(ref_idx=fdoa_ref_idx)
 
     covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
 
@@ -208,8 +208,8 @@ def example2(rng=np.random.default_rng()):
     covar_ang = CovarianceMatrix(ang_err**2 * np.eye(num_aoa))
     covar_roa = CovarianceMatrix(rng_err**2 * np.eye(num_time_freq))
     covar_rroa = CovarianceMatrix(rng_rate_err**2 * np.eye(num_time_freq))
-    covar_rdoa = covar_roa.resample(tdoa_ref_idx)
-    covar_rrdoa = covar_rroa.resample(fdoa_ref_idx)
+    covar_rdoa = covar_roa.resample(ref_idx=tdoa_ref_idx)
+    covar_rrdoa = covar_rroa.resample(ref_idx=fdoa_ref_idx)
 
     covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
 

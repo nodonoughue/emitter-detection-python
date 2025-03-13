@@ -118,15 +118,23 @@ def make_taper(taper_len: int, taper_type: str):
     return w, snr_loss
 
 
-def parse_reference_sensor(ref_idx, num_sensors):
+def parse_reference_sensor(ref_idx, num_sensors=0):
     """
     Accepts a reference index setting (either None, a scalar integer, or a 2 x N array of sensor pairs),
     and returns matching vectors for test and reference indices.
 
-    :param ref_idx: reference index setting
+    :param ref_idx: reference index setting, acceptable formats are:
+            None        -- use default (last sensor) as a common reference, generates a non-redundant set
+            Integer     -- use the specified sensor number as a common reference
+            'Full'      -- generate all possible sensor pairs
+            2 x N array -- specifies N separate measurement pairs; the first vector is taken as the test indices, and
+                           the second as reference.
     :param num_sensors: Number of available sensors
-    :return test_idx_vec:
-    :return ref_idx_vec:
+    :return test_idx_vec: Indices of sensors used for each measurement; sensors can be used more than once. Every
+        element should be an integer.
+    :return ref_idx_vec: Indices of sensors used for each measurement as a reference; sensors can be used more than
+        once. Every element should be an integer, although in general nan is used for measurements that don't use a
+        reference (e.g., AoA).
     """
 
     if ref_idx is None:
@@ -156,22 +164,29 @@ def parse_reference_sensor(ref_idx, num_sensors):
     return test_idx_vec, ref_idx_vec
 
 
-def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights=None, ref_weights=None):
+def resample_covariance_matrix(cov: np.ndarray, test_idx: np.ndarray, ref_idx: np.ndarray,
+                               test_weights=None, ref_weights=None) -> np.ndarray:
+    """
+    Resample a 2D covariance matrix to generate the covariance matrix that would result from a series of difference
+    operations on the underlying random variables. See Section 3.3.1 of the 2022 text for derivation of the covariance
+    matrix that results from sensor pair difference operations.
+
+    :param cov: two-dimensional numpy array, representing a covariance matrix, to be resampled
+    :param test_idx: numpy 1D array of indices for the test sensor for each measurement
+    :param ref_idx: None, or numpy 1D array of indices for the reference sensor for each measurement. Any NaN
+            entries are treated as test-only measurements (e.g., angle of arrival) that don't require a reference
+            measurement. Those entries in the covariance matrix are not resampled.
+    :param test_weights: Optional weights to apply to each measurement when resampling.
+    :param ref_weights: Optional weights to apply to each measurement when resampling.
+    :return: two-dimensional  numpy array, representing the re-sampled covariance matrix.
+    """
 
     # Parse Inputs
     n_sensor = np.size(cov, axis=0)
-    if test_idx_vec is None:
-        # Default behavior, if not specified, is to use the final sensor as the reference
-        test_idx_vec = n_sensor - 1
-
-    # Parse reference and test index vector
-    if ref_idx_vec is None:
-        # Only one was provided; it must be fed to parse_reference_sensor to generate the matched pair of vectors
-        test_idx_vec, ref_idx_vec = parse_reference_sensor(test_idx_vec, n_sensor)
 
     # Determine output size
-    n_test = np.size(test_idx_vec)
-    n_ref = np.size(ref_idx_vec)
+    n_test = np.size(test_idx)
+    n_ref = np.size(ref_idx)
     n_pair_out = np.fmax(n_test, n_ref)
 
     # Error Checking
@@ -179,7 +194,7 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
         raise TypeError("Error calling covariance matrix resample.  "
                         "Reference and test vectors must have the same shape.")
 
-    if np.any(test_idx_vec >= n_sensor) or np.any(ref_idx_vec >= n_sensor):
+    if np.any(test_idx >= n_sensor) or np.any(ref_idx >= n_sensor):
         raise TypeError("Error calling covariance matrix resample.  "
                         "Indices exceed the dimensions of the covariance matrix.")
 
@@ -215,10 +230,10 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
     def element_func(idx_row, idx_col):
         idx_row = idx_row.astype(int)
         idx_col = idx_col.astype(int)
-        a_i = test_idx_vec[idx_row % n_test]
-        b_i = ref_idx_vec[idx_row % n_ref]
-        a_j = test_idx_vec[idx_col % n_test]
-        b_j = ref_idx_vec[idx_col % n_ref]
+        a_i = test_idx[idx_row % n_test]
+        b_i = ref_idx[idx_row % n_ref]
+        a_j = test_idx[idx_col % n_test]
+        b_j = ref_idx[idx_col % n_ref]
         if test_weights:
             a_i_wt = test_weights[idx_row % shp_test_wt]
             a_j_wt = test_weights[idx_col % shp_test_wt]
@@ -245,17 +260,30 @@ def resample_covariance_matrix(cov, test_idx_vec, ref_idx_vec=None, test_weights
     return cov_out
 
 
-def resample_noise(noise, test_idx_vec, ref_idx_vec=None, test_weights=None, ref_weights=None):
+def resample_noise(noise: np.ndarray, test_idx: np.ndarray = None, ref_idx=None, test_weights=None, ref_weights=None):
+    """
+    Generate resampled noise according to the set of test and reference sensors provided. See Section 3.3.1 of the 2022
+    text for a discussion of sensor pairs and noise statistics. If the input noise is distributed according to a
+    covariance matrix cov_in, then the result will be distributed according to
+    resample_covariance_matrix(cov_in, test_idx, ref_idx).
+
+    :param noise: numpy ndarray of noise samples; the first dimension represents individual sensor measurements
+    :param test_idx: numpy 1D array of indices for the test sensor for each measurement, or None
+    :param ref_idx: numpy 1D array of indices for the reference sensor for each measurement. Any NaN
+            entries are treated as test-only measurements (e.g., angle of arrival) that don't require a reference
+            measurement. Those entries in the covariance matrix are not resampled.
+            If test_idx is None, then ref_idx is passed to utils.parse_reference_sensor, and may be any valid input
+            to that function.
+    :param test_weights: Optional weights to apply to each measurement when resampling.
+    :param ref_weights: Optional weights to apply to each measurement when resampling.
+    :return: numpy ndarray of resampled noise; the first dimension has the same length as test_idx and ref_idx.
+    """
     # Parse Inputs
     n_sensor, n_sample = utils.safe_2d_shape(noise)
-    if test_idx_vec is None:
-        # Default behavior, if not specified, is to use the final sensor as the reference
-        test_idx_vec = n_sensor - 1
 
-    # Parse reference and test index vector
-    if ref_idx_vec is None:
-        # Only one was provided; it must be fed to parse_reference_sensor to generate the matched pair of vectors
-        test_idx_vec, ref_idx_vec = parse_reference_sensor(test_idx_vec, n_sensor)
+    if test_idx is None:
+        # We need to use the ref_idx
+        test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
 
     # Determine output size
     n_test = np.size(test_idx_vec)

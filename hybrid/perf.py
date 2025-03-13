@@ -40,8 +40,8 @@ def compute_crlb(x_source, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdo
         x_source = x_source[:, np.newaxis]
 
     if do_resample:
-        cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
-                            tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+        cov = cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
+                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Define a wrapper for the jacobian matrix that accepts only the position 'x'
     def jacobian(x):

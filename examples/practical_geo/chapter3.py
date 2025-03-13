@@ -44,8 +44,8 @@ def example1(colors=None):
     c_max = 5**2 + 3**2
 
     # Generate common reference sets
-    cov_first = cov.resample(0)
-    cov_last = cov.resample(4)
+    cov_first = cov.resample(ref_idx=0)
+    cov_last = cov.resample(ref_idx=4)
 
     fig_a = plt.figure()
     plt.imshow(cov_first.cov, vmin=0, vmax=c_max, cmap=colors)
@@ -58,7 +58,7 @@ def example1(colors=None):
     plt.title('Ref Index = 4')
 
     # Generate a full measurement set example
-    cov_full = cov.resample('full')
+    cov_full = cov.resample(ref_idx='full')
 
     fig_c = plt.figure()
     plt.imshow(cov_full.cov, vmin=0, vmax=c_max, cmap=colors)
@@ -274,20 +274,19 @@ def example4(rng=np.random.default_rng()):
     # Initialize error covariance matrix
     time_err = 1e-7         # 100 ns time of arrival error per sensor
     cov_toa = CovarianceMatrix((time_err**2) * np.eye(num_tdoa))
-    cov_roa = cov_toa.multiply(utils.constants.speed_of_light**2)
+    cov_roa = cov_toa.multiply(utils.constants.speed_of_light**2, overwrite=False)
 
     # TDOA Measurement and Combined Covariance Matrix
-    # TODO: Align test_idx and ref_idx among all usages
     z_common = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_source, ref_idx=None)  # num_tdoa x num_mc
     z_full = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_source, ref_idx='full')
 
-    cov_z_common = cov_roa.copy().resample(None)  # RDOA
-    cov_z_full = cov_roa.copy().resample('full')  # RDOA
+    cov_z_common = cov_roa.resample(ref_idx=None)  # RDOA
+    cov_z_full = cov_roa.resample(ref_idx='full')  # RDOA
 
     # Generate random noise
     noise_sensor = cov_roa.lower @ rng.standard_normal(size=(num_tdoa, num_mc))
-    noise_common = utils.resample_noise(noise_sensor, test_idx_vec=None)
-    noise_full = utils.resample_noise(noise_sensor, test_idx_vec='full')
+    noise_common = utils.resample_noise(noise_sensor, ref_idx=None)
+    noise_full = utils.resample_noise(noise_sensor, ref_idx='full')
 
     # Noisy Measurements
     zeta_common = z_common + noise_common

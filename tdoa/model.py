@@ -125,10 +125,10 @@ def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None,
 
     if variance_is_toa:
         # Convert from TOA/TDOA to ROA/RDOA -- copy to a new object for sanity's sake
-        cov = cov.copy().multiply(utils.constants.speed_of_light ** 2)
+        cov = cov.multiply(utils.constants.speed_of_light ** 2, overwrite=False)
 
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     for idx_source in np.arange(n_source_pos):
         x_i = x_source[:, idx_source]
@@ -181,10 +181,10 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, ref_idx=Non
 
     if variance_is_toa:
         # Convert from TOA/TDOA to ROA/RDOA
-        cov = cov.copy().multiply(utils.constants.speed_of_light ** 2)
+        cov = cov.multiply(utils.constants.speed_of_light ** 2, overwrite=False)
 
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Set up test points
     xx_vec = x_max.flatten() * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))

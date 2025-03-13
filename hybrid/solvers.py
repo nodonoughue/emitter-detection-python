@@ -85,8 +85,8 @@ def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=Non
 
     # Re-sample the covariance matrix, if needed
     if do_resample:
-        cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa,
-                            do_2d_aoa=do_2d_aoa, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+        cov = cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa,
+                                  do_2d_aoa=do_2d_aoa, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Call generic Gradient Descent solver
     x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
@@ -133,8 +133,8 @@ def least_square(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x
 
     # Re-sample the covariance matrix, if needed
     if do_resample:
-        cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
-                            tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+        cov = cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
+                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Call the generic Least Square solver
     x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
@@ -192,8 +192,8 @@ def bestfix(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v
 
     # Re-sample the covariance matrix, if needed
     if do_resample:
-        cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
-                            tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+        cov = cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
+                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     pdfs = utils.make_pdfs(measurement, zeta, pdf_type, cov.cov)
 

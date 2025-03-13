@@ -38,7 +38,7 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov: CovarianceMatrix, v_source=N
         x_source = x_source[:, np.newaxis]
 
     if do_resample:
-        cov = cov.resample(ref_idx)
+        cov = cov.resample(ref_idx=ref_idx)
 
     # Define a wrapper for the jacobian matrix that accepts only the position 'x'
     def jacobian(x):

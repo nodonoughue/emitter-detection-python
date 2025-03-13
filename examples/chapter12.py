@@ -64,7 +64,7 @@ def example1(rng=np.random.default_rng()):
     fdoa_ref_idx = num_sensors - 1  # Use the last sensor as our reference sensor (the one at the origin)
     rng_rate_standard_deviation = freq_error*utils.constants.speed_of_light/transmit_freq
     covar_sensor = CovarianceMatrix(rng_rate_standard_deviation**2 * np.eye(num_sensors))
-    covar_rho = covar_sensor.resample(fdoa_ref_idx)
+    covar_rho = covar_sensor.resample(ref_idx=fdoa_ref_idx)
 
     # Initialize Transmitter Position
     th = rng.random()*2*np.pi
