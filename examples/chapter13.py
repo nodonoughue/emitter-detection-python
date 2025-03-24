@@ -236,7 +236,8 @@ def example2(rng=np.random.default_rng()):
                'x_fdoa': x_time_freq,
                'v_fdoa': v_time_freq,
                'fdoa_ref_idx': fdoa_ref_idx,
-               'cov': covar_rho
+               'cov': covar_rho,
+               'do_resample': False
                }
 
     ml_args = {'x_ctr': x_init,
@@ -295,6 +296,8 @@ def example2(rng=np.random.default_rng()):
     # Call the common plot generator for both examples
     rx_args['x_source'] = x_source  # Add the true source position, for plotting
     rx_args['x_sensor'] = None  # Set the 'x_sensor' flag to none, so that AOA and T/FDOA sensors are plotted separately
+    rx_args['x_init'] = x_init  # Add the initial position estimate, for plotting
+    rx_args['num_iterations'] = num_iterations
     fig_geo, fig_err = _plot_mc_iteration_result(rx_args, results)
 
     return fig_geo, fig_err
