@@ -51,12 +51,6 @@ def example1(rng=None, cmap=None):
     if cmap is None:
         cmap = plt.get_cmap("tab10")
 
-    # Clear the numpy warnings about underflow; we don't care
-    # Underflow warnings can indicate a loss of precision; in our case, these are likely occurring
-    # from positions where our sensors are poorly aligned to determined the target's location. We
-    # can ignore the loss of precision there.
-    np.seterr(all='ignore')
-
     # Define sensor positions
     x_sensor = 30.0*np.array([[-1., 0., 1.], [0.,  0., 0.]])
     num_dims, num_sensors = utils.safe_2d_shape(x_sensor)
@@ -112,7 +106,7 @@ def example1(rng=None, cmap=None):
 
     # Iterative Methods
     epsilon = .5  # km
-    num_mc_trials = 100  # ToDo: Reset to 1000, if needed
+    num_mc_trials = 1000
     num_iterations = 50
 
     out_shp = (2, num_mc_trials)
@@ -246,9 +240,6 @@ def example1(rng=None, cmap=None):
     plt.legend(loc='upper right')
     plt.xlim([1, 150])
     plt.ylim([1, 50])
-
-    # Re-engage the warning for numpy underflow
-    np.seterr(all='warn')
 
     return fig_geo, fig_err
 

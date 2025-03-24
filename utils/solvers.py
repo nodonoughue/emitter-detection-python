@@ -59,27 +59,7 @@ def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_n
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use the squeeze command to drop the third dim (n_source = 1)
 
         # Compute delta_x^(i), according to 10.20
-        delta_x = cov.solve_lstsq(y_i, jacobian_i)  # ToDo: debug and verify
-        # if cov_is_inverted:
-        #     jc = jacobian_i @ covariance_inverse
-        #     jcj = jc @ jacobian_i.T
-        #     jcy = jc @ y_i
-        #     delta_x, _, _, _ = np.linalg.lstsq(jcj, jcy, rcond=None)
-        # else:
-        #     # Using Cholesky decomposition:
-        #     #    C = L@L.T, we solved for L outside the loop
-        #     # [J @ C^{-1} @ J.T]^{-1} @ J @ C^{-1} @ y is
-        #     # rewritten
-        #     # [ a.T @ a ] ^{-1} @ a.T @ b
-        #     # where a and b are solved via forward substitution
-        #     # from the lower triangular matrix L.
-        #     #   L @ a = J.T
-        #     #   L @ b = y
-        #     a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
-        #     b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
-        #     # Then, we solve the system
-        #     #  (a.T @ a) @ delta_x = a.T @ b
-        #     delta_x, _, _, _ = np.linalg.lstsq(a.T @ a, a.T @ b, rcond=None)
+        delta_x = cov.solve_lstsq(y_i, jacobian_i)
 
         # Update predicted location
         x_full[:, current_iteration] = x_prev + np.squeeze(delta_x)
@@ -151,14 +131,8 @@ def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, e
     # Cost Function for Gradient Descent
     def cost_fxn(z):
         this_y = y(z)
-        # ToDo: debug and verify
         return cov.solve_aca(this_y.T)
-        # if cov_is_inverted:
-        #     return this_y.T @ covariance_inverse @ this_y
-        # else:
-        #     l_inv_y = scipy.linalg.solve_triangular(covariance_lower, this_y, lower=True)
-        #     return np.conj(l_inv_y.T) @ l_inv_y
-    
+
     # Initialize Plotting
     if plot_progress:
         fig_plot, (ax1, ax2) = plt.subplots(ncols=1, nrows=2)
@@ -186,7 +160,7 @@ def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, e
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use squeeze to remove third dimension (n_source=1)
         
         # Compute Gradient and Cost function
-        grad = -2 * cov.solve_acb(jacobian_i, y_i)  # ToDo: debug and verify
+        grad = -2 * cov.solve_acb(jacobian_i, y_i)
         # if cov_is_inverted:
         #     grad = -2 * jacobian_i @ covariance_inverse @ y_i
         # else:
@@ -202,6 +176,13 @@ def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, e
         
         # Update x position
         x_update = x_prev + t*del_x
+
+        # Apply Constraints
+        # if ineq_constraints is not None:
+        #     x_update = utils.constraints.apply_inequality(x_update, ineq_constraints)
+        #
+        # if eq_constraints is not None:
+        #     x_update = utils.constraints.apply_equality(x_update, eq_constraints)
 
         # Update variables
         x_full[:, current_iteration] = x_update

@@ -37,12 +37,6 @@ def example1(rng=np.random.default_rng()):
     :return fig_err: figure handle for error as a function of iteration
     """
 
-    # Clear the numpy warnings about underflow; we don't care
-    # Underflow warnings can indicate a loss of precision; in our case, these are likely occurring
-    # from positions where our sensors are poorly aligned to determined the target's location. We
-    # can ignore the loss of precision there.
-    np.seterr(under='ignore')
-
     #  Set up receiver system
     baseline = 10e3
     std_velocity = 100
@@ -80,9 +74,9 @@ def example1(rng=np.random.default_rng()):
                                           tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Initialize Solvers
-    num_mc_trials = int(100)   # ToDo: restore to 1000
+    num_mc_trials = int(1000)
     x_extent = 5 * baseline
-    num_iterations = int(1000)  # ToDo: restore to 1000
+    num_iterations = int(1000)
     alpha = .3
     beta = .8
     epsilon = 100  # [m] desired iterative search stopping condition
@@ -165,9 +159,6 @@ def example1(rng=np.random.default_rng()):
     rx_args['num_iterations'] = num_iterations
     fig_geo, fig_err = _plot_mc_iteration_result(rx_args, results)
 
-    # Re-engage the warning for numpy underflow
-    np.seterr(under='warn')
-
     return fig_geo, fig_err
 
 
@@ -224,7 +215,7 @@ def example2(rng=np.random.default_rng()):
                                           tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Initialize Solvers
-    num_mc_trials = int(100)  # ToDo: increase to 1000
+    num_mc_trials = int(1000)
     x_extent = 5 * baseline
     num_iterations = int(1000)
     alpha = .3

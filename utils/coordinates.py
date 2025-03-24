@@ -271,7 +271,7 @@ def ecef_to_lla(x, y, z, angle_units, dist_units):
     """
 
     # Compute the longitude as the arc-tan of y / x
-    lon_rad = np.atan2(y, x)  # TODO: Check documentation against matlab; correct usage?
+    lon_rad = np.atan2(y, x)
 
     # Read in constants
     a = constants.semimajor_axis_km * 1e3

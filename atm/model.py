@@ -150,7 +150,6 @@ def get_rain_loss_coeff(freq_hz, pol_angle_rad, el_angle_rad, rainfall_rate):
     :return: Loss coefficient [dB/km] caused by rain.
     """
 
-    # TODO: This is the pythonic way to compare things with different sizes...go through code and use this approach
     # Add a new dimension to all the inputs (if they're not scalar) for array operations
     if np.size(freq_hz) > 1:
         freq_hz = freq_hz[..., np.newaxis]

@@ -94,7 +94,7 @@ def example1(rng=np.random.default_rng()):
     cov_z = cov_x.resample(ref_idx_vec=ref_idx, test_idx_vec=test_idx)
 
     # Generate Noise
-    num_mc = 1000  # TODO: raise to 10,000
+    num_mc = 10000
     num_measurements = num_aoa + num_tdoa + num_fdoa
     noise_white = rng.standard_normal(size=(num_measurements, num_mc))
 

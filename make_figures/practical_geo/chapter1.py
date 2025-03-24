@@ -11,7 +11,6 @@ Nicholas O'Donoughue
 
 import utils
 import matplotlib.pyplot as plt
-import numpy as np
 
 from make_figures import chapter10
 from make_figures import chapter11
@@ -22,7 +21,7 @@ def make_all_figures(close_figs=False):
     """
     Call all the figure generators for this chapter
 
-    :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
+    :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
     :return: List of figure handles
     """
@@ -52,7 +51,7 @@ def make_figure_2a(prefix=None):
     """
     Figure 2a, Triangulation Example. A reprint of Figure 10.1 from the 2019 text.
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -75,7 +74,7 @@ def make_figure_2b(prefix=None):
     """
     Figure 2b, TDOA Example. A reprint of Figure 11.1b from the 2019 text.
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 
@@ -98,7 +97,7 @@ def make_figure_2c(prefix=None):
     """
     Figure 2c, FDOA Example
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory
     :return: figure handle
     """
 

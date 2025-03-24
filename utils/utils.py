@@ -561,7 +561,7 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing):
                         maximum offset from x_ctr
     :param grid_spacing: scalar or ND array of grid spacing in each dimension
     :return x_set: n_dim x N numpy array of positions
-    :return x_grid: n_dim-tuple of ND coordinates for each dimension.
+    :return x_grid: n_dim-tuple of n_dim-dimensional numpy arrays containing the coordinates for each dimension.
     :return out_shape:  tuple with the size of the generated grid
     """
 
@@ -597,7 +597,6 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing):
     # Rearrange to a single 2D array of grid locations (n_dim x N)
     x_set = np.asarray([x.flatten() for x in x_grid])
 
-    # ToDo: Ensure that x_set, x_grid, and n_elements match what the documentation says they are
     return x_set, x_grid, n_elements
 
 

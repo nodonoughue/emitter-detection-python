@@ -291,11 +291,11 @@ def _chan_ho_theta(cov: CovarianceMatrix, b, g, y):
     :return cov_mod: modified covariance matrix (eq 11.28)
     """
 
-    cov_mod = b @ cov.cov @ np.transpose(np.conjugate(b))  # BCB', eq 11.28
+    cov_mod = b @ cov.cov @ b.T  # BCB', eq 11.28
     cov_mod_inv = pinvh(cov_mod)
 
     # Assemble matrix products g^H*w_inv*g, and g^H*w_inv*y
-    gw = np.transpose(np.conjugate(g)) @ cov_mod_inv
+    gw = g.T @ cov_mod_inv
     gwg = gw @ g
     gwy = gw @ y
 

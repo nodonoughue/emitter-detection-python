@@ -143,7 +143,7 @@ def max_range(prob_fa, prob_d, num_samples, f0, ht, hr, snr0, include_atm_loss=F
     :param ht: Transmitter height [m]
     :param hr: Receiver height [m]
     :param snr0: Signal-to-Noise ratio [dB] without path loss
-    :param include_atm_loss: Binary flag determining whether or not atmospheric loss is to be included.  [Default=False]
+    :param include_atm_loss: Binary flag determining whether atmospheric loss is to be included.  [Default=False]
     :param atm_struct: (Optional) struct containing fields that specify atmospherics parameters.  See
                       atm.standardAtmosphere().
     :return range: Maximum range at which square law detector can achieve the PD/PFA test point.

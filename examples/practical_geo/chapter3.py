@@ -181,7 +181,6 @@ def example3(colors=None):
     :param colors:
     :return: figure handle to generated graphic
     """
-    # TODO: Look for underflow and ignore warning
 
     if colors is None:
         colors = plt.get_cmap("viridis")

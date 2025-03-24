@@ -38,12 +38,6 @@ def example1(rng=np.random.default_rng()):
     :return fig_err: figure handle for error as a function of iteration
     """
 
-    # Clear the numpy warnings about underflow; we don't care
-    # Underflow warnings can indicate a loss of precision; in our case, these are likely occurring
-    # from positions where our sensors are poorly aligned to determined the target's location. We
-    # can ignore the loss of precision there.
-    np.seterr(under='ignore')
-
     #  Set up TDOA Receiver system
     #  Spacing of 1 km at 60 degree intervals around origin
 
@@ -77,8 +71,8 @@ def example1(rng=np.random.default_rng()):
     # x_isochrone3 = tdoa.model.draw_isochrone(x_sensor[:, -1], x_sensor[:, 2], dR[2], 1000, 5*baseline)
 
     # Set up the Monte Carlo Trial
-    num_mc_trials = int(100)  # ToDo: raise to 1000
-    num_iterations = int(100)  # ToDo: raise to 1000
+    num_mc_trials = int(1000)
+    num_iterations = int(1000)
     alpha = .3
     beta = .8
     epsilon = 100  # [m] desired iterative search stopping condition
@@ -254,9 +248,6 @@ def example1(rng=np.random.default_rng()):
     plt.xlabel('Iteration Number')
     plt.ylabel('$CEP_{50}$ [km]')
     plt.legend(loc='upper right')
-
-    # Re-engage the warning for numpy underflow
-    np.seterr(under='warn')
 
     return fig_geo_a, fig_geo_b, fig_err
 
