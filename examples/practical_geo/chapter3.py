@@ -69,7 +69,7 @@ def example1(colors=None):
     return fig_a, fig_b, fig_c
 
 
-def example2(colors=None):
+def example2(colors=None, do_video_example=False):
     """
     Executes Example 3.2.
 
@@ -146,7 +146,25 @@ def example2(colors=None):
         this_fig = _plot_contourf(x_grid, extent, grid_shape_2d, this_cep/1e3, x_sensors, None, levels, colors)
         figs.append(this_fig)
 
-    # TODO: Repeat with higher error on one sensor to match what was done in the video?
+    if do_video_example:
+        # For the video about Example 3.2, we modified the code to re-run with a larger covariance error on one sensor
+        c = cov_full.cov                # Extract the covariance matrix
+        c[0, 0] = 10 * c[0, 0]          # Multiply the first sensor's error by 10
+        cov_full = CovarianceMatrix(c)  # Make a new covariance matrix object
+
+        ref_set = [0, 'full']
+
+        for this_ref_set in ref_set:
+            # Compute CRLB
+            this_crlb = tdoa.perf.compute_crlb(x_sensor=x_sensors, x_source=x_source, cov=cov_full, variance_is_toa=True,
+                                               ref_idx=this_ref_set, print_progress=True)
+
+            # Compute CEP50
+            this_cep = utils.errors.compute_cep50(this_crlb)
+
+            # Plot this Result
+            this_fig = _plot_contourf(x_grid, extent, grid_shape_2d, this_cep/1e3, x_sensors, None, levels, colors)
+            figs.append(this_fig)
 
     return figs
 
