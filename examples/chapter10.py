@@ -338,25 +338,25 @@ def example2():
     print('Maximum cross range position at 100 km downrange that satisfies CEP < 25 km is {:.2f} km'
           .format(max_cross_range/1e3))
 
-    # TODO: Re-write to use utils.make_nd_grid
-    x_max = 100
-    x_vec = np.arange(start=-x_max, step=.25, stop=x_max)
-    x_mesh, y_mesh = np.meshgrid(x_vec, x_vec)
-    x0 = np.stack((x_mesh.flatten(), y_mesh.flatten()), axis=1).T
+    x_max = 100  # TODO: test and debug
+    grid_res = 0.25
+    x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr=np.array([0., 0.]), max_offset=x_max, grid_spacing=grid_res)
+    # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
+    grid_shape_2d = [i for i in grid_shape if i > 1]
 
     # Compute CRLB
-    crlb = triang.perf.compute_crlb(x_sensor*1e3, x0*1e3, cov=covar_psi)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=x_mesh.shape)
+    crlb = triang.perf.compute_crlb(x_aoa=x_sensor*1e3, x_source=x_source*1e3, cov=covar_psi)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape_2d)
 
     # Blank out y=0
-    nan_mask = np.abs(y_mesh) < 1e-6
+    nan_mask = np.abs(x_grid[1]) < 1e-6  # x_grid is a list of meshgrid outputs; search the y-dimension
     cep50[nan_mask] = np.nan
     
     # Plot
     fig = plt.figure()
     plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='AOA Sensors')
     contour_levels = [1, 5, 10, 25, 50]
-    contour_set = plt.contour(x_mesh, y_mesh, cep50/1e3, levels=contour_levels)
+    contour_set = plt.contour(x_grid[0], x_grid[1], cep50/1e3, levels=contour_levels)
     plt.clabel(contour_set, contour_levels)
     plt.xlabel('x [km]')
     plt.ylabel('y [km]')
