@@ -190,13 +190,12 @@ def chan_ho(x_sensor, rho, cov: CovarianceMatrix, ref_idx=None, do_resample=Fals
     n_dims, n_sensor = np.shape(x_sensor)
     if ref_idx is not None and ref_idx != n_sensor-1:
         # Throw an error if there are multiple reference sensors
-        # TODO: Test assertion
         assert np.size(ref_idx) == 1, 'The Chan-Ho solver currently requires a single reference sensor.'
 
         # Re-arrange the sensors
         sort_idx = [i for i in np.arange(n_sensor) if i != ref_idx]
-        sort_idx = sort_idx.append(ref_idx)
-        x_sensor = x_sensor[sort_idx, :]
+        sort_idx.append(int(ref_idx))
+        x_sensor = x_sensor[:, sort_idx]
 
         # Note: We don't need to rearrange cov, since
         # the following code block will handle its resampling to account
