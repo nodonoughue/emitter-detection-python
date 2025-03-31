@@ -5,7 +5,8 @@ from utils.covariance import CovarianceMatrix
 
 
 def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_num_iterations=10e3,
-              force_full_calc=False, plot_progress=False):
+              force_full_calc=False, plot_progress=False, eq_constraints=None, ineq_constraints=None,
+              constraint_tolerance=None):
     """
     Computes the least square solution for geolocation processing.
     
@@ -62,10 +63,22 @@ def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_n
         delta_x = cov.solve_lstsq(y_i, jacobian_i)
 
         # Update predicted location
-        x_full[:, current_iteration] = x_prev + np.squeeze(delta_x)
+        x_curr = x_prev + np.squeeze(delta_x)
+
+        # Apply Equality Constraints
+        if eq_constraints is not None:
+            x_update = utils.constraints.snap_to_equality_constraints(x_update, eq_constraints=eq_constraints,
+                                                                      tol=constraint_tolerance)
+
+        # Apply Inequality Constraints
+        if ineq_constraints is not None:
+            x_update = utils.constraints.snap_to_inequality_constraints(x_update, ineq_constraints=ineq_constraints)
+
+        # TODO: What to do if both ineq and eq constraints are in use?
 
         # Update variables
-        x_prev = x_full[:, current_iteration]
+        x_full[:, current_iteration] = x_update
+        x_prev = x_update
         error = np.linalg.norm(delta_x)
 
         if plot_progress:
@@ -93,7 +106,8 @@ def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_n
 
 
 def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6, max_num_iterations=10e3,
-              force_full_calc=False, plot_progress=False):
+              force_full_calc=False, plot_progress=False, eq_constraints=None, ineq_constraints=None,
+              constraint_tolerance=None):
     """
     Computes the gradient descent solution for localization given the provided measurement and Jacobian function 
     handles, and measurement error covariance.
@@ -177,12 +191,16 @@ def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, e
         # Update x position
         x_update = x_prev + t*del_x
 
-        # Apply Constraints
-        # if ineq_constraints is not None:
-        #     x_update = utils.constraints.apply_inequality(x_update, ineq_constraints)
-        #
-        # if eq_constraints is not None:
-        #     x_update = utils.constraints.apply_equality(x_update, eq_constraints)
+        # Apply Equality Constraints
+        if eq_constraints is not None:
+            x_update = utils.constraints.snap_to_equality_constraints(x_update, eq_constraints=eq_constraints,
+                                                                      tol=constraint_tolerance)
+
+        # Apply Inequality Constraints
+        if ineq_constraints is not None:
+            x_update = utils.constraints.snap_to_inequality_constraints(x_update, ineq_constraints=ineq_constraints)
+
+        # TODO: What to do if both ineq and eq constraints are in use?
 
         # Update variables
         x_full[:, current_iteration] = x_update
@@ -252,7 +270,7 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
     return t
 
 
-def ml_solver(ell, x_ctr, search_size, epsilon):
+def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None):
     """
     Execute ML estimation through brute force computational methods.
 
@@ -273,6 +291,11 @@ def ml_solver(ell, x_ctr, search_size, epsilon):
 
     # Set up the search space
     x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
+
+    # Constrain the likelihood, if needed
+    if ineq_constraints is not None or eq_constraints is not None:
+        ell = utils.constraints.constrain_likelihood(ell=ell, eq_constraints=eq_constraints,
+                                                     ineq_constraints=ineq_constraints, tol=constraint_tolerance)
 
     # Evaluate the likelihood function at each coordinate in the search space
     likelihood = ell(x_set)

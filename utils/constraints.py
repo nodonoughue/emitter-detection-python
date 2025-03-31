@@ -6,10 +6,6 @@ _deg2rad = utils.unit_conversions.convert(1, 'deg', 'rad')
 
 # TODO: Test and Debug!!
 # TODO: Convert filterGrid.m?  Not actually used in MATLAB code.
-# TODO: Convert gdSolnFixed.m and gdSolnBounded.m
-# TODO: Convert lsSolnFixed.m and lsSolnBounded.m
-# TODO: Convert mlSolnConstrained.m
-
 
 # **********************************************************************************************************************
 # Altitude Constraints
