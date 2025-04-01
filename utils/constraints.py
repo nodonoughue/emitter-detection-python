@@ -107,7 +107,7 @@ def fixed_alt_constraint_flat(x, alt):
 
     # To make x valid, replace the altitude with alt
     x_valid = x.copy()
-    x_valid[2, :] = alt
+    x_valid[2] = alt
 
     return epsilon, x_valid
 
@@ -126,7 +126,7 @@ def fixed_alt_gradient_flat(x):
 
     # For flat Earth, the gradient is simply a one in the vertical coordinate, and zero elsewhere
     epsilon_gradient = np.zeros_like(x)
-    epsilon_gradient[2, :] = 1.
+    epsilon_gradient[2] = 1.
 
     return epsilon_gradient
 
@@ -348,19 +348,22 @@ def fixed_cartesian(bound_type: str, bound_val: np.double = None, x0: np.array =
 
 def fixed_cartesian_xyz(x: np.array, bound_val: np.double, axis: int):
 
-    verify_3d_input(x)
+    # Cartesian bounds work on 2D or 3D
+    # verify_3d_input(x)
 
     # Compute the difference between each coordinate's value in the specified axis and the desired constraint
-    epsilon = x[axis, :] - bound_val
+    epsilon = x[axis] - bound_val
 
     # Replace the specified axis with bound_val to generate coordinates that satisfy the constraint
     x_valid = x.copy()
-    x_valid[axis, :] = bound_val
+    x_valid[axis] = bound_val
 
     return epsilon, x_valid
 
 def fixed_cartesian_gradient_xyz(x, axis: int):
-    verify_3d_input(x)
+
+    # Cartesian bounds work on 2D or 3D
+    # verify_3d_input(x)
 
     # The gradient is all zeros, except for ones in the specified axis
     epsilon_gradient = np.zeros_like(x)

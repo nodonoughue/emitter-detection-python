@@ -284,6 +284,9 @@ def resample_noise(noise: np.ndarray, test_idx: np.ndarray = None, ref_idx=None,
     if test_idx is None:
         # We need to use the ref_idx
         test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
+    else:
+        test_idx_vec = test_idx
+        ref_idx_vec = ref_idx
 
     # Determine output size
     n_test = np.size(test_idx_vec)
@@ -323,21 +326,21 @@ def resample_noise(noise: np.ndarray, test_idx: np.ndarray = None, ref_idx=None,
         else:
             b_i_wt = 1.
 
-        noise_ai = np.zeros((len(a_i), np.size(noise, 1)))
+        noise_ai = np.zeros((len(a_i), utils.safe_2d_shape(noise)[1]))
         noise_bi = np.zeros_like(noise_ai)
 
         mask_ai = ~np.isnan(a_i)
         mask_bi = ~np.isnan(b_i)
 
         if not np.all(mask_ai):
-            noise_ai[mask_ai] = noise[a_i[mask_ai].astype(int), :]
+            noise_ai[mask_ai] = noise[a_i[mask_ai].astype(int)]
         else:
-            noise_ai = noise[a_i.astype(int), :]
+            noise_ai = noise[a_i.astype(int)]
 
         if not np.all(mask_bi):
-            noise_bi[mask_bi] = noise[b_i[mask_bi].astype(int), :]
+            noise_bi[mask_bi] = noise[b_i[mask_bi].astype(int)]
         else:
-            noise_bi = noise[b_i.astype(int), :]
+            noise_bi = noise[b_i.astype(int)]
 
         res = b_i_wt * noise_bi - a_i_wt * noise_ai
         # raise ValueError('mo')

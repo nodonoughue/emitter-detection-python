@@ -5,4 +5,5 @@ from . import solvers
 from . import perf
 from . import unit_conversions
 from . import coordinates
+from . import constraints
 from .utils import *

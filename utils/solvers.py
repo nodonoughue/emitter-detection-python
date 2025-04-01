@@ -4,9 +4,17 @@ import utils
 from utils.covariance import CovarianceMatrix
 
 
-def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_num_iterations=10e3,
-              force_full_calc=False, plot_progress=False, eq_constraints=None, ineq_constraints=None,
-              constraint_tolerance=None):
+def ls_solver(zeta,
+              jacobian,
+              cov: CovarianceMatrix,
+              x_init: np.array,
+              epsilon:np.double=1e-6,
+              max_num_iterations:np.integer=int(10e3),
+              force_full_calc:bool=False,
+              plot_progress:bool=False,
+              eq_constraints:list=None,
+              ineq_constraints:list=None,
+              constraint_tolerance:np.double=1e-6):
     """
     Computes the least square solution for geolocation processing.
     
@@ -63,7 +71,7 @@ def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_n
         delta_x = cov.solve_lstsq(y_i, jacobian_i)
 
         # Update predicted location
-        x_curr = x_prev + np.squeeze(delta_x)
+        x_update = x_prev + np.squeeze(delta_x)
 
         # Apply Equality Constraints
         if eq_constraints is not None:
@@ -96,7 +104,7 @@ def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_n
                 
         prev_error = error
 
-    x = x_full[:, current_iteration]
+    x = x_prev
 
     # Bookkeeping
     if not force_full_calc:
@@ -105,9 +113,19 @@ def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_n
     return x, x_full
 
 
-def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6, max_num_iterations=10e3,
-              force_full_calc=False, plot_progress=False, eq_constraints=None, ineq_constraints=None,
-              constraint_tolerance=None):
+def gd_solver(y,
+              jacobian,
+              cov: CovarianceMatrix,
+              x_init:np.array,
+              alpha:np.double=0.3,
+              beta:np.double=0.8,
+              epsilon:np.double=1.e-6,
+              max_num_iterations:np.integer=int(10e3),
+              force_full_calc:bool=False,
+              plot_progress:bool=False,
+              eq_constraints:list=None,
+              ineq_constraints:list=None,
+              constraint_tolerance:np.double=1e-6):
     """
     Computes the gradient descent solution for localization given the provided measurement and Jacobian function 
     handles, and measurement error covariance.
@@ -223,7 +241,7 @@ def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, e
 
         prev_error = error
 
-    x = x_full[:, current_iteration]
+    x = x_prev
 
     # Bookkeeping
     if not force_full_calc:

@@ -250,8 +250,8 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, do_2d_aoa=F
 
 
 def draw_lob(x_sensor, psi, x_source=None, scale=1):
-    num_sensors = x_sensor.shape[1]
-    num_measurements = len(psi)
+    _, num_sensors = utils.safe_2d_shape(x_sensor)
+    num_measurements = np.size(psi)
 
     if num_sensors != num_measurements:
         print('The number of sensor positions and measurements must match.\n')
