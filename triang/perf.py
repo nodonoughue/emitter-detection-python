@@ -4,7 +4,7 @@ from . import model
 from utils.covariance import CovarianceMatrix
 
 
-def compute_crlb(x_aoa, x_source, cov: CovarianceMatrix, do_2d_aoa=False, print_progress=False):
+def compute_crlb(x_aoa, x_source, cov: CovarianceMatrix, do_2d_aoa=False, print_progress=False, **kwargs):
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_aoa (Ndim x N).  C is an NxN matrix of TOA
@@ -39,6 +39,6 @@ def compute_crlb(x_aoa, x_source, cov: CovarianceMatrix, do_2d_aoa=False, print_
         return model.jacobian(x_sensor=x_aoa, x_source=x, do_2d_aoa=do_2d_aoa)
 
     crlb = utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=jacobian, cov=cov,
-                                            print_progress=print_progress)
+                                            print_progress=print_progress, **kwargs)
 
     return crlb

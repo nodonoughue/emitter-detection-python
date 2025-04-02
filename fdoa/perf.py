@@ -6,7 +6,7 @@ from utils.covariance import CovarianceMatrix
 
 
 def compute_crlb(x_sensor, v_sensor, x_source, cov: CovarianceMatrix, v_source=None, ref_idx=None, do_resample=True,
-                 print_progress=False):
+                 print_progress=False, **kwargs):
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_fdoa (Ndim x N) with velocity v_fdoa.
@@ -46,7 +46,7 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov: CovarianceMatrix, v_source=N
                               x_source=x, v_source=v_source, ref_idx=ref_idx)
 
     crlb = utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=jacobian, cov=cov,
-                                            print_progress=print_progress)
+                                            print_progress=print_progress, **kwargs)
 
     return crlb
 

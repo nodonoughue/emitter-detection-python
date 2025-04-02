@@ -5,7 +5,6 @@ import scipy
 import tdoa.model
 import utils
 import hybrid
-import time
 from utils.covariance import CovarianceMatrix
 import triang
 
@@ -168,18 +167,19 @@ def example2():
             if np.all(this_x == x_tdoa[:, ref_idx]):
                 continue
 
-            iso = tdoa.model.draw_isochrone(x1=this_x[:2, np.newaxis], x2=x_tdoa[:2, ref_idx],
+            iso = tdoa.model.draw_isochrone(x1=x_tdoa[:2, ref_idx], x2=this_x[:2],
                                             range_diff=this_zeta, num_pts=101, max_ortho=40e3)
-            plt.plot(iso[0], iso[1], '--k', label=iso_label)
+            plt.plot(iso[0], iso[1], '--k', linewidth=0.5, label=iso_label)
             iso_label=None
 
         # Plot GD solution
-        this_ax.plot(x_gd_full[0], x_gd_full[1], x_gd_full[2], '-.s', markevery=[-1],label='GD (Unconstrained)')
+        this_ax.plot(x_gd_full[0], x_gd_full[1], x_gd_full[2], '-.s', markevery=[-1], label='GD (Unconstrained)')
         this_ax.plot(x_gd_full_alt[0], x_gd_full_alt[1], x_gd_full_alt[2], '-.s', markevery=[-1], label='GD (Constrained)')
 
         this_ax.set_xlim([-20e3, 20e3])
         this_ax.set_ylim([0e3, 50e3])
-        this_ax.set_zlim([0e3, 1.2e3])
+        this_ax.set_zlim([0e3, 2.1e3])
+        this_ax.set_clip_on(True)
 
         if title is not None:
             plt.title(title)
@@ -229,7 +229,103 @@ def example3():
     :return: figure handle to generated graphic
     """
 
-    return []
+    # Set up scene
+    ref_lla = np.array([20., -150., 0.])  # deg lat, deg lon, m alt
+    x_aoa = np.zeros((3,1))               # meters, ENU
+    x_tdoa = np.array([[20e3, 25e3],
+                       np.zeros((2,)),
+                       np.zeros((2,))])   # meters, ENU
+    _, num_tdoa = utils.safe_2d_shape(x_tdoa)
+    ref_idx = num_tdoa - 1  # index of TDOA reference sensor
+
+    tgt_az = 30.    # degrees E of N
+    tgt_rng = 50e3  # meters
+    tgt_alt = 10e3  # meters
+
+    x_tgt = np.array([tgt_rng * np.sin(tgt_az * _deg2rad),
+                      tgt_rng * np.cos(tgt_az * _deg2rad),
+                      tgt_alt])  # meters, ENU
+
+    # Errors
+    err_aoa = 3 * _deg2rad
+    err_toa = 1e-6
+    err_roa = utils.constants.speed_of_light * err_toa
+
+    cov_aoa = err_aoa**2 * np.eye(2)  # 2D AOA measurement covariance
+    cov_roa = err_roa**2 * np.eye(num_tdoa)  # ROA measurement covariance
+    cov_raw = CovarianceMatrix(scipy.linalg.block_diag(cov_aoa, cov_roa))  # convert to Covariance Matrix object
+    cov_msmt = cov_raw.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, do_2d_aoa=True, tdoa_ref_idx=ref_idx)
+
+    # CRLB Computation
+    crlb_args = {'x_source':x_tgt,
+                 'cov':cov_msmt,
+                 'x_aoa':x_aoa,
+                 'x_tdoa':x_tdoa,
+                 'do_2d_aoa':True,
+                 'tdoa_ref_idx': ref_idx,
+                 'do_resample': False}
+    crlb_raw = hybrid.perf.compute_crlb(**crlb_args)
+
+    _, a_grad = utils.constraints.fixed_alt(tgt_alt, geo_type='flat')
+    crlb_fix = hybrid.perf.compute_crlb(**crlb_args, eq_constraints_grad=[a_grad])
+
+    print('CRLB (unconstrained):')
+    with np.printoptions(precision=0):
+        print(crlb_raw)
+    print('CRLB (constrained):')
+    with np.printoptions(precision=0, suppress=True):
+        print(crlb_fix)
+
+    ## Plot for x/y grid
+    # Initialize grid
+    max_offset = int(10e3)
+    num_pts = 201
+    grid_res = 2*max_offset / (num_pts-1)
+    x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr=x_tgt,
+                                                  max_offset=max_offset*np.array([1, 1, 0]),
+                                                  grid_spacing=grid_res)
+
+    # Compute CRLB across grid
+    crlb_args['x_source'] = x_set  # replace singular source point with grid of potential source points
+    crlb_args['print_progress'] = True  # turn on progress tracker; these may take some time
+    crlb_raw_grid = hybrid.perf.compute_crlb(**crlb_args)
+    crlb_fix_grid = hybrid.perf.compute_crlb(**crlb_args, eq_constraints_grad=[a_grad])
+
+    # Compute RMSE of each grid point
+    rmse_raw = np.reshape(np.sqrt(np.trace(crlb_raw_grid, axis1=0, axis2=1)), newshape=out_shape)
+    rmse_fix = np.reshape(np.sqrt(np.trace(crlb_fix_grid, axis1=0, axis2=1)), newshape=out_shape)
+
+    # Plot RMSE
+    fig, axes = plt.subplots(ncols=2)
+    contour_levels = np.arange(20)
+    extent = ((x_tgt[0] - max_offset)/1e3,
+              (x_tgt[0] + max_offset)/1e3,
+              (x_tgt[1] - max_offset)/1e3,
+              (x_tgt[1] + max_offset)/1e3)
+
+    # Unconstrained on axes[0] and Constrained on axes[1]
+    for this_ax, this_z in zip(axes, [rmse_raw, rmse_fix]):
+        # Begin with the RMSE Background Plot
+        hdl_img = this_ax.imshow(this_z.squeeze()/1e3, origin='lower', cmap='viridis_r', extent=extent,
+                                 vmin=0, vmax=contour_levels[-1])
+
+        # Unlike in MATLAB, contourf does not draw contour edges. Manually add contours
+        hdl_contour = this_ax.contour(x_grid[0].squeeze()/1e3, x_grid[1].squeeze()/1e3, this_z.squeeze()/1e3,
+                                      levels=contour_levels,origin='lower', colors='k')
+        plt.clabel(hdl_contour, fontsize=10, colors='k')
+
+        # Add a target scatterer, legend, and axis labels
+        this_ax.scatter(x_tgt[0]/1e3, x_tgt[1]/1e3, color='k', facecolors='k', marker='^', label='Target')
+        this_ax.set_xlabel('E [km]')
+        this_ax.set_ylabel('N [km]')
+        this_ax.legend(loc='upper left')
+
+    # Colorbar and subplot titles
+    fig.colorbar(hdl_img, ax=axes, location='bottom', label='RMSE [km]')
+    axes[0].set_title('Unconstrained')
+    axes[1].set_title('Constrained')
+
+    return fig
 
 
 def example4():
