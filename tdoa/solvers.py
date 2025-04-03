@@ -8,7 +8,7 @@ solvers = utils.solvers
 
 
 def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon=None, ref_idx=None,
-                   do_resample=False):
+                   do_resample=False, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -37,7 +37,8 @@ def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, eps
         return model.log_likelihood(x_sensor, rho, cov, x, ref_idx, do_resample=False, variance_is_toa=False)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
+                                                  **kwargs)
 
     return x_est, likelihood, x_grid
 
@@ -305,21 +306,19 @@ def _chan_ho_theta(cov: CovarianceMatrix, b, g, y):
 
 def _chan_ho_theta_hat(cov_mod, b2, g1, g2, y2):
     """
-    Compute position estimate overline(theta) according to 11.25.
-    This is an internal function called by chan_ho.
 
     :param cov_mod: measurement-level covariance matrix
     :param b2:
     :param g1:
     :param g2:
     :param y2: shifted measurement vector
-    :return theta: parameter vector (eq 11.26)
-    :return cov_mod: modified covariance matrix (eq 11.28)
+    :return theta: parameter vector (eq 11.36)
     """
 
-    g1wg1 = np.transpose(np.conjugate(g1)) @ cov_mod @ g1
-    w2 = np.linalg.pinv(np.conjugate(np.transpose(b2))) @ g1wg1 @ np.linalg.pinv(b2)
-    g2w = np.transpose(np.conjugate(g2)) @ w2
+    # TODO: Debug and verify
+    g1wg1 = g1.T @ cov_mod @ g1
+    w2 = pinvh(b2.T @ pinvh(g1wg1) @ b2)
+    g2w = g2.T @ w2
     g2wg2 = g2w @ g2
     g2wy = g2w @ y2
 

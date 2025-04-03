@@ -4,7 +4,8 @@ from scipy import stats
 
 import utils
 from .unit_conversions import lin_to_db
-from itertools import combinations
+from itertools import combinations, chain
+from collections.abc import Iterable
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
@@ -694,3 +695,36 @@ def remove_outliers(data, axis=0, remove_nan=False):
     data_out = np.delete(data, deletion_mask, axis=axis)
 
     return data_out
+
+def ensure_iterable(var, flatten=False)->Iterable:
+    """
+    Ensure that the input is an iterable. If it is not, wrap it in a list.
+
+    Optionally searched for nested iterables and flatten them, so that all entries
+    can be iterated over in a single for loop.
+
+    Nicholas O'Donoughue
+    3 April 2025
+
+    :param var: variable to be tested
+    :param flatten: whether to flatten the variable (default=False)
+    :return var_out: Iterable containing the elements of var
+    """
+    # Make sure it's iterable
+    if not isinstance(var, Iterable):  # accepts list, tuple, array, ...
+        var = [var]  # wrap it in a list
+
+    # Check for nested iterables
+    if flatten:
+        # Repeat until none of the elements are iterable
+        while any(isinstance(element, Iterable) for element in var):
+            var_out = []
+            for element in var:
+                if isinstance(element, Iterable):
+                    # Use list comprehension
+                    var_out.append(*element)
+                else:
+                    var_out.append(element)
+            var = var_out  # overwrite the variable
+
+    return var

@@ -10,7 +10,7 @@ _deg2rad = utils.unit_conversions.convert(1, 'deg', 'rad')
 # **********************************************************************************************************************
 # Altitude Constraints
 # **********************************************************************************************************************
-def fixed_alt(alt_val: np.double, geo_type: str = 'ellipse', is_upper_bound=True):
+def fixed_alt(alt_val: float, geo_type: str = 'ellipse', is_upper_bound=True):
     """
     Define the cost function and gradient for a fixed altitude constraint. The form of this cost function and its
     gradient depend on the Earth model in use, either flat Earth (altitude is the cartesian z-coordinate), spherical
@@ -70,7 +70,7 @@ def fixed_alt(alt_val: np.double, geo_type: str = 'ellipse', is_upper_bound=True
     return a, a_gradient
 
 
-def bounded_alt(geo_type: str, alt_min=None, alt_max=None):
+def bounded_alt(geo_type: str, alt_min:float =None, alt_max:float =None):
 
     bounds = list([])
 
@@ -89,7 +89,7 @@ def bounded_alt(geo_type: str, alt_min=None, alt_max=None):
     return bounds
 
 
-def fixed_alt_constraint_flat(x, alt):
+def fixed_alt_constraint_flat(x: np.ndarray, alt: float):
     """
     Implement the flat Earth altitude constraint; altitude is simply the 3rd cartesian dimension.
     Ported from MATLAB code.
@@ -112,7 +112,7 @@ def fixed_alt_constraint_flat(x, alt):
     return epsilon, x_valid
 
 
-def fixed_alt_gradient_flat(x):
+def fixed_alt_gradient_flat(x: np.ndarray):
     """
     Implement the gradient of the flat Earth altitude constraint; altitude is simply the 3rd cartesian dimension.
     Ported from MATLAB code.
@@ -131,7 +131,7 @@ def fixed_alt_gradient_flat(x):
     return epsilon_gradient
 
 
-def fixed_alt_constraint_sphere(x, alt):
+def fixed_alt_constraint_sphere(x: np.ndarray, alt: float):
     """
     Implement the spherical Earth altitude constraint; altitude is simply the Euclidean norm of each coordinate. The
     radius of the Earth (utils.constants.radius_earth_true) will be subtracted from the norm before comparing to the
@@ -157,7 +157,7 @@ def fixed_alt_constraint_sphere(x, alt):
     return epsilon, x_valid
 
 
-def fixed_alt_gradient_sphere(x):
+def fixed_alt_gradient_sphere(x: np.ndarray):
     """
     Implement the gradient of the spherical Earth altitude constraint; altitude is simply the Euclidean norm of each
     coordinate.
@@ -175,7 +175,7 @@ def fixed_alt_gradient_sphere(x):
     return 2*x
 
 
-def fixed_alt_constraint_ellipse(x, alt):
+def fixed_alt_constraint_ellipse(x: np.ndarray, alt: float):
     """
     Implement the ellipsoidal Earth altitude constraint. Uses the coordinate conversion ecef_to_lla to compute the
     altitude of each point.
@@ -199,12 +199,12 @@ def fixed_alt_constraint_ellipse(x, alt):
 
     # Find the nearest valid x -- replace computed altitude with desired
     xx, yy, zz = utils.coordinates.lla_to_ecef(lat, lon, alt * np.ones_like(alt_coord))
-    x_valid = np.concatenate(xx[np.newaxis, :], yy[np.newaxis, :], zz[np.newaxis, :])
+    x_valid = np.concatenate((xx[np.newaxis], yy[np.newaxis], zz[np.newaxis]), axis=0)
 
     return epsilon, x_valid
 
 
-def fixed_alt_gradient_ellipse(x):
+def fixed_alt_gradient_ellipse(x: np.ndarray):
     """
     Implement the gradient of the ellipsoidal Earth altitude constraint.
 
@@ -255,9 +255,9 @@ def fixed_alt_gradient_ellipse(x):
     d_eps_dy = (xx + yy)/(cos_lat*xy_len)-d_r_dy
     d_eps_dz = -d_r_dz
 
-    epsilon_grad = np.concatenate((d_eps_dx[np.newaxis, :],
-                                   d_eps_dy[np.newaxis, :],
-                                   d_eps_dz[np.newaxis, :]), axis=0)
+    epsilon_grad = np.concatenate((d_eps_dx[np.newaxis],
+                                   d_eps_dy[np.newaxis],
+                                   d_eps_dz[np.newaxis]), axis=0)
 
     return epsilon_grad
 
@@ -267,7 +267,7 @@ def fixed_alt_gradient_ellipse(x):
 # **********************************************************************************************************************
 # Cartesian Constraints
 # **********************************************************************************************************************
-def fixed_cartesian(bound_type: str, bound_val: np.double = None, x0: np.array = None, u_vec: np.array = None,
+def fixed_cartesian(bound_type: str, bound_val: float = None, x0: np.ndarray = None, u_vec: np.ndarray = None,
                     is_upper_bound=True):
     """
     Generate a set of constraints and constraint gradient functions for fixed solution constraints on a cartesian grid.
@@ -346,7 +346,7 @@ def fixed_cartesian(bound_type: str, bound_val: np.double = None, x0: np.array =
     return a, a_gradient
 
 
-def fixed_cartesian_xyz(x: np.array, bound_val: np.double, axis: int):
+def fixed_cartesian_xyz(x: np.ndarray, bound_val: float, axis: int):
 
     # Cartesian bounds work on 2D or 3D
     # verify_3d_input(x)
@@ -360,7 +360,7 @@ def fixed_cartesian_xyz(x: np.array, bound_val: np.double, axis: int):
 
     return epsilon, x_valid
 
-def fixed_cartesian_gradient_xyz(x, axis: int):
+def fixed_cartesian_gradient_xyz(x: np.ndarray, axis: int):
 
     # Cartesian bounds work on 2D or 3D
     # verify_3d_input(x)
@@ -371,7 +371,7 @@ def fixed_cartesian_gradient_xyz(x, axis: int):
     return epsilon_gradient
 
 
-def fixed_cartesian_linear(x: np.array, x0: np.ndarray, u_vec: np.ndarray):
+def fixed_cartesian_linear(x: np.ndarray, x0: np.ndarray, u_vec: np.ndarray):
 
     # Make sure all three inputs have the same number of spatial coordinates
     verify_common_dim(x, x0, u_vec)
@@ -426,7 +426,7 @@ def verify_common_dim(*args: np.ndarray):
     assert np.all(dims == dims[0]), 'Not all inputs have the same number of spatial dimensions'
 
 
-def snap_to_equality_constraints(x: np.ndarray, eq_constraints: list, tol: np.double = 1e-6):
+def snap_to_equality_constraints(x: np.ndarray, eq_constraints: list, tol: float = 1e-6):
     """
     Apply the equality constraints in the function handle eq_constraints to the position
     x, subject to a tolerance tol.
@@ -509,7 +509,7 @@ def snap_to_inequality_constraints(x: np.ndarray, ineq_constraints: list):
     return x_valid
 
 
-def constrain_likelihood(ell, eq_constraints: list=None, ineq_constraints: list=None, tol: np.double = 1e-6):
+def constrain_likelihood(ell, eq_constraints: list=None, ineq_constraints: list=None, tol: float = 1e-6):
     """
     Accepts a set of functions handles ell (likelihood), a (equality
     constraints), b (inequality constraints), and a tolerance to apply
@@ -529,6 +529,12 @@ def constrain_likelihood(ell, eq_constraints: list=None, ineq_constraints: list=
     :return ell_constrained:    Function handle to a modified likelihood, that returns -Inf for any points that violate
                                 one or more constraints.
     """
+
+    # Make certain that eq_constraints and ineq_constraints are iterable
+    if ineq_constraints is not None:
+        utils.ensure_iterable(ineq_constraints, flatten=True)
+    if eq_constraints is not None:
+        utils.ensure_iterable(eq_constraints, flatten=True)
 
     def ell_constrained(x):
         valid_mask = True

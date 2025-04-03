@@ -6,7 +6,7 @@ from utils.covariance import CovarianceMatrix
 
 
 def max_likelihood(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon=None, ref_idx=None,
-                   do_resample=False):
+                   do_resample=False, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -37,7 +37,8 @@ def max_likelihood(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search
                                     x_source=x, v_source=None, ref_idx=ref_idx, do_resample=False)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
+                                                  **kwargs)
 
     return x_est, likelihood, x_grid
 

@@ -6,6 +6,7 @@ import tdoa.model
 import utils
 import hybrid
 from utils.covariance import CovarianceMatrix
+from utils.coordinates import ecef_to_enu, ecef_to_lla, enu_to_ecef, lla_to_ecef
 import triang
 
 _rad2deg = utils.unit_conversions.convert(1, "rad", "deg")
@@ -71,7 +72,7 @@ def example1(do_mod_cov=False):
     x_gd, x_gd_full = triang.solvers.gradient_descent(**gd_args)
 
     # Gradient Descent Solution; Constrained
-    y_soln = 25
+    y_soln = 25.
     a, _ = utils.constraints.fixed_cartesian('y', y_soln)
     constraint_arg = {'eq_constraints': [a]}
     x_gd_const, x_gd_full_const = triang.solvers.gradient_descent(**gd_args, **constraint_arg)
@@ -114,7 +115,6 @@ def example2():
     Nicholas O'Donoughue
     7 February 2025
 
-    :param do_mod_pos: boolean, if True then the
     :return: figure handle to generated graphic
     """
 
@@ -174,7 +174,7 @@ def example2():
 
         # Plot GD solution
         this_ax.plot(x_gd_full[0], x_gd_full[1], x_gd_full[2], '-.s', markevery=[-1], label='GD (Unconstrained)')
-        this_ax.plot(x_gd_full_alt[0], x_gd_full_alt[1], x_gd_full_alt[2], '-.s', markevery=[-1], label='GD (Constrained)')
+        this_ax.plot(x_gd_full_alt[0], x_gd_full_alt[1], x_gd_full_alt[2], '-.o', markevery=[-1], label='GD (Constrained)')
 
         this_ax.set_xlim([-20e3, 20e3])
         this_ax.set_ylim([0e3, 50e3])
@@ -230,7 +230,7 @@ def example3():
     """
 
     # Set up scene
-    ref_lla = np.array([20., -150., 0.])  # deg lat, deg lon, m alt
+    # ref_lla = np.array([20., -150., 0.])  # deg lat, deg lon, m alt
     x_aoa = np.zeros((3,1))               # meters, ENU
     x_tdoa = np.array([[20e3, 25e3],
                        np.zeros((2,)),
@@ -304,7 +304,7 @@ def example3():
               (x_tgt[1] + max_offset)/1e3)
 
     # Unconstrained on axes[0] and Constrained on axes[1]
-    for this_ax, this_z in zip(axes, [rmse_raw, rmse_fix]):
+    for this_ax, this_z, this_title in zip(axes, [rmse_raw, rmse_fix], ['Unconstrained', 'Constrained']):
         # Begin with the RMSE Background Plot
         hdl_img = this_ax.imshow(this_z.squeeze()/1e3, origin='lower', cmap='viridis_r', extent=extent,
                                  vmin=0, vmax=contour_levels[-1])
@@ -318,14 +318,13 @@ def example3():
         this_ax.scatter(x_tgt[0]/1e3, x_tgt[1]/1e3, color='k', facecolors='k', marker='^', label='Target')
         this_ax.set_xlabel('E [km]')
         this_ax.set_ylabel('N [km]')
+        this_ax.set_title(this_title)
         this_ax.legend(loc='upper left')
 
     # Colorbar and subplot titles
     fig.colorbar(hdl_img, ax=axes, location='bottom', label='RMSE [km]')
-    axes[0].set_title('Unconstrained')
-    axes[1].set_title('Constrained')
 
-    return fig
+    return [fig]
 
 
 def example4():
@@ -335,12 +334,103 @@ def example4():
     Ported from MATLAB Code
 
     Nicholas O'Donoughue
-    7 February 2025
+    3 April 2025
 
     :return: figure handle to generated graphic
     """
 
-    return []
+    # Set up scene
+    ref_lla = np.array([25., -15., 0.])  # deg lat, deg lon, m alt
+    x_aoa_enu = np.array([[0, 50e3, 0],
+                          [0, 0, 50e3],
+                          10*np.ones((3,))])  # meters, ENU
+    x_aoa_ecef = np.array(enu_to_ecef(east=x_aoa_enu[0], north=x_aoa_enu[1], up=x_aoa_enu[2],
+                                      lat_ref=ref_lla[0], lon_ref=ref_lla[1], alt_ref=ref_lla[2],
+                                      dist_units='m', angle_units='deg'))  # convert tuple output to an array
+    _, num_aoa = utils.safe_2d_shape(x_aoa_ecef)
+
+    sat_lla = np.array([27, -13, 575e3])  # deg lat, deg lon, m alt
+    x_tgt_ecef = np.array(lla_to_ecef(lat=sat_lla[0], lon=sat_lla[1], alt=sat_lla[2],
+                                      angle_units='deg', dist_units='m'))
+    x_tgt_enu = np.array(ecef_to_enu(x=x_tgt_ecef[0], y=x_tgt_ecef[1], z=x_tgt_ecef[2],
+                                     lat_ref=ref_lla[0], lon_ref=ref_lla[1], alt_ref=ref_lla[2],
+                                     angle_units='deg', dist_units='m'))
+
+    ## Build Constraints
+    # Note: bounded_alt returns a list of two one-sided inequality constraints; no need to wrap it in a list
+    # when passing to gradient_descent
+    alt_low = 500e3
+    alt_high = 600e3
+    b = utils.constraints.bounded_alt(alt_min=alt_low, alt_max=alt_high, geo_type='ellipse')
+
+    ## Measurement Errors
+    err_aoa = 3 * _deg2rad
+    cov_aoa = CovarianceMatrix(err_aoa ** 2 * np.eye(2*num_aoa))  # 2D AOA measurement covariance
+
+    ## Noisy Measurement
+    z = triang.model.measurement(x_sensor=x_aoa_ecef, x_source=x_tgt_ecef, do_2d_aoa=True)
+    n = cov_aoa.lower @ np.random.randn(2*num_aoa)
+    zeta = z + n
+
+    ## Solvers
+    init_alt = 500e3
+    x_init = np.array(lla_to_ecef(lat=ref_lla[0], lon=ref_lla[1], alt=init_alt,
+                                  angle_units='deg', dist_units='m'))
+
+    gd_args = {'x_init': x_init, 'x_sensor': x_aoa_ecef, 'cov': cov_aoa, 'psi': zeta, 'do_2d_aoa': True}
+    x_gd, x_gd_full = triang.solvers.gradient_descent(**gd_args)
+    x_gd_bound, x_gd_bound_full = triang.solvers.gradient_descent(**gd_args, ineq_constraints=b)
+
+    ## Convert Solutions to LLA and Print
+    x_gd_lla = np.array(ecef_to_lla(x_gd[0], x_gd[1], x_gd[2],
+                                    angle_units='deg', dist_units='m'))
+    print('Unconstrained Solution: {:.2f} deg N, {:.2f} deg W, {:.2f} km'.format(x_gd_lla[0],
+                                                                               np.fabs(x_gd_lla[1]),
+                                                                               x_gd_lla[2]/1e3))
+    gd_err = np.linalg.norm(x_gd-x_tgt_ecef)/1e3
+    print('   Error: {:.2f} km'.format(gd_err))
+
+    x_gd_bound_lla = np.array(ecef_to_lla(x_gd_bound[0], x_gd_bound[1], x_gd_bound[2],
+                                          angle_units='deg', dist_units='m'))
+    print('Constrained Solution: {:.2f} deg N, {:.2f} deg W, {:.2f} km'.format(x_gd_bound_lla[0],
+                                                                             np.fabs(x_gd_bound_lla[1]),
+                                                                             x_gd_bound_lla[2] / 1e3))
+    gd_bound_err = np.linalg.norm(x_gd_bound - x_tgt_ecef) / 1e3
+    print('   Error: {:.2f} km'.format(gd_bound_err))
+
+    ## Plot in ENU Coordinates
+    x_gd_enu = np.array(ecef_to_enu(x_gd_full[0], x_gd_full[1], x_gd_full[2],
+                                    lat_ref=ref_lla[0], lon_ref=ref_lla[1], alt_ref=ref_lla[2],
+                                    angle_units='deg', dist_units='m'))
+    x_gd_bound_enu = np.array(ecef_to_enu(x_gd_bound_full[0], x_gd_bound_full[1], x_gd_bound_full[2],
+                                          lat_ref=ref_lla[0], lon_ref=ref_lla[1], alt_ref=ref_lla[2],
+                                          angle_units='deg', dist_units='m'))
+
+    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
+    ax.stem(x_aoa_enu[0]/1e3, x_aoa_enu[1]/1e3, x_aoa_enu[2]/1e3, basefmt='grey', linefmt='grey',
+            markerfmt='+', label='Sensors')
+    ax.stem([x_tgt_enu[0]/1e3], [x_tgt_enu[1]/1e3], [x_tgt_enu[2]/1e3], basefmt='grey', linefmt='grey',
+            markerfmt='^', label='Target')
+    def _my_plot3(x_3d_vec, marker, label):
+        this_hdl = ax.plot(x_3d_vec[0], x_3d_vec[1], x_3d_vec[2], marker=marker, markevery=[-1], label=label)
+        ax.plot(x_3d_vec[0], x_3d_vec[1], np.zeros_like(x_3d_vec[2]), '-.', color=this_hdl[0].get_color(), label=None)
+        ax.plot(x_3d_vec[0], np.zeros_like(x_3d_vec[1]), x_3d_vec[2], '-.', color=this_hdl[0].get_color(), label=None)
+        ax.plot(np.zeros_like(x_3d_vec[0]), x_3d_vec[1], x_3d_vec[2], '-.', color=this_hdl[0].get_color(), label=None)
+
+    _my_plot3(x_gd_enu/1e3, 's', 'GD (Unconstrained)')
+    _my_plot3(x_gd_bound_enu/1e3, 'o', 'GD (Constrained)')
+
+    plt.legend()
+
+    ax.set_xlabel('x [km]')
+    ax.set_ylabel('y [km]')
+    ax.set_zlabel('z [km]')
+
+    # Set the view angle
+    ax.azim = -45
+    ax.elev = 10
+
+    return [fig]
 
 
 def example5():
@@ -355,4 +445,53 @@ def example5():
     :return: figure handle to generated graphic
     """
 
-    return []
+    ## Set up scenario
+    baseline = 10e3
+    num_tdoa = 4
+    tdoa_angle = np.pi/6 + 2*np.pi/3 * np.arange(num_tdoa-1)
+    x_tdoa = baseline * np.array([np.cos(tdoa_angle), np.sin(tdoa_angle), np.zeros_like(tdoa_angle)])
+    x_tdoa = np.concatenate((np.zeros((3,1)), x_tdoa), axis=1)  # add a sensor at the origin
+
+    # Errors
+    err_time = 1e-7
+    err_range = utils.constants.speed_of_light * err_time
+    cov_roa = CovarianceMatrix(err_range**2 * np.eye(num_tdoa))
+    ref_idx = int(0)
+    cov_rdoa = cov_roa.resample(ref_idx=ref_idx)
+
+    # Target Coordinates
+    tgt_range = 100e3
+    tgt_alt = utils.unit_conversions.convert(40e3,from_unit='ft', to_unit='m')
+    x_tgt = np.array(utils.coordinates.correct_enu(e_ground=tgt_range, n_ground=0., u_ground=tgt_alt))
+
+    ## External Prior
+    x_prior = np.array(utils.coordinates.correct_enu(e_ground=95e3, n_ground=10e3, u_ground=10e3))
+    cov_prior = np.array([[5., 1., 0.],[1., 50., 0.],[0., 0., 10.]])*1e6
+    def prior(x):
+        # x is (n_dim x n_position) array of potential source positions; compute mvnpdf for each, but don't bother
+        # with cross-terms
+        return np.array([scipy.stats.multivariate_normal.pdf(this_x, mean=x_prior, cov=cov_prior) for this_x in x.T])
+
+    ## Measurement
+    z = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_tgt, ref_idx=ref_idx)
+    noise = cov_rdoa.lower @ np.random.randn(num_tdoa-1)
+    zeta = z + noise
+
+    ## Solution
+    x_center = x_tgt
+    grid_size = np.array([50e3, 50e3, 0])
+    epsilon = 250
+
+    ml_args = {'x_sensor': x_tdoa, 'rho': zeta, 'cov': cov_rdoa, 'x_ctr': x_center, 'search_size': grid_size,
+               'epsilon': epsilon, 'ref_idx': ref_idx}
+    x_ml, score, x_grid = tdoa.solvers.max_likelihood(**ml_args)
+    x_ml_prior, score_prior, _ = tdoa.solvers.max_likelihood(**ml_args, prior=prior, prior_wt=0.5)
+
+    print('Solution w/o prior: {:.2f} km, {:.2f} km, {:.2f} km'.format(x_ml[0]/1e3, x_ml[1]/1e3, x_ml[2]/1e3))
+    print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml-x_tgt)/1e3))
+    print('Solution w/prior: {:.2f} km, {:.2f} km, {:.2f} km'.format(x_ml_prior[0]/1e3, x_ml_prior[2]/1e3, x_ml_prior[2]/1e3))
+    print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml_prior - x_tgt)/1e3))
+
+    ## Plot
+
+    return [None, None]

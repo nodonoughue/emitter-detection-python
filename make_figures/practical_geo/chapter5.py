@@ -35,12 +35,12 @@ def make_all_figures(close_figs=False, force_recalc=False):
     utils.init_plot_style()
 
     # Generate all figures
-    figs_5_6 = make_figures_5_6(prefix, force_recalc=force_recalc)
-    fig_7 = make_figure_7(prefix, force_recalc=force_recalc)
-    fig_8 = make_figure_8(prefix, force_recalc=force_recalc)
-    fig_11 = make_figure_11(prefix, force_recalc=force_recalc)
-    fig_12 = make_figure_12(prefix)
-    fig_13 = make_figure_13(prefix)
+    # figs_5_6 = make_figures_5_6(prefix, force_recalc=force_recalc)
+    # fig_7 = make_figure_7(prefix, force_recalc=force_recalc)
+    # fig_8 = make_figure_8(prefix, force_recalc=force_recalc)
+    # fig_11 = make_figure_11(prefix, force_recalc=force_recalc)
+    # fig_12 = make_figure_12(prefix)
+    # fig_13 = make_figure_13(prefix)
     fig_14 = make_figure_14(prefix, force_recalc=force_recalc)
 
     figs = list(figs_5_6) + list(fig_7) + list(fig_8) + list(fig_11) + list(fig_12) + list(fig_13) + list(fig_14)

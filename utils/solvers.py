@@ -4,6 +4,7 @@ import utils
 from utils.covariance import CovarianceMatrix
 
 
+
 def ls_solver(zeta,
               jacobian,
               cov: CovarianceMatrix,
@@ -39,6 +40,12 @@ def ls_solver(zeta,
 
     # Parse inputs
     n_dims = np.size(x_init)
+
+    # Make certain that eq_constraints and ineq_constraints are iterable
+    if ineq_constraints is not None:
+        utils.ensure_iterable(ineq_constraints, flatten=True)
+    if eq_constraints is not None:
+        utils.ensure_iterable(eq_constraints, flatten=True)
 
     # Initialize loop
     current_iteration = 0
@@ -152,7 +159,13 @@ def gd_solver(y,
     """
     # Parse inputs
     n_dims = np.size(x_init)
-        
+
+    # Make certain that eq_constraints and ineq_constraints are iterable
+    if ineq_constraints is not None:
+        utils.ensure_iterable(ineq_constraints, flatten=True)
+    if eq_constraints is not None:
+        utils.ensure_iterable(eq_constraints, flatten=True)
+
     # Initialize loop
     current_iteration = 0
     error = np.inf
@@ -288,7 +301,8 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
     return t
 
 
-def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None):
+def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
+              prior=None, prior_wt: float=0.):
     """
     Execute ML estimation through brute force computational methods.
 
@@ -317,6 +331,11 @@ def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constr
 
     # Evaluate the likelihood function at each coordinate in the search space
     likelihood = ell(x_set)
+
+    if prior is not None and prior_wt > 0:
+        pdf_prior = np.reshape(prior(x_set), newshape=likelihood.shape)
+
+        likelihood = (1 - prior_wt) * likelihood + prior_wt * np.log10(pdf_prior)
 
     # Find the peak
     idx_pk = likelihood.argmax()
