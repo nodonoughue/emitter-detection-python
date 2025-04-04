@@ -1,5 +1,6 @@
 import utils
 import numpy as np
+from numpy import typing as npt
 
 
 _deg2rad = utils.unit_conversions.convert(1, 'deg', 'rad')
@@ -89,7 +90,7 @@ def bounded_alt(geo_type: str, alt_min:float =None, alt_max:float =None):
     return bounds
 
 
-def fixed_alt_constraint_flat(x: np.ndarray, alt: float):
+def fixed_alt_constraint_flat(x: npt.ArrayLike, alt: float):
     """
     Implement the flat Earth altitude constraint; altitude is simply the 3rd cartesian dimension.
     Ported from MATLAB code.
@@ -112,7 +113,7 @@ def fixed_alt_constraint_flat(x: np.ndarray, alt: float):
     return epsilon, x_valid
 
 
-def fixed_alt_gradient_flat(x: np.ndarray):
+def fixed_alt_gradient_flat(x: npt.ArrayLike):
     """
     Implement the gradient of the flat Earth altitude constraint; altitude is simply the 3rd cartesian dimension.
     Ported from MATLAB code.
@@ -131,7 +132,7 @@ def fixed_alt_gradient_flat(x: np.ndarray):
     return epsilon_gradient
 
 
-def fixed_alt_constraint_sphere(x: np.ndarray, alt: float):
+def fixed_alt_constraint_sphere(x: npt.ArrayLike, alt: float):
     """
     Implement the spherical Earth altitude constraint; altitude is simply the Euclidean norm of each coordinate. The
     radius of the Earth (utils.constants.radius_earth_true) will be subtracted from the norm before comparing to the
@@ -157,7 +158,7 @@ def fixed_alt_constraint_sphere(x: np.ndarray, alt: float):
     return epsilon, x_valid
 
 
-def fixed_alt_gradient_sphere(x: np.ndarray):
+def fixed_alt_gradient_sphere(x: npt.ArrayLike):
     """
     Implement the gradient of the spherical Earth altitude constraint; altitude is simply the Euclidean norm of each
     coordinate.
@@ -175,7 +176,7 @@ def fixed_alt_gradient_sphere(x: np.ndarray):
     return 2*x
 
 
-def fixed_alt_constraint_ellipse(x: np.ndarray, alt: float):
+def fixed_alt_constraint_ellipse(x: npt.ArrayLike, alt: float):
     """
     Implement the ellipsoidal Earth altitude constraint. Uses the coordinate conversion ecef_to_lla to compute the
     altitude of each point.
@@ -204,7 +205,7 @@ def fixed_alt_constraint_ellipse(x: np.ndarray, alt: float):
     return epsilon, x_valid
 
 
-def fixed_alt_gradient_ellipse(x: np.ndarray):
+def fixed_alt_gradient_ellipse(x: npt.ArrayLike):
     """
     Implement the gradient of the ellipsoidal Earth altitude constraint.
 
@@ -251,9 +252,10 @@ def fixed_alt_gradient_ellipse(x: np.ndarray):
     d_r_dz = a*e1sq*sin_lat*cos_lat*d_lat_dz/((1-e1sq*sin_lat**2) ** 1.5)
 
     # Compute gradient of constraint (epsilon), equations 5.18-5.20
-    d_eps_dx = (xx - yy**2 / xx)/(cos_lat*xy_len)-d_r_dx
-    d_eps_dy = (xx + yy)/(cos_lat*xy_len)-d_r_dy
-    d_eps_dz = -d_r_dz
+    # Make sure they're arrays, because we plan to concatenate them with a new axis
+    d_eps_dx = np.array((xx - yy**2 / xx)/(cos_lat*xy_len)-d_r_dx)
+    d_eps_dy = np.array((xx + yy)/(cos_lat*xy_len)-d_r_dy)
+    d_eps_dz = np.array(-d_r_dz)
 
     epsilon_grad = np.concatenate((d_eps_dx[np.newaxis],
                                    d_eps_dy[np.newaxis],
@@ -267,7 +269,7 @@ def fixed_alt_gradient_ellipse(x: np.ndarray):
 # **********************************************************************************************************************
 # Cartesian Constraints
 # **********************************************************************************************************************
-def fixed_cartesian(bound_type: str, bound_val: float = None, x0: np.ndarray = None, u_vec: np.ndarray = None,
+def fixed_cartesian(bound_type: str, bound_val: float = None, x0: npt.ArrayLike = None, u_vec: npt.ArrayLike = None,
                     is_upper_bound=True):
     """
     Generate a set of constraints and constraint gradient functions for fixed solution constraints on a cartesian grid.
@@ -346,7 +348,7 @@ def fixed_cartesian(bound_type: str, bound_val: float = None, x0: np.ndarray = N
     return a, a_gradient
 
 
-def fixed_cartesian_xyz(x: np.ndarray, bound_val: float, axis: int):
+def fixed_cartesian_xyz(x: npt.ArrayLike, bound_val: float, axis: int):
 
     # Cartesian bounds work on 2D or 3D
     # verify_3d_input(x)
@@ -360,7 +362,7 @@ def fixed_cartesian_xyz(x: np.ndarray, bound_val: float, axis: int):
 
     return epsilon, x_valid
 
-def fixed_cartesian_gradient_xyz(x: np.ndarray, axis: int):
+def fixed_cartesian_gradient_xyz(x: npt.ArrayLike, axis: int):
 
     # Cartesian bounds work on 2D or 3D
     # verify_3d_input(x)
@@ -371,7 +373,7 @@ def fixed_cartesian_gradient_xyz(x: np.ndarray, axis: int):
     return epsilon_gradient
 
 
-def fixed_cartesian_linear(x: np.ndarray, x0: np.ndarray, u_vec: np.ndarray):
+def fixed_cartesian_linear(x: npt.ArrayLike, x0: npt.ArrayLike, u_vec: npt.ArrayLike):
 
     # Make sure all three inputs have the same number of spatial coordinates
     verify_common_dim(x, x0, u_vec)
@@ -393,7 +395,7 @@ def fixed_cartesian_linear(x: np.ndarray, x0: np.ndarray, u_vec: np.ndarray):
     return epsilon, x_valid
 
 
-def fixed_cartesian_gradient_linear(x: np.ndarray, x0: np.ndarray, u_vec: np.ndarray):
+def fixed_cartesian_gradient_linear(x: npt.ArrayLike, x0: npt.ArrayLike, u_vec: npt.ArrayLike):
     # Make sure all three inputs have the same number of spatial coordinates
     verify_common_dim(x, x0, u_vec)
     n_dim, _ = utils.safe_2d_shape(x)
@@ -409,7 +411,7 @@ def fixed_cartesian_gradient_linear(x: np.ndarray, x0: np.ndarray, u_vec: np.nda
 # **********************************************************************************************************************
 # Utilities Constraints
 # **********************************************************************************************************************
-def verify_3d_input(x: np.ndarray):
+def verify_3d_input(x: npt.ArrayLike):
     """
     Ensure that the input x is a (3,n) numpy array. Assert an error if it is not.
     """
@@ -418,7 +420,7 @@ def verify_3d_input(x: np.ndarray):
     return
 
 
-def verify_common_dim(*args: np.ndarray):
+def verify_common_dim(*args: npt.ArrayLike):
     """
     Ensure that all inputs args have a common first dimension
     """
@@ -426,7 +428,7 @@ def verify_common_dim(*args: np.ndarray):
     assert np.all(dims == dims[0]), 'Not all inputs have the same number of spatial dimensions'
 
 
-def snap_to_equality_constraints(x: np.ndarray, eq_constraints: list, tol: float = 1e-6):
+def snap_to_equality_constraints(x: npt.ArrayLike, eq_constraints: list, tol: float = 1e-6):
     """
     Apply the equality constraints in the function handle eq_constraints to the position
     x, subject to a tolerance tol.
@@ -469,7 +471,7 @@ def snap_to_equality_constraints(x: np.ndarray, eq_constraints: list, tol: float
     return x_valid
 
 
-def snap_to_inequality_constraints(x: np.ndarray, ineq_constraints: list):
+def snap_to_inequality_constraints(x: npt.ArrayLike, ineq_constraints: list):
     """
     Apply the inequality constraints in the function handle ineq_constraints to the position
     x.

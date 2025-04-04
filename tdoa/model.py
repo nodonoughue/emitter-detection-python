@@ -137,7 +137,7 @@ def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None,
         rho_dot = measurement(x_sensor, x_i, ref_idx)
 
         # Evaluate the measurement error
-        err = (rho_dot - rho)
+        err = (rho - rho_dot)
 
         # Compute the scaled log likelihood
         ell[idx_source] = - cov.solve_aca(err)

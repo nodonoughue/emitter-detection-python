@@ -23,6 +23,7 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
      :param jacobian: function that accepts a single source position and returns the n_dim x n_measurement Jacobian
      :param cov: Covariance Matrix object
      :param print_progress: Boolean flag; if true then elapsed/remaining time estimates will be printed to the console
+     :param eq_constraints_grad: list of constraint gradients for equality constraints to be applied
      :return crlb: n_dim x n_dim x n_source lower bound on the estimate covariance matrix
     """
 
@@ -31,14 +32,9 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
 
     do_eq_constraints = eq_constraints_grad is not None
     if do_eq_constraints:
-        # Compute the gradient for all positions and store the result in a array of dimension
+        # Compute the gradient for all positions and store the result in an array of dimension
         #   num_constraints x n_dim x n_source
         constraint_grad = np.asarray([eq(x_source) for eq in eq_constraints_grad])
-        num_constraints = np.shape(constraint_grad)[0]
-    else:
-        # Initialize to avoid warnings; shouldn't matter
-        num_constraints = 0
-        constraint_grad = None
 
     # Initialize output variable
     crlb = np.zeros((n_dim, n_dim, n_source))
@@ -76,6 +72,7 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
         if do_eq_constraints:
             # Grab the constraint gradient for the current source position
             # Transpose it so the dimensions are n_dim x num_constraints
+            # noinspection PyUnboundLocalVariable
             this_gradient = constraint_grad[:, :, idx].T
 
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
@@ -86,6 +83,7 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
             fisher_inv = np.real(pinvh(fisher_matrix))
             if do_eq_constraints:
                 # Apply the impact of equality constraints
+                # noinspection PyUnboundLocalVariable
                 fg = fisher_inv @ this_gradient
                 gfg = this_gradient.T @ fg
                 lower = cholesky(gfg, lower=True)

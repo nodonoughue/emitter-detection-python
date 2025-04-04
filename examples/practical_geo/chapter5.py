@@ -322,6 +322,7 @@ def example3():
         this_ax.legend(loc='upper left')
 
     # Colorbar and subplot titles
+    # noinspection PyUnboundLocalVariable
     fig.colorbar(hdl_img, ax=axes, location='bottom', label='RMSE [km]')
 
     return [fig]
@@ -411,14 +412,9 @@ def example4():
             markerfmt='+', label='Sensors')
     ax.stem([x_tgt_enu[0]/1e3], [x_tgt_enu[1]/1e3], [x_tgt_enu[2]/1e3], basefmt='grey', linefmt='grey',
             markerfmt='^', label='Target')
-    def _my_plot3(x_3d_vec, marker, label):
-        this_hdl = ax.plot(x_3d_vec[0], x_3d_vec[1], x_3d_vec[2], marker=marker, markevery=[-1], label=label)
-        ax.plot(x_3d_vec[0], x_3d_vec[1], np.zeros_like(x_3d_vec[2]), '-.', color=this_hdl[0].get_color(), label=None)
-        ax.plot(x_3d_vec[0], np.zeros_like(x_3d_vec[1]), x_3d_vec[2], '-.', color=this_hdl[0].get_color(), label=None)
-        ax.plot(np.zeros_like(x_3d_vec[0]), x_3d_vec[1], x_3d_vec[2], '-.', color=this_hdl[0].get_color(), label=None)
-
-    _my_plot3(x_gd_enu/1e3, 's', 'GD (Unconstrained)')
-    _my_plot3(x_gd_bound_enu/1e3, 'o', 'GD (Constrained)')
+    ax.plot(x_gd_enu[0]/1e3, x_gd_enu[1]/1e3, x_gd_enu[2]/1e3, marker='s', markevery=[-1], label='GD (Unconstrained)')
+    ax.plot(x_gd_bound_enu[0] / 1e3, x_gd_bound_enu[1] / 1e3, x_gd_bound_enu[2] / 1e3, marker='o', markevery=[-1],
+            label='GD (Constrained)')
 
     plt.legend()
 
@@ -453,10 +449,10 @@ def example5():
     x_tdoa = np.concatenate((np.zeros((3,1)), x_tdoa), axis=1)  # add a sensor at the origin
 
     # Errors
-    err_time = 1e-7
+    err_time = 3e-7
     err_range = utils.constants.speed_of_light * err_time
     cov_roa = CovarianceMatrix(err_range**2 * np.eye(num_tdoa))
-    ref_idx = int(0)
+    ref_idx = None
     cov_rdoa = cov_roa.resample(ref_idx=ref_idx)
 
     # Target Coordinates
@@ -481,6 +477,10 @@ def example5():
     x_center = x_tgt
     grid_size = np.array([50e3, 50e3, 0])
     epsilon = 250
+    extent = (float(x_tgt[0] - grid_size[0]) / 1e3,
+              float(x_tgt[0] + grid_size[0]) / 1e3,
+              float(x_tgt[1] - grid_size[1]) / 1e3,
+              float(x_tgt[1] + grid_size[1]) / 1e3)  # cast each entry to a float to avoid a PyCharm type warning later
 
     ml_args = {'x_sensor': x_tdoa, 'rho': zeta, 'cov': cov_rdoa, 'x_ctr': x_center, 'search_size': grid_size,
                'epsilon': epsilon, 'ref_idx': ref_idx}
@@ -493,5 +493,31 @@ def example5():
     print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml_prior - x_tgt)/1e3))
 
     ## Plot
+    def _do_plot(this_ell, title, do_prior=False):
+        this_fig = plt.figure()
+        im = plt.imshow(this_ell, origin='lower', extent=extent, cmap='viridis', label=None, vmin=-50, vmax=0)
+        plt.scatter(x_tdoa[0]/1e3, x_tdoa[1]/1e3, marker='o', label='Sensors')
+        plt.scatter(x_tgt[0]/1e3, x_tgt[1]/1e3, marker='^', label='Target')
+        plt.scatter(x_ml[0]/1e3, x_ml[1]/1e3, marker='s', label='Estimate')
 
-    return [None, None]
+        if do_prior:
+            ell_prior = utils.errors.draw_error_ellipse(x_prior[:2], cov_prior[:2, :2], num_pts=100, conf_interval=90)
+            plt.scatter(x_prior[0]/1e3, x_prior[1]/1e3, marker='v', label='Prior')
+            plt.plot(ell_prior[0]/1e3, ell_prior[1]/1e3, 'w-.', label='Prior Confidence (90%)')
+            plt.scatter(x_ml_prior[0]/1e3, x_ml_prior[1]/1e3, marker='d', label='Estimate (w/prior)')
+
+        plt.grid(True, color='w')
+        plt.xlabel('x [km]')
+        plt.ylabel('y [km]')
+        plt.legend(loc='upper left', fontsize='small')
+        plt.title(title)
+
+        this_fig.colorbar(im, shrink=0.6)
+
+        return this_fig
+
+    out_shape = np.shape(np.squeeze(x_grid[0]))
+    fig1 = _do_plot(np.reshape(score, out_shape), title='Likelihood Estimate w/o Prior', do_prior=False)
+    fig2 = _do_plot(np.reshape(score_prior, out_shape), title='Likelihood Estimate w/Prior', do_prior=True)
+
+    return [fig1, fig2]

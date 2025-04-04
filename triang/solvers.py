@@ -5,6 +5,7 @@ from . import model
 import numpy as np
 import math
 from itertools import combinations
+import numpy.typing as npt
 
 
 def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, do_2d_aoa=False, epsilon=None, **kwargs):
@@ -263,7 +264,7 @@ def _parse_sensor_triplets(x_sensor):
     return sensor_sets, num_sets
 
 
-def _find_vertices(x: np.ndarray, psi: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray):
+def _find_vertices(x: npt.ArrayLike, psi: npt.ArrayLike) -> (npt.ArrayLike, npt.ArrayLike, npt.ArrayLike):
     # Find vertices
     v0 = utils.geo.find_intersect(x[:, 0], psi[0], x[:, 1], psi[1])
     v1 = utils.geo.find_intersect(x[:, 1], psi[1], x[:, 2], psi[2])

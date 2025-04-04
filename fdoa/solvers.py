@@ -168,7 +168,7 @@ def bestfix(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, 
         cov = cov.resample(ref_idx=ref_idx)
 
     # Make sure that rho is a vector -- the pdf functions choke if the mean value
-    # is an Nx1 matrix
+    # is a Nx1 matrix
     rho = np.squeeze(rho)
 
     # Generate the PDF

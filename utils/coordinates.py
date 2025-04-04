@@ -11,6 +11,7 @@ import utils.constants
 from . import unit_conversions
 from . import constants
 import numpy as np
+from numpy import typing as npt
 
 
 def aer_to_ecef(az, el, rng, lat_ref, lon_ref, alt_ref, angle_units='deg', dist_units='m'):
@@ -576,7 +577,7 @@ def lla_to_enu(lat, lon, alt, lat_ref, lon_ref, alt_ref, angle_units, dist_units
     return east, north, up
 
 
-def correct_enu(e_ground: np.ndarray, n_ground: np.ndarray, u_ground: np.ndarray):
+def correct_enu(e_ground: npt.ArrayLike, n_ground: npt.ArrayLike, u_ground: npt.ArrayLike):
     """
     Correct ground-centric coordinates (E/N/local Alt) to true ENU, using a flat plane that intersects
     the Earth. The input distances are assumed to be measured along the surface of a spherical Earth, with local
@@ -591,9 +592,9 @@ def correct_enu(e_ground: np.ndarray, n_ground: np.ndarray, u_ground: np.ndarray
     :param e_ground: distance units in the East direction (along the Earth's surface)
     :param n_ground: distance units in the North direction (along the Earth's surface)
     :param u_ground: distance units above the Earth's surface at the coordinates (e_ground, n_ground)
-    :param e: East vector
-    :param n: North vector
-    :param u: Up vector
+    :return e: East vector
+    :return n: North vector
+    :return u: Up vector
     """
 
     # Parse Inputs
@@ -610,7 +611,7 @@ def correct_enu(e_ground: np.ndarray, n_ground: np.ndarray, u_ground: np.ndarray
     return e, n, u
 
 
-def reckon_sphere_enu(ground_range: np.ndarray, alt: np.ndarray):
+def reckon_sphere_enu(ground_range: npt.ArrayLike, alt: npt.ArrayLike):
     """
     Given some distance along the Earth's surface (ground_range), and altitude above the Earth's surface (alt),
     compute the in-plane distance parallel to the Earth's surface (local East and local North) and the out-of-plane

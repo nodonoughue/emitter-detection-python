@@ -1,10 +1,11 @@
 import numpy as np
+from numpy import typing as npt
 from scipy.special import erfcinv
 from scipy import stats
 
 import utils
 from .unit_conversions import lin_to_db
-from itertools import combinations, chain
+from itertools import combinations
 from collections.abc import Iterable
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -165,8 +166,8 @@ def parse_reference_sensor(ref_idx, num_sensors=0):
     return test_idx_vec, ref_idx_vec
 
 
-def resample_covariance_matrix(cov: np.ndarray, test_idx: np.ndarray, ref_idx: np.ndarray,
-                               test_weights=None, ref_weights=None) -> np.ndarray:
+def resample_covariance_matrix(cov: npt.ArrayLike, test_idx: npt.ArrayLike, ref_idx: npt.ArrayLike,
+                               test_weights=None, ref_weights=None) -> npt.ArrayLike:
     """
     Resample a 2D covariance matrix to generate the covariance matrix that would result from a series of difference
     operations on the underlying random variables. See Section 3.3.1 of the 2022 text for derivation of the covariance
@@ -261,7 +262,7 @@ def resample_covariance_matrix(cov: np.ndarray, test_idx: np.ndarray, ref_idx: n
     return cov_out
 
 
-def resample_noise(noise: np.ndarray, test_idx: np.ndarray = None, ref_idx=None, test_weights=None, ref_weights=None):
+def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx=None, test_weights=None, ref_weights=None):
     """
     Generate resampled noise according to the set of test and reference sensors provided. See Section 3.3.1 of the 2022
     text for a discussion of sensor pairs and noise statistics. If the input noise is distributed according to a
@@ -418,7 +419,7 @@ def ensure_invertible(covariance, epsilon=1e-10):
     return cov_out
 
 
-def make_pdfs(measurement_function, measurements, pdf_type='MVN', covariance: np.ndarray = 1):
+def make_pdfs(measurement_function, measurements, pdf_type='MVN', covariance: npt.ArrayLike = 1):
     """
     Generate a joint PDF or set of unitary PDFs representing the measurements, given the measurement_function,
     covariance matrix and pdf_type

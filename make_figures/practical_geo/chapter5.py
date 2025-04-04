@@ -35,12 +35,12 @@ def make_all_figures(close_figs=False, force_recalc=False):
     utils.init_plot_style()
 
     # Generate all figures
-    # figs_5_6 = make_figures_5_6(prefix, force_recalc=force_recalc)
-    # fig_7 = make_figure_7(prefix, force_recalc=force_recalc)
-    # fig_8 = make_figure_8(prefix, force_recalc=force_recalc)
-    # fig_11 = make_figure_11(prefix, force_recalc=force_recalc)
-    # fig_12 = make_figure_12(prefix)
-    # fig_13 = make_figure_13(prefix)
+    figs_5_6 = make_figures_5_6(prefix, force_recalc=force_recalc)
+    fig_7 = make_figure_7(prefix, force_recalc=force_recalc)
+    fig_8 = make_figure_8(prefix, force_recalc=force_recalc)
+    fig_11 = make_figure_11(prefix, force_recalc=force_recalc)
+    fig_12 = make_figure_12(prefix)
+    fig_13 = make_figure_13(prefix)
     fig_14 = make_figure_14(prefix, force_recalc=force_recalc)
 
     figs = list(figs_5_6) + list(fig_7) + list(fig_8) + list(fig_11) + list(fig_12) + list(fig_13) + list(fig_14)
@@ -244,6 +244,8 @@ def make_figure_13(prefix=None):
     # Axes
     y_axis = np.linspace(start=0, stop=10, num=101)
     x_axis = np.linspace(start=-10, stop=10, num=1001)
+    # Define the corners of the grid, for imshow. Cast as float types to avoid type warning
+    extent = (float(x_axis[0]), float(x_axis[-1]), float(y_axis[0]), float(y_axis[-1]))
 
     xx, yy = np.meshgrid(x_axis, y_axis)
 
@@ -257,30 +259,29 @@ def make_figure_13(prefix=None):
     ell = scipy.stats.norm.pdf(x=xx, loc=mean_val, scale=std_dev)
 
     # Subfigure generator
-    def _make_subfig(data, vec=None, title=''):
+    def _make_sub_fig(data, vec=None, title=''):
         this_fig = plt.figure()
-        plt.imshow(data, origin='lower', extent=[x_axis[0], x_axis[-1], y_axis[0], y_axis[-1]], cmap='viridis')
+        plt.imshow(data, origin='lower', extent=extent, cmap='viridis')
         if vec is not None:
             plt.plot(vec, y_axis, 'k--')
         plt.grid(True, color='w')
         plt.xlabel('x')
         plt.ylabel('y')
-        # plt.zlabel('f(x,y)');
         plt.title(title)
         return this_fig
 
     # First Subplot -- Raw Likelihood
-    figs = [_make_subfig(ell, vec=mean_vec, title='Data Likelihood')]
+    figs = [_make_sub_fig(ell, vec=mean_vec, title='Data Likelihood')]
 
     # A priori
     pos = np.dstack((xx, yy))
     rv = scipy.stats.multivariate_normal(mean=np.array([x_ctr, y_ctr]), cov=np.diag([20, 2]))
     prior = np.reshape(rv.pdf(pos), xx.shape)
 
-    figs.append(_make_subfig(prior, title='Prior Distribution on Target Location'))
+    figs.append(_make_sub_fig(prior, title='Prior Distribution on Target Location'))
 
     # Posterior
-    figs.append(_make_subfig(prior*ell, title='Posterior Distribution on Target Location'))
+    figs.append(_make_sub_fig(prior*ell, title='Posterior Distribution on Target Location'))
 
     # Output to file
     if prefix is not None:

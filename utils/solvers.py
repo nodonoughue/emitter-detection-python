@@ -2,20 +2,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 import utils
 from utils.covariance import CovarianceMatrix
-
+from numpy import typing as npt
 
 
 def ls_solver(zeta,
               jacobian,
               cov: CovarianceMatrix,
-              x_init: np.array,
-              epsilon:np.double=1e-6,
-              max_num_iterations:np.integer=int(10e3),
+              x_init: npt.ArrayLike,
+              epsilon:float=1e-6,
+              max_num_iterations:int=int(10e3),
               force_full_calc:bool=False,
               plot_progress:bool=False,
               eq_constraints:list=None,
               ineq_constraints:list=None,
-              constraint_tolerance:np.double=1e-6):
+              constraint_tolerance:float=1e-6):
     """
     Computes the least square solution for geolocation processing.
     
@@ -34,6 +34,10 @@ def ls_solver(zeta,
     :param max_num_iterations: Maximum number of LS iterations to perform
     :param force_full_calc: Forces all max_num_iterations to be calculated
     :param plot_progress: Binary flag indicating whether to plot error/pos est over time
+    :param eq_constraints: List of equality constraint functions (see utils.constraints)
+    :param ineq_constraints: List of inequality constraint functions (see utils.constraints)
+    :param constraint_tolerance: Tolerance to apply to equality constraints (default = 1e-6); any deviations with a
+                                 Euclidean norm less than this tolerance are considered to satisfy the constraint.
     :return x: Estimated source position.
     :return x_full: Iteration-by-iteration estimated source positions
     """
@@ -123,16 +127,16 @@ def ls_solver(zeta,
 def gd_solver(y,
               jacobian,
               cov: CovarianceMatrix,
-              x_init:np.array,
-              alpha:np.double=0.3,
-              beta:np.double=0.8,
-              epsilon:np.double=1.e-6,
-              max_num_iterations:np.integer=int(10e3),
+              x_init:npt.ArrayLike,
+              alpha:float=0.3,
+              beta:float=0.8,
+              epsilon:float=1.e-6,
+              max_num_iterations:int=int(10e3),
               force_full_calc:bool=False,
               plot_progress:bool=False,
               eq_constraints:list=None,
               ineq_constraints:list=None,
-              constraint_tolerance:np.double=1e-6):
+              constraint_tolerance:float=1e-6):
     """
     Computes the gradient descent solution for localization given the provided measurement and Jacobian function 
     handles, and measurement error covariance.
@@ -154,6 +158,10 @@ def gd_solver(y,
     :param max_num_iterations: Maximum number of LS iterations to perform
     :param force_full_calc: Forces all max_num_iterations to be executed
     :param plot_progress: Binary flag indicating whether to plot error/pos est over time
+    :param eq_constraints: List of equality constraint functions (see utils.constraints)
+    :param ineq_constraints: List of inequality constraint functions (see utils.constraints)
+    :param constraint_tolerance: Tolerance to apply to equality constraints (default = 1e-6); any deviations with a
+                                 Euclidean norm less than this tolerance are considered to satisfy the constraint.
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
@@ -316,6 +324,14 @@ def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constr
     :param x_ctr: Center position for search space (x, x/y, or z/y/z).
     :param search_size: Search space size (same units as x_ctr)
     :param epsilon: Search space resolution (same units as x_ctr)
+    :param eq_constraints: List of equality constraint functions (see utils.constraints)
+    :param ineq_constraints: List of inequality constraint functions (see utils.constraints)
+    :param constraint_tolerance: Tolerance to apply to equality constraints (default = 1e-6); any deviations with a
+                                 Euclidean norm less than this tolerance are considered to satisfy the constraint.
+    :param prior: Function handle that accepts one or more positions and returns the probability of that position being
+                  the true source location, according to some prior distribution. Will be multiplied by log10 when
+                  combined with the likelihood distribution (which is assumed to be a log likelihood).
+    :param prior_wt: Weight to apply to the prior distribution; (1-prior_wt) will be applied to the likelihood function.
     :return x_est: Estimated minimum
     :return A: Likelihood computed at each x position in the search space
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
