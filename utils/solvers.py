@@ -2,10 +2,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 import utils
 from utils.covariance import CovarianceMatrix
+from numpy import typing as npt
 
 
-def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_num_iterations=10e3,
-              force_full_calc=False, plot_progress=False):
+def ls_solver(zeta,
+              jacobian,
+              cov: CovarianceMatrix,
+              x_init: npt.ArrayLike,
+              epsilon:float=1e-6,
+              max_num_iterations:int=int(10e3),
+              force_full_calc:bool=False,
+              plot_progress:bool=False,
+              eq_constraints:list=None,
+              ineq_constraints:list=None,
+              constraint_tolerance:float=1e-6):
     """
     Computes the least square solution for geolocation processing.
     
@@ -24,12 +34,22 @@ def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_n
     :param max_num_iterations: Maximum number of LS iterations to perform
     :param force_full_calc: Forces all max_num_iterations to be calculated
     :param plot_progress: Binary flag indicating whether to plot error/pos est over time
+    :param eq_constraints: List of equality constraint functions (see utils.constraints)
+    :param ineq_constraints: List of inequality constraint functions (see utils.constraints)
+    :param constraint_tolerance: Tolerance to apply to equality constraints (default = 1e-6); any deviations with a
+                                 Euclidean norm less than this tolerance are considered to satisfy the constraint.
     :return x: Estimated source position.
     :return x_full: Iteration-by-iteration estimated source positions
     """
 
     # Parse inputs
     n_dims = np.size(x_init)
+
+    # Make certain that eq_constraints and ineq_constraints are iterable
+    if ineq_constraints is not None:
+        utils.ensure_iterable(ineq_constraints, flatten=True)
+    if eq_constraints is not None:
+        utils.ensure_iterable(eq_constraints, flatten=True)
 
     # Initialize loop
     current_iteration = 0
@@ -62,10 +82,22 @@ def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_n
         delta_x = cov.solve_lstsq(y_i, jacobian_i)
 
         # Update predicted location
-        x_full[:, current_iteration] = x_prev + np.squeeze(delta_x)
+        x_update = x_prev + np.squeeze(delta_x)
+
+        # Apply Equality Constraints
+        if eq_constraints is not None:
+            x_update = utils.constraints.snap_to_equality_constraints(x_update, eq_constraints=eq_constraints,
+                                                                      tol=constraint_tolerance)
+
+        # Apply Inequality Constraints
+        if ineq_constraints is not None:
+            x_update = utils.constraints.snap_to_inequality_constraints(x_update, ineq_constraints=ineq_constraints)
+
+        # TODO: What to do if both ineq and eq constraints are in use?
 
         # Update variables
-        x_prev = x_full[:, current_iteration]
+        x_full[:, current_iteration] = x_update
+        x_prev = x_update
         error = np.linalg.norm(delta_x)
 
         if plot_progress:
@@ -83,7 +115,7 @@ def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_n
                 
         prev_error = error
 
-    x = x_full[:, current_iteration]
+    x = x_prev
 
     # Bookkeeping
     if not force_full_calc:
@@ -92,8 +124,19 @@ def ls_solver(zeta, jacobian, cov: CovarianceMatrix, x_init, epsilon=1e-6, max_n
     return x, x_full
 
 
-def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, epsilon=1.e-6, max_num_iterations=10e3,
-              force_full_calc=False, plot_progress=False):
+def gd_solver(y,
+              jacobian,
+              cov: CovarianceMatrix,
+              x_init:npt.ArrayLike,
+              alpha:float=0.3,
+              beta:float=0.8,
+              epsilon:float=1.e-6,
+              max_num_iterations:int=int(10e3),
+              force_full_calc:bool=False,
+              plot_progress:bool=False,
+              eq_constraints:list=None,
+              ineq_constraints:list=None,
+              constraint_tolerance:float=1e-6):
     """
     Computes the gradient descent solution for localization given the provided measurement and Jacobian function 
     handles, and measurement error covariance.
@@ -115,12 +158,22 @@ def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, e
     :param max_num_iterations: Maximum number of LS iterations to perform
     :param force_full_calc: Forces all max_num_iterations to be executed
     :param plot_progress: Binary flag indicating whether to plot error/pos est over time
+    :param eq_constraints: List of equality constraint functions (see utils.constraints)
+    :param ineq_constraints: List of inequality constraint functions (see utils.constraints)
+    :param constraint_tolerance: Tolerance to apply to equality constraints (default = 1e-6); any deviations with a
+                                 Euclidean norm less than this tolerance are considered to satisfy the constraint.
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
     # Parse inputs
     n_dims = np.size(x_init)
-        
+
+    # Make certain that eq_constraints and ineq_constraints are iterable
+    if ineq_constraints is not None:
+        utils.ensure_iterable(ineq_constraints, flatten=True)
+    if eq_constraints is not None:
+        utils.ensure_iterable(eq_constraints, flatten=True)
+
     # Initialize loop
     current_iteration = 0
     error = np.inf
@@ -177,12 +230,16 @@ def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, e
         # Update x position
         x_update = x_prev + t*del_x
 
-        # Apply Constraints
-        # if ineq_constraints is not None:
-        #     x_update = utils.constraints.apply_inequality(x_update, ineq_constraints)
-        #
-        # if eq_constraints is not None:
-        #     x_update = utils.constraints.apply_equality(x_update, eq_constraints)
+        # Apply Equality Constraints
+        if eq_constraints is not None:
+            x_update = utils.constraints.snap_to_equality_constraints(x_update, eq_constraints=eq_constraints,
+                                                                      tol=constraint_tolerance)
+
+        # Apply Inequality Constraints
+        if ineq_constraints is not None:
+            x_update = utils.constraints.snap_to_inequality_constraints(x_update, ineq_constraints=ineq_constraints)
+
+        # TODO: What to do if both ineq and eq constraints are in use?
 
         # Update variables
         x_full[:, current_iteration] = x_update
@@ -205,7 +262,7 @@ def gd_solver(y, jacobian, cov: CovarianceMatrix, x_init, alpha=0.3, beta=0.8, e
 
         prev_error = error
 
-    x = x_full[:, current_iteration]
+    x = x_prev
 
     # Bookkeeping
     if not force_full_calc:
@@ -252,7 +309,8 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
     return t
 
 
-def ml_solver(ell, x_ctr, search_size, epsilon):
+def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
+              prior=None, prior_wt: float=0.):
     """
     Execute ML estimation through brute force computational methods.
 
@@ -266,6 +324,14 @@ def ml_solver(ell, x_ctr, search_size, epsilon):
     :param x_ctr: Center position for search space (x, x/y, or z/y/z).
     :param search_size: Search space size (same units as x_ctr)
     :param epsilon: Search space resolution (same units as x_ctr)
+    :param eq_constraints: List of equality constraint functions (see utils.constraints)
+    :param ineq_constraints: List of inequality constraint functions (see utils.constraints)
+    :param constraint_tolerance: Tolerance to apply to equality constraints (default = 1e-6); any deviations with a
+                                 Euclidean norm less than this tolerance are considered to satisfy the constraint.
+    :param prior: Function handle that accepts one or more positions and returns the probability of that position being
+                  the true source location, according to some prior distribution. Will be multiplied by log10 when
+                  combined with the likelihood distribution (which is assumed to be a log likelihood).
+    :param prior_wt: Weight to apply to the prior distribution; (1-prior_wt) will be applied to the likelihood function.
     :return x_est: Estimated minimum
     :return A: Likelihood computed at each x position in the search space
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
@@ -274,8 +340,18 @@ def ml_solver(ell, x_ctr, search_size, epsilon):
     # Set up the search space
     x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
 
+    # Constrain the likelihood, if needed
+    if ineq_constraints is not None or eq_constraints is not None:
+        ell = utils.constraints.constrain_likelihood(ell=ell, eq_constraints=eq_constraints,
+                                                     ineq_constraints=ineq_constraints, tol=constraint_tolerance)
+
     # Evaluate the likelihood function at each coordinate in the search space
     likelihood = ell(x_set)
+
+    if prior is not None and prior_wt > 0:
+        pdf_prior = np.reshape(prior(x_set), newshape=likelihood.shape)
+
+        likelihood = (1 - prior_wt) * likelihood + prior_wt * np.log10(pdf_prior)
 
     # Find the peak
     idx_pk = likelihood.argmax()

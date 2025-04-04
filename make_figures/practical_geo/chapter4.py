@@ -61,7 +61,7 @@ def make_figures_10_11(prefix=None, force_recalc=False):
         print('Skipping Figures 4.10, and 4.11 (re-run with force_recalc=True to generate)...')
         return None, None
 
-    print('Generating Figures 4.10, 4.11...')
+    print('Generating Figures 4.10, 4.11 (from Example 4.1)...')
 
     figs = chapter4.example1()
 
@@ -94,7 +94,7 @@ def make_figure_12(prefix=None, force_recalc=False):
         print('Skipping Figure 4.12 (re-run with force_recalc=True to generate)...')
         return None, None
 
-    print('Generating Figure 4.12 (from Example 4.2...')
+    print('Generating Figure 4.12 (from Example 4.2)...')
 
     figs = chapter4.example2()
 

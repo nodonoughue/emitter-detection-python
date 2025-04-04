@@ -136,7 +136,7 @@ def example1(rng=np.random.default_rng()):
     print('Performing Monte Carlo simulation...')
     t_start = time.perf_counter()
 
-    iterations_per_marker = 1
+    iterations_per_marker = 10
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
 
@@ -321,3 +321,8 @@ def example2(colors=None):
     plt.ylabel('N [km]')
 
     return fig,
+
+# TODO: Make a version of Example 4.2 that plots on a globe. Use basemap?
+# https://jakevdp.github.io/PythonDataScienceHandbook/04.13-geographic-data-with-basemap.html
+
+# TODO: Implement the code from book2_vid4_1.m

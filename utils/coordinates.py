@@ -7,9 +7,11 @@ coordinate systems, including:
 - LLA (Latitude, Longitude, Altitude)
 - ECEF (Earth-Centered, Earth-Fixed)
 """
+import utils.constants
 from . import unit_conversions
 from . import constants
 import numpy as np
+from numpy import typing as npt
 
 
 def aer_to_ecef(az, el, rng, lat_ref, lon_ref, alt_ref, angle_units='deg', dist_units='m'):
@@ -171,7 +173,7 @@ def ecef_to_enu(x, y, z, lat_ref, lon_ref, alt_ref, angle_units='deg', dist_unit
     :return up: up
     """
     # Convert the reference point to ECEF
-    [x_ref, y_ref, z_ref] = lla_to_ecef(lat_ref, lon_ref, alt_ref, angle_units, dist_units)
+    x_ref, y_ref, z_ref = lla_to_ecef(lat_ref, lon_ref, alt_ref, angle_units, dist_units)
 
     # Take the difference
     dx = x - x_ref
@@ -246,7 +248,7 @@ def ecef_to_enu_vel(vel_x, vel_y, vel_z, lat_ref, lon_ref, angle_units='deg'):
     return vel_e, vel_n, vel_u
 
 
-def ecef_to_lla(x, y, z, angle_units, dist_units):
+def ecef_to_lla(x, y, z, angle_units='deg', dist_units='m'):
     """
     Conversion from cartesian ECEF to geodetic LLA coordinates, using a
     direct computation methods.  Note that iterative solutions also exist,
@@ -573,3 +575,75 @@ def lla_to_enu(lat, lon, alt, lat_ref, lon_ref, alt_ref, angle_units, dist_units
     east, north, up = ecef_to_enu(x, y, z, lat_ref, lon_ref, alt_ref, angle_units, dist_units)
 
     return east, north, up
+
+
+def correct_enu(e_ground: npt.ArrayLike, n_ground: npt.ArrayLike, u_ground: npt.ArrayLike):
+    """
+    Correct ground-centric coordinates (E/N/local Alt) to true ENU, using a flat plane that intersects
+    the Earth. The input distances are assumed to be measured along the surface of a spherical Earth, with local
+    altitude perpendicular to the Earth's surface at the end point.
+
+    The outputs are cartesian coordinates in a plane that is perpendicular to the Earth's surface at the starting
+    point.
+
+    Ported from MATLAB code.
+    3 April 2025
+
+    :param e_ground: distance units in the East direction (along the Earth's surface)
+    :param n_ground: distance units in the North direction (along the Earth's surface)
+    :param u_ground: distance units above the Earth's surface at the coordinates (e_ground, n_ground)
+    :return e: East vector
+    :return n: North vector
+    :return u: Up vector
+    """
+
+    # Parse Inputs
+    bearing = np.atan2(e_ground, n_ground)
+    ground_range = np.sqrt(e_ground**2 + n_ground**2)
+
+    # Correct for the Earth's curvature
+    en_range, u = reckon_sphere_enu(ground_range, u_ground)
+
+    # Compute ENU coordinates
+    e = en_range * np.sin(bearing)
+    n = en_range * np.cos(bearing)
+
+    return e, n, u
+
+
+def reckon_sphere_enu(ground_range: npt.ArrayLike, alt: npt.ArrayLike):
+    """
+    Given some distance along the Earth's surface (ground_range), and altitude above the Earth's surface (alt),
+    compute the in-plane distance parallel to the Earth's surface (local East and local North) and the out-of-plane
+    distance (local-up).
+
+    Ported from MATLAB code.
+    3 April 2025
+
+    :param ground_range: distance along the Earth's surface
+    :param alt: distance above the Earth's surface
+    :return en_range: in-plane distance parallel to the Earth's surface at the start location
+    :return up: out-of-plane distance (local-up)
+    """
+
+    # Parse inputs
+    radius_earth = utils.constants.radius_earth_true
+
+    # Find the central angle (phi)
+    phi = ground_range / radius_earth
+
+    # Radius and EN distance to the crossing of the radial and the EN plane
+    radial = radius_earth / np.cos(phi)   # radial distance to the EN plane above the end-point
+    en_dist = radius_earth * np.tan(phi)  # in-plane distance if up=0
+
+    # Find the radial to get to the desired point
+    y = alt + radius_earth - radial
+
+    # Compute the excess in-plane and the up
+    up = y * np.cos(phi)
+    en_delta = y * np.sin(phi)
+
+    # Compute the distance in the EN plane
+    en_range = en_dist + en_delta
+
+    return en_range, up

@@ -6,7 +6,7 @@ from utils.covariance import CovarianceMatrix
 
 def compute_crlb(x_source, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
                  do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
-                 print_progress=False):
+                 print_progress=False, **kwargs):
     """
     Computes the CRLB on position accuracy for source at location xs and
     a combined set of AOA, TDOA, and FDOA measurements.  The covariance
@@ -50,6 +50,6 @@ def compute_crlb(x_source, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdo
                               tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     crlb = utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=jacobian, cov=cov,
-                                            print_progress=print_progress)
+                                            print_progress=print_progress, **kwargs)
 
     return crlb

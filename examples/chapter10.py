@@ -329,7 +329,7 @@ def example2():
     print('Maximum cross range position at 100 km downrange that satisfies CEP < 25 km is {:.2f} km'
           .format(max_cross_range/1e3))
 
-    x_max = 100  # TODO: test and debug
+    x_max = 100
     grid_res = 0.25
     x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr=np.array([0., 0.]), max_offset=x_max, grid_spacing=grid_res)
     # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input

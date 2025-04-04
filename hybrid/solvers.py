@@ -6,7 +6,7 @@ from . import model
 
 def max_likelihood(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
                    x_ctr=0., search_size=1., epsilon=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None,
-                   do_resample=False):
+                   do_resample=False, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -41,7 +41,8 @@ def max_likelihood(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=
                                     tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx, do_resample=do_resample)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
+                                                  **kwargs)
 
     return x_est, likelihood, x_grid
 

@@ -1,10 +1,12 @@
 import numpy as np
+from numpy import typing as npt
 from scipy.special import erfcinv
 from scipy import stats
 
 import utils
 from .unit_conversions import lin_to_db
 from itertools import combinations
+from collections.abc import Iterable
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
@@ -164,8 +166,8 @@ def parse_reference_sensor(ref_idx, num_sensors=0):
     return test_idx_vec, ref_idx_vec
 
 
-def resample_covariance_matrix(cov: np.ndarray, test_idx: np.ndarray, ref_idx: np.ndarray,
-                               test_weights=None, ref_weights=None) -> np.ndarray:
+def resample_covariance_matrix(cov: npt.ArrayLike, test_idx: npt.ArrayLike, ref_idx: npt.ArrayLike,
+                               test_weights=None, ref_weights=None) -> npt.ArrayLike:
     """
     Resample a 2D covariance matrix to generate the covariance matrix that would result from a series of difference
     operations on the underlying random variables. See Section 3.3.1 of the 2022 text for derivation of the covariance
@@ -260,7 +262,7 @@ def resample_covariance_matrix(cov: np.ndarray, test_idx: np.ndarray, ref_idx: n
     return cov_out
 
 
-def resample_noise(noise: np.ndarray, test_idx: np.ndarray = None, ref_idx=None, test_weights=None, ref_weights=None):
+def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx=None, test_weights=None, ref_weights=None):
     """
     Generate resampled noise according to the set of test and reference sensors provided. See Section 3.3.1 of the 2022
     text for a discussion of sensor pairs and noise statistics. If the input noise is distributed according to a
@@ -284,6 +286,9 @@ def resample_noise(noise: np.ndarray, test_idx: np.ndarray = None, ref_idx=None,
     if test_idx is None:
         # We need to use the ref_idx
         test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
+    else:
+        test_idx_vec = test_idx
+        ref_idx_vec = ref_idx
 
     # Determine output size
     n_test = np.size(test_idx_vec)
@@ -323,21 +328,21 @@ def resample_noise(noise: np.ndarray, test_idx: np.ndarray = None, ref_idx=None,
         else:
             b_i_wt = 1.
 
-        noise_ai = np.zeros((len(a_i), np.size(noise, 1)))
+        noise_ai = np.zeros((len(a_i), utils.safe_2d_shape(noise)[1]))
         noise_bi = np.zeros_like(noise_ai)
 
         mask_ai = ~np.isnan(a_i)
         mask_bi = ~np.isnan(b_i)
 
         if not np.all(mask_ai):
-            noise_ai[mask_ai] = noise[a_i[mask_ai].astype(int), :]
+            noise_ai[mask_ai] = noise[a_i[mask_ai].astype(int)]
         else:
-            noise_ai = noise[a_i.astype(int), :]
+            noise_ai = noise[a_i.astype(int)]
 
         if not np.all(mask_bi):
-            noise_bi[mask_bi] = noise[b_i[mask_bi].astype(int), :]
+            noise_bi[mask_bi] = noise[b_i[mask_bi].astype(int)]
         else:
-            noise_bi = noise[b_i.astype(int), :]
+            noise_bi = noise[b_i.astype(int)]
 
         res = b_i_wt * noise_bi - a_i_wt * noise_ai
         # raise ValueError('mo')
@@ -414,7 +419,7 @@ def ensure_invertible(covariance, epsilon=1e-10):
     return cov_out
 
 
-def make_pdfs(measurement_function, measurements, pdf_type='MVN', covariance: np.ndarray = 1):
+def make_pdfs(measurement_function, measurements, pdf_type='MVN', covariance: npt.ArrayLike = 1):
     """
     Generate a joint PDF or set of unitary PDFs representing the measurements, given the measurement_function,
     covariance matrix and pdf_type
@@ -691,3 +696,36 @@ def remove_outliers(data, axis=0, remove_nan=False):
     data_out = np.delete(data, deletion_mask, axis=axis)
 
     return data_out
+
+def ensure_iterable(var, flatten=False)->Iterable:
+    """
+    Ensure that the input is an iterable. If it is not, wrap it in a list.
+
+    Optionally searched for nested iterables and flatten them, so that all entries
+    can be iterated over in a single for loop.
+
+    Nicholas O'Donoughue
+    3 April 2025
+
+    :param var: variable to be tested
+    :param flatten: whether to flatten the variable (default=False)
+    :return var_out: Iterable containing the elements of var
+    """
+    # Make sure it's iterable
+    if not isinstance(var, Iterable):  # accepts list, tuple, array, ...
+        var = [var]  # wrap it in a list
+
+    # Check for nested iterables
+    if flatten:
+        # Repeat until none of the elements are iterable
+        while any(isinstance(element, Iterable) for element in var):
+            var_out = []
+            for element in var:
+                if isinstance(element, Iterable):
+                    # Use list comprehension
+                    var_out.append(*element)
+                else:
+                    var_out.append(element)
+            var = var_out  # overwrite the variable
+
+    return var

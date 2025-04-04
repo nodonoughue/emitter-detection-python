@@ -5,9 +5,10 @@ from . import model
 import numpy as np
 import math
 from itertools import combinations
+import numpy.typing as npt
 
 
-def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon=None):
+def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, do_2d_aoa=False, epsilon=None, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -24,6 +25,7 @@ def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, eps
     :param cov: Measurement error covariance matrix
     :param x_ctr: Center of search grid [m]
     :param search_size: 2-D vector of search grid sizes [m]
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :param epsilon: Desired resolution of search grid [m]
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
@@ -32,15 +34,15 @@ def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, eps
 
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_sensor, psi, cov, x)
+        return model.log_likelihood(x_sensor, psi, cov, x, do_2d_aoa=do_2d_aoa)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon, **kwargs)
 
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, **kwargs):
+def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -53,16 +55,17 @@ def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, **kwargs):
     :param psi: AOA Measurement vector [rad]
     :param cov: Measurement error covariance matrix
     :param x_init: Initial estimate of source position [m]
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
 
     # Initialize measurement error and jacobian functions
     def y(this_x):
-        return psi - model.measurement(x_sensor, this_x)
+        return psi - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
 
     def jacobian(this_x):
-        return model.jacobian(x_sensor, this_x)
+        return model.jacobian(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
 
     # Call generic Gradient Descent solver
     x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
@@ -70,7 +73,7 @@ def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, **kwargs):
     return x, x_full
 
 
-def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, **kwargs):
+def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -83,16 +86,17 @@ def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, **kwargs):
     :param psi: AOA Measurements [rad]
     :param cov: Measurement Error Covariance Matrix [(m/s)^2]
     :param x_init: Initial estimate of source position [m]
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
 
     # Initialize measurement error and Jacobian function handles
     def y(this_x):
-        return psi - model.measurement(x_sensor, this_x)
+        return psi - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
 
     def jacobian(this_x):
-        return model.jacobian(x_sensor, this_x)
+        return model.jacobian(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
 
     # Call the generic Least Square solver
     x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
@@ -100,7 +104,7 @@ def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, **kwargs):
     return x, x_full
 
 
-def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, pdf_type=None):
+def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, pdf_type=None, do_2d_aoa=False):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
     a series of coordinates, and returning the index of the maximum.
@@ -127,6 +131,7 @@ def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, p
     :param search_size: 2-D vector of search grid sizes [m]
     :param epsilon: Desired resolution of search grid [m]
     :param pdf_type: String indicating the type of distribution to use. See +utils/makePDFs.m for options.
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions
@@ -134,7 +139,7 @@ def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, p
 
     # Generate the PDF
     def measurement(x):
-        return model.measurement(x_sensor, x)
+        return model.measurement(x_sensor, x, do_2d_aoa=do_2d_aoa)
 
     pdfs = utils.make_pdfs(measurement, psi, pdf_type, cov.cov)
 
@@ -259,7 +264,7 @@ def _parse_sensor_triplets(x_sensor):
     return sensor_sets, num_sets
 
 
-def _find_vertices(x: np.ndarray, psi: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray):
+def _find_vertices(x: npt.ArrayLike, psi: npt.ArrayLike) -> (npt.ArrayLike, npt.ArrayLike, npt.ArrayLike):
     # Find vertices
     v0 = utils.geo.find_intersect(x[:, 0], psi[0], x[:, 1], psi[1])
     v1 = utils.geo.find_intersect(x[:, 1], psi[1], x[:, 2], psi[2])

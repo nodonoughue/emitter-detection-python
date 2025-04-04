@@ -2,10 +2,11 @@ import utils
 from utils.covariance import CovarianceMatrix
 import numpy as np
 import time
-from scipy.linalg import pinvh
+from scipy.linalg import pinvh, cholesky, solve_triangular
 
 
-def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progress=False):
+def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progress=False,
+                          eq_constraints_grad:list = None):
     """
     Computes the CRLB for a Gaussian problem at one or more source positions. The CRLB for Gaussian problems takes the
     general form:
@@ -22,11 +23,18 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
      :param jacobian: function that accepts a single source position and returns the n_dim x n_measurement Jacobian
      :param cov: Covariance Matrix object
      :param print_progress: Boolean flag; if true then elapsed/remaining time estimates will be printed to the console
+     :param eq_constraints_grad: list of constraint gradients for equality constraints to be applied
      :return crlb: n_dim x n_dim x n_source lower bound on the estimate covariance matrix
     """
 
     # Parse inputs
     n_dim, n_source = utils.safe_2d_shape(x_source)
+
+    do_eq_constraints = eq_constraints_grad is not None
+    if do_eq_constraints:
+        # Compute the gradient for all positions and store the result in an array of dimension
+        #   num_constraints x n_dim x n_source
+        constraint_grad = np.asarray([eq(x_source) for eq in eq_constraints_grad])
 
     # Initialize output variable
     crlb = np.zeros((n_dim, n_dim, n_source))
@@ -60,12 +68,35 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
         # Compute the Fisher Information Matrix
         fisher_matrix = cov.solve_aca(this_jacobian)
 
+        # Compute Constraint Gradients, if any
+        if do_eq_constraints:
+            # Grab the constraint gradient for the current source position
+            # Transpose it so the dimensions are n_dim x num_constraints
+            # noinspection PyUnboundLocalVariable
+            this_gradient = constraint_grad[:, :, idx].T
+
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
             # Problem is ill-defined, Fisher Information Matrix cannot be
             # inverted
             crlb[:, :, idx] = np.nan
         else:
-            crlb[:, :, idx] = np.real(pinvh(fisher_matrix))
+            fisher_inv = np.real(pinvh(fisher_matrix))
+            if do_eq_constraints:
+                # Apply the impact of equality constraints
+                # noinspection PyUnboundLocalVariable
+                fg = fisher_inv @ this_gradient
+                gfg = this_gradient.T @ fg
+                lower = cholesky(gfg, lower=True)
+
+                res = solve_triangular(lower, fg.T, lower=True)
+
+                fisher_const_inv = res.T @ res
+
+                # Subtract the Fisher inverse for the constraint from the unconstrained Fisher inverse to yield the
+                # constrained Fisher inverse
+                fisher_inv = fisher_inv - fisher_const_inv
+
+            crlb[:, :, idx] = fisher_inv
 
     if print_progress:
         print('done')

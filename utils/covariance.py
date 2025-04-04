@@ -4,10 +4,11 @@ from scipy.linalg import pinvh, solve_triangular, block_diag
 import utils
 import warnings
 import copy
+from numpy import typing as npt
 
 
 class CovarianceMatrix:
-    def __init__(self, cov: np.ndarray, do_cholesky=True, do_inverse=True):
+    def __init__(self, cov: npt.ArrayLike, do_cholesky: bool=True, do_inverse: bool=True):
         self._cov = cov.copy()  # Store the covariance matrix; use copy to make sure it's a fresh copy
         self._inv = None
         self._lower = None
@@ -25,7 +26,7 @@ class CovarianceMatrix:
         return self._cov
 
     @cov.setter
-    def cov(self, cov: np.ndarray):
+    def cov(self, cov: npt.ArrayLike):
         self._cov = cov.copy()
         self._do_parse = True
 
@@ -40,7 +41,7 @@ class CovarianceMatrix:
         return self._lower
 
     @lower.setter
-    def lower(self, val: np.ndarray):
+    def lower(self, val: npt.ArrayLike):
         self._lower = val.copy()
 
         # Use the lower to also define the covariance matrix
@@ -63,7 +64,7 @@ class CovarianceMatrix:
         return self._inv
 
     @inv.setter
-    def inv(self, val: np.ndarray):
+    def inv(self, val: npt.ArrayLike):
         self._inv = val.copy()
 
         # Clear the basic covariance and Cholesky decomposition
@@ -166,7 +167,7 @@ class CovarianceMatrix:
 
         return
 
-    def solve_aca(self, a: np.ndarray):
+    def solve_aca(self, a: npt.ArrayLike):
         """
         Solve the matrix problem res = A @ C^{-1} @ A.T
 
@@ -200,7 +201,7 @@ class CovarianceMatrix:
 
         return val
 
-    def solve_acb(self, a: np.ndarray, b: np.ndarray):
+    def solve_acb(self, a: npt.ArrayLike, b: npt.ArrayLike):
         """
         Solve the matrix problem res = A @ C^{-1} @ B
 
@@ -232,7 +233,7 @@ class CovarianceMatrix:
 
         return val
 
-    def solve_lstsq(self, y: np.ndarray, jacobian: np.ndarray):
+    def solve_lstsq(self, y: npt.ArrayLike, jacobian: npt.ArrayLike):
         """
         Solve a linear equation of the form for x:
             J@C^{-1}@y = J@C^{-1}@J.T @ x
@@ -272,7 +273,7 @@ class CovarianceMatrix:
 
         return val
 
-    def resample(self, ref_idx=None, ref_idx_vec: np.ndarray = None, test_idx_vec: np.ndarray = None) \
+    def resample(self, ref_idx=None, ref_idx_vec: npt.ArrayLike = None, test_idx_vec: npt.ArrayLike = None) \
             -> 'CovarianceMatrix':
         """
         Resample the covariance matrix. Users may specify the reference index in one of three ways:
