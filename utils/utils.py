@@ -352,7 +352,7 @@ def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx
     return noise_out
 
 
-def ensure_invertible(covariance, epsilon=1e-10):
+def ensure_invertible(covariance, epsilon=1e-20):
     """
     Check the input matrix by finding the eigenvalues and checking that they are all >= a small value
     (epsilon), to ensure that it can be inverted.
