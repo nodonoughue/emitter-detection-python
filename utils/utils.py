@@ -586,7 +586,7 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing, max_elements=1e8):
     assert n_dim == np.size(max_offset) and n_dim == np.size(grid_spacing), \
            'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
 
-    n_elements = np.fix(1 + 2 * max_offset / grid_spacing).astype(int)
+    n_elements = np.fix(2 * max_offset / grid_spacing).astype(int)  # don't add +1 here; linspace takes care of that
 
     # Check Search Size
     assert np.prod(n_elements) < max_elements, \
@@ -594,7 +594,7 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing, max_elements=1e8):
            + ' increase the max allowed.'
 
     # Make a set of axes, one for each dimension, that are centered on x_ctr
-    dims = [x + np.linspace(start=-x_max, stop=x_max*(1+n)/n, num=n) for (x, x_max, n)
+    dims = [x + np.linspace(start=-x_max, stop=x_max, num=n, endpoint=True) for (x, x_max, n)
             in zip(x_ctr, max_offset, n_elements)]
 
     # Use meshgrid expansion; each element of x_grid is now a full n_dim dimensioned grid
