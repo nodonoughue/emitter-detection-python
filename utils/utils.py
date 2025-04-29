@@ -553,7 +553,7 @@ def safe_2d_shape(x: np.array) -> np.array:
     return dims_out
 
 
-def make_nd_grid(x_ctr, max_offset, grid_spacing):
+def make_nd_grid(x_ctr, max_offset, grid_spacing, max_elements=1e8):
     """
     Create and return an ND search grid, based on the specified center of the search space, extent, and grid spacing.
 
@@ -565,6 +565,8 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing):
     :param max_offset: scalar or ND array of the extent of the search grid in each dimension, taken as the one-sided
                         maximum offset from x_ctr
     :param grid_spacing: scalar or ND array of grid spacing in each dimension
+    :param max_elements: maximum number of elements in search grid; will return an error if the desired grid will be
+    too large (default=1e8)
     :return x_set: n_dim x N numpy array of positions
     :return x_grid: n_dim-tuple of n_dim-dimensional numpy arrays containing the coordinates for each dimension.
     :return out_shape:  tuple with the size of the generated grid
@@ -587,7 +589,6 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing):
     n_elements = np.fix(1 + 2 * max_offset / grid_spacing).astype(int)
 
     # Check Search Size
-    max_elements = 1e8  # Set a conservative limit
     assert np.prod(n_elements) < max_elements, \
            'Search size is too large; python is likely to crash or become unresponsive. Reduce your search size, or' \
            + ' increase the max allowed.'
