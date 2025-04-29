@@ -43,6 +43,69 @@ def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, eps
     return x_est, likelihood, x_grid
 
 
+def max_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, x_ctr, search_size, epsilon=None, ref_idx=None,
+                               do_resample=False, variance_is_toa=False, do_sensor_bias=True, **kwargs):
+    """
+    Construct the ML Estimate with uncertainty. Uses the utility function utils.make_uncertainty_search_space to handle
+    defaults, such as the number of grid points and search size to use for sensor bias terms and sensor position
+    uncertainty. To ignore these, fully define the x_ctr, search_size, and epsilon terms to consider those
+    parameters (in which case, each should have (n_dim+1)*(n_sensor+1) entries to reflect source position,
+    sensor measurement bias, and sensor position uncertainty).
+
+    :param x_sensor: Sensor positions [m]
+    :param rho: Measurement vector [m]
+    :param cov: Measurement error covariance matrix
+    :param cov_pos: Sensor position error covariance matrix
+    :param x_ctr: Center of search grid [m]; scalar or array with n_dim or (n_dim+1)*(n_sensor+1) entries.
+    :param search_size: vector of search grid sizes [m]; scalar or array with n_dim or (n_dim+1)*(n_sensor+1) entries.
+    :param epsilon: Desired resolution of search grid [m]; scalar or array with n_dim or (n_dim+1)*(n_sensor+1) entries.
+    :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+    it is in m^2
+    :param do_sensor_bias: Boolean flag; if true, then sensor bias terms will be included in search
+    :return x_est: Estimated source position [m]
+    :return likelihood: Likelihood computed across the entire set of candidate source positions
+    :return x_grid: Candidate source positions
+    """
+    # TODO: Implement for triang, fdoa, and hybrid
+    num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
+
+    if variance_is_toa:
+        # Convert from TOA/TDOA to ROA/RDOA -- copy to a new object for sanity's sake
+        cov = cov.multiply(utils.constants.speed_of_light ** 2, overwrite=False)
+
+    if do_resample:
+        cov = cov.resample(ref_idx=ref_idx)
+
+    # Make sure the search space is properly defined, and parse the parameter indices
+    search_params = {'th_center': x_ctr,
+                     'search_size': search_size,
+                     'search_resolution': epsilon,
+                     'do_tdoa_bias': do_sensor_bias,
+                     'x_tdoa': x_sensor}
+    search_center, search_size, search_resolution, param_indices = utils.make_uncertainty_search_space(**search_params)
+
+    # Set up function handle
+    # We must take care to ensure that it can handle an n_th x N matrix of
+    # inputs; for compatibility with how utils.solvers.ml_solver will call it.
+    def ell(theta):
+        return tdoa.model.log_likelihood_uncertainty(x_sensor=x_sensor, rho=rho, cov=cov,
+                                                     cov_pos=cov_pos, theta=theta, ref_idx=ref_idx,
+                                                     do_resample=False, variance_is_toa=False,
+                                                     do_sensor_bias=do_sensor_bias)
+
+    # Call the util function
+    th_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
+                                                   **kwargs)
+
+    x_est = th_est[param_indices['source_pos']]
+    bias_est = th_est[param_indices['bias']]
+    sensor_pos_est = th_est[param_indices['tdoa_pos']]
+
+    return x_est, bias_est, sensor_pos_est, likelihood, x_grid
+
+
 def gradient_descent(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False, **kwargs):
     """
     Computes the gradient descent solution for tdoa processing.

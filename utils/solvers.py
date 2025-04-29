@@ -310,7 +310,7 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
 
 
 def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
-              prior=None, prior_wt: float=0.):
+              prior=None, prior_wt: float = 0., cov_pos=None):
     """
     Execute ML estimation through brute force computational methods.
 
