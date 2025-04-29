@@ -47,8 +47,9 @@ def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, eps
     return x_est, likelihood, x_grid
 
 
-def max_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, x_ctr, search_size, epsilon=None, ref_idx=None,
-                               do_resample=False, variance_is_toa=False, do_sensor_bias=True, **kwargs):
+def max_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, x_ctr, search_size,
+                               epsilon=None, ref_idx=None, do_resample=False, variance_is_toa=False,
+                               do_sensor_bias=True, **kwargs):
     """
     Construct the ML Estimate with uncertainty. Uses the utility function utils.make_uncertainty_search_space to handle
     defaults, such as the number of grid points and search size to use for sensor bias terms and sensor position
@@ -94,7 +95,7 @@ def max_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: Co
     # We must take care to ensure that it can handle an n_th x N matrix of
     # inputs; for compatibility with how utils.solvers.ml_solver will call it.
     def ell(theta):
-        return tdoa.model.log_likelihood_uncertainty(x_sensor=x_sensor, rho=rho, cov=cov,
+        return model.log_likelihood_uncertainty(x_sensor=x_sensor, rho=rho, cov=cov,
                                                      cov_pos=cov_pos, theta=theta, ref_idx=ref_idx,
                                                      do_resample=False, variance_is_toa=False,
                                                      do_sensor_bias=do_sensor_bias)
