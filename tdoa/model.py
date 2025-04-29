@@ -5,7 +5,7 @@ unit_conversions = utils.unit_conversions
 geo = utils.geo
 
 
-def measurement(x_sensor, x_source, ref_idx=None):
+def measurement(x_sensor, x_source, ref_idx=None, bias=None):
     """
     Computes TDOA measurements and converts to range difference of arrival (by compensating for the speed of light).
 
@@ -17,6 +17,7 @@ def measurement(x_sensor, x_source, ref_idx=None):
     :param x_sensor: nDim x nTDOA array of TDOA sensor positions
     :param x_source: nDim x n_source array of source positions
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
+    :param bias: (optional) nSensor x 1 vector of range bias terms [default=None]
     :return rdoa: nAoa + nTDOA + nFDOA - 2 x n_source array of range difference of arrival measurements
     """
 
@@ -30,13 +31,31 @@ def measurement(x_sensor, x_source, ref_idx=None):
     # Parse sensor pairs
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
 
+    # Parse TDOA bias
+    rdoa_bias = 0
+    if bias is not None:
+        rdoa_bias = bias[test_idx_vec] - bias[ref_idx_vec]
+
     # Compute range from each source to each sensor
     # dx = np.reshape(x_source, (n_dim1, 1, n_source)) - x_sensor
     # r = np.reshape(np.sqrt(np.sum(np.fabs(dx)**2, axis=0)), (n_sensor, n_source))  # n_sensor x n_source
     r = utils.geo.calc_range(x_sensor, x_source)
 
     # Compute range difference for each pair of sensors
-    rdoa = r[test_idx_vec] - r[ref_idx_vec]
+    if n_source > 1:
+        # There are multiple sources; they must traverse the second dimension
+        out_dims = (np.size(test_idx_vec), n_source)
+        bias_dims = (out_dims[0], 1)
+    else:
+        # Single source, make it an array
+        out_dims = (np.size(test_idx_vec), )
+        bias_dims = out_dims
+
+    rdoa = np.reshape(r[test_idx_vec] - r[ref_idx_vec], out_dims)
+
+    if bias is not None:
+        rdoa = rdoa + np.reshape(rdoa_bias, bias_dims)
+
     return rdoa
 
 
@@ -114,7 +133,7 @@ def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None,
     """
 
     n_dim, n_source_pos = utils.safe_2d_shape(x_source)
-    ell = np.zeros((n_source_pos, 1))
+    ell = np.zeros((n_source_pos, ))
 
     # Make sure the source pos is a matrix, rather than simply a vector
     if n_source_pos == 1:
@@ -130,14 +149,12 @@ def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None,
     if do_resample:
         cov = cov.resample(ref_idx=ref_idx)
 
-    for idx_source in np.arange(n_source_pos):
-        x_i = x_source[:, idx_source]
-
+    for idx_source, x_i in enumerate(x_source.T):
         # Generate the ideal measurement matrix for this position
-        rho_dot = measurement(x_sensor, x_i, ref_idx)
+        rho_dot = measurement(x_sensor=x_sensor, x_source=x_i, ref_idx=ref_idx)
 
         # Evaluate the measurement error
-        err = (rho - rho_dot)
+        err = rho - rho_dot
 
         # Compute the scaled log likelihood
         ell[idx_source] = - cov.solve_aca(err)

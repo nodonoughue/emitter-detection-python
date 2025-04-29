@@ -3,7 +3,7 @@ import utils
 from utils.covariance import CovarianceMatrix
 
 
-def measurement(x_sensor, x_source, do_2d_aoa=False):
+def measurement(x_sensor, x_source, do_2d_aoa=False, bias=None):
     """
     Computes angle of arrival measurements.
 
@@ -19,6 +19,7 @@ def measurement(x_sensor, x_source, do_2d_aoa=False):
     :param x_sensor: nDim x nSensor array of sensor positions
     :param x_source: nDim x n_source array of source positions
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
+    :param bias:  Optional nSensor x 1 vector of AOA biases (nSensor x 2 if do2DAoA is true).  [default = None]
     :return psi: nSensor -1 x n_source array of AOA measurements
     """
 
@@ -33,16 +34,35 @@ def measurement(x_sensor, x_source, do_2d_aoa=False):
     if n_dim1 != n_dim2:
         raise TypeError('First dimension of all inputs must match')
 
+    # Check angle bias dimensions and parse
+    angle_bias_az = 0.
+    angle_bias_el = 0.
+    if bias is not None:
+        n_dim_bias, n_bias = utils.safe_2d_shape(bias)
+        # Check for vector input
+        if len(np.shape(bias)):
+            n_bias = n_dim_bias
+            n_dim_bias = 1
+        valid_dims = True
+        if (do_2d_aoa and n_dim_bias != 2) or (not do_2d_aoa and n_dim_bias != 1) or n_bias != n_sensor:
+            raise TypeError('Angle bias dimensions must match number of sensor measurements to make.')
+
+        if do_2d_aoa:
+            angle_bias_az = np.reshape(bias[0], (1, n_sensor, n_source))
+            angle_bias_el = np.reshape(bias[1], (1, n_sensor, n_source))
+        else:
+            angle_bias_az = np.reshape(bias, (1, n_sensor, n_source))
+
     # Compute cartesian offset from each source position to each sensor
     dx = np.reshape(x_source, (n_dim1, 1, n_source)) - np.reshape(x_sensor, (n_dim1, n_sensor, 1))
 
     # Compute angle in radians
-    az = np.reshape(np.arctan2(dx[1, :, :], dx[0, :, :]), newshape=out_dims)
+    az = np.reshape(np.arctan2(dx[1, :, :], dx[0, :, :]) + angle_bias_az, newshape=out_dims)
 
     # Elevation angle, if desired
     if do_2d_aoa and n_dim1 == 3:
         ground_rng = np.expand_dims(np.sqrt(np.sum(dx[0:2, :, :]**2, axis=0)), axis=0)
-        el = np.reshape(np.arctan2(dx[2, :, :], ground_rng), newshape=out_dims)
+        el = np.reshape(np.arctan2(dx[2, :, :], ground_rng) + angle_bias_el, newshape=out_dims)
 
         # Stack az/el along the first dimension
         psi = np.concatenate((az, el), axis=0)

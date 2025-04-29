@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.linalg import block_diag
 import triang
 import tdoa
 import fdoa
@@ -7,7 +8,8 @@ from utils.covariance import CovarianceMatrix
 
 
 def measurement(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
+                do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, angle_bias=None,
+                range_bias=None, range_rate_bias=None):
     """
     Computes hybrid measurements, for AOA, TDOA, and FDOA sensors.
 
@@ -25,21 +27,24 @@ def measurement(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_s
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
+    :param angle_bias: (Optional) nAOA x 1 (or nAOA x 2 if do_2d_aoa=True) vector of angle bias terms [default=None]
+    :param range_bias: (Optional) nTDOA x 1 vector of range bias terms (time bias * c) [default=None]
+    :param range_rate_bias: (Optional) nFDOA x 1 vector of range-rate bias terms (freq bias * c/f0) [default=None]
     :return zeta: nAoa + nTDOA + nFDOA - 2 x nSource array of measurements
     """
 
     # Construct component measurements
     to_concat = []
     if x_aoa is not None:
-        z_a = triang.model.measurement(x_sensor=x_aoa, x_source=x_source, do_2d_aoa=do_2d_aoa)
+        z_a = triang.model.measurement(x_sensor=x_aoa, x_source=x_source, do_2d_aoa=do_2d_aoa, bias=angle_bias)
         to_concat.append(z_a)
     if x_tdoa is not None:
-        z_t = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_source, ref_idx=tdoa_ref_idx)
+        z_t = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_source, ref_idx=tdoa_ref_idx, bias=range_bias)
         to_concat.append(z_t)
     if x_fdoa is not None:
         z_f = fdoa.model.measurement(x_sensor=x_fdoa, v_sensor=v_fdoa, 
                                      x_source=x_source, v_source=v_source,
-                                     ref_idx=fdoa_ref_idx)
+                                     ref_idx=fdoa_ref_idx, bias=range_rate_bias)
         to_concat.append(z_f)
 
     # Combine into a single data vector

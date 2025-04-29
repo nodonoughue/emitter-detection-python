@@ -4,7 +4,7 @@ from utils.covariance import CovarianceMatrix
 import matplotlib.pyplot as plt
 
 
-def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
+def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=None):
     """
     # Computed range rate difference measurements, using the
     # final sensor as a common reference for all FDOA measurements.
@@ -19,31 +19,42 @@ def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     :param v_sensor: nDim x nSensor array of sensor velocities
     :param v_source: nDim x n_source array of source velocities
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
+    :param bias: nSensor x 1 array of range-rate bias terms
     :return rrdoa: nSensor -1 x n_source array of RRDOA measurements
     """
 
     # Parse inputs
     n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
-    
+
+    # Parse FDOA bias
+    rrdoa_bias = 0
+    if bias is not None:
+        rrdoa_bias = bias[test_idx_vec] - bias[ref_idx_vec]
+
     # Compute distance from each source position to each sensor
     dx = np.reshape(x_source, (n_dim, 1, n_source)) - np.reshape(x_sensor, (n_dim, n_sensor, 1))
     r = np.sqrt(np.sum(dx**2, axis=0))  # 1 x nSensor1 x n_source1
     
     # Compute range rate from range and velocity
     dv = np.reshape(v_sensor, (n_dim, n_sensor, 1)) - np.reshape(v_source, (n_dim, 1, n_source))
-    rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor, n_source))  # nSensor x n_source
+    rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor, n_source)) + bias  # nSensor x n_source
     
     # Apply reference sensors to compute range rate difference for each sensor
     # pair
     if n_source > 1:
         # There are multiple sources; they must traverse the second dimension
         out_dims = (np.size(test_idx_vec), n_source)
+        bias_dims = (out_dims[0], 1)
     else:
         # Single source, make it an array
         out_dims = (np.size(test_idx_vec), )
+        bias_dims = out_dims
 
-    rrdoa = np.reshape(rr[test_idx_vec, :] - rr[ref_idx_vec, :], newshape=out_dims)
+    rrdoa = np.reshape(rr[test_idx_vec] - rr[ref_idx_vec], out_dims)
+
+    if bias is not None:
+        rrdoa = rrdoa + np.reshape(rrdoa_bias, bias_dims)
 
     return rrdoa
 
