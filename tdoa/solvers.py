@@ -1,5 +1,4 @@
 import utils
-# from ..utils import solvers
 from . import model
 import numpy as np
 from utils.covariance import CovarianceMatrix
@@ -8,7 +7,7 @@ solvers = utils.solvers
 
 
 def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon=None, ref_idx=None,
-                   do_resample=False, **kwargs):
+                   do_resample=False, variance_is_toa=False, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -23,12 +22,17 @@ def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, eps
     :param epsilon: Desired resolution of search grid [m]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+    it is in m^2
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions
     """
 
-    # Resample the covariance matrix
+    if variance_is_toa:
+        # Convert from TOA/TDOA to ROA/RDOA -- copy to a new object for sanity's sake
+        cov = cov.multiply(utils.constants.speed_of_light ** 2, overwrite=False)
+
     if do_resample:
         cov = cov.resample(ref_idx=ref_idx)
 
