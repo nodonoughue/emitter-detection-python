@@ -163,7 +163,7 @@ def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None,
 
 
 def log_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, theta, ref_idx=None,
-                               do_resample=False, variance_is_toa=True, do_sensor_bias=True):
+                               do_resample=False, variance_is_toa=True, do_sensor_bias=False):
     """
     Compute log likelihood for TDOA measurements with uncertainty. The unknown parameter vector takes the form:
 
@@ -186,8 +186,8 @@ def log_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: Co
     :param do_sensor_bias: Boolean flag; if true, then sensor bias terms will be included in search
     :return ell: Log-likelihood evaluated at each position x_source.
     """
-    # TODO: Implement for triang, fdoa, and hybrid
 
+    # Parse Inputs
     n_dim, n_sensor = utils.safe_2d_shape(x_sensor)
     _, n_source_pos = utils.safe_2d_shape(theta)
     ell = np.zeros((n_source_pos, ))
@@ -225,7 +225,7 @@ def log_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: Co
             beta_i = th_i[parameter_indices['tdoa_pos']]
             x_sensor_i = np.reshape(beta_i, (n_dim, n_sensor))
         else:
-            beta_i = 0
+            beta_i = beta
             x_sensor_i = x_sensor
 
         # Generate the ideal measurement matrix for this position
@@ -241,7 +241,7 @@ def log_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: Co
             this_ell -= cov_pos.solve_aca(err_pos)
         ell[idx_source] = this_ell
 
-    return ell  # TODO: Make versions for triang, fdoa, and hybrid
+    return ell
 
 
 def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, ref_idx=None, do_resample=False,

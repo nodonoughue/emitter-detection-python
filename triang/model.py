@@ -209,6 +209,87 @@ def log_likelihood(x_aoa, psi, cov: CovarianceMatrix, x_source, do_2d_aoa=False)
     return ell
 
 
+def log_likelihood_uncertainty(x_aoa, psi, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, theta, do_2d_aoa=False,
+                               do_sensor_bias=False):
+    """
+    Computes the Log Likelihood for AOA sensor measurement, given the
+    received measurement vector psi, covariance matrix cov,
+    and set of candidate uncertainty vectors theta.
+
+    theta = [x_source, bias, x_sensor.ravel()]
+
+    Modified from the original version to include a flag for 2D AOA calculations (where both az/el are computed). If
+    specified, the assumption is that the measurements are arranged with the n_sensor azimuth measurements first, and
+    the n_sensor elevation measurements second.
+
+    Ported from MATLAB Code.
+
+    Nicholas O'Donoughue
+    29 April 2025
+
+    :param x_aoa: Sensor positions [m]
+    :param psi: AOA measurement vector
+    :param cov: AOA measurement error covariance matrix; object of the CovarianceMatrix class
+    :param cov_pos: sensor position error covariance matrix (if set to None, then sensor position error is ignored)
+    :param theta: Candidate source positions
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
+    :param do_sensor_bias: Boolean flag; if true, then sensor bias terms will be included in search
+    :return ell: Log-likelihood evaluated at each position x_source.
+    """
+    # TODO: Test
+
+    # Parse inputs
+    n_dim, n_sensor = utils.safe_2d_shape(x_aoa)
+    _, n_source_pos = utils.safe_2d_shape(theta)
+
+    # Make sure the source pos is a matrix, rather than simply a vector
+    if n_source_pos == 1:
+        theta = np.expand_dims(theta, axis=1)
+
+    # Initialize Output
+    ell = np.zeros(shape=(n_source_pos, ))
+
+    # Generate the indices for source position, measurement bias, and sensor position errors in the expanded
+    # parameter vector represented by theta. Instead of nDim x nSourcePos, the matrix is assumed to have
+    # size (nDim + nAOA + nDim*nAOA) x nSourcePos, where the first nDim rows represent the unknown target
+    # position, the next nAOA rows are measurement biases, and the remainder are sensor positions.
+    do_pos_error = cov_pos is not None
+    parameter_indices = utils.make_uncertainty_indices(num_dim=n_dim, num_aoa=n_sensor,
+                                                       do_aoa_bias=do_sensor_bias,
+                                                       do_aoa_pos_error=do_pos_error)
+    beta = x_aoa.ravel()  # Assume the x_aoa positions provided are truth.
+
+    for idx_source, th_i in enumerate(theta.T):
+        # Parse the parameter vector to grab the assumed target position, sensor measurement
+        # biases, and sensor positions
+        x_i = th_i[parameter_indices['source_pos']]
+        if do_sensor_bias:
+            bias_i = th_i[parameter_indices['bias']]
+        else:
+            bias_i = 0
+        if do_pos_error:
+            beta_i = th_i[parameter_indices['tdoa_pos']]
+            x_aoa_i = np.reshape(beta_i, (n_dim, n_sensor))
+        else:
+            beta_i = beta
+            x_aoa_i = x_aoa
+
+        # Generate the ideal measurement matrix for this position
+        this_psi = measurement(x_sensor=x_aoa_i, x_source=x_i, do_2d_aoa=do_2d_aoa, bias=bias_i)
+
+        # Evaluate the measurement error
+        err = utils.modulo2pi(psi - this_psi)
+        err_pos = beta - beta_i
+
+        # Compute the scaled log likelihood
+        this_ell = - cov.solve_aca(err)
+        if do_pos_error:
+            this_ell -= cov_pos.solve_aca(err_pos)
+        ell[idx_source] = this_ell
+
+    return ell
+
+
 def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, do_2d_aoa=False):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each

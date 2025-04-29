@@ -138,12 +138,11 @@ def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
     """
 
     # Parse inputs
-    n_dim, n_sensors = utils.safe_2d_shape(x_sensor)
-    n_dim2, n_source_pos = utils.safe_2d_shape(x_source)
-    assert n_dim == n_dim2, 'Input dimension mismatch.'
+    n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source=x_source, v_source=v_source,
+                                                                  x_sensor=x_sensor, v_sensor=v_sensor)
 
     # Handle vector input
-    if n_source_pos == 1 and len(x_source.shape) == 1:
+    if n_source == 1:
         # x_source is a vector; 2D indexing below will fail.
         # Let's add a new axis
         x_source = x_source[:, np.newaxis]
@@ -152,9 +151,9 @@ def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
         cov = cov.resample(ref_idx=ref_idx)
 
     # Initialize output
-    ell = np.zeros((n_source_pos, ))
+    ell = np.zeros((n_source, ))
 
-    for idx_source in np.arange(n_source_pos):
+    for idx_source in np.arange(n_source):
         x_i = x_source[:, idx_source]
         
         # Generate the ideal measurement matrix for this position
@@ -167,6 +166,103 @@ def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
 
         # Compute the scaled log likelihood
         ell[idx_source] = - cov.solve_aca(err)
+
+    return ell
+
+
+def log_likelihood_uncertainty(x_sensor, rho_dot, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, theta,
+                               v_sensor=None, ref_idx=None, do_resample=False, do_sensor_bias=False):
+    """
+    # Computes the Log Likelihood for FDOA sensor measurement, given the
+    # received measurement vector rho_dot, covariance matrix C,
+    # and set of candidate uncertainty vectors theta.
+
+    theta = [x_source, v_source, bias, x_sensor.ravel(), v_sensor.ravel()]
+
+    Sensor position and velocity are only part of the theta vector if cov_pos is defined.
+    Sensor bias is only part of the theta vector is the flag do_sensor_bias=True
+
+    Ported from MATLAB Code.
+
+    Nicholas O'Donoughue
+    29 April 2025
+
+    :param x_sensor: Sensor positions [m]
+    :param rho_dot: FDOA measurement vector
+    :param cov: CovarianceMatrix object
+    :param cov_pos: sensor position error covariance matrix (if set to None, then sensor position error is ignored)
+    :param theta: Candidate source positions
+    :param v_sensor: Sensor velocities [m/s]
+    :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
+    :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param do_sensor_bias: Boolean flag; if true, then sensor bias terms will be included in search
+    :return ell: Log-likelihood evaluated at each position x_source.
+    """
+    # TODO: Test
+
+    # Parse inputs
+    # Using _check_inputs is a convenient way to make sure v_sensor has the appropriate shape.
+    n_dim, n_sensors = utils.safe_2d_shape(x_sensor)
+    n_dim, n_source, n_sensor, _, v_sensor = _check_inputs(x_source=theta[:n_dim, :],
+                                                           v_source=theta[n_dim:2*n_dim],
+                                                           x_sensor=x_sensor, v_sensor=v_sensor)
+    _, n_source_pos = utils.safe_2d_shape(theta)
+
+    # Handle vector input
+    if n_source_pos == 1:
+        # x_source is a vector; 2D indexing below will fail.
+        # Let's add a new axis
+        theta = theta[:, np.newaxis]
+
+    if do_resample:
+        cov = cov.resample(ref_idx=ref_idx)
+
+    # Initialize output
+    ell = np.zeros((n_source_pos, ))
+
+    # Generate the indices for source position, measurement bias, and sensor position errors in the expanded
+    # parameter vector represented by theta. Instead of nDim x nSourcePos, the matrix is assumed to have
+    # size (nDim + nAOA + nDim*nAOA) x nSourcePos, where the first nDim rows represent the unknown target
+    # position, the next nAOA rows are measurement biases, and the remainder are sensor positions.
+    do_pos_error = cov_pos is not None
+    parameter_indices = utils.make_uncertainty_indices(num_dim=n_dim, num_fdoa=n_sensor,
+                                                       do_fdoa_bias=do_sensor_bias,
+                                                       do_fdoa_pos_error=do_pos_error)
+    beta = np.concatenate((x_sensor, v_sensor), axis=None)  # Assume the sensor positions and velocities provided
+                                                                   # are truth.
+
+    for idx_source, th_i in enumerate(theta.T):
+        # Parse the parameter vector to grab the assumed target position, sensor measurement
+        # biases, and sensor positions
+        x_i = th_i[parameter_indices['source_pos']]
+        v_i = th_i[parameter_indices['source_vel']]
+        if do_sensor_bias:
+            bias_i = th_i[parameter_indices['bias']]
+        else:
+            bias_i = 0
+        if do_pos_error:
+            beta_i = th_i[parameter_indices['sensor']]
+            x_sensor_i = np.reshape(th_i[parameter_indices['fdoa_sensor_pos']], (n_dim, n_sensor))
+            v_sensor_i = np.reshape(th_i[parameter_indices['fdoa_sensor_vel']], (n_dim, n_sensor))
+        else:
+            beta_i = beta
+            x_sensor_i = x_sensor
+            v_sensor_i = v_sensor
+
+        # Generate the ideal measurement matrix for this position
+        r_dot = measurement(x_sensor=x_sensor_i, x_source=x_i,
+                            v_sensor=v_sensor_i, v_source=v_i,
+                            ref_idx=ref_idx)
+
+        # Evaluate the measurement error
+        err = rho_dot - r_dot
+        err_pos = beta - beta_i
+
+        # Compute the scaled log likelihood
+        this_ell = - cov.solve_aca(err)
+        if do_pos_error:
+            this_ell -= cov_pos.solve_aca(err_pos)
+        ell[idx_source] = this_ell
 
     return ell
 
