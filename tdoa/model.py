@@ -434,3 +434,136 @@ def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
     y_iso = iso[1, :]
 
     return x_iso, y_iso
+
+
+def grad_x(x_sensor, x_source, ref_idx=None, bias=None):
+    """
+    Return the gradient of TDOA measurements, with sensor uncertainties, with respect to target position, x.
+    Equation 6.27. The sensor uncertainties don't impact the gradient for TDOA, so this reduces to the previously
+    defined Jacobian. This function is merely a wrapper for calls to tdoa.model.jacobian, with the optional argument
+    'bias' ignored.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    TDOA sensor positions
+    :param x_source:    Source positions
+    :param ref_idx:     Reference index (optional)
+    :param bias:        Range bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Sensor uncertainties don't impact the gradient with respect to target position; this is the same as the previously
+    # defined function tdoa.model.jacobian.
+    return jacobian(x_sensor=x_sensor, x_source=x_source, ref_idx=ref_idx)
+
+
+def grad_bias(x_sensor, x_source, ref_idx=None, bias=None):
+    """
+    Return the gradient of TDOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
+    terms, from equation 6.31.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    TDOA sensor positions
+    :param x_source:    Source positions
+    :param ref_idx:     Reference index (optional)
+    :param bias:        Range bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Parse the reference index
+    _, num_sensors = utils.safe_2d_shape(x_sensor)
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
+
+    # According to eq 6.32, the m-th row is 1 for every column in which the m-th sensor is a test index, and -1 for
+    # every column in which the m-th sensor is a reference index.
+    num_measurements = np.size(test_idx_vec)
+    grad = np.zeros((num_sensors, num_measurements))
+    for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
+        grad[i, test] = 1
+        grad[i, ref] = -1
+
+    # Repeat for each source position
+    _, num_sources = utils.safe_2d_shape(x_source)
+    if num_sources > 1:
+        grad = np.repeat(grad, num_sources, axis=2)
+
+    return grad
+
+
+def grad_sensor_pos(x_sensor, x_source, ref_idx=None, bias=None):
+    """
+    Compute the gradient of TDOA measurements, with sensor uncertainties, with respect to sensor position,
+    equation 6.31.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    TDOA sensor positions
+    :param x_source:    Source positions
+    :param ref_idx:     Reference index (optional)
+    :param bias:        Range bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Parse inputs
+    n_dim, n_sensor = utils.safe_2d_shape(x_sensor)
+    _, n_source = utils.safe_2d_shape(x_source)
+
+    # Compute pointing vectors and projection matrix
+    dx = x_sensor - np.reshape(x_source, newshape=(n_dim, 1, n_source))
+    rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # (1, n_sensor, n_source)
+    dx_norm = dx / rn
+
+    # Parse the reference index
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
+
+    # Build the Gradient
+    n_measurement = np.size(test_idx_vec)
+    grad_pos = np.zeros((n_dim * n_sensor, n_measurement, n_source))
+
+    for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
+        # Gradient w.r.t. sensor pos, eq 6.38
+        start_test = n_dim * test
+        end_test = start_test + n_dim  # add +1 because of the way python indexing works
+        grad_pos[start_test:end_test, i, :] = -dx_norm[:, test, :]
+
+        start_ref = n_dim * ref
+        end_ref = start_ref + n_dim
+        grad_pos[start_ref:end_ref, i, :] = dx_norm[:, ref, :]
+
+    return grad_pos
+
+
+def generate_parameter_indices(x_sensor, do_bias=True):
+    """
+    Return index mapping for parameter estimation, using the assumed standard mapping of
+        theta = [x_source, sensor_bias, x_sensor]
+
+    Adapted from MATLAB code
+    22 April 2025
+
+    Nicholas O'Donoughue
+
+    :param x_sensor: n_dim x n_sensor array of sensor positions
+    :param do_bias: Option (default=True) boolean. If false, then sensor measurement biases are ignored.
+    :return: dictionary with fields 'target_pos', 'bias', and 'sensor_pos' indicating the indices corresponding
+    to each parameter.
+    """
+    num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
+
+    indices = {'target_pos': np.arange(num_dim),
+               'bias': np.arange(num_sensors) + num_dim if do_bias else None,
+               'sensor_pos': np.arange(num_dim * num_sensors) + num_dim + (num_sensors if do_bias else 0)}
+    return indices

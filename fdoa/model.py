@@ -421,6 +421,138 @@ def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
     return x_iso, y_iso
 
 
+def grad_x(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=None):
+    """
+    Return the gradient of FDOA measurements, with sensor uncertainties, with respect to target position, x.
+    Equation 6.31. The sensor uncertainties don't impact the gradient for FDOA, so this reduces to the previously
+    defined Jacobian. This function is merely a wrapper for calls to fdoa.model.jacobian, with the optional argument
+    'bias' ignored.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    FDOA sensor positions
+    :param x_source:    Source positions
+    :param v_sensor:    Optional FDOA sensor velocities (0 if not defined)
+    :param v_source:    Optional FDOA source velocities (0 if not defined)
+    :param ref_idx:     Reference index (optional)
+    :param bias:        Range-Rate bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Sensor uncertainties don't impact the gradient with respect to target position; this is the same as the previously
+    # defined function fdoa.model.jacobian.
+    return jacobian(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source, ref_idx=ref_idx)
+
+
+def grad_bias(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=None):
+    """
+    Return the gradient of FDOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
+    terms.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    FDOA sensor positions
+    :param x_source:    Source positions
+    :param v_sensor:    Optional FDOA sensor velocities (0 if not defined)
+    :param v_source:    Optional FDOA source velocities (0 if not defined)
+    :param ref_idx:     Reference index (optional)
+    :param bias:        Range-Rate bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Parse the reference index
+    _, num_sensors = utils.safe_2d_shape(x_sensor)
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
+
+    # According to eq 6.42, the m-th row is 1 for every column in which the m-th sensor is a test index, and -1 for
+    # every column in which the m-th sensor is a reference index.
+    num_measurements = np.size(test_idx_vec)
+    grad = np.zeros((num_sensors, num_measurements))
+    for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
+        grad[i, test] = 1
+        grad[i, ref] = -1
+
+    # Repeat for each source position
+    _, num_sources = utils.safe_2d_shape(x_source)
+    if num_sources > 1:
+        grad = np.repeat(grad, num_sources, axis=2)
+
+    return grad
+
+
+def grad_sensor_pos(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=None):
+    """
+    Compute the gradient of FDOA measurements, with sensor uncertainties, with respect to sensor position and velocity.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    FDOA sensor positions
+    :param x_source:    Source positions
+    :param v_sensor:    Optional FDOA sensor velocities (0 if not defined)
+    :param v_source:    Optional FDOA source velocities (0 if not defined)
+    :param ref_idx:     Reference index (optional)
+    :param bias:        Range-Rate bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Parse inputs
+    n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
+
+    # Compute pointing vectors and projection matrix
+    dx = x_sensor - np.reshape(x_source, newshape=(n_dim, 1, n_source))
+    dv = v_sensor - np.reshape(v_source, newshape=(n_dim, 1, n_source))
+    rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # (1, n_sensor, n_source)
+    dx_norm = dx / rn
+    dv_norm = dv / rn
+
+    proj_x = (np.reshape(dx_norm, newshape=(n_dim, 1, n_sensor, n_source)) *
+              np.reshape(np.conjugate(dx_norm), newshape=(1, n_dim, n_sensor, n_source)))
+
+    # Compute the gradient of R_n
+    nabla_rn = np.squeeze(np.sum((np.eye(n_dim) - proj_x) *
+                                 np.reshape(dv_norm, newshape=(1, n_dim, n_sensor, n_source)), axis=1))
+    # (n_dim, n_sensor, n_source)
+
+    # Parse the reference index
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
+
+    # Build the Gradient
+    n_measurement = np.size(test_idx_vec)
+    grad_pos = np.zeros((n_dim * n_sensor, n_measurement, n_source))
+    grad_vel = np.zeros((n_dim * n_sensor, n_measurement, n_source))
+    for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
+        # Gradient w.r.t. sensor pos, eq 6.38
+        start_test = n_dim * test
+        end_test = start_test + n_dim  # add +1 because of the way python indexing works
+        grad_pos[start_test:end_test, i, :] = nabla_rn[:, test, :]
+
+        start_ref = n_dim * ref
+        end_ref = start_ref + n_dim
+        grad_pos[start_ref:end_ref, i, :] = -nabla_rn[:, ref, :]
+
+        # Gradient w.r.t. sensor vel, eq 6.40
+        grad_vel[start_test:end_test, i, :] = dx_norm[:, test, :]
+        grad_vel[start_ref:end_ref, i, :] = -dx_norm[:, ref, :]
+
+    # Combine the gradient w.r.t. sensor pos and sensor vel
+    # eq 6.36
+    grad = np.concatenate((grad_pos, grad_vel), axis=1)
+
+    return grad
+
+
 def _check_inputs(x_source, v_source, x_sensor, v_sensor):
     if v_sensor is None and v_source is None:
         raise ValueError('At least one of either v_sensor or v_source must be defined to use FDOA.')

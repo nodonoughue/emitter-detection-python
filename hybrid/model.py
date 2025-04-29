@@ -371,3 +371,153 @@ def error(x_source, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None,
     epsilon_list = [cov.solve_aca(this_err) for this_err in err.T]
 
     return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
+
+
+def grad_x(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
+           do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
+    """
+    Return the gradient of Hybrid measurements, with sensor uncertainties, with respect to target position, x.
+    Equation 6.43. This function calls grad_x for each sensor type in succession, then concatenates the results.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_source:
+    :param x_aoa: nDim x nAOA array of sensor positions
+    :param x_tdoa: nDim x nTDOA array of TDOA sensor positions
+    :param x_fdoa: nDim x nFDOA array of FDOA sensor positions
+    :param v_fdoa: nDim x nFDOA array of FDOA sensor velocities
+    :param v_source: nDim x 1 source velocity; assumed stationary if left blank
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
+    :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
+    :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
+    :param aoa_bias:        Range-Rate bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    gradients = []
+    if x_aoa is not None:
+        gradients.append(triang.model.grad_x(x_source=x_source, x_sensor=x_aoa, do_2d_aoa=do_2d_aoa))
+
+    if x_tdoa is not None:
+        gradients.append(tdoa.model.grad_x(x_source=x_source, x_sensor=x_tdoa, ref_idx=tdoa_ref_idx))
+
+    if x_fdoa is not None:
+        gradients.append(fdoa.model.grad_x(x_source=x_source, x_sensor=x_fdoa, v_sensor=v_fdoa, v_source=v_source,
+                                           ref_idx=fdoa_ref_idx))
+
+    grad = np.concatenate(gradients, axis=1)
+
+    return grad
+
+
+def grad_bias(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
+              do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
+    """
+    Return the gradient of FDOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
+    terms.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_source:
+    :param x_aoa: nDim x nAOA array of sensor positions
+    :param x_tdoa: nDim x nTDOA array of TDOA sensor positions
+    :param x_fdoa: nDim x nFDOA array of FDOA sensor positions
+    :param v_fdoa: nDim x nFDOA array of FDOA sensor velocities
+    :param v_source: nDim x 1 source velocity; assumed stationary if left blank
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
+    :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
+    :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
+    :param aoa_bias:        Range-Rate bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    gradients = []
+    if x_aoa is not None:
+        gradients.append(triang.model.grad_bias(x_source=x_source, x_sensor=x_aoa, do_2d_aoa=do_2d_aoa))
+
+    if x_tdoa is not None:
+        gradients.append(tdoa.model.grad_bias(x_source=x_source, x_sensor=x_tdoa, ref_idx=tdoa_ref_idx))
+
+    if x_fdoa is not None:
+        gradients.append(fdoa.model.grad_bias(x_source=x_source, x_sensor=x_fdoa, v_sensor=v_fdoa, v_source=v_source,
+                                              ref_idx=fdoa_ref_idx))
+
+    _, n_source = utils.safe_2d_shape(x_source)
+    if n_source <= 1:
+        # There is only one source, combine the gradients with a block diagonal across axes 0 and 1
+        grad = block_diag(gradients)
+    else:
+        # The individual gradients are 3D, but block_diag only works on 2D, let's do some reshaping.
+        # We need to move the third axis to the front
+        gradients_reshape = [np.moveaxis(x, -1, 0) for x in gradients]
+
+        # Now we can use list comprehension to call block_diag on each in turn
+        res = [block_diag(*arrs) for arrs in zip(*gradients_reshape)]
+
+        # This is now a list of length n_source, where each entry is a block-diagonal jacobian matrix at that source
+        # position. Convert back to an ndarray and rearrange the axes
+        grad = np.moveaxis(np.asarray(res), 0, -1)  # Move the first axis (n_source) back to the end.
+
+    return grad
+
+
+def grad_sensor_pos(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
+                    do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
+    """
+    Compute the gradient of hybrid measurements, with sensor uncertainties, with respect to sensor position and
+    velocity, according to equation 6.43.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_source:
+    :param x_aoa: nDim x nAOA array of sensor positions
+    :param x_tdoa: nDim x nTDOA array of TDOA sensor positions
+    :param x_fdoa: nDim x nFDOA array of FDOA sensor positions
+    :param v_fdoa: nDim x nFDOA array of FDOA sensor velocities
+    :param v_source: nDim x 1 source velocity; assumed stationary if left blank
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
+    :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
+    :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    gradients = []
+    if x_aoa is not None:
+        grad_a = triang.model.grad_sensor_pos(x_source=x_source, x_sensor=x_aoa, do_2d_aoa=do_2d_aoa)
+
+        # Append zeros to reflect lack of dependence on sensor velocity
+        grad_a = np.concatenate((grad_a, np.zeros_like(grad_a)), axis=0)
+
+        # Add to running list of gradients
+        gradients.append(grad_a)
+
+    if x_tdoa is not None:
+        grad_t = tdoa.model.grad_sensor_pos(x_source=x_source, x_sensor=x_tdoa, ref_idx=tdoa_ref_idx)
+
+        # Append zeros to reflect lack of dependence on sensor velocity
+        grad_t = np.concatenate((grad_t, np.zeros_like(grad_t)), axis=0)
+
+        # Add to running list of gradients
+        gradients.append(grad_t)
+
+    if x_fdoa is not None:
+        # No need to append zeros, the FDOA gradient assumes both velocity and position are considered.
+        gradients.append(fdoa.model.grad_sensor_pos(x_source=x_source, x_sensor=x_fdoa, v_sensor=v_fdoa,
+                                                    v_source=v_source, ref_idx=fdoa_ref_idx))
+
+    # Concatenate the available gradients along the second dimension (axis=1)
+    grad = np.concatenate(gradients, axis=1)
+
+    return grad

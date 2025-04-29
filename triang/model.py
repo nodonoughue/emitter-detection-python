@@ -380,3 +380,109 @@ def draw_lob(x_sensor, psi, x_source=None, scale=1):
     xy_lob = np.reshape(x_sensor, [2, 1, num_measurements]) + xy_lob_centered
 
     return xy_lob
+
+
+def grad_x(x_sensor, x_source, do_2d_aoa=False, bias=None):
+    """
+    Return the gradient of AOA measurements, with sensor uncertainties, with respect to target position, x.
+    Equation 6.16. The sensor uncertainties don't impact the gradient for AOA, so this reduces to the previously
+    defined Jacobian. This function is merely a wrapper for calls to triang.model.jacobian, with the optional argument
+    'bias' ignored.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    AOA sensor positions
+    :param x_source:    Source positions
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
+    :param bias:        Angle bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Sensor uncertainties don't impact the gradient with respect to target position; this is the same as the previously
+    # defined function triang.model.jacobian.
+    return jacobian(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=do_2d_aoa)
+
+
+def grad_bias(x_sensor, x_source, do_2d_aoa=False, bias=None):
+    """
+    Return the gradient of AOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
+    terms, from equation 6.24.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    TDOA sensor positions
+    :param x_source:    Source positions
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
+    :param bias:        Range bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Parse the reference index
+    num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
+    _, num_sources = utils.safe_2d_shape(x_source)
+
+    # According to eq 6.32, the m-th row is 1 for every column in which the m-th sensor is a test index, and -1 for
+    # every column in which the m-th sensor is a reference index.
+    num_measurements = num_sensors * (1 + do_2d_aoa)
+    grad = np.eye(num_measurements)
+
+    # Repeat for each source position
+    _, num_sources = utils.safe_2d_shape(x_source)
+    if num_sources > 1:
+        grad = np.repeat(grad, num_sources, axis=2)
+
+    return grad
+
+
+def grad_sensor_pos(x_sensor, x_source, do_2d_aoa=False, bias=None):
+    """
+    Compute the gradient of TDOA measurements, with sensor uncertainties, with respect to sensor position,
+    equation 6.21.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    TDOA sensor positions
+    :param x_source:    Source positions
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
+    :param bias:        Range bias terms (not used) -- implemented for consistency across solver types
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Parse inputs
+    n_dim, n_sensor = utils.safe_2d_shape(x_sensor)
+    _, n_source = utils.safe_2d_shape(x_source)
+
+    # Compute the Jacobian for Azimuth measurements
+    # Equation 6.22 and 6.23 show that the gradient with respect to sensor position is the negative of the gradient
+    # with respect to target position for both azimuth and elevation angle measurements, but resampled to be on a block
+    # diagonal.
+    _grad_x = grad_x(x_sensor, x_source, do_2d_aoa)
+
+    grad = np.zeros((n_dim*n_sensor, n_sensor, n_source))
+    for i in np.arange(n_sensor):
+        start = n_dim * i
+        end = start + n_dim
+        grad[start:end, i, :] = _grad_x[:, i, :]  # The first n_sensor columns are J_az
+
+    if do_2d_aoa:
+        grad_el = np.zeros_like(grad)
+        for i in np.arange(n_sensor):
+            start = n_dim * i
+            end = start + n_dim
+            grad_el[start:end, i, :] = _grad_x[:, n_sensor + i, :]  # The second n_sensor columns are J_el
+
+        grad = np.concatenate((grad, grad_el), axis=1)
+
+    return grad
