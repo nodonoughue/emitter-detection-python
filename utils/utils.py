@@ -572,9 +572,6 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing):
 
     n_dim = np.size(x_ctr)
 
-    if n_dim < 1 or n_dim > 3:
-        raise AttributeError('Number of spatial dimensions must be between 1 and 3')
-
     if np.size(max_offset) == 1:
         max_offset = max_offset * np.ones((n_dim, ))
 
