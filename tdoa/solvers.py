@@ -49,7 +49,7 @@ def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, eps
 
 def max_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, x_ctr, search_size,
                                epsilon=None, ref_idx=None, do_resample=False, variance_is_toa=False,
-                               do_sensor_bias=True, **kwargs):
+                               do_sensor_bias=False, **kwargs):
     """
     Construct the ML Estimate with uncertainty. Uses the utility function utils.make_uncertainty_search_space to handle
     defaults, such as the number of grid points and search size to use for sensor bias terms and sensor position
@@ -70,10 +70,12 @@ def max_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: Co
     it is in m^2
     :param do_sensor_bias: Boolean flag; if true, then sensor bias terms will be included in search
     :return x_est: Estimated source position [m]
+    :return bias_est: Estimated sensor bias [m]
+    :return sensor_pos_est: Estimated sensor positions [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions
     """
-    # TODO: Implement for triang, fdoa, and hybrid
+
     num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
 
     if variance_is_toa:
@@ -96,17 +98,17 @@ def max_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: Co
     # inputs; for compatibility with how utils.solvers.ml_solver will call it.
     def ell(theta):
         return model.log_likelihood_uncertainty(x_sensor=x_sensor, rho=rho, cov=cov,
-                                                     cov_pos=cov_pos, theta=theta, ref_idx=ref_idx,
-                                                     do_resample=False, variance_is_toa=False,
-                                                     do_sensor_bias=do_sensor_bias)
+                                                cov_pos=cov_pos, theta=theta, ref_idx=ref_idx,
+                                                do_resample=False, variance_is_toa=False,
+                                                do_sensor_bias=do_sensor_bias)
 
     # Call the util function
     th_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
                                                    **kwargs)
 
     x_est = th_est[param_indices['source_pos']]
-    bias_est = th_est[param_indices['bias']]
-    sensor_pos_est = th_est[param_indices['tdoa_pos']]
+    bias_est = th_est[param_indices['bias']] if do_sensor_bias else None
+    sensor_pos_est = np.reshape(th_est[param_indices['tdoa_pos']], (num_dim, num_sensors)) if cov_pos is not None else None
 
     return x_est, bias_est, sensor_pos_est, likelihood, x_grid
 
