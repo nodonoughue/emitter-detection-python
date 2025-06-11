@@ -68,7 +68,7 @@ def example1(do_mod_cov=False):
     plt.legend()
 
     # Gradient Descent Solution; Unconstrained
-    gd_args = {'x_sensor':x_aoa, 'psi': psi, 'cov': cov, 'x_init': x_init}
+    gd_args = {'x_sensor': x_aoa, 'psi': psi, 'cov': cov, 'x_init': x_init}
     x_gd, x_gd_full = triang.solvers.gradient_descent(**gd_args)
 
     # Gradient Descent Solution; Constrained
@@ -87,7 +87,7 @@ def example1(do_mod_cov=False):
     plt.plot(x_gd_full_const[0], x_gd_full_const[1], '--s', markevery=[-1], label='GD (Constrained')
     plt.legend()
 
-    ## Do it again with LS
+    # Do it again with LS
     x_ls, x_ls_full = triang.solvers.least_square(**gd_args)
     x_ls_const, x_ls_full_const = triang.solvers.least_square(**gd_args, **constraint_arg)
 
@@ -170,11 +170,12 @@ def example2():
             iso = tdoa.model.draw_isochrone(x1=x_tdoa[:2, ref_idx], x2=this_x[:2],
                                             range_diff=this_zeta, num_pts=101, max_ortho=40e3)
             plt.plot(iso[0], iso[1], '--k', linewidth=0.5, label=iso_label)
-            iso_label=None
+            iso_label = None
 
         # Plot GD solution
         this_ax.plot(x_gd_full[0], x_gd_full[1], x_gd_full[2], '-.s', markevery=[-1], label='GD (Unconstrained)')
-        this_ax.plot(x_gd_full_alt[0], x_gd_full_alt[1], x_gd_full_alt[2], '-.o', markevery=[-1], label='GD (Constrained)')
+        this_ax.plot(x_gd_full_alt[0], x_gd_full_alt[1], x_gd_full_alt[2], '-.o', markevery=[-1],
+                     label='GD (Constrained)')
 
         this_ax.set_xlim([-20e3, 20e3])
         this_ax.set_ylim([0e3, 50e3])
@@ -201,7 +202,7 @@ def example2():
                        [0., 0., 0., 0.],
                        [alt1, alt1, alt1, alt1]])
 
-    figs =[_ex2_inner(x_tdoa, x_init, title='Example 5.2')]
+    figs = [_ex2_inner(x_tdoa, x_init, title='Example 5.2')]
 
     # Try again with better elevation support
     alt2 = 2*alt1
@@ -210,7 +211,7 @@ def example2():
 
     # Video 5.2 modified altitude again
     alt2 = 0.5*alt1
-    alt3=0*alt1
+    alt3 = 0*alt1
     x_tdoa[2] = [alt2, alt1, alt3, alt2]
     figs.append(_ex2_inner(x_tdoa, x_init, title='Video 5.2 Version'))
 
@@ -231,7 +232,7 @@ def example3():
 
     # Set up scene
     # ref_lla = np.array([20., -150., 0.])  # deg lat, deg lon, m alt
-    x_aoa = np.zeros((3,1))               # meters, ENU
+    x_aoa = np.zeros((3, 1))               # meters, ENU
     x_tdoa = np.array([[20e3, 25e3],
                        np.zeros((2,)),
                        np.zeros((2,))])   # meters, ENU
@@ -257,11 +258,11 @@ def example3():
     cov_msmt = cov_raw.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, do_2d_aoa=True, tdoa_ref_idx=ref_idx)
 
     # CRLB Computation
-    crlb_args = {'x_source':x_tgt,
-                 'cov':cov_msmt,
-                 'x_aoa':x_aoa,
-                 'x_tdoa':x_tdoa,
-                 'do_2d_aoa':True,
+    crlb_args = {'x_source': x_tgt,
+                 'cov': cov_msmt,
+                 'x_aoa': x_aoa,
+                 'x_tdoa': x_tdoa,
+                 'do_2d_aoa': True,
                  'tdoa_ref_idx': ref_idx,
                  'do_resample': False}
     crlb_raw = hybrid.perf.compute_crlb(**crlb_args)
@@ -276,7 +277,7 @@ def example3():
     with np.printoptions(precision=0, suppress=True):
         print(crlb_fix)
 
-    ## Plot for x/y grid
+    # Plot for x/y grid
     # Initialize grid
     max_offset = int(10e3)
     num_pts = 201
@@ -311,7 +312,7 @@ def example3():
 
         # Unlike in MATLAB, contourf does not draw contour edges. Manually add contours
         hdl_contour = this_ax.contour(x_grid[0].squeeze()/1e3, x_grid[1].squeeze()/1e3, this_z.squeeze()/1e3,
-                                      levels=contour_levels,origin='lower', colors='k')
+                                      levels=contour_levels, origin='lower', colors='k')
         plt.clabel(hdl_contour, fontsize=10, colors='k')
 
         # Add a target scatterer, legend, and axis labels
@@ -357,23 +358,23 @@ def example4():
                                      lat_ref=ref_lla[0], lon_ref=ref_lla[1], alt_ref=ref_lla[2],
                                      angle_units='deg', dist_units='m'))
 
-    ## Build Constraints
+    # Build Constraints
     # Note: bounded_alt returns a list of two one-sided inequality constraints; no need to wrap it in a list
     # when passing to gradient_descent
     alt_low = 500e3
     alt_high = 600e3
     b = utils.constraints.bounded_alt(alt_min=alt_low, alt_max=alt_high, geo_type='ellipse')
 
-    ## Measurement Errors
+    # Measurement Errors
     err_aoa = 3 * _deg2rad
     cov_aoa = CovarianceMatrix(err_aoa ** 2 * np.eye(2*num_aoa))  # 2D AOA measurement covariance
 
-    ## Noisy Measurement
+    # Noisy Measurement
     z = triang.model.measurement(x_sensor=x_aoa_ecef, x_source=x_tgt_ecef, do_2d_aoa=True)
     n = cov_aoa.lower @ np.random.randn(2*num_aoa)
     zeta = z + n
 
-    ## Solvers
+    # Solvers
     init_alt = 500e3
     x_init = np.array(lla_to_ecef(lat=ref_lla[0], lon=ref_lla[1], alt=init_alt,
                                   angle_units='deg', dist_units='m'))
@@ -382,24 +383,24 @@ def example4():
     x_gd, x_gd_full = triang.solvers.gradient_descent(**gd_args)
     x_gd_bound, x_gd_bound_full = triang.solvers.gradient_descent(**gd_args, ineq_constraints=b)
 
-    ## Convert Solutions to LLA and Print
+    # Convert Solutions to LLA and Print
     x_gd_lla = np.array(ecef_to_lla(x_gd[0], x_gd[1], x_gd[2],
                                     angle_units='deg', dist_units='m'))
     print('Unconstrained Solution: {:.2f} deg N, {:.2f} deg W, {:.2f} km'.format(x_gd_lla[0],
-                                                                               np.fabs(x_gd_lla[1]),
-                                                                               x_gd_lla[2]/1e3))
+                                                                                 np.fabs(x_gd_lla[1]),
+                                                                                 x_gd_lla[2]/1e3))
     gd_err = np.linalg.norm(x_gd-x_tgt_ecef)/1e3
     print('   Error: {:.2f} km'.format(gd_err))
 
     x_gd_bound_lla = np.array(ecef_to_lla(x_gd_bound[0], x_gd_bound[1], x_gd_bound[2],
                                           angle_units='deg', dist_units='m'))
     print('Constrained Solution: {:.2f} deg N, {:.2f} deg W, {:.2f} km'.format(x_gd_bound_lla[0],
-                                                                             np.fabs(x_gd_bound_lla[1]),
-                                                                             x_gd_bound_lla[2] / 1e3))
+                                                                               np.fabs(x_gd_bound_lla[1]),
+                                                                               x_gd_bound_lla[2] / 1e3))
     gd_bound_err = np.linalg.norm(x_gd_bound - x_tgt_ecef) / 1e3
     print('   Error: {:.2f} km'.format(gd_bound_err))
 
-    ## Plot in ENU Coordinates
+    # Plot in ENU Coordinates
     x_gd_enu = np.array(ecef_to_enu(x_gd_full[0], x_gd_full[1], x_gd_full[2],
                                     lat_ref=ref_lla[0], lon_ref=ref_lla[1], alt_ref=ref_lla[2],
                                     angle_units='deg', dist_units='m'))
@@ -441,12 +442,12 @@ def example5():
     :return: figure handle to generated graphic
     """
 
-    ## Set up scenario
+    # Set up scenario
     baseline = 10e3
     num_tdoa = 4
     tdoa_angle = np.pi/6 + 2*np.pi/3 * np.arange(num_tdoa-1)
     x_tdoa = baseline * np.array([np.cos(tdoa_angle), np.sin(tdoa_angle), np.zeros_like(tdoa_angle)])
-    x_tdoa = np.concatenate((np.zeros((3,1)), x_tdoa), axis=1)  # add a sensor at the origin
+    x_tdoa = np.concatenate((np.zeros((3, 1)), x_tdoa), axis=1)  # add a sensor at the origin
 
     # Errors
     err_time = 3e-7
@@ -457,23 +458,24 @@ def example5():
 
     # Target Coordinates
     tgt_range = 100e3
-    tgt_alt = utils.unit_conversions.convert(40e3,from_unit='ft', to_unit='m')
+    tgt_alt = utils.unit_conversions.convert(40e3, from_unit='ft', to_unit='m')
     x_tgt = np.array(utils.coordinates.correct_enu(e_ground=tgt_range, n_ground=0., u_ground=tgt_alt))
 
-    ## External Prior
+    # External Prior
     x_prior = np.array(utils.coordinates.correct_enu(e_ground=95e3, n_ground=10e3, u_ground=10e3))
-    cov_prior = np.array([[5., 1., 0.],[1., 50., 0.],[0., 0., 10.]])*1e6
+    cov_prior = np.array([[5., 1., 0.], [1., 50., 0.], [0., 0., 10.]])*1e6
+
     def prior(x):
         # x is (n_dim x n_position) array of potential source positions; compute mvnpdf for each, but don't bother
         # with cross-terms
         return np.array([scipy.stats.multivariate_normal.pdf(this_x, mean=x_prior, cov=cov_prior) for this_x in x.T])
 
-    ## Measurement
+    # Measurement
     z = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_tgt, ref_idx=ref_idx)
     noise = cov_rdoa.lower @ np.random.randn(num_tdoa-1)
     zeta = z + noise
 
-    ## Solution
+    # Solution
     x_center = x_tgt
     grid_size = np.array([50e3, 50e3, 0])
     epsilon = 250
@@ -489,10 +491,12 @@ def example5():
 
     print('Solution w/o prior: {:.2f} km, {:.2f} km, {:.2f} km'.format(x_ml[0]/1e3, x_ml[1]/1e3, x_ml[2]/1e3))
     print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml-x_tgt)/1e3))
-    print('Solution w/prior: {:.2f} km, {:.2f} km, {:.2f} km'.format(x_ml_prior[0]/1e3, x_ml_prior[2]/1e3, x_ml_prior[2]/1e3))
+    print('Solution w/prior: {:.2f} km, {:.2f} km, {:.2f} km'.format(x_ml_prior[0]/1e3,
+                                                                     x_ml_prior[2]/1e3,
+                                                                     x_ml_prior[2]/1e3))
     print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml_prior - x_tgt)/1e3))
 
-    ## Plot
+    # Plot
     def _do_plot(this_ell, title, do_prior=False):
         this_fig = plt.figure()
         im = plt.imshow(this_ell, origin='lower', extent=extent, cmap='viridis', label=None, vmin=-50, vmax=0)

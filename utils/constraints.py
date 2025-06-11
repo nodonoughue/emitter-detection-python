@@ -8,6 +8,7 @@ _deg2rad = utils.unit_conversions.convert(1, 'deg', 'rad')
 # TODO: Test and Debug!!
 # TODO: Convert filterGrid.m?  Not actually used in MATLAB code.
 
+
 # **********************************************************************************************************************
 # Altitude Constraints
 # **********************************************************************************************************************
@@ -71,7 +72,7 @@ def fixed_alt(alt_val: float, geo_type: str = 'ellipse', is_upper_bound=True):
     return a, a_gradient
 
 
-def bounded_alt(geo_type: str, alt_min:float =None, alt_max:float =None):
+def bounded_alt(geo_type: str, alt_min: float = None, alt_max: float = None):
 
     bounds = list([])
 
@@ -107,7 +108,7 @@ def fixed_alt_constraint_flat(x: npt.ArrayLike, alt: float):
     epsilon = x[2] - alt
 
     # To make x valid, replace the altitude with alt
-    x_valid = x.copy()
+    x_valid = np.asarray(x).copy()
     x_valid[2] = alt
 
     return epsilon, x_valid
@@ -225,9 +226,9 @@ def fixed_alt_gradient_ellipse(x: npt.ArrayLike):
     a = utils.constants.semimajor_axis_km * 1e3
 
     # Break position into x/y/z components
-    xx = x[0]
-    yy = x[1]
-    zz = x[2]
+    xx = np.asarray(x)[0]
+    yy = np.asarray(x)[1]
+    zz = np.asarray(x)[2]
 
     # Compute geodetic latitude
     lat, _, _ = utils.coordinates.ecef_to_lla(xx, yy, zz)
@@ -262,8 +263,6 @@ def fixed_alt_gradient_ellipse(x: npt.ArrayLike):
                                    d_eps_dz[np.newaxis]), axis=0)
 
     return epsilon_grad
-
-
 
 
 # **********************************************************************************************************************
@@ -357,10 +356,11 @@ def fixed_cartesian_xyz(x: npt.ArrayLike, bound_val: float, axis: int):
     epsilon = x[axis] - bound_val
 
     # Replace the specified axis with bound_val to generate coordinates that satisfy the constraint
-    x_valid = x.copy()
+    x_valid = np.asarray(x).copy()
     x_valid[axis] = bound_val
 
     return epsilon, x_valid
+
 
 def fixed_cartesian_gradient_xyz(x: npt.ArrayLike, axis: int):
 
@@ -381,7 +381,7 @@ def fixed_cartesian_linear(x: npt.ArrayLike, x0: npt.ArrayLike, u_vec: npt.Array
 
     # Make sure the pointing vector is unit-norm and compute projection matrix
     u_vec = u_vec / np.linalg.norm(u_vec)
-    proj_matrix = np.eye(n_dim) - u_vec @ u_vec.T
+    proj_matrix = np.eye(n_dim) - np.asarray(u_vec) @ np.asarray(u_vec).T
 
     # Find the component of x-x0 that is perpendicular to u_vec
     x_ortho = proj_matrix @ (x - x0)
@@ -402,7 +402,7 @@ def fixed_cartesian_gradient_linear(x: npt.ArrayLike, x0: npt.ArrayLike, u_vec: 
 
     # Make sure the pointing vector is unit-norm and compute projection matrix
     u_vec = u_vec / np.linalg.norm(u_vec)
-    proj_matrix = np.eye(n_dim) - u_vec @ u_vec.T
+    proj_matrix = np.eye(n_dim) - np.asarray(u_vec) @ np.asarray(u_vec).T
 
     epsilon_gradient = 2 * proj_matrix @ (x - x0)
     return epsilon_gradient
@@ -454,7 +454,7 @@ def snap_to_equality_constraints(x: npt.ArrayLike, eq_constraints: list, tol: fl
     :return x_valid:        Valid x-coordinates, numpy array of size (n_dim, n)
     """
 
-    x_valid = x.copy()
+    x_valid = np.asarray(x).copy()
     for constraint in eq_constraints:
         # Apply the constraint
         this_eps, this_x_valid = constraint(x_valid)
@@ -496,7 +496,7 @@ def snap_to_inequality_constraints(x: npt.ArrayLike, ineq_constraints: list):
     :return x_valid:        Valid x-coordinates, numpy array of size (n_dim, n)
     """
 
-    x_valid = x.copy()
+    x_valid = np.asarray(x).copy()
     for constraint in ineq_constraints:
         # Apply the constraint
         this_eps, this_x_valid = constraint(x_valid)
@@ -511,7 +511,7 @@ def snap_to_inequality_constraints(x: npt.ArrayLike, ineq_constraints: list):
     return x_valid
 
 
-def constrain_likelihood(ell, eq_constraints: list=None, ineq_constraints: list=None, tol: float = 1e-6):
+def constrain_likelihood(ell, eq_constraints: list = None, ineq_constraints: list = None, tol: float = 1e-6):
     """
     Accepts a set of functions handles ell (likelihood), a (equality
     constraints), b (inequality constraints), and a tolerance to apply

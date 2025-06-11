@@ -241,15 +241,16 @@ def example3():
     return [fig]
 
 
-def example4():
+def example4(do_iterative=False):
     """
     Executes Example 6.4.
 
     Ported from MATLAB Code
 
     Nicholas O'Donoughue
-    7 April 2025
+    29 April 2025
 
+    :param do_iterative: Boolean flag; if True this example executes the modifications discussed in Video 6.2
     :return: figure handle to generated graphic
     """
 
@@ -386,10 +387,24 @@ def example4():
         print(*bias_est[:n_tdoa], sep=', ', end=') m\n')
 
     # Plot Solutions
-    figs.append(_make_plot(ell_true_plot, [x_tdoa, x_tgt, x_est_true],
+    figs.append(_make_plot(ell_plot, [x_tdoa, x_tgt, x_est_true],
                            ['Sensors', 'Target', 'ML Est.']))
-    figs.append(_make_plot(ell_true_plot, [x_tdoa, x_tgt, x_est, x_est_bias],
+    figs.append(_make_plot(ell_plot, [x_tdoa, x_tgt, x_est, x_est_bias],
                            ['Sensors', 'Target', 'ML Est.', 'ML Est. w/uncertainty']))
+
+    if do_iterative:
+        # Iterative Solvers
+        x_est_gd, x_est_gd_full, bias_est_gd = tdoa.solvers.gradient_descent()
+        x_est_ls, x_est_ls_full, bias_est_ls = tdoa.solvers.least_square()
+
+        with np.printoptions(precision=3, suppress=True):
+            print('GD Est. range bias: (', end='')
+            print(*bias_est_gd, sep=', ', end=') m\n')
+            print('LS Est. range bias: (', end='')
+            print(*bias_est_ls, sep=', ', end=') m\n')
+
+        figs.append(_make_plot(ell_plot, [x_tdoa, x_tgt, x_est_true, x_est_bias, x_est_gd, x_est_ls],
+                               ['Sensors', 'Target', 'ML Est.', 'ML Est. w/unc.', 'GD Est.', 'LS Est.']))
 
     return figs
 
@@ -401,9 +416,69 @@ def example5():
     Ported from MATLAB Code
 
     Nicholas O'Donoughue
-    7 April 2025
+    29 April 2025
 
     :return: figure handle to generated graphic
     """
+
+    # Set up sensors
+    x_tdoa = np.array([[-1, 0, 1],
+                       [0, 1, 0]])*1e3
+    x_fdoa = x_tdoa
+    v_fdoa = np.array([[0, 0, 0],
+                       [500, 500, 500]])
+
+    n_dim, n_tdoa = utils.safe_2d_shape(x_tdoa)
+    _, n_fdoa = utils.safe_2d_shape(x_fdoa)
+
+    # Generate Random Velocity Errors
+    cov_vel = CovarianceMatrix(100**2 * np.eye(n_dim * n_fdoa))
+    vel_err = np.reshape(cov_vel.lower() @ np.random.randn(n_dim*n_fdoa, 1), (n_dim, n_fdoa))
+    v_fdoa_actual = v_fdoa + vel_err
+
+    # Generate Measurements
+    x_source = np.array([-3, 4]) * 1e3
+    x_cal = np.array([-2, -1, 0, 1, 2],
+                     [-5, -5, -5, -5, -5]) * 1e3
+    _, num_cal = utils.safe_2d_shape(x_cal)
+
+    system_args = {'x_aoa': None,
+                   'x_tdoa': x_tdoa,
+                   'x_fdoa': x_fdoa,
+                   'v_fdoa': v_fdoa}
+    system_args_truth = system_args
+    system_args_truth['v_fdoa'] = v_fdoa_actual
+
+    z = hybrid.model.measurement(x_source=x_source, **system_args_truth)
+    z_cal = hybrid.model.measurement(x_source=x_cal, **system_args_truth)
+
+    # Build sensor-level covariance matrix
+    err_time = 100e-9
+    err_freq = 1
+    freq_hz = 10e9
+    lam = utils.constants.speed_of_light / freq_hz  # wavelength
+    cov_toa = CovarianceMatrix(err_time**2 * np.eye(n_tdoa))
+    cov_roa = cov_toa.multiply(utils.constants.speed_of_light**2)
+    cov_foa = CovarianceMatrix(err_freq**2 * np.eye(n_fdoa))
+    cov_rroa = cov_foa.multiply(lam**2)
+
+    cov_rdoa = cov_roa.resample()
+    cov_rrdoa = cov_rroa.resample()
+    cov_tf = CovarianceMatrix.block_diagonal(cov_rdoa, cov_rrdoa)
+
+    # Generate Noise
+    noise = cov_tf.lower() @ np.random.randn(n_tdoa+n_fdoa-2, n_cal + 1)
+    zeta = z + noise[:, 0]
+    zeta_cal = z_cal + noise[:, 1:]
+
+    # Estimate Position
+    x_init = np.array([0, 5])*1e3
+    x_est, x_est_full = hybrid.solvers.gradient_descent(zeta=zeta, cov=cov_tf, x_init=x_init, **system_args)
+    x_est_cal, x_est_cal_full, _, _ = hybrid.solvers.gradient_descent(zeta=zeta, cov=cov_tf, x_init=x_init,
+                                                                      x_cal=x_cal, zeta_cal=zeta_cal, **system_args)
+    
+    # Plot Scenario
+
+    # Bonus: FDOA-only Cal
 
     return []
