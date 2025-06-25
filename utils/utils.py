@@ -813,11 +813,11 @@ def make_uncertainty_indices(num_dim=2, num_aoa=0, num_tdoa=0, num_fdoa=0, do_2d
     return indices
 
 
-def make_uncertainty_search_space(th_center, search_size, search_resolution,
+def make_uncertainty_search_space(th_center=None, search_size=None, search_resolution=None,
                                   do_2d_aoa=False, do_aoa_bias=False, do_tdoa_bias=False, do_fdoa_bias=False,
                                   aoa_bias_search=1, tdoa_bias_search=10, fdoa_bias_search=10,
                                   sensor_pos_search=25, sensor_vel_search=10, source_pos_search=10e3,
-                                  source_vel_search=10,
+                                  source_vel_search=100,
                                   source_search_dim = 101, bias_search_dim=11, sensor_search_dim=11,
                                   x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None):
     """
@@ -837,8 +837,34 @@ def make_uncertainty_search_space(th_center, search_size, search_resolution,
     Nicholas O'Donoughue
     22 April 2025
 
-    :param
-
+    :param th_center: Starting point for search space (optional, set to None for default). If an array of length
+                      n_dim, then assumed to be center of source position search. If array of length 2*n_dim, then
+                      assumed to be center of source position and velocity search. Otherwise, must be the same length
+                      as the number of desired unknowns (source pos/vel, measurement biases, sensor pos/vel)
+    :param search_size: One-sided width of search space for each dimension (optional, set to None for default)
+    :param search_resolution: One-sided grid spacing for search space (optional, set to None for default)
+    :param do_2d_aoa: Optional; default=False
+    :param do_aoa_bias: Optional flag specifying whether AOA measurement bias is needed; default=False
+    :param do_tdoa_bias: Optional flag specifying whether TDOA measurement bias is needed; default=False
+    :param do_fdoa_bias: Optional flag specifying whether FDOA measurement bias is needed; default=False
+    :param aoa_bias_search: Optional search space for AOA biases, default=1 (deg)
+    :param tdoa_bias_search: Optional search space for TDOA biases, default=10 (m)
+    :param fdoa_bias_search: Optional search space for FDOA biases, default=10 (m/s)
+    :param sensor_pos_search: Optional search space for sensor positions errors, default=25 (m)
+    :param sensor_vel_search: Optional search space for sensor velocity errors, default=25 (m)
+    :param source_pos_search: Optional search space for source positions errors, default=10 (km)
+    :param source_vel_search: Optional search space for source velocity errors, default=100 (m/s)
+    :param source_search_dim: Optional, number of search points per dimension for source search (default=11)
+    :param bias_search_dim: Optional, number of search points per dimension for bias search (default=11)
+    :param sensor_search_dim: Optional, number of search points per dimension for sensor search (default=11)
+    :param x_aoa: Optional, nominal AOA sensor positions
+    :param x_tdoa: Optional, nominal TDOA sensor positions
+    :param x_fdoa: Optional, nominal FDOA sensor positions
+    :param v_fdoa: Optional, nominal FDOA sensor velocities
+    :return th_center: Center of search space
+    :return search_size: Size of search space
+    :return search_resolution: Resolution of search space
+    :return param_indices: dict of indices for each uncertainty parameter
 
     """
     # Look up parameter indices
@@ -967,7 +993,8 @@ def make_uncertainty_search_space(th_center, search_size, search_resolution,
     return th_center, search_size, search_resolution, param_indices
 
 
-def parse_sensor_coords(x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None):
+def parse_sensor_coords(x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, do_2d_aoa=False,
+                        tdoa_ref_idx=None, fdoa_ref_idx=None):
     n_dim1, n_aoa = utils.safe_2d_shape(x_aoa)  # returns 0, 0 if x_aoa is None
     n_dim2, n_tdoa = utils.safe_2d_shape(x_tdoa)
     n_dim3, n_fdoa = utils.safe_2d_shape(x_fdoa)
@@ -985,10 +1012,29 @@ def parse_sensor_coords(x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None):
     if x_fdoa is not None and v_fdoa is not None and not utils.is_broadcastable(x_fdoa, v_fdoa):
         raise TypeError('FDOA sensor position and velocity inputs must have matching shapes.')
 
+    # Determine the Number of Sensor Measurements
+    n_aoa_msmt = n_aoa * (2 if do_2d_aoa else 1)
+
+    if n_tdoa > 0:
+        tdoa_ref_vec, _ = parse_reference_sensor(ref_idx=tdoa_ref_idx, num_sensors=n_tdoa)
+        n_tdoa_msmt = len(tdoa_ref_vec)
+    else:
+        n_tdoa_msmt = 0
+
+    if n_fdoa > 0:
+        fdoa_ref_vec, _ = parse_reference_sensor(ref_idx=fdoa_ref_idx, num_sensors=n_fdoa)
+        n_fdoa_msmt = len(fdoa_ref_vec)
+    else:
+        n_fdoa_msmt = 0
+
     # Package Response
     sensor_coords = {'num_dim': n_dim_nonzero[0],
                      'num_aoa': n_aoa,
                      'num_tdoa': n_tdoa,
-                     'num_fdoa': n_fdoa}
+                     'num_fdoa': n_fdoa,
+                     'num_aoa_msmt': n_aoa_msmt,
+                     'num_tdoa_msmt': n_tdoa_msmt,
+                     'num_fdoa_msmt': n_fdoa_msmt}
 
     return sensor_coords
+

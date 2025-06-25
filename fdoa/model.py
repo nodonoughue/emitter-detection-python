@@ -108,14 +108,68 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     else:
         out_dims = (n_dim, num_measurements)
 
-    result = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], newshape=out_dims)
-    # result = np.delete(result, np.unique(ref_idx_vec), axis=1) # rm ref_sensor column b/c all zeros
-    # not needed when parse_ref_sensors is fixed
-    return result  # n_dim x nPair x n_source
+    result_pos = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], newshape=out_dims)
+    result_vel = np.reshape(dx_norm[:, test_idx_vec, :] - dx_norm[:, ref_idx_vec, :], newshape=out_dims)
+
+    return np.concatenate((result_pos, result_vel), axis=0)  # 2*n_dim x nPair x n_source
+
+
+def jacobian_uncertainty(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, do_bias=False, do_pos_error=False):
+    """
+    Returns the Jacobian matrix for a set of FDOA measurements in the presence of sensor
+    uncertainty, in the form of measurement bias and/or sensor position errors..
+
+    Ported from MATLAB Code
+
+    Nicholas O'Donoughue
+    30 April 2025
+
+    :param x_sensor: nDim x nTDOA array of TDOA sensor positions
+    :param x_source: nDim x n_source array of source positions
+    :param v_sensor: n_dim x n_sensor vector of sensor velocities
+    :param v_source: n_dim x n_source vector of source velocities
+    :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
+    :param do_bias: if True, jacobian includes gradient w.r.t. measurement biases
+    :param do_pos_error: if True, jacobian includes gradient w.r.t. sensor pos/vel errors
+    :return: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
+    """
+
+    # Parse inputs
+    n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_source = utils.safe_2d_shape(x_source)
+
+    if n_dim1 != n_dim2:
+        raise TypeError('Input variables must match along first dimension.')
+
+    # Make a dict with the args for all three gradient function calls
+    jacob_args = {'x_sensor': x_sensor,
+                  'x_source': x_source,
+                  'v_sensor': v_sensor,
+                  'v_source': v_source,
+                  'ref_idx': ref_idx}
+
+    # Gradient w.r.t source position
+    j_source = grad_x(**jacob_args)
+    j_list = [j_source]
+
+    # Gradient w.r.t measurement biases
+    if do_bias:
+        j_bias = grad_bias(**jacob_args)
+        j_list.append(j_bias)
+
+    # Gradient w.r.t sensor position
+    if do_pos_error:
+        j_sensor_pos = grad_sensor_pos(**jacob_args)
+        j_list.append(j_sensor_pos)
+
+    # Combine component Jacobians
+    j = np.concatenate(j_list, axis=0)
+
+    return j
 
 
 def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
-                   v_sensor=None, v_source=None, ref_idx=None, do_resample=False):
+                   v_sensor=None, v_source=None, ref_idx=None, do_resample=False, bias=None):
     """
     # Computes the Log Likelihood for FDOA sensor measurement, given the
     # received measurement vector rho_dot, covariance matrix C,
@@ -159,7 +213,7 @@ def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
         # Generate the ideal measurement matrix for this position
         r_dot = measurement(x_sensor=x_sensor, x_source=x_i,
                             v_sensor=v_sensor, v_source=v_source,
-                            ref_idx=ref_idx)
+                            ref_idx=ref_idx, bias=bias)
         
         # Evaluate the measurement error
         err = (rho_dot - r_dot)
@@ -252,6 +306,7 @@ def log_likelihood_uncertainty(x_sensor, rho_dot, cov: CovarianceMatrix, cov_pos
         # Generate the ideal measurement matrix for this position
         r_dot = measurement(x_sensor=x_sensor_i, x_source=x_i,
                             v_sensor=v_sensor_i, v_source=v_i,
+                            bias=bias_i,
                             ref_idx=ref_idx)
 
         # Evaluate the measurement error
@@ -421,7 +476,7 @@ def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
     return x_iso, y_iso
 
 
-def grad_x(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=None):
+def grad_x(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     """
     Return the gradient of FDOA measurements, with sensor uncertainties, with respect to target position, x.
     Equation 6.31. The sensor uncertainties don't impact the gradient for FDOA, so this reduces to the previously
@@ -438,7 +493,6 @@ def grad_x(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=
     :param v_sensor:    Optional FDOA sensor velocities (0 if not defined)
     :param v_source:    Optional FDOA source velocities (0 if not defined)
     :param ref_idx:     Reference index (optional)
-    :param bias:        Range-Rate bias terms (not used) -- implemented for consistency across solver types
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
     # TODO: Debug
@@ -448,7 +502,7 @@ def grad_x(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=
     return jacobian(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source, ref_idx=ref_idx)
 
 
-def grad_bias(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=None):
+def grad_bias(x_sensor, x_source, ref_idx=None):
     """
     Return the gradient of FDOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
     terms.
@@ -460,10 +514,7 @@ def grad_bias(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bi
 
     :param x_sensor:    FDOA sensor positions
     :param x_source:    Source positions
-    :param v_sensor:    Optional FDOA sensor velocities (0 if not defined)
-    :param v_source:    Optional FDOA source velocities (0 if not defined)
     :param ref_idx:     Reference index (optional)
-    :param bias:        Range-Rate bias terms (not used) -- implemented for consistency across solver types
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
     # TODO: Debug
@@ -488,7 +539,7 @@ def grad_bias(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bi
     return grad
 
 
-def grad_sensor_pos(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=None):
+def grad_sensor_pos(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     """
     Compute the gradient of FDOA measurements, with sensor uncertainties, with respect to sensor position and velocity.
 
@@ -502,7 +553,6 @@ def grad_sensor_pos(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=No
     :param v_sensor:    Optional FDOA sensor velocities (0 if not defined)
     :param v_source:    Optional FDOA source velocities (0 if not defined)
     :param ref_idx:     Reference index (optional)
-    :param bias:        Range-Rate bias terms (not used) -- implemented for consistency across solver types
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
     # TODO: Debug

@@ -144,7 +144,7 @@ def gd_solver(y,
     Ported from MATLAB code.
     
     Nicholas O'Donoughue
-    14 January 2021
+    29 April 2025
         
     :param y: Measurement vector function handle (accepts n_dim vector of source position estimate, responds with error 
               between received and modeled data vector)
@@ -202,7 +202,7 @@ def gd_solver(y,
     num_expanding_iterations = 0
     max_num_expanding_iterations = 5
     prev_error = np.inf
-    
+
     # Loop until either the desired tolerance is achieved or the maximum
     # number of iterations have occurred
     while current_iteration < (max_num_iterations-1) and (force_full_calc or error >= epsilon):
@@ -310,7 +310,7 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
 
 
 def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
-              prior=None, prior_wt: float = 0., cov_pos=None):
+              prior=None, prior_wt: float = 0.):
     """
     Execute ML estimation through brute force computational methods.
 
@@ -398,3 +398,83 @@ def bestfix(pdfs, x_ctr, search_size, epsilon):
     x_est = x_set[:, idx_pk]
 
     return x_est, result, x_grid
+
+def sensor_calibration(ell,
+                       pos_search: dict,
+                       vel_search: dict,
+                       bias_search: dict,
+                       num_iterations=1):
+    """
+    This function attempts to calibrate sensor uncertainties given a series of measurements (AOA, TDOA, and/or FDOA)
+    against a set of calibration emitters. Sensor uncertainties can take the form of unknown measurement bias or
+    position/velocity errors.
+
+    This follows the logic in Figure 6.11 of the 2022 text, loosely summarized:
+    1. Assume that the sensor positions and velocities are accurate, and estimate measurement biases.
+    2. Use the estimated measurement biases to update the sensor positions.
+    3. Use the estimated measurement biases and sensor positions to update sensor velocities.
+    4. (Optionally) Repeat Steps 1-3 num_iterations times.
+
+    Figure 6.11 shows this as a linear operation, but if the estimates are not accurate enough, repeated iterations
+    of the process may be desired. This can be achieved by calling the sensor_calibration function again with the
+    updated position and measurement bias estimates.
+
+    :param ell: function handle that accepts two inputs: (bias, x_sensor); bias being an array of measurement biases,
+                and x_sensor a 2D array of sensor positions.
+    :param pos_search: dictionary with parameters for the ML search for sensor positions
+    :param vel_search: dictionary with parameters for the ML search for sensor velocities
+    :param bias_search: dictionary with parameters for the ML search for measurement bias
+    :param num_iterations: number of times to repeat the calibration search
+    :return x_sensor_est: Estimated sensor positions
+    :return bias_est: Estimated measurement biases
+    """
+
+    # Check dictionaries
+    # pos_search, vel_search, and bias_search need to have fields 'x_ctr', 'search_size', and 'epsilon' in order to be
+    # passed to utils.solvers.maximum_likelihood as named arguments
+    _needed_fields = ['x_ctr', 'epsilon', 'search_size']
+    if pos_search is not None:
+        assert np.all([x in pos_search.keys() for x in _needed_fields]), 'pos_search dictionary missing required fields.'
+    if bias_search is not None:
+        assert np.all([x in bias_search.keys() for x in _needed_fields]), 'bias_search dictionary missing required fields.'
+    if vel_search is not None:
+        assert np.all([x in vel_search.keys() for x in _needed_fields]), 'bias_search dictionary missing required fields.'
+
+    # Initialize Outputs
+    bias_est = bias_search['x_ctr']
+    x_sensor_est = pos_search['x_ctr']
+    v_sensor_est = vel_search['x_ctr']
+
+    for _ in np.arange(num_iterations):
+
+        # ================= Estimate Measurement Bias ========================
+        if bias_search['search_size'] > 1:
+            x_sensor_vec = pos_search['x_ctr']
+            v_sensor_vec = vel_search['x_ctr']
+            def ell_bias(bias):
+                return ell(bias, x_sensor_vec, v_sensor_vec)
+
+            result = ml_solver(ell=ell_bias, *bias_search)
+            bias_est = result[0]
+            bias_search['x_ctr'] = bias_est # store result as center for next iteration
+
+        # =================== Estimate Sensor Position =========================
+        if pos_search['search_size'] > 1:
+            v_sensor_vec = vel_search['x_ctr']
+            def ell_pos(x):
+                return ell(bias_est, x, v_sensor_vec)
+
+            result = utils.solvers.ml_solver(ell=ell_pos, *pos_search)
+            x_sensor_est = result[0]
+            pos_search['x_ctr'] = x_sensor_est # store result as center for next iteration
+
+        # =================== Estimate Sensor Velocity =========================
+        if vel_search['search_size'] > 1:
+            def ell_vel(v):
+                return ell(bias_est, x_sensor_est, v)
+
+            result = utils.solvers.ml_solver(ell=ell_vel, *vel_search)
+            v_sensor_est = result[0]
+            vel_search['x_ctr'] = v_sensor_est # store result as center for next iteration
+
+    return x_sensor_est, v_sensor_est, bias_est

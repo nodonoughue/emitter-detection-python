@@ -71,6 +71,7 @@ def max_likelihood_uncertainty(zeta, cov: CovarianceMatrix, cov_pos: CovarianceM
     :param v_source: Source velocity [m/s] [assumed zero if not provided]
     :param zeta: Combined measurement vector
     :param cov: Measurement error covariance matrix
+    :param cov_pos: Sensor position error covariance matrix
     :param x_ctr: Center of search grid [m]
     :param search_size: 2-D vector of search grid sizes [m]
     :param epsilon: Desired resolution of search grid [m]
@@ -78,6 +79,9 @@ def max_likelihood_uncertainty(zeta, cov: CovarianceMatrix, cov_pos: CovarianceM
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param do_aoa_bias: Flag for AOA measurement bias
+    :param do_tdoa_bias: Flag for TDOA measurement bias
+    :param do_fdoa_bias: Flag for FDOA measurement bias
     :return x_est: Estimated source position [m]
     :return bias_est: Estimated sensor bias (dict with fields 'aoa', 'tdoa', and 'fdoa')
     :return sensor_pos_est: Estimated sensor positions (dict with fields 'aoa', 'tdoa', and 'fdoa')
@@ -106,7 +110,7 @@ def max_likelihood_uncertainty(zeta, cov: CovarianceMatrix, cov_pos: CovarianceM
                                   tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Make sure the search space is properly defined, and parse the parameter indices
-    search_params = {'th_center': x_ctr,
+    search_params = {'th_center': np.concatenate((x_ctr,v_source), axis=None) if v_source is not None else x_ctr,
                      'search_size': search_size,
                      'search_resolution': epsilon,
                      'do_aoa_bias': do_aoa_bias,

@@ -43,7 +43,6 @@ def measurement(x_sensor, x_source, do_2d_aoa=False, bias=None):
         if len(np.shape(bias)):
             n_bias = n_dim_bias
             n_dim_bias = 1
-        valid_dims = True
         if (do_2d_aoa and n_dim_bias != 2) or (not do_2d_aoa and n_dim_bias != 1) or n_bias != n_sensor:
             raise TypeError('Angle bias dimensions must match number of sensor measurements to make.')
 
@@ -157,8 +156,50 @@ def jacobian(x_sensor, x_source, do_2d_aoa=False):
 
     return j
 
+def jacobian_uncertainty(x_sensor, x_source, do_2d_aoa=False, do_bias=False, do_pos_error=False):
+    """
+    Returns the Jacobian matrix for a set of AOA measurements in the presence of sensor
+    uncertainty, in the form of measurement bias and/or sensor position errors.
 
-def log_likelihood(x_aoa, psi, cov: CovarianceMatrix, x_source, do_2d_aoa=False):
+    Ported from MATLAB Code
+
+    Nicholas O'Donoughue
+    30 April 2025
+
+    :param x_sensor: nDim x n_sensor array of sensor positions
+    :param x_source: nDim x n_source array of source positions
+    :param do_bias: if True, jacobian includes gradient w.r.t. measurement biases
+    :param do_pos_error: if True, jacobian includes gradient w.r.t. sensor pos/vel errors
+    :return: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
+    """
+
+    # Parse inputs
+    n_dim1, _ = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_source = utils.safe_2d_shape(x_source)
+
+    if n_dim1 != n_dim2:
+        raise TypeError('Input variables must match along first dimension.')
+
+    # Gradient w.r.t source position
+    j_source = grad_x(x_sensor, x_source, do_2d_aoa)
+    j_list = [j_source]
+
+    # Gradient w.r.t measurement biases
+    if do_bias:
+        j_bias = grad_bias(x_sensor, x_source, do_2d_aoa)
+        j_list.append(j_bias)
+
+    # Gradient w.r.t sensor position
+    if do_pos_error:
+        j_sensor_pos = grad_sensor_pos(x_sensor, x_source, do_2d_aoa)
+        j_list.append(j_sensor_pos)
+
+    # Combine component Jacobians
+    j = np.concatenate(j_list, axis=0)
+
+    return j
+
+def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=False, bias=None):
     """
     Computes the Log Likelihood for AOA sensor measurement, given the
     received measurement vector psi, covariance matrix cov,
@@ -173,8 +214,8 @@ def log_likelihood(x_aoa, psi, cov: CovarianceMatrix, x_source, do_2d_aoa=False)
     Nicholas O'Donoughue
     5 September 2021
 
-    :param x_aoa: Sensor positions [m]
-    :param psi: AOA measurement vector
+    :param x_sensor: Sensor positions [m]
+    :param zeta: AOA measurement vector
     :param cov: AOA measurement error covariance matrix; object of the CovarianceMatrix class
     :param x_source: Candidate source positions
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
@@ -182,7 +223,7 @@ def log_likelihood(x_aoa, psi, cov: CovarianceMatrix, x_source, do_2d_aoa=False)
     """
 
     # Parse inputs
-    n_dim1, n_sensor = utils.safe_2d_shape(x_aoa)
+    n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
     n_dim2, n_source_pos = utils.safe_2d_shape(x_source)
 
     if n_dim1 != n_dim2:
@@ -198,10 +239,10 @@ def log_likelihood(x_aoa, psi, cov: CovarianceMatrix, x_source, do_2d_aoa=False)
         x_i = x_source[:, idx_source]
 
         # Generate the ideal measurement matrix for this position
-        this_psi = measurement(x_aoa, x_i, do_2d_aoa)
+        this_psi = measurement(x_sensor, x_i, do_2d_aoa, bias=bias)
 
         # Evaluate the measurement error
-        err = utils.modulo2pi(psi - this_psi)
+        err = utils.modulo2pi(zeta - this_psi)
 
         # Compute the scaled log likelihood
         ell[idx_source] = - cov.solve_aca(err)
@@ -209,7 +250,7 @@ def log_likelihood(x_aoa, psi, cov: CovarianceMatrix, x_source, do_2d_aoa=False)
     return ell
 
 
-def log_likelihood_uncertainty(x_aoa, psi, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, theta, do_2d_aoa=False,
+def log_likelihood_uncertainty(x_sensor, zeta, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, theta, do_2d_aoa=False,
                                do_sensor_bias=False):
     """
     Computes the Log Likelihood for AOA sensor measurement, given the
@@ -227,8 +268,8 @@ def log_likelihood_uncertainty(x_aoa, psi, cov: CovarianceMatrix, cov_pos: Covar
     Nicholas O'Donoughue
     29 April 2025
 
-    :param x_aoa: Sensor positions [m]
-    :param psi: AOA measurement vector
+    :param x_sensor: Sensor positions [m]
+    :param zeta: AOA measurement vector
     :param cov: AOA measurement error covariance matrix; object of the CovarianceMatrix class
     :param cov_pos: sensor position error covariance matrix (if set to None, then sensor position error is ignored)
     :param theta: Candidate source positions
@@ -239,7 +280,7 @@ def log_likelihood_uncertainty(x_aoa, psi, cov: CovarianceMatrix, cov_pos: Covar
     # TODO: Test
 
     # Parse inputs
-    n_dim, n_sensor = utils.safe_2d_shape(x_aoa)
+    n_dim, n_sensor = utils.safe_2d_shape(x_sensor)
     _, n_source_pos = utils.safe_2d_shape(theta)
 
     # Make sure the source pos is a matrix, rather than simply a vector
@@ -257,7 +298,7 @@ def log_likelihood_uncertainty(x_aoa, psi, cov: CovarianceMatrix, cov_pos: Covar
     parameter_indices = utils.make_uncertainty_indices(num_dim=n_dim, num_aoa=n_sensor,
                                                        do_aoa_bias=do_sensor_bias,
                                                        do_aoa_pos_error=do_pos_error)
-    beta = x_aoa.ravel()  # Assume the x_aoa positions provided are truth.
+    beta = x_sensor.ravel()  # Assume the x_aoa positions provided are truth.
 
     for idx_source, th_i in enumerate(theta.T):
         # Parse the parameter vector to grab the assumed target position, sensor measurement
@@ -272,13 +313,13 @@ def log_likelihood_uncertainty(x_aoa, psi, cov: CovarianceMatrix, cov_pos: Covar
             x_aoa_i = np.reshape(beta_i, (n_dim, n_sensor))
         else:
             beta_i = beta
-            x_aoa_i = x_aoa
+            x_aoa_i = x_sensor
 
         # Generate the ideal measurement matrix for this position
         this_psi = measurement(x_sensor=x_aoa_i, x_source=x_i, do_2d_aoa=do_2d_aoa, bias=bias_i)
 
         # Evaluate the measurement error
-        err = utils.modulo2pi(psi - this_psi)
+        err = utils.modulo2pi(zeta - this_psi)
         err_pos = beta - beta_i
 
         # Compute the scaled log likelihood
@@ -351,6 +392,7 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, do_2d_aoa=F
 
 
 def draw_lob(x_sensor, psi, x_source=None, scale=1):
+    # TODO: Expand for 3D LOBs
     _, num_sensors = utils.safe_2d_shape(x_sensor)
     num_measurements = np.size(psi)
 
@@ -382,7 +424,7 @@ def draw_lob(x_sensor, psi, x_source=None, scale=1):
     return xy_lob
 
 
-def grad_x(x_sensor, x_source, do_2d_aoa=False, bias=None):
+def grad_x(x_sensor, x_source, do_2d_aoa=False):
     """
     Return the gradient of AOA measurements, with sensor uncertainties, with respect to target position, x.
     Equation 6.16. The sensor uncertainties don't impact the gradient for AOA, so this reduces to the previously
@@ -397,7 +439,6 @@ def grad_x(x_sensor, x_source, do_2d_aoa=False, bias=None):
     :param x_sensor:    AOA sensor positions
     :param x_source:    Source positions
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
-    :param bias:        Angle bias terms (not used) -- implemented for consistency across solver types
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
     # TODO: Debug
@@ -407,7 +448,7 @@ def grad_x(x_sensor, x_source, do_2d_aoa=False, bias=None):
     return jacobian(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=do_2d_aoa)
 
 
-def grad_bias(x_sensor, x_source, do_2d_aoa=False, bias=None):
+def grad_bias(x_sensor, x_source, do_2d_aoa=False):
     """
     Return the gradient of AOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
     terms, from equation 6.24.
@@ -420,7 +461,6 @@ def grad_bias(x_sensor, x_source, do_2d_aoa=False, bias=None):
     :param x_sensor:    TDOA sensor positions
     :param x_source:    Source positions
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
-    :param bias:        Range bias terms (not used) -- implemented for consistency across solver types
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
     # TODO: Debug
@@ -442,7 +482,7 @@ def grad_bias(x_sensor, x_source, do_2d_aoa=False, bias=None):
     return grad
 
 
-def grad_sensor_pos(x_sensor, x_source, do_2d_aoa=False, bias=None):
+def grad_sensor_pos(x_sensor, x_source, do_2d_aoa=False):
     """
     Compute the gradient of TDOA measurements, with sensor uncertainties, with respect to sensor position,
     equation 6.21.
@@ -455,7 +495,6 @@ def grad_sensor_pos(x_sensor, x_source, do_2d_aoa=False, bias=None):
     :param x_sensor:    TDOA sensor positions
     :param x_source:    Source positions
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
-    :param bias:        Range bias terms (not used) -- implemented for consistency across solver types
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
     # TODO: Debug

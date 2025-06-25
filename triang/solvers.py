@@ -82,7 +82,7 @@ def max_likelihood_uncertainty(x_sensor, psi, cov: CovarianceMatrix, cov_pos: Co
 
     # Set up function handle
     def ell(theta):
-        return model.log_likelihood_uncertainty(x_aoa=x_sensor, psi=psi, cov=cov, cov_pos=cov_pos, theta=theta,
+        return model.log_likelihood_uncertainty(x_sensor=x_sensor, zeta=psi, cov=cov, cov_pos=cov_pos, theta=theta,
                                                 do_2d_aoa=do_2d_aoa, do_sensor_bias=do_sensor_bias)
 
     # Call the util function

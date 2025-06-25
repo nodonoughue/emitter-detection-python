@@ -110,11 +110,61 @@ def jacobian(x_sensor, x_source, ref_idx=None):
     return j
 
 
-def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None, do_resample=False,
-                   variance_is_toa=True):
+def jacobian_uncertainty(x_sensor, x_source, ref_idx=None, do_bias=False, do_pos_error=False):
+    """
+    Returns the Jacobian matrix for a set of TDOA measurements in the presence of sensor
+    uncertainty, in the form of measurement bias and/or sensor position errors..
+
+    Ported from MATLAB Code
+
+    Nicholas O'Donoughue
+    30 April 2025
+
+    :param x_sensor: nDim x nTDOA array of TDOA sensor positions
+    :param x_source: nDim x n_source array of source positions
+    :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
+    :param do_bias: if True, jacobian includes gradient w.r.t. measurement biases
+    :param do_pos_error: if True, jacobian includes gradient w.r.t. sensor pos/vel errors
+    :return: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
+    """
+
+    # Parse inputs
+    n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_source = utils.safe_2d_shape(x_source)
+
+    if n_dim1 != n_dim2:
+        raise TypeError('Input variables must match along first dimension.')
+
+    # Make a dict with the args for all three gradient function calls
+    jacob_args = {'x_sensor': x_sensor,
+                  'x_source': x_source,
+                  'ref_idx': ref_idx}
+
+    # Gradient w.r.t source position
+    j_source = grad_x(**jacob_args)
+    j_list = [j_source]
+
+    # Gradient w.r.t measurement biases
+    if do_bias:
+        j_bias = grad_bias(**jacob_args)
+        j_list.append(j_bias)
+
+    # Gradient w.r.t sensor position
+    if do_pos_error:
+        j_sensor_pos = grad_sensor_pos(**jacob_args)
+        j_list.append(j_sensor_pos)
+
+    # Combine component Jacobians
+    j = np.concatenate(j_list, axis=0)
+
+    return j
+
+
+def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, ref_idx=None, do_resample=False,
+                   variance_is_toa=True, bias=None):
     """
     Computes the Log Likelihood for TDOA sensor measurement, given the received range difference measurement vector
-    rho, covariance matrix cov, and set of candidate source positions x_source.
+    zeta, covariance matrix cov, and set of candidate source positions x_source.
 
     Ported from MATLAB Code.
 
@@ -122,13 +172,14 @@ def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None,
     11 March 2021
 
     :param x_sensor: nDim x nTDOA array of TDOA sensor positions
-    :param rho: Combined TDOA measurement vector (range difference)
+    :param zeta: Combined TDOA measurement vector (range difference)
     :param cov: measurement error covariance matrix
     :param x_source: Candidate source positions
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
     it is in m^2
+    :param bias: sensor measurement biases
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -151,10 +202,10 @@ def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None,
 
     for idx_source, x_i in enumerate(x_source.T):
         # Generate the ideal measurement matrix for this position
-        rho_dot = measurement(x_sensor=x_sensor, x_source=x_i, ref_idx=ref_idx)
+        rho = measurement(x_sensor=x_sensor, x_source=x_i, ref_idx=ref_idx, bias=bias)
 
         # Evaluate the measurement error
-        err = rho - rho_dot
+        err = zeta - rho
 
         # Compute the scaled log likelihood
         ell[idx_source] = - cov.solve_aca(err)
@@ -162,7 +213,7 @@ def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None,
     return ell
 
 
-def log_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, theta, ref_idx=None,
+def log_likelihood_uncertainty(x_sensor, zeta, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, theta, ref_idx=None,
                                do_resample=False, variance_is_toa=True, do_sensor_bias=False):
     """
     Compute log likelihood for TDOA measurements with uncertainty. The unknown parameter vector takes the form:
@@ -175,7 +226,7 @@ def log_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: Co
     21 April 2025
 
     :param x_sensor: nDim x nTDOA array of TDOA sensor positions
-    :param rho: Combined TDOA measurement vector (range difference)
+    :param zeta: Combined TDOA measurement vector (range difference)
     :param cov: measurement error covariance matrix
     :param cov_pos: sensor position error covariance matrix (if set to None, then sensor position error is ignored)
     :param theta: Candidate parameter vectors
@@ -229,10 +280,10 @@ def log_likelihood_uncertainty(x_sensor, rho, cov: CovarianceMatrix, cov_pos: Co
             x_sensor_i = x_sensor
 
         # Generate the ideal measurement matrix for this position
-        rho_dot = measurement(x_sensor=x_sensor_i, x_source=x_i, ref_idx=ref_idx, bias=bias_i)
+        rho = measurement(x_sensor=x_sensor_i, x_source=x_i, ref_idx=ref_idx, bias=bias_i)
 
         # Evaluate the measurement error
-        err = rho - rho_dot
+        err = zeta - rho
         err_pos = beta - beta_i
 
         # Compute the scaled log likelihood
@@ -436,7 +487,7 @@ def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
     return x_iso, y_iso
 
 
-def grad_x(x_sensor, x_source, ref_idx=None, bias=None):
+def grad_x(x_sensor, x_source, ref_idx=None):
     """
     Return the gradient of TDOA measurements, with sensor uncertainties, with respect to target position, x.
     Equation 6.27. The sensor uncertainties don't impact the gradient for TDOA, so this reduces to the previously
@@ -451,7 +502,6 @@ def grad_x(x_sensor, x_source, ref_idx=None, bias=None):
     :param x_sensor:    TDOA sensor positions
     :param x_source:    Source positions
     :param ref_idx:     Reference index (optional)
-    :param bias:        Range bias terms (not used) -- implemented for consistency across solver types
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
     # TODO: Debug
@@ -461,7 +511,7 @@ def grad_x(x_sensor, x_source, ref_idx=None, bias=None):
     return jacobian(x_sensor=x_sensor, x_source=x_source, ref_idx=ref_idx)
 
 
-def grad_bias(x_sensor, x_source, ref_idx=None, bias=None):
+def grad_bias(x_sensor, x_source, ref_idx=None):
     """
     Return the gradient of TDOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
     terms, from equation 6.31.
@@ -474,7 +524,6 @@ def grad_bias(x_sensor, x_source, ref_idx=None, bias=None):
     :param x_sensor:    TDOA sensor positions
     :param x_source:    Source positions
     :param ref_idx:     Reference index (optional)
-    :param bias:        Range bias terms (not used) -- implemented for consistency across solver types
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
     # TODO: Debug
@@ -499,7 +548,7 @@ def grad_bias(x_sensor, x_source, ref_idx=None, bias=None):
     return grad
 
 
-def grad_sensor_pos(x_sensor, x_source, ref_idx=None, bias=None):
+def grad_sensor_pos(x_sensor, x_source, ref_idx=None):
     """
     Compute the gradient of TDOA measurements, with sensor uncertainties, with respect to sensor position,
     equation 6.31.
@@ -512,7 +561,6 @@ def grad_sensor_pos(x_sensor, x_source, ref_idx=None, bias=None):
     :param x_sensor:    TDOA sensor positions
     :param x_source:    Source positions
     :param ref_idx:     Reference index (optional)
-    :param bias:        Range bias terms (not used) -- implemented for consistency across solver types
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
     # TODO: Debug
