@@ -34,11 +34,11 @@ def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, 
 
     # Compute distance from each source position to each sensor
     dx = np.reshape(x_source, (n_dim, 1, n_source)) - np.reshape(x_sensor, (n_dim, n_sensor, 1))
-    r = np.sqrt(np.sum(dx**2, axis=0))  # 1 x nSensor1 x n_source1
+    r = np.sqrt(np.sum(dx**2, axis=0, keepdims=True))  # 1 x nSensor1 x n_source1
     
     # Compute range rate from range and velocity
     dv = np.reshape(v_sensor, (n_dim, n_sensor, 1)) - np.reshape(v_source, (n_dim, 1, n_source))
-    rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor, n_source)) + bias  # nSensor x n_source
+    rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor, n_source)) + rrdoa_bias  # nSensor x n_source
     
     # Apply reference sensors to compute range rate difference for each sensor
     # pair
@@ -209,10 +209,11 @@ def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
 
     for idx_source in np.arange(n_source):
         x_i = x_source[:, idx_source]
-        
+        v_i = v_source[:, idx_source]
+
         # Generate the ideal measurement matrix for this position
         r_dot = measurement(x_sensor=x_sensor, x_source=x_i,
-                            v_sensor=v_sensor, v_source=v_source,
+                            v_sensor=v_sensor, v_source=v_i,
                             ref_idx=ref_idx, bias=bias)
         
         # Evaluate the measurement error
@@ -627,9 +628,5 @@ def _check_inputs(x_source, v_source, x_sensor, v_sensor):
 
     n_sensor = np.amax((n_sensor1, n_sensor2))
     n_source = np.amax((n_source1, n_source2))
-
-    # Handle any nones (make them zeros of the appropriate size)
-    if v_source is None: v_source = np.zeros_like(x_source)
-    if v_sensor is None: v_sensor = np.zeros_like(x_sensor)
 
     return n_dim1, n_source, n_sensor, v_source, v_sensor

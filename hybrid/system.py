@@ -2,13 +2,14 @@ import numpy as np
 from scipy.linalg import block_diag
 
 import utils
-from utils.system import PassiveSurveillanceSystem
+from utils.system import DifferencePSS
+from utils.covariance import CovarianceMatrix
 from triang import DirectionFinder
 from tdoa import TDOAPassiveSurveillanceSystem
 from fdoa import FDOAPassiveSurveillanceSystem
 
 
-class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
+class HybridPassiveSurveillanceSystem(DifferencePSS):
     bias = None
     aoa: DirectionFinder or None = None
     tdoa: TDOAPassiveSurveillanceSystem or None = None
@@ -30,29 +31,37 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
     tdoa_measurement_idx = None
     fdoa_measurement_idx = None
 
-    def __init__(self, cov=None, aoa_pss=None, tdoa_pss=None, fdoa_pss=None, **kwargs):
+    def __init__(self, cov=None, aoa_pss=None, tdoa_pss=None, fdoa_pss=None, ref_idx=None, do_resample=False, **kwargs):
         # Parse the provided sensor types
-        x = np.array([])
+        x_arr = []
         if aoa_pss is not None:
-            x = np.concatenate((x, aoa_pss.pos), axis=1)
+            x_arr.append(aoa_pss.pos)
             self.aoa = aoa_pss
             self.num_aoa_sensors = self.aoa.num_sensors
             self.num_aoa_measurements = self.aoa.num_measurements
 
         if tdoa_pss is not None:
-            x = np.concatenate((x, tdoa_pss.pos), axis=1)
+            x_arr.append(tdoa_pss.pos)
             self.tdoa = tdoa_pss
             self.num_tdoa_sensors = self.tdoa.num_sensors
             self.num_tdoa_measurements = self.tdoa.num_measurements
 
         if fdoa_pss is not None:
-            x = np.concatenate((x, fdoa_pss.pos), axis=1)
+            x_arr.append(fdoa_pss.pos)
             self.fdoa = fdoa_pss
             self.num_fdoa_sensors = self.fdoa.num_sensors
             self.num_fdoa_measurements = self.fdoa.num_measurements
 
+        x = np.concatenate(x_arr, axis=1)
+
+        if ref_idx is None:
+            ref_idx = self.parse_reference_indices()
+
+        if cov is None:
+            cov = self.parse_covariance_matrix()
+
         # Initiate the superclass
-        super().__init__(x, cov, **kwargs)
+        super().__init__(x, cov, ref_idx, **kwargs)
 
         # Overwrite the numbers of sensors/measurements and generate indices for referencing
         # from combined position, measurement, and covariance matrices.
@@ -77,13 +86,13 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
             if pss is None: continue
 
             # Add defaults from this PSS
-            bias_search_epsilon.append([pss.bias_search_epsilon] * pss.num_measurements)
-            bias_search_size.append([pss.bias_search_size] * pss.num_measurements)
-            sensor_pos_search_epsilon.append([pss.sensor_pos_search_epsilon] * pss.num_sensors * self.num_dim)
-            sensor_pos_search_size.append([pss.sensor_pos_search_size] * pss.num_sensors * self.num_dim)
+            bias_search_epsilon.append([pss.default_bias_search_epsilon] * pss.num_measurements)
+            bias_search_size.append([pss.default_bias_search_size] * pss.num_measurements)
+            sensor_pos_search_epsilon.append([pss.default_sensor_pos_search_epsilon] * pss.num_sensors * self.num_dim)
+            sensor_pos_search_size.append([pss.default_sensor_pos_search_size] * pss.num_sensors * self.num_dim)
         if self.fdoa is not None:
-            sensor_vel_search_epsilon.append([self.fdoa.sensor_vel_search_epsilon] * self.num_fdoa_sensors * self.num_dim)
-            sensor_vel_search_size.append([self.fdoa.sensor_vel_search_size] * self.num_fdoa_sensors * self.num_dim)
+            sensor_vel_search_epsilon.append([self.fdoa.default_sensor_vel_search_epsilon] * self.num_fdoa_sensors * self.num_dim)
+            sensor_vel_search_size.append([self.fdoa.default_sensor_vel_search_size] * self.num_fdoa_sensors * self.num_dim)
 
         self._bias_search_epsilon = np.concatenate(bias_search_epsilon, axis=None)
         self._bias_search_size = np.concatenate(bias_search_size, axis=None)
@@ -92,8 +101,7 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
         self._sensor_vel_search_epsilon = np.concatenate(sensor_vel_search_epsilon, axis=None)
         self._sensor_vel_search_size = np.concatenate(sensor_vel_search_size, axis=None)
 
-        # Check the covariance matrix and resample, if needed
-        self.check_covariance_matrix()
+        return
 
     ## ============================================================================================================== ##
     ## Model Methods
@@ -188,6 +196,8 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
         x_aoa, x_tdoa, x_fdoa = self.parse_sensor_data(x_sensor)
         _, _, v_fdoa = self.parse_sensor_data(v_sensor, vel_input=True)
         b_aoa, b_tdoa, b_fdoa = self.parse_measurement_data(bias)
+        z_aoa, z_tdoa, z_fdoa = self.parse_measurement_data(zeta)
+
         # Parse source position and velocity
         if v_source is None:
             # It might be passed as a single input under x_source with 2*num_dim rows
@@ -195,12 +205,12 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
 
         result = 0
         if self.aoa is not None:
-            result = result + self.aoa.likelihood(x_source=x_source, zeta=zeta, x_sensor=x_aoa, bias=b_aoa)
+            result = result + self.aoa.log_likelihood(x_source=x_source, zeta=z_aoa, x_sensor=x_aoa, bias=b_aoa)
         if self.tdoa is not None:
-            result = result + self.tdoa.likelihood(x_source=x_source, zeta=zeta, x_sensor=x_tdoa, bias=b_tdoa)
+            result = result + self.tdoa.log_likelihood(x_source=x_source, zeta=z_tdoa, x_sensor=x_tdoa, bias=b_tdoa)
         if self.fdoa is not None:
-            result = result + self.fdoa.likelihood(x_source=x_source, zeta=zeta, x_sensor=x_fdoa,
-                                                  v_sensor=v_fdoa, v_source=v_source, bias=b_fdoa)
+            result = result + self.fdoa.log_likelihood(x_source=x_source, zeta=z_fdoa, x_sensor=x_fdoa,
+                                                       v_sensor=v_fdoa, v_source=v_source, bias=b_fdoa)
 
         return result
 
@@ -277,9 +287,12 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
     ##
     ## These methods handle the interface to solvers
     ## ============================================================================================================== ##
-    def max_likelihood(self, zeta, x_ctr, search_size, epsilon=None, cal_data: dict=None, **kwargs):
+    def max_likelihood(self, zeta, x_ctr, search_size, epsilon=None, cal_data:dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         # Likelihood function for ML Solvers
         def ell(pos_vel):
@@ -333,7 +346,10 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
 
     def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         # Initialize measurement error and jacobian functions
         def y(pos_vel):
@@ -343,7 +359,11 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
 
         def this_jacobian(pos_vel):
             this_pos, this_vel = self.parse_source_pos_vel(pos_vel)
-            return self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
+            n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
+            j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
+            # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
+            # excise just the position portion
+            return j[:n_dim]
 
         # Call generic Gradient Descent solver
         x_est, x_full = utils.solvers.gd_solver(y=y, jacobian=this_jacobian, cov=self.cov, x_init=x_init, **kwargs)
@@ -353,7 +373,10 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
 
     def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         # Initialize measurement error and jacobian functions
         def y(pos_vel):
@@ -363,7 +386,11 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
 
         def this_jacobian(pos_vel):
             this_pos, this_vel = self.parse_source_pos_vel(pos_vel)
-            return self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
+            n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
+            j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
+            # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
+            # excise just the position portion
+            return j[:n_dim]
 
         # Call generic Gradient Descent solver
         x_est, x_full = utils.solvers.ls_solver(zeta=y, jacobian=this_jacobian, cov=self.cov, x_init=x_init, **kwargs)
@@ -428,64 +455,67 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
     ##
     ## These are generic utility functions that are unique to this class
     ## ============================================================================================================== ##
-    def check_covariance_matrix(self):
-        if self.cov is None:
-            # Build it from the components
-            cov_components = []
-            if self.aoa is not None: cov_components.append(self.aoa.cov)
-            if self.tdoa is not None: cov_components.append(self.tdoa.cov)
-            if self.fdoa is not None: cov_components.append(self.fdoa.cov)
-        elif self.cov.cov.shape[0] == self.num_sensors:
-            # The covariance matrix is the same size as the number of sensors; it needs to be resampled
-            cov_tmp = self.cov
+    def parse_reference_indices(self):
+        # Intuit reference indices from the components
 
-            # First, we generate the test and reference index vectors
-            if self.num_aoa_sensors > 0:
-                test_idx_vec_aoa = np.arange(self.aoa.num_measurements)  # Use num_measurements -- it might be 2 per sensor
-                ref_idx_vec_aoa = np.nan * np.ones((self.aoa.num_measurements,))
-            else:
-                test_idx_vec_aoa = np.array([])
-                ref_idx_vec_aoa = np.array([])
-            if self.num_tdoa_sensors > 0:
-                test_idx_vec_tdoa, ref_idx_vec_tdoa = utils.parse_reference_sensor(self.tdoa.ref_idx,
-                                                                                   self.num_tdoa_sensors)
-            else:
-                test_idx_vec_tdoa = np.array([])
-                ref_idx_vec_tdoa = np.array([])
-            if self.num_fdoa_sensors > 0:
-                test_idx_vec_fdoa, ref_idx_vec_fdoa = utils.parse_reference_sensor(self.fdoa.ref_idx,
-                                                                                   self.num_fdoa_sensors)
-            else:
-                test_idx_vec_fdoa = np.array([])
-                ref_idx_vec_fdoa = np.array([])
+        # First, we generate the test and reference index vectors
+        test_idx_vec_aoa = np.arange(self.num_aoa_sensors)
+        ref_idx_vec_aoa = np.nan * np.ones((self.num_aoa_sensors,))
 
-            # Second, we assemble them into a single vector
-            test_idx_vec = np.concatenate((test_idx_vec_aoa,
-                                           self.aoa.num_measurements + test_idx_vec_tdoa,
-                                           self.aoa.num_measurements + self.num_tdoa_sensors + test_idx_vec_fdoa),
-                                          axis=0)
-            ref_idx_vec = np.concatenate((ref_idx_vec_aoa,
-                                          self.aoa.num_measurements + ref_idx_vec_tdoa,
-                                          self.aoa.num_measurements + self.num_tdoa_sensors + ref_idx_vec_fdoa),
-                                         axis=0)
-
-            # Finally, call the generic resampler and return the result
-            new_cov = cov_tmp.resample(test_idx_vec=test_idx_vec, ref_idx_vec=ref_idx_vec)
-
-            self.cov = new_cov
-        elif self.cov.cov.shape[0] == self.num_measurements:
-            # Nothing to do, the covariance matrix is the expected size
-            pass
+        if self.tdoa is not None:
+            test_idx_vec_tdoa, ref_idx_vec_tdoa = utils.parse_reference_sensor(self.tdoa.ref_idx, self.num_tdoa_sensors)
         else:
-            # Raise an error
-            raise ValueError("Unable to parse the covariance matrix; unexpected size.")
+            test_idx_vec_tdoa = np.array([])
+            ref_idx_vec_tdoa = np.array([])
+
+        if self.fdoa is not None:
+            test_idx_vec_fdoa, ref_idx_vec_fdoa = utils.parse_reference_sensor(self.fdoa.ref_idx, self.num_fdoa_sensors)
+        else:
+            test_idx_vec_fdoa = np.array([])
+            ref_idx_vec_fdoa = np.array([])
+
+        # Second, we assemble them into a single vector
+        test_idx_vec = np.concatenate((test_idx_vec_aoa,
+                                       self.num_aoa_sensors + test_idx_vec_tdoa,
+                                       self.num_aoa_sensors + self.num_tdoa_sensors + test_idx_vec_fdoa), axis=0)
+        ref_idx_vec = np.concatenate((ref_idx_vec_aoa,
+                                      self.num_aoa_sensors + ref_idx_vec_tdoa,
+                                      self.num_aoa_sensors + self.num_tdoa_sensors + ref_idx_vec_fdoa), axis=0)
+
+        ref_idx = np.array([test_idx_vec, ref_idx_vec]) # store in object's field
+        return ref_idx # return as well
+
+    def update_reference_indices(self):
+        self.ref_idx = self.parse_reference_indices()
+
+    def parse_covariance_matrix(self):
+        # Pull the covariance matrix from the components; we need the unresampled version because
+        # when we set it we will resample it.
+        # ToDo: if self.cov is not None, raise a warning that this will overwrite the current covariance matrix
+
+        to_concat = []
+        if self.aoa is not None:
+            to_concat.append(self.aoa.cov)
+
+        if self.tdoa is not None:
+            to_concat.append(self.tdoa.cov_raw)
+
+        if self.fdoa is not None:
+            to_concat.append(self.fdoa.cov_raw)
+
+        new_cov = CovarianceMatrix.block_diagonal(*to_concat)
+
+        return new_cov
+
+    def update_covariance_matrix(self):
+        self.cov = self.parse_covariance_matrix()
         return
 
     def parse_sensor_data(self, data, vel_input=False):
-        # Split apart a vector of sensor data, must have length equal to self.num_sensors
-        assert len(data) == self.num_sensors or (vel_input and len(data)==self.num_fdoa_sensors), "Unable to parse sensor data; unexpected size."
-
         if data is not None:
+            # Split apart a vector of sensor data, must have length equal to self.num_sensors
+            assert len(data) == self.num_sensors or (vel_input and len(data)==self.num_fdoa_sensors), "Unable to parse sensor data; unexpected size."
+
             # Parse the AOA, TDOA, and FDOA sensor indices
             data_aoa = data[self.aoa_sensor_idx]
             data_tdoa = data[self.tdoa_sensor_idx]
@@ -498,10 +528,10 @@ class HybridPassiveSurveillanceSystem(PassiveSurveillanceSystem):
         return data_aoa, data_tdoa, data_fdoa
 
     def parse_measurement_data(self, data):
-        # Split apart a vector of measurement data, must have length equal to self.num_measurements
-        assert len(data) == self.num_measurements, "Unable to parse sensor data; unexpected size."
-
         if data is not None:
+            # Split apart a vector of measurement data, must have length equal to self.num_measurements
+            assert len(data) == self.num_measurements, "Unable to parse sensor data; unexpected size."
+
             # Parse the AOA, TDOA, and FDOA sensor indices
             data_aoa = data[self.aoa_measurement_idx]
             data_tdoa = data[self.tdoa_measurement_idx]

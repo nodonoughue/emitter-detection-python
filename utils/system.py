@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import utils
 from utils.covariance import CovarianceMatrix
+import matplotlib.pyplot as plt
 
 
 class PassiveSurveillanceSystem(ABC):
@@ -25,6 +26,7 @@ class PassiveSurveillanceSystem(ABC):
     default_sensor_vel_search_size = 0  # By default, we can't search across sensor velocity
 
     def __init__(self, x: np.ndarray, cov: CovarianceMatrix, bias=None, cov_pos=None, vel=None):
+        if len(np.shape(x))==0: x = np.expand_dims(x, 1) # Add a second dimension, if there isn't one
         self.pos = x
         self.cov = cov
 
@@ -45,7 +47,7 @@ class PassiveSurveillanceSystem(ABC):
         pass
 
     @abstractmethod
-    def jacobian(self, x_source, v_source=None):
+    def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
         pass
 
     @abstractmethod
@@ -202,7 +204,12 @@ class PassiveSurveillanceSystem(ABC):
         pass
 
     # ==================== Helper Methods =====================
-    # None are required by the interface
+    def plot_sensors(self, ax=None, **kwargs):
+        if ax is not None:
+            ax.scatter(self.pos[0], self.pos[1], **kwargs)
+        else:
+            plt.scatter(self.pos[0], self.pos[1], **kwargs)
+        return
 
 
 class DifferencePSS(PassiveSurveillanceSystem, ABC):
@@ -226,19 +233,20 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
     _cov_raw: CovarianceMatrix or None                  # sensor-level covariance matrix
     _do_resample: bool = True
 
-    def __init__(self, x: np.ndarray, cov: CovarianceMatrix, ref_idx, do_resample=False, **kwargs):
+    parent = None
+
+    def __init__(self, x: np.ndarray, cov: CovarianceMatrix, ref_idx, **kwargs):
         (super().__init__(x, cov, **kwargs))
 
-        if do_resample:
-            self._cov_raw = cov
-        else:
-            self._cov_resample = cov
-            self._cov_raw = None
-
+        self._cov_raw = cov.copy()
         self._ref_idx = ref_idx
-        self._do_resample = do_resample
+        self._do_resample = True
 
         self.resample()
+
+    @property
+    def cov_raw(self):
+        return self._cov_raw
 
     @property
     def cov(self):
@@ -249,15 +257,14 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
         return self._cov_resample
 
     @cov.setter
-    def cov(self, cov: CovarianceMatrix, do_resample=False):
-        if do_resample:
-            self._cov_raw = cov.copy()
-            self._do_resample = True
-            self.resample()
-        else:
-            self._cov_resample = cov.copy()
-            self._do_resample = False
-            self.num_measurements = self._cov_resample.cov.shape[0]
+    def cov(self, cov: CovarianceMatrix):
+        # Must be input as a raw covariance matrix; one per sensor. Set the
+        # do_resample flag.
+        self._cov_raw = cov.copy()
+        self._cov_resample = None
+        self._do_resample = True
+        if self.parent is not None: self.parent._do_resample = True
+        self.resample()
 
     @cov.deleter
     def cov(self):
@@ -265,6 +272,7 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
         self._cov_resample = None
         self.num_measurements = 0
         self._do_resample = True
+        if self.parent is not None: self.parent._do_resample = True
 
     @property
     def ref_idx(self):
@@ -278,12 +286,14 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
 
         self._ref_idx = idx
         self._do_resample = True  # Reset the do_resample flag
+        if self.parent is not None: self.parent._do_resample = True
         self.resample()
 
     @ref_idx.deleter
     def ref_idx(self):
         self._ref_idx = None
         self._do_resample = True
+        if self.parent is not None: self.parent._do_resample = True
 
     def resample(self):
         if self._do_resample:

@@ -29,6 +29,8 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
 
     # Parse inputs
     n_dim, n_source = utils.safe_2d_shape(x_source)
+    if n_source==1 and len(x_source.shape) == 1:
+        x_source = x_source[:, np.newaxis]
 
     do_eq_constraints = eq_constraints_grad is not None
     if do_eq_constraints:

@@ -12,9 +12,9 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     _default_fdoa_vel_search_epsilon = 1 # meters/second
     _default_fdoa_vel_search_size = 10 # meters/second
 
-    def __init__(self,x, cov, do_resample=False, **kwargs):
+    def __init__(self,x, cov, **kwargs):
 
-        super().__init__(x=x, cov=cov, do_resample=do_resample, **kwargs)
+        super().__init__(x=x, cov=cov, **kwargs)
 
         # Overwrite uncertainty search defaults
         self.default_bias_search_epsilon = self._default_fdoa_bias_search_epsilon
@@ -35,8 +35,10 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         return model.measurement(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source,
                                  ref_idx=self.ref_idx, bias=bias)
 
-    def jacobian(self, x_source, v_source=None):
-        return model.jacobian(x_sensor=self.pos, x_source=x_source, v_sensor=self.vel, v_source=v_source,
+    def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
+        if x_sensor is None: x_sensor = self.pos
+        if v_sensor is None: v_sensor = self.vel
+        return model.jacobian(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source,
                               ref_idx=self.ref_idx)
 
     def jacobian_uncertainty(self, x_source, **kwargs):
@@ -72,7 +74,10 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ## ============================================================================================================== ##
     def max_likelihood(self, zeta, x_ctr, search_size, epsilon=None, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         # Call the non-calibration solver
         return solvers.max_likelihood(x_sensor=x_sensor, v_sensor=v_sensor, psi=zeta, cov=self.cov,
@@ -87,7 +92,10 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
 
     def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         return solvers.gradient_descent(x_sensor=x_sensor, v_sensor=self.vel, zeta=zeta, cov=self.cov,
                                         x_init=x_init, ref_idx=self.ref_idx,
@@ -95,7 +103,10 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
 
     def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         return solvers.least_square(x_sensor=x_sensor, v_sensor=self.vel, zeta=zeta, cov=self.cov, x_init=x_init,
                                     ref_idx=self.ref_idx, do_resample=False, **kwargs)
@@ -132,6 +143,6 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         ref_pos = self.pos[ref_idx_vec]
         ref_vel = self.vel[ref_idx_vec]
         isodopplers = [model.draw_isodoppler(x1, v1, x2, v2, vel_diff, num_pts, max_ortho) for
-                       (x1, v1, x2, v2) in zip(test_pos, test_vel, ref_pos, ref_vel)]
+                       (x1, v1, x2, v2) in zip(ref_pos, ref_vel, test_pos, test_vel)]
 
         return isodopplers

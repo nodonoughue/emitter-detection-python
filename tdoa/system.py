@@ -10,12 +10,12 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
     _default_tdoa_bias_search_epsilon = 1 # meters
     _default_tdoa_bias_search_size = 10 # meters
 
-    def __init__(self,x, cov, variance_is_toa=True, do_resample=False, **kwargs):
+    def __init__(self,x, cov, variance_is_toa=True, **kwargs):
         # First, we need to convert from TOA to ROA
         if variance_is_toa:
             cov = cov.multiply(_speed_of_light**2, overwrite=False)
 
-        super().__init__(x, cov, do_resample=do_resample, **kwargs)
+        super().__init__(x, cov, **kwargs)
 
         # Overwrite uncertainty search defaults
         self.default_bias_search_epsilon = self._default_tdoa_bias_search_epsilon
@@ -32,8 +32,9 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         if bias is None: bias = self.bias
         return model.measurement(x_sensor=x_sensor, x_source=x_source, ref_idx=self.ref_idx, bias=bias)
 
-    def jacobian(self, x_source, v_source=None):
-        return model.jacobian(x_sensor=self.pos, x_source=x_source, ref_idx=self.ref_idx)
+    def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
+        if x_sensor is None: x_sensor = self.pos
+        return model.jacobian(x_sensor=x_sensor, x_source=x_source, ref_idx=self.ref_idx)
 
     def jacobian_uncertainty(self, x_source, **kwargs):
         return model.jacobian_uncertainty(x_sensor=self.pos, x_source=x_source, ref_idx=self.ref_idx, **kwargs)
@@ -65,7 +66,10 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
     ## ============================================================================================================== ##
     def max_likelihood(self, zeta, x_ctr, search_size, epsilon=None, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         # Call the non-calibration solver
         return solvers.max_likelihood(x_sensor=x_sensor, psi=zeta, cov=self.cov, ref_idx=self.ref_idx, x_ctr=x_ctr,
@@ -79,14 +83,20 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
 
     def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         return solvers.gradient_descent(x_sensor=x_sensor, zeta=zeta, cov=self.cov, th_init=x_init, ref_idx=self.ref_idx,
                                         do_resample=False, variance_is_toa=False, **kwargs)
 
     def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         return solvers.least_square(x_sensor=x_sensor, zeta=zeta, cov=self.cov, x_init=x_init, ref_idx=self.ref_idx,
                                     do_resample=False, variance_is_toa=False, **kwargs)
@@ -117,7 +127,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
     def draw_isochrones(self, range_diff, num_pts, max_ortho):
         test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(self.ref_idx, self.num_sensors)
 
-        isochrones = [model.draw_isochrone(self.pos[test_idx], self.pos[ref_idx], range_diff, num_pts, max_ortho) for
+        isochrones = [model.draw_isochrone(self.pos[ref_idx], self.pos[test_idx], range_diff, num_pts, max_ortho) for
                       (test_idx, ref_idx) in zip(test_idx_vec, ref_idx_vec)]
         return isochrones
 

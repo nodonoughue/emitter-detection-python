@@ -28,8 +28,9 @@ class DirectionFinder(PassiveSurveillanceSystem):
         if bias is None: bias = self.bias
         return model.measurement(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa, bias=bias)
 
-    def jacobian(self, x_source, v_source=None):
-        return model.jacobian(x_sensor=self.pos, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
+    def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
+        if x_sensor is None: x_sensor = self.pos
+        return model.jacobian(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
 
     def jacobian_uncertainty(self, x_source, **kwargs):
         return model.jacobian_uncertainty(x_sensor=self.pos, x_source=x_source, do_2d_aoa=self.do_2d_aoa, **kwargs)
@@ -51,7 +52,10 @@ class DirectionFinder(PassiveSurveillanceSystem):
     ## ============================================================================================================== ##
     def max_likelihood(self, zeta, x_ctr, search_size, epsilon, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         # Call the non-calibration solver
         return solvers.max_likelihood(x_sensor=x_sensor, psi=zeta, cov=self.cov, do_2d_aoa=self.do_2d_aoa, x_ctr=x_ctr,
@@ -66,14 +70,20 @@ class DirectionFinder(PassiveSurveillanceSystem):
 
     def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         return solvers.gradient_descent(x_sensor=x_sensor, psi=zeta, cov=self.cov, bias=bias, do_2d_aoa=self.do_2d_aoa,
                                         **kwargs)
 
     def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
-        x_sensor, bias = self.sensor_calibration(*cal_data)
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = None, None, None
 
         return solvers.least_square(x_sensor=self.pos, psi=zeta, cov=self.cov, x_init=x_init, bias=bias,
                                     do_2d_aoa=self.do_2d_aoa, **kwargs)
