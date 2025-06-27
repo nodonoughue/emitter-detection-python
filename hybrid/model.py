@@ -97,6 +97,8 @@ def jacobian(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_sour
 
     # Compute Jacobian for FDOA measurements
     if x_fdoa is not None and v_fdoa is not None:
+        j_aoa = np.concatenate((j_aoa, np.zeros_like(j_aoa)), axis=0)
+        j_tdoa = np.concatenate((j_tdoa, np.zeros_like(j_tdoa)), axis=0)
         j_fdoa = fdoa.model.jacobian(x_sensor=x_fdoa, v_sensor=v_fdoa, x_source=x_source, v_source=v_source,
                                      ref_idx=fdoa_ref_idx)
     else:

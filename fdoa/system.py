@@ -78,7 +78,7 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
         # Call the non-calibration solver
         return solvers.max_likelihood(x_sensor=x_sensor, v_sensor=v_sensor, psi=zeta, cov=self.cov,
@@ -96,7 +96,7 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
         return solvers.gradient_descent(x_sensor=x_sensor, v_sensor=self.vel, zeta=zeta, cov=self.cov,
                                         x_init=x_init, ref_idx=self.ref_idx,
@@ -107,7 +107,7 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
         return solvers.least_square(x_sensor=x_sensor, v_sensor=self.vel, zeta=zeta, cov=self.cov, x_init=x_init,
                                     ref_idx=self.ref_idx, do_resample=False, **kwargs)
@@ -136,17 +136,22 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
                            x_max=x_max, num_pts=num_pts, cov=self.cov,
                            do_resample=False, ref_idx=self.ref_idx)
 
-    def draw_isodoppler(self, vel_diff, num_pts, max_ortho, v_source=None):
+    def draw_isodoppler(self, vel_diff, num_pts, max_ortho, v_source=None, x_sensor=None, v_sensor=None):
+        if x_sensor is None:
+            x_sensor = self.pos
+        if v_sensor is None:
+            v_sensor = self.vel
+
         test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(self.ref_idx, self.num_sensors)
 
-        test_pos = self.pos[:,test_idx_vec]
-        test_vel = self.vel[:,test_idx_vec] if self.vel is not None else np.zeros_like(test_pos)
-        ref_pos = self.pos[:,ref_idx_vec]
-        ref_vel = self.vel[:,ref_idx_vec] if self.vel is not None else np.zeros_like(ref_pos)
+        test_pos = x_sensor[:,test_idx_vec]
+        test_vel = v_sensor[:,test_idx_vec] if v_sensor is not None else np.zeros_like(test_pos)
+        ref_pos = x_sensor[:,ref_idx_vec]
+        ref_vel = v_sensor[:,ref_idx_vec] if v_sensor is not None else np.zeros_like(ref_pos)
 
         isodopplers = [model.draw_isodoppler(x_test=x_t, v_test=v_t, x_ref=x_r, v_ref=v_r,
-                                             vdiff=vel_diff, num_pts=num_pts, max_ortho=max_ortho,
+                                             vdiff=v_diff, num_pts=num_pts, max_ortho=max_ortho,
                                              v_source=v_source) for
-                       (x_t, v_t, x_r, v_r) in zip(test_pos, test_vel, ref_pos, ref_vel)]
+                       (x_t, v_t, x_r, v_r, v_diff) in zip(test_pos.T, test_vel.T, ref_pos.T, ref_vel.T, vel_diff)]
 
         return isodopplers

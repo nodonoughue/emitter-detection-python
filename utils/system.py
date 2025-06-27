@@ -25,7 +25,7 @@ class PassiveSurveillanceSystem(ABC):
     default_sensor_vel_search_epsilon = 1
     default_sensor_vel_search_size = 0  # By default, we can't search across sensor velocity
 
-    def __init__(self, x: np.ndarray, cov: CovarianceMatrix, bias=None, cov_pos=None, vel=None):
+    def __init__(self, x: np.ndarray, cov: CovarianceMatrix or None, bias=None, cov_pos=None, vel=None):
         if len(np.shape(x))==0: x = np.expand_dims(x, 1) # Add a second dimension, if there isn't one
         self.pos = x
         self.cov = cov
@@ -235,14 +235,19 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
 
     parent = None
 
-    def __init__(self, x: np.ndarray, cov: CovarianceMatrix, ref_idx, **kwargs):
+    def __init__(self, x: np.ndarray, cov: CovarianceMatrix or None, ref_idx, **kwargs):
         (super().__init__(x, cov, **kwargs))
 
-        self._cov_raw = cov.copy()
-        self._ref_idx = ref_idx
-        self._do_resample = True
+        if cov is not None:
+            self._cov_raw = cov.copy()
+            self._do_resample = True
+        else:
+            self._do_resample = False
 
-        self.resample()
+        self._ref_idx = ref_idx
+
+        if cov is not None:
+            self.resample()
 
     @property
     def cov_raw(self):

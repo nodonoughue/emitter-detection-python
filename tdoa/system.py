@@ -69,10 +69,10 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, None, self.bias
 
         # Call the non-calibration solver
-        return solvers.max_likelihood(x_sensor=x_sensor, psi=zeta, cov=self.cov, ref_idx=self.ref_idx, x_ctr=x_ctr,
+        return solvers.max_likelihood(x_sensor=x_sensor, zeta=zeta, cov=self.cov, ref_idx=self.ref_idx, x_ctr=x_ctr,
                                       search_size=search_size, epsilon=epsilon, bias=bias,
                                       do_resample=False, variance_is_toa=False, **kwargs)
 
@@ -86,7 +86,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, None, self.bias
 
         return solvers.gradient_descent(x_sensor=x_sensor, zeta=zeta, cov=self.cov, th_init=x_init, ref_idx=self.ref_idx,
                                         do_resample=False, variance_is_toa=False, **kwargs)
@@ -96,7 +96,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, None, self.bias
 
         return solvers.least_square(x_sensor=x_sensor, zeta=zeta, cov=self.cov, x_init=x_init, ref_idx=self.ref_idx,
                                     do_resample=False, variance_is_toa=False, **kwargs)
@@ -124,12 +124,15 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         return model.error(x_sensor=self.pos, x_source=x_source, x_max=x_max, num_pts=num_pts, cov=self.cov,
                            do_resample=False, variance_is_toa=False, ref_idx=self.ref_idx)
 
-    def draw_isochrones(self, range_diff, num_pts, max_ortho):
+    def draw_isochrones(self, range_diff, num_pts, max_ortho, x_sensor=None):
+        if x_sensor is None:
+            x_sensor = self.pos
+
         test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(self.ref_idx, self.num_sensors)
 
-        isochrones = [model.draw_isochrone(x_ref=self.pos[:,ref_idx], x_test=self.pos[:,test_idx],
-                                           range_diff=range_diff, num_pts=num_pts, max_ortho=max_ortho) for
-                      (test_idx, ref_idx) in zip(test_idx_vec, ref_idx_vec)]
+        isochrones = [model.draw_isochrone(x_ref=x_sensor[:,ref_idx], x_test=x_sensor[:,test_idx],
+                                           range_diff=this_range_diff, num_pts=num_pts, max_ortho=max_ortho) for
+                      (test_idx, ref_idx, this_range_diff) in zip(test_idx_vec, ref_idx_vec, range_diff)]
         return isochrones
 
     def generate_parameter_indices(self, do_bias=True):

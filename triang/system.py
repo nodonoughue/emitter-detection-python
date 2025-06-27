@@ -55,7 +55,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, None, self.bias
 
         # Call the non-calibration solver
         return solvers.max_likelihood(x_sensor=x_sensor, psi=zeta, cov=self.cov, do_2d_aoa=self.do_2d_aoa, x_ctr=x_ctr,
@@ -73,7 +73,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, None, self.bias
 
         return solvers.gradient_descent(x_sensor=x_sensor, psi=zeta, cov=self.cov, bias=bias, do_2d_aoa=self.do_2d_aoa,
                                         **kwargs)
@@ -83,7 +83,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, None, self.bias
 
         return solvers.least_square(x_sensor=self.pos, psi=zeta, cov=self.cov, x_init=x_init, bias=bias,
                                     do_2d_aoa=self.do_2d_aoa, **kwargs)
@@ -116,5 +116,8 @@ class DirectionFinder(PassiveSurveillanceSystem):
         return model.error(x_sensor=self.pos, x_source=x_source, x_max=x_max, num_pts=num_pts, cov=self.cov,
                            do_2d_aoa=self.do_2d_aoa)
 
-    def draw_lob(self, zeta, **kwargs):
-        return model.draw_lob(x_sensor=self.pos, psi=zeta, **kwargs)
+    def draw_lobs(self, zeta, x_sensor=None, **kwargs):
+        if x_sensor is None:
+            x_sensor = self.pos
+
+        return [model.draw_lob(x_sensor=this_x_sensor.T, psi=this_zeta, **kwargs) for this_x_sensor, this_zeta in zip(x_sensor.T, zeta)]

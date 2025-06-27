@@ -31,26 +31,28 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     tdoa_measurement_idx = None
     fdoa_measurement_idx = None
 
-    def __init__(self, cov=None, aoa_pss=None, tdoa_pss=None, fdoa_pss=None, ref_idx=None, do_resample=False, **kwargs):
+    def __init__(self, cov=None, aoa=None, tdoa=None, fdoa=None, ref_idx=None, do_resample=False, **kwargs):
         # Parse the provided sensor types
         x_arr = []
-        if aoa_pss is not None:
-            x_arr.append(aoa_pss.pos)
-            self.aoa = aoa_pss
+        if aoa is not None:
+            x_arr.append(aoa.pos)
+            self.aoa = aoa
             self.num_aoa_sensors = self.aoa.num_sensors
             self.num_aoa_measurements = self.aoa.num_measurements
 
-        if tdoa_pss is not None:
-            x_arr.append(tdoa_pss.pos)
-            self.tdoa = tdoa_pss
+        if tdoa is not None:
+            x_arr.append(tdoa.pos)
+            self.tdoa = tdoa
             self.num_tdoa_sensors = self.tdoa.num_sensors
             self.num_tdoa_measurements = self.tdoa.num_measurements
 
-        if fdoa_pss is not None:
-            x_arr.append(fdoa_pss.pos)
-            self.fdoa = fdoa_pss
+        if fdoa is not None:
+            x_arr.append(fdoa.pos)
+            self.fdoa = fdoa
             self.num_fdoa_sensors = self.fdoa.num_sensors
             self.num_fdoa_measurements = self.fdoa.num_measurements
+
+        assert len(x_arr)>0, 'Error initializing HybridPSS system; at least one type of subordinate PSS system must be supplied.'
 
         x = np.concatenate(x_arr, axis=1)
 
@@ -69,7 +71,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         self.num_measurements = self.num_aoa_measurements + self.num_tdoa_measurements + self.num_fdoa_measurements
         self.aoa_sensor_idx = np.arange(self.num_aoa_sensors)
         self.tdoa_sensor_idx = np.arange(self.num_tdoa_sensors) + self.num_aoa_sensors
-        self.fdoa_sensor_idx = np.arange(self.num_fdoa_sensors) + self.num_tdoa_sensors + self.num_fdoa_sensors
+        self.fdoa_sensor_idx = np.arange(self.num_fdoa_sensors) + self.num_aoa_sensors + self.num_tdoa_sensors
         self.aoa_measurement_idx = np.arange(self.num_aoa_measurements)
         self.tdoa_measurement_idx = np.arange(self.num_tdoa_measurements) + self.num_aoa_measurements
         self.fdoa_measurement_idx = (np.arange(self.num_fdoa_measurements) + self.num_tdoa_measurements
@@ -292,7 +294,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
         # Likelihood function for ML Solvers
         def ell(pos_vel):
@@ -349,7 +351,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
         # Initialize measurement error and jacobian functions
         def y(pos_vel):
@@ -376,7 +378,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
         else:
-            x_sensor, v_sensor, bias = None, None, None
+            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
         # Initialize measurement error and jacobian functions
         def y(pos_vel):
@@ -446,7 +448,15 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
     def compute_crlb(self, x_source, **kwargs):
-        return utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=self.jacobian, cov=self.cov,
+        def this_jacobian(pos_vel):
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel)
+            n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
+            j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=self.pos, v_sensor=self.vel)
+            # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
+            # excise just the position portion
+            return j[:n_dim]
+
+        return utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov,
                                                 **kwargs)
 
     ## ============================================================================================================== ##
@@ -513,12 +523,19 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     def parse_sensor_data(self, data, vel_input=False):
         if data is not None:
             # Split apart a vector of sensor data, must have length equal to self.num_sensors
-            assert len(data) == self.num_sensors or (vel_input and len(data)==self.num_fdoa_sensors), "Unable to parse sensor data; unexpected size."
+            # assert len(data) == self.num_sensors or (vel_input and len(data)==self.num_fdoa_sensors), "Unable to parse sensor data; unexpected size."
 
-            # Parse the AOA, TDOA, and FDOA sensor indices
-            data_aoa = data[self.aoa_sensor_idx]
-            data_tdoa = data[self.tdoa_sensor_idx]
-            data_fdoa = data[self.fdoa_sensor_idx]
+            # todo: make this cleaner
+            if len(data.shape) == 1:
+                # Parse the AOA, TDOA, and FDOA sensor indices
+                data_aoa = data[self.aoa_sensor_idx]
+                data_tdoa = data[self.tdoa_sensor_idx]
+                data_fdoa = data[self.fdoa_sensor_idx]
+            else:
+                # Parse the AOA, TDOA, and FDOA sensor indices
+                data_aoa = data[:,self.aoa_sensor_idx]
+                data_tdoa = data[:,self.tdoa_sensor_idx]
+                data_fdoa = data[:,self.fdoa_sensor_idx]
         else:
             data_aoa = None
             data_tdoa = None
