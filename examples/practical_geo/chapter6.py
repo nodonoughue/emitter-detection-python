@@ -110,9 +110,9 @@ def example2():
     label_nominal = 'Isochrone (nominal positions)'
     label_actual = 'Isochrone (true positions)'
     for idx in np.arange(n_tdoa - 1):
-        xy_iso = tdoa.model.draw_isochrone(x1=x_tdoa[:, -1], x2=x_tdoa[:, idx],
+        xy_iso = tdoa.model.draw_isochrone(x_ref=x_tdoa[:, -1], x_test=x_tdoa[:, idx],
                                            range_diff=zeta_unc[idx], num_pts=101, max_ortho=8)
-        xy_iso_unc = tdoa.model.draw_isochrone(x1=x_tdoa_actual[:, -1], x2=x_tdoa_actual[:, idx],
+        xy_iso_unc = tdoa.model.draw_isochrone(x_ref=x_tdoa_actual[:, -1], x_test=x_tdoa_actual[:, idx],
                                                range_diff=zeta_unc[idx], num_pts=101, max_ortho=8)
 
         plt.plot(xy_iso[0], xy_iso[1], '-', color=hdl_nominal.get_facecolor(), label=label_nominal)
@@ -293,15 +293,15 @@ def example4(do_iterative=False):
                  'do_resample': True,
                  'cov': cov_roa,
                  'variance_is_toa': False}
-    ell = tdoa.model.log_likelihood(rho=zeta, **tdoa_args)
-    ell_true = tdoa.model.log_likelihood(rho=zeta_true, **tdoa_args)
+    ell = tdoa.model.log_likelihood(zeta=zeta, **tdoa_args)
+    ell_true = tdoa.model.log_likelihood(zeta=zeta_true, **tdoa_args)
 
     # Plot Scenario
     levels = [-1000, -100, -50, -20, -10, -5, 0]
     def _make_plot(this_ell, x_plot, label_set, title=None):
         this_fig, this_ax = plt.subplots()
 
-        cmap = cm.viridis  # Choose a colormap
+        cmap = cm.get_cmap('viridis')  # Choose a colormap
         cmap.set_under('k', alpha=0)  # Set values below vmin to transparent black
 
         hdl = plt.imshow(this_ell, origin='lower', cmap=cmap, extent=extent)
@@ -346,8 +346,8 @@ def example4(do_iterative=False):
                    'ref_idx': n_tdoa-1,
                    'do_resample': False,
                    'variance_is_toa': False}
-    x_est_true, _, _ = tdoa.solvers.max_likelihood(rho=zeta_true, **solver_args)
-    x_est, _, _ = tdoa.solvers.max_likelihood(rho=zeta, **solver_args)
+    x_est_true, _, _ = tdoa.solvers.max_likelihood(zeta=zeta_true, **solver_args)
+    x_est, _, _ = tdoa.solvers.max_likelihood(zeta=zeta, **solver_args)
 
     print('True ML Est.: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_true[0]/1e3, x_est_true[1]/1e3,
                                                                       np.linalg.norm(x_est_true-x_tgt)/1e3))
@@ -374,7 +374,7 @@ def example4(do_iterative=False):
     unc_solver_args['epsilon'] = epsilon
     unc_solver_args['cov_pos'] = cov_beta
 
-    x_est_bias, bias_est, x_tdoa_est, _, _  = tdoa.solvers.max_likelihood_uncertainty(rho=zeta, **unc_solver_args)
+    x_est_bias, bias_est, x_tdoa_est, _, _  = tdoa.solvers.max_likelihood_uncertainty(zeta=zeta, **unc_solver_args)
     err_km = np.linalg.norm(x_est_bias-x_tgt)/1e3
     print('ML Est. w/Uncertainty: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_bias[0]/1e3,
                                                                                 x_est_bias[1]/1e3,
@@ -393,9 +393,17 @@ def example4(do_iterative=False):
                            ['Sensors', 'Target', 'ML Est.', 'ML Est. w/uncertainty']))
 
     if do_iterative:
+        iter_solver_args = {'x_sensor': x_tdoa,
+                            'cov': cov_rdoa,
+                            'th_init': x_ctr,
+                            'epsilon': grid_res,
+                            'ref_idx': n_tdoa-1,
+                            'do_resample': False,
+                            'variance_is_toa': False}
+
         # Iterative Solvers
-        x_est_gd, x_est_gd_full, bias_est_gd = tdoa.solvers.gradient_descent()
-        x_est_ls, x_est_ls_full, bias_est_ls = tdoa.solvers.least_square()
+        x_est_gd, x_est_gd_full, bias_est_gd = tdoa.solvers.gradient_descent(zeta=zeta, **iter_solver_args)
+        x_est_ls, x_est_ls_full, bias_est_ls = tdoa.solvers.least_square(zeta=zeta, **iter_solver_args)
 
         with np.printoptions(precision=3, suppress=True):
             print('GD Est. range bias: (', end='')

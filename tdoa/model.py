@@ -408,7 +408,7 @@ def toa_error_cross_corr(snr, bandwidth, pulse_len, bandwidth_rms=None):
     return 1/(8*np.pi*a)
 
 
-def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
+def draw_isochrone(x_ref, x_test, range_diff, num_pts, max_ortho):
     """
     Finds the isochrone with the stated range difference from points x1
     and x2.  Generates an arc with 2*numPts-1 points, that spans up to
@@ -419,8 +419,8 @@ def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
     Nicholas O'Donoughue
     11 March 2021
 
-    :param x1: Position of first sensor (Ndim x 1) [m]
-    :param x2: Position of second sensor (Ndim x 1) [m]
+    :param x_ref: Position of first sensor (Ndim x 1) [m]
+    :param x_test: Position of second sensor (Ndim x 1) [m]
     :param range_diff: Desired range difference [m]
     :param num_pts: Number of points to compute
     :param max_ortho: Maximum offset from line of sight between x1 and x2 [m]
@@ -432,8 +432,8 @@ def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
     #  u = unit vector from x1 to x2
     #  v = unit vector orthogonal to u
     rot_mat = np.array(((0, 1), (-1, 0)))
-    r = geo.calc_range(x1, x2)
-    u = (x2-x1)/r
+    r = geo.calc_range(x_ref, x_test)
+    u = (x_test - x_ref) / r
     v = rot_mat.dot(u)
     x_proj = np.array([u, v])
 
@@ -480,7 +480,7 @@ def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
     xuv = np.concatenate((xuv_mirror, xuv), axis=1)
 
     # Convert to x/y space and re-center at origin
-    iso = x_proj.dot(xuv) + x1[:, np.newaxis]
+    iso = x_proj.dot(xuv) + x_ref[:, np.newaxis]
     x_iso = iso[0, :]
     y_iso = iso[1, :]
 

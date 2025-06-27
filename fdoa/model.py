@@ -377,7 +377,7 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts,
     return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
 
 
-def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
+def draw_isodoppler(x_ref, v_ref, x_test, v_test, vdiff, num_pts, max_ortho, v_source=None):
     """
     # Finds the isochrone with the stated range rate difference from points x1
     # and x2.  Generates an arc with 2*numPts-1 points, that spans up to
@@ -388,10 +388,10 @@ def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
     Nicholas O'Donoughue
     21 January 2021
 
-    :param x1: Position of first sensor (Ndim x 1) [m]
-    :param v1: Velocity vector of first sensor (Ndim x 1) [m/s]
-    :param x2: Position of second sensor (Ndim x 1) [m]
-    :param v2: Velocity vector of second sensor (Ndim x 1) [m/s]
+    :param x_ref: Position of first sensor (Ndim x 1) [m]
+    :param v_ref: Velocity vector of first sensor (Ndim x 1) [m/s]
+    :param x_test: Position of second sensor (Ndim x 1) [m]
+    :param v_test: Velocity vector of second sensor (Ndim x 1) [m/s]
     :param vdiff: Desired velocity difference [m/s]
     :param num_pts: Number of points to compute
     :param max_ortho: Maximum offset from line of sight between x1 and x2 [m]
@@ -409,7 +409,10 @@ def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
                                                    max_offset=max_ortho,
                                                    grid_spacing=grid_spacing)
 
-    df_plot = utils.geo.calc_doppler_diff(x_set, np.zeros_like(x_set), x1, v1, x2, v2, f_0)
+    if v_source is None:
+        v_source = np.zeros_like(x_set)
+    df_plot = utils.geo.calc_doppler_diff(x_source=x_set, v_source=v_source,
+                                          x_ref=x_ref, v_ref=v_ref, x_test=x_test, v_test=v_test, f=f_0)
 
     # Generate Levels
     if np.size(vdiff) > 1:

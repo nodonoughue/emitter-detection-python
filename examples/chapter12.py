@@ -279,8 +279,8 @@ def _mc_iteration(args):
 
     # Generate solutions
     res_ml, ml_surf, ml_grid = fdoa.solvers.max_likelihood(**args['rx_args'], **args['ml_args'], zeta=rho)
-    res_bf, bf_surf, bf_grid = fdoa.solvers.bestfix(**args['rx_args'], **args['ml_args'], rho=rho)
-    _, res_ls = fdoa.solvers.least_square(**args['rx_args'], **args['ls_args'], rho=rho)
-    _, res_gd = fdoa.solvers.gradient_descent(**args['rx_args'], **args['gd_args'], rho=rho)
+    res_bf, bf_surf, bf_grid = fdoa.solvers.bestfix(**args['rx_args'], **args['ml_args'], zeta=rho)
+    _, res_ls = fdoa.solvers.least_square(**args['rx_args'], **args['ls_args'], zeta=rho)
+    _, res_gd = fdoa.solvers.gradient_descent(**args['rx_args'], **args['gd_args'], zeta=rho)
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf}

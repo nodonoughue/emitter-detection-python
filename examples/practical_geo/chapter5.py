@@ -167,7 +167,7 @@ def example2():
             if np.all(this_x == x_tdoa[:, ref_idx]):
                 continue
 
-            iso = tdoa.model.draw_isochrone(x1=x_tdoa[:2, ref_idx], x2=this_x[:2],
+            iso = tdoa.model.draw_isochrone(x_ref=x_tdoa[:2, ref_idx], x_test=this_x[:2],
                                             range_diff=this_zeta, num_pts=101, max_ortho=40e3)
             plt.plot(iso[0], iso[1], '--k', linewidth=0.5, label=iso_label)
             iso_label = None

@@ -124,8 +124,8 @@ def make_figure_1(prefix=None, colors=None):
     plt.plot(xy_isochrone[0], xy_isochrone[1], color=colors(3), linestyle=':', label='Isochrone')
 
     # Draw isodoppler line
-    x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x1=x_sensor[0], v1=v_sensor[0],
-                                                            x2=x_sensor[1], v2=v_sensor[1],
+    x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x_ref=x_sensor[0], v_ref=v_sensor[0],
+                                                            x_test=x_sensor[1], v_test=v_sensor[1],
                                                             vdiff=velocity_diff, num_pts=1000, max_ortho=5)
 
     plt.plot(x_isodoppler, y_isodoppler, color=colors(4), linestyle='-.', label='Lines of Constant FDOA')

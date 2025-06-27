@@ -379,12 +379,12 @@ def make_figure_4(prefix):
                  fontsize=12, color=this_color)
 
         # Draw isodoppler lines
-        vdiff = utils.geo.calc_doppler_diff(x0=x_source, v0=np.array([0, 0]),
-                                            x1=x_now[0], v1=v_sensor[0],
-                                            x2=x_now[1], v2=v_sensor[1],
+        vdiff = utils.geo.calc_doppler_diff(x_source=x_source, v_source=np.array([0, 0]),
+                                            x_ref=x_now[0], v_ref=v_sensor[0],
+                                            x_test=x_now[1], v_test=v_sensor[1],
                                             f=utils.constants.speed_of_light)
-        x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x1=x_now[0], v1=v_sensor[0],
-                                                                x2=x_now[1], v2=v_sensor[1],
+        x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x_ref=x_now[0], v_ref=v_sensor[0],
+                                                                x_test=x_now[1], v_test=v_sensor[1],
                                                                 vdiff=vdiff, num_pts=1000, max_ortho=20)
         plt.plot(x_isodoppler, y_isodoppler, linestyle='-.', label=None, color=this_color)
 

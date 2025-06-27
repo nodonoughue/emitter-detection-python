@@ -283,10 +283,10 @@ def _mc_iteration(rx_args: dict, ml_args: dict, ls_args: dict, gd_args: dict, mc
     rho = mc_args['rho_act'] + rx_args['cov'].lower @ rng.standard_normal(size=(mc_args['num_measurements'], ))
 
     # Generate solutions
-    res_ml, _, _ = tdoa.solvers.max_likelihood(**rx_args, **ml_args, rho=rho)
-    res_bf, _, _ = tdoa.solvers.bestfix(**rx_args, **ml_args, rho=rho)
-    _, res_ls = tdoa.solvers.least_square(**rx_args, **ls_args, rho=rho)
-    _, res_gd = tdoa.solvers.gradient_descent(**rx_args, **gd_args, rho=rho)
-    res_chan_ho = tdoa.solvers.chan_ho(x_sensor=rx_args['x_sensor'], rho=rho, cov=rx_args['cov'])
+    res_ml, _, _ = tdoa.solvers.max_likelihood(**rx_args, **ml_args, zeta=rho)
+    res_bf, _, _ = tdoa.solvers.bestfix(**rx_args, **ml_args, zeta=rho)
+    _, res_ls = tdoa.solvers.least_square(**rx_args, **ls_args, zeta=rho)
+    _, res_gd = tdoa.solvers.gradient_descent(**rx_args, **gd_args, zeta=rho)
+    res_chan_ho = tdoa.solvers.chan_ho(x_sensor=rx_args['x_sensor'], zeta=rho, cov=rx_args['cov'])
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf, 'chan_ho': res_chan_ho}

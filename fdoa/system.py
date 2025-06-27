@@ -1,6 +1,7 @@
 from . import model, perf, solvers
 import utils
 from utils.system import DifferencePSS
+import numpy as np
 
 _speed_of_light = utils.constants.speed_of_light
 
@@ -135,14 +136,17 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
                            x_max=x_max, num_pts=num_pts, cov=self.cov,
                            do_resample=False, ref_idx=self.ref_idx)
 
-    def draw_isodoppler(self, vel_diff, num_pts, max_ortho):
+    def draw_isodoppler(self, vel_diff, num_pts, max_ortho, v_source=None):
         test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(self.ref_idx, self.num_sensors)
 
-        test_pos = self.pos[test_idx_vec]
-        test_vel = self.vel[test_idx_vec] if self.vel is not None else None
-        ref_pos = self.pos[ref_idx_vec]
-        ref_vel = self.vel[ref_idx_vec]
-        isodopplers = [model.draw_isodoppler(x1, v1, x2, v2, vel_diff, num_pts, max_ortho) for
-                       (x1, v1, x2, v2) in zip(ref_pos, ref_vel, test_pos, test_vel)]
+        test_pos = self.pos[:,test_idx_vec]
+        test_vel = self.vel[:,test_idx_vec] if self.vel is not None else np.zeros_like(test_pos)
+        ref_pos = self.pos[:,ref_idx_vec]
+        ref_vel = self.vel[:,ref_idx_vec] if self.vel is not None else np.zeros_like(ref_pos)
+
+        isodopplers = [model.draw_isodoppler(x_test=x_t, v_test=v_t, x_ref=x_r, v_ref=v_r,
+                                             vdiff=vel_diff, num_pts=num_pts, max_ortho=max_ortho,
+                                             v_source=v_source) for
+                       (x_t, v_t, x_r, v_r) in zip(test_pos, test_vel, ref_pos, ref_vel)]
 
         return isodopplers

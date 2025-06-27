@@ -122,7 +122,7 @@ def calc_doppler(x1, v1, x2, v2, f):
     return f * (1 + v/c)
 
 
-def calc_doppler_diff(x0, v0, x1, v1, x2, v2, f):
+def calc_doppler_diff(x_source, v_source, x_ref, v_ref, x_test, v_test, f):
     """
     Computes the difference in Doppler shift between reference and test
     sensor pairs and a source.  The two sets of sensor positions (x1 and x2)
@@ -133,22 +133,22 @@ def calc_doppler_diff(x0, v0, x1, v1, x2, v2, f):
     Nicholas O'Donoughue
     16 January 2021
 
-    :param x0: Position vector for N sources (nDim x N), in m
-    :param v0: Velocity vector for N sources (nDim x N), in m/s
-    :param x1: Position vector for M reference sensors (nDim x M), in m
-    :param v1: Velocity vector for M reference sensors (nDim x M), in m/s
-    :param x2: Position vector for M test sensors (nDim x M), in m
-    :param v2: Velocity vector for M test sensors (nDim x M), in m/s
+    :param x_source: Position vector for N sources (nDim x N), in m
+    :param v_source: Velocity vector for N sources (nDim x N), in m/s
+    :param x_ref: Position vector for M reference sensors (nDim x M), in m
+    :param v_ref: Velocity vector for M reference sensors (nDim x M), in m/s
+    :param x_test: Position vector for M test sensors (nDim x M), in m
+    :param v_test: Velocity vector for M test sensors (nDim x M), in m/s
     :param f: Carrier frequency, in Hertz
     :return fd_diff: Differential Doppler shift (N x M), in Hertz
     """
 
     # Compute Doppler velocity from reference to each set of test positions
-    dop1 = calc_doppler(x0, v0, x1, v1, f)  # N x M
-    dop2 = calc_doppler(x0, v0, x2, v2, f)  # N x M
+    dop_ref = calc_doppler(x_source, v_source, x_ref, v_ref, f)  # N x M
+    dop_test = calc_doppler(x_source, v_source, x_test, v_test, f)  # N x M
 
     # Doppler difference
-    return dop2 - dop1
+    return dop_test - dop_ref
 
 
 def compute_slant_range(alt1, alt2, el_angle_deg, use_effective_earth=False):
