@@ -428,6 +428,10 @@ def draw_isochrone(x_ref, x_test, range_diff, num_pts, max_ortho):
     :return y_iso: Second dimension of isochrone [m]
     """
 
+    # This function is only defined for 2D inputs
+    x_ref = x_ref[:2]
+    x_test = x_test[:2]
+
     # Generate pointing vectors u and v in rotated coordinate space
     #  u = unit vector from x1 to x2
     #  v = unit vector orthogonal to u

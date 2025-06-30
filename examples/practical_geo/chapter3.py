@@ -433,12 +433,12 @@ def example4(rng=np.random.default_rng()):
 
     # ---- Plot Results from the final Monte Carlo iteration----
     # x_init = gd_ls_args['x_init']
-    x_ml = res['ml']
-    x_ls = res['ls']
-    x_gd = res['gd']
-    x_ml_full = res['ml_full']
-    x_ls_full = res['ls_full']
-    x_gd_full = res['gd_full']
+    x_ml = res_common['ml']
+    x_ls = res_common['ls']
+    x_gd = res_common['gd']
+    x_ml_full = res_full['ml']
+    x_ls_full = res_full['ls']
+    x_gd_full = res_full['gd']
 
     fig_full = plt.figure()
     plt.scatter(x_source[0, -1], x_source[1, -1], marker='x', color='k', label='Target', clip_on=False, zorder=3)

@@ -7,7 +7,7 @@ import numpy as np
 
 def max_likelihood(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
                    x_ctr=0., search_size=1., epsilon=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None,
-                   do_resample=False, **kwargs):
+                   do_resample=False, angle_bias=None, range_bias=None, range_rate_bias=None, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -43,7 +43,8 @@ def max_likelihood(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=
                                     x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                     zeta=zeta, x_source=x, v_source=v_source,
                                     cov=cov, do_2d_aoa=do_2d_aoa,
-                                    tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx, do_resample=False)
+                                    tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx, do_resample=False,
+                                    angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
@@ -155,7 +156,8 @@ def max_likelihood_uncertainty(zeta, cov: CovarianceMatrix, cov_pos: CovarianceM
 
 
 def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
-                     v_source=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False, **kwargs):
+                     v_source=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
+                     angle_bias=None, range_bias=None, range_rate_bias=None, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -184,7 +186,8 @@ def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=Non
     def y(this_x):
         return zeta - model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                         x_source=this_x, v_source=v_source, do_2d_aoa=do_2d_aoa,
-                                        tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+                                        tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
+                                        angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
 
     def jacobian(this_x):
         return model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
@@ -203,7 +206,8 @@ def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=Non
 
 
 def least_square(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                 do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False, **kwargs):
+                 do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
+                 angle_bias=None, range_bias=None, range_rate_bias=None, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -232,7 +236,8 @@ def least_square(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x
     def y(this_x):
         return zeta - model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                         x_source=this_x, v_source=v_source, do_2d_aoa=do_2d_aoa,
-                                        tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+                                        tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
+                                        angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
 
     def jacobian(this_x):
         return model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,

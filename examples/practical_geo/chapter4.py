@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy
 
 import utils
-import hybrid
 import time
 from utils.covariance import CovarianceMatrix
-
+from triang import DirectionFinder
+from tdoa import TDOAPassiveSurveillanceSystem
+from fdoa import FDOAPassiveSurveillanceSystem
+from hybrid import HybridPassiveSurveillanceSystem
 
 _rad2deg = utils.unit_conversions.convert(1, "rad", "deg")
 _deg2rad = utils.unit_conversions.convert(1, "deg", "rad")
@@ -42,6 +43,7 @@ def example1(rng=np.random.default_rng()):
     v_sensor_enu = np.array([[80, 80, 80],
                             [0, 0, 0],
                             [0, 0, 0]])*_kph2mps  # Convert to SI units (m/s)
+
     # Reference coordinate for ENU
     ref_lat = 5  # deg Lat (N)
     ref_lon = -15  # deg Lon (W)
@@ -71,17 +73,6 @@ def example1(rng=np.random.default_rng()):
     ref_tdoa = num_tdoa - 1
     ref_fdoa = num_fdoa - 1
 
-    # Manually do a reference/text index set
-    # (0, 2*num_aoa-1) are AOA sensors (double the number because each generates both az and el measurements)
-    # 2*num_aoa + (0, num_tdoa-1) are TDOA sensors
-    # 2*num_aoa + num_tdoa + (0, num_fdoa-1) are FDOA sensors
-    [tdoa_ref_vec, tdoa_test_vec] = utils.parse_reference_sensor(ref_tdoa, num_tdoa)
-    [fdoa_ref_vec, fdoa_test_vec] = utils.parse_reference_sensor(ref_fdoa, num_fdoa)
-    ref_idx = np.concatenate((np.arange(2*num_aoa), 2*num_aoa + tdoa_ref_vec,
-                              2*num_aoa + num_tdoa + fdoa_ref_vec))
-    test_idx = np.concatenate((np.full(2*num_aoa, np.nan), 2*num_aoa + tdoa_test_vec,
-                               2*num_aoa + num_tdoa + fdoa_test_vec))
-
     # Error Covariance Matrix
     if do_2d_aoa:
         num_aoa = 2 * num_aoa  # double the number of aoa "sensors" to account for the second measurement from each
@@ -90,32 +81,21 @@ def example1(rng=np.random.default_rng()):
     cov_r = (err_tdoa_s*utils.constants.speed_of_light)**2 * np.eye(num_tdoa)  # m^2
     cov_rr = (err_fdoa_hz*utils.constants.speed_of_light/f_source_hz)**2 * np.eye(num_fdoa)  # m^2/s^2
 
-    cov_x = CovarianceMatrix(scipy.linalg.block_diag(cov_psi, cov_r, cov_rr))
-    cov_z = cov_x.resample(ref_idx_vec=ref_idx, test_idx_vec=test_idx)
+    # Make the PSS Objects
+    aoa = DirectionFinder(x=x_sensor_enu, do_2d_aoa=do_2d_aoa, cov=CovarianceMatrix(cov_psi))
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_sensor_enu, cov=CovarianceMatrix(cov_r), variance_is_toa=False, ref_idx=ref_tdoa)
+    fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor_enu, vel=v_sensor_enu, cov=CovarianceMatrix(cov_rr), ref_idx=ref_fdoa)
+    hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=fdoa)
 
     # Generate Noise
     num_mc = 1000
-    num_measurements = num_aoa + num_tdoa + num_fdoa
-    noise_white = rng.standard_normal(size=(num_measurements, num_mc))
+    noise_white = rng.standard_normal(size=(hybrid.num_measurements, num_mc))
 
-    # Generate sensor level (num_aoa + num_tdoa + num_fdoa) noise with proper errors
-    # cov_low = scipy.linalg.cholesky(cov_x, lower=True)
-    noise_sensor = cov_x.lower @ noise_white
-
-    # Resample to account for reference sensors used in TDOA and FDOA
-    noise_measurement = utils.resample_noise(noise_sensor, test_idx, ref_idx)
-
-    # System args -- make a dict with the receiver arguments; to avoid transcription errors when we repeatedly call them
-    rx_args = {'x_aoa': x_sensor_enu,
-               'x_tdoa': x_sensor_enu,
-               'x_fdoa': x_sensor_enu,
-               'v_fdoa': v_sensor_enu - v_source_enu,
-               'do_2d_aoa': do_2d_aoa,
-               'tdoa_ref_idx': ref_tdoa,
-               'fdoa_ref_idx': ref_fdoa}
+    # Generate correlated noise to account for reference sensors used in TDOA and FDOA
+    noise_measurement = hybrid.cov.lower @ noise_white
 
     # Generate Data
-    z = hybrid.model.measurement(x_source=x_source_enu, **rx_args)
+    z = hybrid.measurement(x_source=x_source_enu, v_source=v_source_enu)
     zeta = z[:, np.newaxis] + noise_measurement
 
     # GD and LS Search Parameters
@@ -147,8 +127,7 @@ def example1(rng=np.random.default_rng()):
         # TDOA, AOA, and FDOA Error
 
         # LS Solution
-        _, x_ls_iters = hybrid.solvers.least_square(zeta=zeta[:, idx], cov=cov_z,
-                                                    do_resample=False,  **rx_args, **ls_args)
+        _, x_ls_iters = hybrid.least_square(zeta=zeta[:, idx], **ls_args)
 
         error[idx] = np.sqrt(np.sum(np.abs(x_ls_iters-x_source_enu[:, np.newaxis])**2, 0))
 
@@ -166,11 +145,9 @@ def example1(rng=np.random.default_rng()):
     fig2 = plt.figure()
     plt.plot(np.arange(max_num_iterations), rmse_ls, label='Least Squares')
     plt.yscale('log')
-    plt.legend(loc='upper right')
 
     # Compute the CRLB
-    crlb = hybrid.perf.compute_crlb(x_source=x_source_enu, cov=cov_z, do_resample=False,
-                                    **rx_args)
+    crlb = hybrid.compute_crlb(x_source=x_source_enu)
 
     # Compute and display the RMSE
     rmse_crlb = np.sqrt(np.trace(crlb, axis1=0, axis2=1))
@@ -180,6 +157,7 @@ def example1(rng=np.random.default_rng()):
     plt.ylabel('RMSE [m]')
     plt.title('Monte Carlo Geolocation Results')
     plt.ylim([1e4, 1e5])
+    plt.legend(loc='upper right')
 
     # Compute and display the CEP50
     cep50 = utils.errors.compute_cep50(crlb)
@@ -251,9 +229,9 @@ def example2(colors=None):
     f_source_hz = 1e9
 
     # Build grid of positions within 500km of source position (ENU origin)
-    v_source_enu = np.array([0., 0., 0.])  # source is stationary
+    v_source_enu = np.zeros(shape=(3, 1))  # source is stationary
 
-    x_ctr = np.array([0., 0., 0.])
+    x_ctr = np.zeros(shape=(3, 1))
     max_offset = 500e3  # +/- distance from the center of each axis to the edges
     search_size = np.array([1., 1., 0.]) * max_offset  # only search East-North dimensions, not Up
     num_points_per_axis = 201  # MATLAB code uses 1,001, but the image appears properly resolved with just 201
@@ -280,14 +258,16 @@ def example2(colors=None):
     cov_psi = CovarianceMatrix((err_aoa_deg * _deg2rad)**2 * np.eye(2*n_aoa))  # rad^2
     cov_r = CovarianceMatrix((err_tdoa_s*utils.constants.speed_of_light)**2 * np.eye(n_tdoa))  # m^2
     cov_rr = CovarianceMatrix((err_fdoa_hz*utils.constants.speed_of_light/f_source_hz)**2 * np.eye(n_fdoa))  # m^2/s^2
+    # cov_x = CovarianceMatrix.block_diagonal(cov_psi, cov_r, cov_rr)
 
-    cov_x = CovarianceMatrix.block_diagonal(cov_psi, cov_r, cov_rr)
+    # Make the PSS objects
+    aoa = DirectionFinder(x=x_sensor_enu, do_2d_aoa=True, cov=cov_psi)
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_sensor_enu, cov=cov_r, ref_idx=ref_tdoa, variance_is_toa=False)
+    fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor_enu, vel=v_sensor_enu, cov=cov_rr, ref_idx=ref_fdoa)
+    hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=fdoa)
 
     # Compute the CRLB
-    crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor_enu, x_tdoa=x_sensor_enu, x_fdoa=x_sensor_enu,
-                                    v_fdoa=v_sensor_enu - v_source_enu[:, np.newaxis], x_source=x_source_enu,
-                                    cov=cov_x, do_2d_aoa=True, do_resample=True,
-                                    tdoa_ref_idx=ref_tdoa, fdoa_ref_idx=ref_fdoa, print_progress=True)
+    crlb = hybrid.compute_crlb(v_source= v_source_enu, x_source=x_source_enu, print_progress=True)
 
     # Compute and display the RMSE
     rmse_crlb = np.sqrt(np.trace(crlb, axis1=0, axis2=1))

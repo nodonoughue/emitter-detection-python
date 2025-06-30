@@ -1,6 +1,8 @@
 from . import model, perf, solvers
 import utils
 from utils.system import DifferencePSS
+from utils.covariance import CovarianceMatrix
+import numpy as np
 
 _speed_of_light = utils.constants.speed_of_light
 
@@ -11,6 +13,12 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
     _default_tdoa_bias_search_size = 10 # meters
 
     def __init__(self,x, cov, variance_is_toa=True, **kwargs):
+        # Handle empty covariance matrix inputs
+        if cov is None:
+            # Make a dummy; unit variance
+            _, num_sensors = utils.safe_2d_shape(x)
+            cov = CovarianceMatrix(np.eye(num_sensors))
+
         # First, we need to convert from TOA to ROA
         if variance_is_toa:
             cov = cov.multiply(_speed_of_light**2, overwrite=False)
@@ -76,10 +84,14 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
                                       search_size=search_size, epsilon=epsilon, bias=bias,
                                       do_resample=False, variance_is_toa=False, **kwargs)
 
-    def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, **kwargs):
-        return solvers.max_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, cov=self.cov, cov_pos=self.cov_pos,
+    def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, cov_pos=None,
+                                   **kwargs):
+        if cov_pos is None: cov_pos = self.cov_pos
+
+        return solvers.max_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, cov=self.cov, cov_pos=cov_pos,
                                                   ref_idx=self.ref_idx, x_ctr=x_ctr, search_size=search_size,
-                                                  epsilon=epsilon, do_resample=False, variance_is_toa=False, **kwargs)
+                                                  epsilon=epsilon, do_resample=False, variance_is_toa=False,
+                                                  do_sensor_bias=do_sensor_bias, **kwargs)
 
     def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration

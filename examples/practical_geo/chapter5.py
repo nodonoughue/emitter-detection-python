@@ -2,9 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy
 
-import tdoa.model
 import utils
-import hybrid
+from triang import DirectionFinder
+from tdoa import TDOAPassiveSurveillanceSystem
+from hybrid import HybridPassiveSurveillanceSystem
 from utils.covariance import CovarianceMatrix
 from utils.coordinates import ecef_to_enu, ecef_to_lla, enu_to_ecef, lla_to_ecef
 import triang
@@ -48,6 +49,9 @@ def example1(do_mod_cov=False):
         cov = CovarianceMatrix(np.diag([0.05, 0.2]))
     x_init = np.array([0, 1])  # initial guess
 
+    # Make the PSS object
+    aoa = DirectionFinder(x=x_aoa, cov=cov, do_2d_aoa=False)
+
     # Plot the scenario
     def _make_laydown():
         this_fig = plt.figure()
@@ -68,14 +72,15 @@ def example1(do_mod_cov=False):
     plt.legend()
 
     # Gradient Descent Solution; Unconstrained
-    gd_args = {'x_sensor': x_aoa, 'psi': psi, 'cov': cov, 'x_init': x_init}
-    x_gd, x_gd_full = triang.solvers.gradient_descent(**gd_args)
+    gd_args = {'zeta': psi,
+               'x_init': x_init}
+    x_gd, x_gd_full = aoa.gradient_descent(**gd_args)
 
     # Gradient Descent Solution; Constrained
     y_soln = 25.
     a, _ = utils.constraints.fixed_cartesian('y', y_soln)
     constraint_arg = {'eq_constraints': [a]}
-    x_gd_const, x_gd_full_const = triang.solvers.gradient_descent(**gd_args, **constraint_arg)
+    x_gd_const, x_gd_full_const = aoa.gradient_descent(**gd_args, **constraint_arg)
 
     # Report Output and Generate Figure
     print('Gradient Descent Solvers...')
@@ -88,8 +93,8 @@ def example1(do_mod_cov=False):
     plt.legend()
 
     # Do it again with LS
-    x_ls, x_ls_full = triang.solvers.least_square(**gd_args)
-    x_ls_const, x_ls_full_const = triang.solvers.least_square(**gd_args, **constraint_arg)
+    x_ls, x_ls_full = aoa.least_square(**gd_args)
+    x_ls_const, x_ls_full_const = aoa.least_square(**gd_args, **constraint_arg)
 
     # Report Output and Generate Figure
     print('Least Squares Solvers...')
@@ -131,20 +136,18 @@ def example2():
         roa_var = (utils.constants.speed_of_light*time_err)**2
         cov = CovarianceMatrix(np.eye(num_tdoa)*roa_var)
 
-        # Measurement and Noise
-        ref_idx = num_tdoa-1
-        z = tdoa.model.measurement(x_sensor=this_x_tdoa, x_source=x_tgt, ref_idx=ref_idx)
-        noise = cov.lower @ np.random.randn(num_tdoa)
-        cov_z = cov.resample(ref_idx=ref_idx)
-        noise_z = utils.resample_noise(noise, ref_idx=ref_idx)
+        # Make PSS Object
+        tdoa = TDOAPassiveSurveillanceSystem(x=this_x_tdoa, cov=cov, variance_is_toa=False, ref_idx=None)
+        z = tdoa.measurement(x_source=x_tgt)
+        noise_z = tdoa.cov.lower @ np.random.randn(tdoa.num_measurements)
         zeta = z + noise_z
 
         # Solve for Target Position
-        gd_args = {'x_sensor': this_x_tdoa, 'rho': zeta, 'cov': cov_z, 'x_init': this_x_init}
-        x_gd, x_gd_full = tdoa.solvers.gradient_descent(**gd_args)
+        gd_args = {'zeta': zeta, 'x_init': this_x_init}
+        x_gd, x_gd_full = tdoa.gradient_descent(**gd_args)
 
         a, _ = utils.constraints.fixed_alt(alt_val=tgt_alt, geo_type='flat')
-        x_gd_alt, x_gd_full_alt = tdoa.solvers.gradient_descent(**gd_args, eq_constraints=[a])
+        x_gd_alt, x_gd_full_alt = tdoa.gradient_descent(**gd_args, eq_constraints=[a])
         if title is not None:
             print(title)
         print('Unconstrained Solution: ({:.2f} km E, {:.2f} km N, {:.2f} km U)'.format(x_gd[0]/1e3,
@@ -163,13 +166,9 @@ def example2():
 
         # Add isochrones
         iso_label = 'Isochrones'
-        for this_x, this_zeta in zip(this_x_tdoa.T, zeta):
-            if np.all(this_x == x_tdoa[:, ref_idx]):
-                continue
-
-            iso = tdoa.model.draw_isochrone(x_ref=x_tdoa[:2, ref_idx], x_test=this_x[:2],
-                                            range_diff=this_zeta, num_pts=101, max_ortho=40e3)
-            plt.plot(iso[0], iso[1], '--k', linewidth=0.5, label=iso_label)
+        isos = tdoa.draw_isochrones(range_diff=zeta, num_pts=101, max_ortho=40e3)
+        for this_iso in isos:
+            plt.plot(this_iso[0], this_iso[1], '--k', linewidth=0.5, label=iso_label)
             iso_label = None
 
         # Plot GD solution
@@ -252,23 +251,21 @@ def example3():
     err_toa = 1e-6
     err_roa = utils.constants.speed_of_light * err_toa
 
-    cov_aoa = err_aoa**2 * np.eye(2)  # 2D AOA measurement covariance
-    cov_roa = err_roa**2 * np.eye(num_tdoa)  # ROA measurement covariance
-    cov_raw = CovarianceMatrix(scipy.linalg.block_diag(cov_aoa, cov_roa))  # convert to Covariance Matrix object
-    cov_msmt = cov_raw.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, do_2d_aoa=True, tdoa_ref_idx=ref_idx)
+    cov_aoa = CovarianceMatrix(err_aoa**2 * np.eye(2))  # 2D AOA measurement covariance
+    cov_roa = CovarianceMatrix(err_roa**2 * np.eye(num_tdoa))  # ROA measurement covariance
+    # cov_raw = CovarianceMatrix(scipy.linalg.block_diag(cov_aoa, cov_roa))  # convert to Covariance Matrix object
+    # cov_msmt = cov_raw.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, do_2d_aoa=True, tdoa_ref_idx=ref_idx)
+
+    # Make PSS Objects
+    aoa = DirectionFinder(x=x_aoa, cov=cov_aoa, do_2d_aoa=True)
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx, variance_is_toa=False)
+    hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=None)
 
     # CRLB Computation
-    crlb_args = {'x_source': x_tgt,
-                 'cov': cov_msmt,
-                 'x_aoa': x_aoa,
-                 'x_tdoa': x_tdoa,
-                 'do_2d_aoa': True,
-                 'tdoa_ref_idx': ref_idx,
-                 'do_resample': False}
-    crlb_raw = hybrid.perf.compute_crlb(**crlb_args)
+    crlb_raw = hybrid.compute_crlb(x_source=x_tgt)
 
     _, a_grad = utils.constraints.fixed_alt(tgt_alt, geo_type='flat')
-    crlb_fix = hybrid.perf.compute_crlb(**crlb_args, eq_constraints_grad=[a_grad])
+    crlb_fix = hybrid.compute_crlb(x_source=x_tgt, eq_constraints_grad=[a_grad])
 
     print('CRLB (unconstrained):')
     with np.printoptions(precision=0):
@@ -287,10 +284,8 @@ def example3():
                                                   grid_spacing=grid_res)
 
     # Compute CRLB across grid
-    crlb_args['x_source'] = x_set  # replace singular source point with grid of potential source points
-    crlb_args['print_progress'] = True  # turn on progress tracker; these may take some time
-    crlb_raw_grid = hybrid.perf.compute_crlb(**crlb_args)
-    crlb_fix_grid = hybrid.perf.compute_crlb(**crlb_args, eq_constraints_grad=[a_grad])
+    crlb_raw_grid = hybrid.compute_crlb(x_source=x_set, print_progress=True)
+    crlb_fix_grid = hybrid.compute_crlb(x_source=x_set, print_progress=True, eq_constraints_grad=[a_grad])
 
     # Compute RMSE of each grid point
     rmse_raw = np.reshape(np.sqrt(np.trace(crlb_raw_grid, axis1=0, axis2=1)), newshape=out_shape)
@@ -369,9 +364,12 @@ def example4():
     err_aoa = 3 * _deg2rad
     cov_aoa = CovarianceMatrix(err_aoa ** 2 * np.eye(2*num_aoa))  # 2D AOA measurement covariance
 
+    # PSS Object
+    aoa = DirectionFinder(x=x_aoa_ecef, cov=cov_aoa, do_2d_aoa=True)
+
     # Noisy Measurement
-    z = triang.model.measurement(x_sensor=x_aoa_ecef, x_source=x_tgt_ecef, do_2d_aoa=True)
-    n = cov_aoa.lower @ np.random.randn(2*num_aoa)
+    z = aoa.measurement(x_source=x_tgt_ecef)
+    n = aoa.cov.lower @ np.random.randn(aoa.num_measurements)
     zeta = z + n
 
     # Solvers
@@ -379,9 +377,9 @@ def example4():
     x_init = np.array(lla_to_ecef(lat=ref_lla[0], lon=ref_lla[1], alt=init_alt,
                                   angle_units='deg', dist_units='m'))
 
-    gd_args = {'x_init': x_init, 'x_sensor': x_aoa_ecef, 'cov': cov_aoa, 'psi': zeta, 'do_2d_aoa': True}
-    x_gd, x_gd_full = triang.solvers.gradient_descent(**gd_args)
-    x_gd_bound, x_gd_bound_full = triang.solvers.gradient_descent(**gd_args, ineq_constraints=b)
+    gd_args = {'x_init': x_init, 'zeta': zeta}
+    x_gd, x_gd_full = aoa.gradient_descent(**gd_args)
+    x_gd_bound, x_gd_bound_full = aoa.gradient_descent(**gd_args, ineq_constraints=b)
 
     # Convert Solutions to LLA and Print
     x_gd_lla = np.array(ecef_to_lla(x_gd[0], x_gd[1], x_gd[2],
@@ -454,7 +452,10 @@ def example5():
     err_range = utils.constants.speed_of_light * err_time
     cov_roa = CovarianceMatrix(err_range**2 * np.eye(num_tdoa))
     ref_idx = None
-    cov_rdoa = cov_roa.resample(ref_idx=ref_idx)
+    # cov_rdoa = cov_roa.resample(ref_idx=ref_idx)
+
+    # PSS Object
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx, variance_is_toa=False)
 
     # Target Coordinates
     tgt_range = 100e3
@@ -471,8 +472,8 @@ def example5():
         return np.array([scipy.stats.multivariate_normal.pdf(this_x, mean=x_prior, cov=cov_prior) for this_x in x.T])
 
     # Measurement
-    z = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_tgt, ref_idx=ref_idx)
-    noise = cov_rdoa.lower @ np.random.randn(num_tdoa-1)
+    z = tdoa.measurement(x_source=x_tgt)
+    noise = tdoa.cov.lower @ np.random.randn(num_tdoa-1)
     zeta = z + noise
 
     # Solution
@@ -484,10 +485,9 @@ def example5():
               float(x_tgt[1] - grid_size[1]) / 1e3,
               float(x_tgt[1] + grid_size[1]) / 1e3)  # cast each entry to a float to avoid a PyCharm type warning later
 
-    ml_args = {'x_sensor': x_tdoa, 'rho': zeta, 'cov': cov_rdoa, 'x_ctr': x_center, 'search_size': grid_size,
-               'epsilon': epsilon, 'ref_idx': ref_idx}
-    x_ml, score, x_grid = tdoa.solvers.max_likelihood(**ml_args)
-    x_ml_prior, score_prior, _ = tdoa.solvers.max_likelihood(**ml_args, prior=prior, prior_wt=0.5)
+    ml_args = {'zeta': zeta, 'x_ctr': x_center, 'search_size': grid_size, 'epsilon': epsilon}
+    x_ml, score, x_grid = tdoa.max_likelihood(**ml_args)
+    x_ml_prior, score_prior, _ = tdoa.max_likelihood(**ml_args, prior=prior, prior_wt=0.5)
 
     print('Solution w/o prior: {:.2f} km, {:.2f} km, {:.2f} km'.format(x_ml[0]/1e3, x_ml[1]/1e3, x_ml[2]/1e3))
     print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml-x_tgt)/1e3))

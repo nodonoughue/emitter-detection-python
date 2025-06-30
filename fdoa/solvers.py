@@ -108,7 +108,7 @@ def max_likelihood_uncertainty(x_sensor, zeta, cov: CovarianceMatrix, cov_pos: C
 
 
 def gradient_descent(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, v_source=None, ref_idx=None,
-                     do_resample=False, **kwargs):
+                     do_resample=False, bias=None, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -132,7 +132,7 @@ def gradient_descent(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, v_
     # Initialize measurement error and jacobian functions
     def y(this_x):
         return zeta - model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
-                                        x_source=this_x, v_source=v_source, ref_idx=ref_idx)
+                                        x_source=this_x, v_source=v_source, ref_idx=ref_idx, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor=x_sensor, v_sensor=v_sensor,
@@ -150,7 +150,7 @@ def gradient_descent(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, v_
 
 
 def least_square(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
-                 **kwargs):
+                 bias=None, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -174,7 +174,7 @@ def least_square(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, ref_id
     def y(this_x):
         return zeta - model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
                                         x_source=this_x, v_source=None,
-                                        ref_idx=ref_idx)
+                                        ref_idx=ref_idx, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor=x_sensor, v_sensor=v_sensor,

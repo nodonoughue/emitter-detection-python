@@ -8,7 +8,8 @@ from itertools import combinations
 import numpy.typing as npt
 
 
-def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, do_2d_aoa=False, epsilon=None, **kwargs):
+def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, do_2d_aoa=False, epsilon=None, bias=None,
+                   **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -34,7 +35,7 @@ def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, do_
 
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_sensor, psi, cov, x, do_2d_aoa=do_2d_aoa)
+        return model.log_likelihood(x_sensor, psi, cov, x, do_2d_aoa=do_2d_aoa, bias=bias)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon, **kwargs)
@@ -96,7 +97,7 @@ def max_likelihood_uncertainty(x_sensor, psi, cov: CovarianceMatrix, cov_pos: Co
     return x_est, bias_est, sensor_pos_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, **kwargs):
+def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias=None, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -116,7 +117,7 @@ def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=Fal
 
     # Initialize measurement error and jacobian functions
     def y(this_x):
-        return psi - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
+        return psi - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
@@ -127,7 +128,7 @@ def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=Fal
     return x, x_full
 
 
-def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, **kwargs):
+def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias=None, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -147,7 +148,7 @@ def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, 
 
     # Initialize measurement error and Jacobian function handles
     def y(this_x):
-        return psi - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
+        return psi - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, do_2d_aoa=do_2d_aoa)

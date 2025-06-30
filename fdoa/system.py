@@ -1,6 +1,7 @@
 from . import model, perf, solvers
 import utils
 from utils.system import DifferencePSS
+from utils.covariance import CovarianceMatrix
 import numpy as np
 
 _speed_of_light = utils.constants.speed_of_light
@@ -14,7 +15,11 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     _default_fdoa_vel_search_size = 10 # meters/second
 
     def __init__(self,x, cov, **kwargs):
-
+        # Handle empty covariance matrix inputs
+        if cov is None:
+            # Make a dummy; unit variance
+            _, num_sensors = utils.safe_2d_shape(x)
+            cov = CovarianceMatrix(np.eye(num_sensors))
         super().__init__(x=x, cov=cov, **kwargs)
 
         # Overwrite uncertainty search defaults
@@ -122,7 +127,15 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
-    def compute_crlb(self, x_source, **kwargs):
+    def compute_crlb(self, x_source, v_source=None, **kwargs):
+        def this_jacobian(pos_vel):
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, v_source)
+            n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
+            j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=self.pos, v_sensor=self.vel)
+            # Jacobian returns 2*self.n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
+            # excise just the position portion
+            return j[:n_dim]
+
         return perf.compute_crlb(x_sensor=self.pos, v_sensor=self.vel, x_source=x_source, cov=self.cov,
                                  ref_idx=self.ref_idx, do_resample=False, **kwargs)
 
@@ -155,3 +168,18 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
                        (x_t, v_t, x_r, v_r, v_diff) in zip(test_pos.T, test_vel.T, ref_pos.T, ref_vel.T, vel_diff)]
 
         return isodopplers
+
+    def parse_source_pos_vel(self, pos_vel, default_vel):
+        num_dim, _ = utils.safe_2d_shape(pos_vel)
+        if num_dim==self.num_dim:
+            # Position only; return zero for velocity
+            pos = pos_vel
+            vel = default_vel
+        elif num_dim==2*self.num_dim:
+            # Position/Velocity
+            pos = pos_vel[:self.num_dim]
+            vel = pos_vel[self.num_dim:]
+        else:
+            raise ValueError("Unable to parse source position/velocity; unexpected number of spatial dimensions.")
+
+        return pos, vel

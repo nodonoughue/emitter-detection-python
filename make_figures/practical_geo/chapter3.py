@@ -180,7 +180,7 @@ def make_figures_6_7(prefix=None):
     :return: handle
     """
 
-    print('Generating Figures 3.6, 3.7a, 3.7b, 3.7c, 3.7d, 3.7e...')
+    print('Generating Figures 3.6, 3.7a, 3.7b, 3.7c, 3.7d, 3.7e (Example 3.2)...')
 
     figs = chapter3.example2()
 
@@ -208,7 +208,7 @@ def make_figures_9_10(prefix=None):
     :return: handle
     """
 
-    print('Generating Figures 3.9, 3.10a, 3.10b, 3.10c...')
+    print('Generating Figures 3.9, 3.10a, 3.10b, 3.10c (Example 3.3)...')
 
     figs = chapter3.example3()
 
@@ -241,7 +241,7 @@ def make_figures_11_12(prefix=None, force_recalc=False):
         print('Skipping Figures 3.11, and 3.12 (re-run with force_recalc=True to generate)...')
         return None, None
 
-    print('Generating Figure 3.11, 3.12...')
+    print('Generating Figure 3.11, 3.12 (Example 3.4)...')
 
     figs = chapter3.example4()
 

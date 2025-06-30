@@ -35,7 +35,8 @@ def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_ctr, search_size, ep
 
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_sensor, zeta, cov, x, ref_idx, do_resample=False, variance_is_toa=False, bias=bias)
+        return model.log_likelihood(x_sensor, zeta, cov, x, ref_idx, do_resample=False, variance_is_toa=False,
+                                    bias=bias)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
@@ -107,7 +108,7 @@ def max_likelihood_uncertainty(x_sensor, zeta, cov: CovarianceMatrix, cov_pos: C
 
 
 def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, th_init, ref_idx=None, do_resample=False,
-                     variance_is_toa=False, **kwargs):
+                     variance_is_toa=False, bias=None, **kwargs):
     """
     Computes the gradient descent solution for tdoa processing.
 
@@ -133,7 +134,7 @@ def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, th_init, ref_idx=Non
 
     # Initialize measurement error and jacobian functions
     def y(this_x):
-        return zeta - model.measurement(x_sensor, this_x, ref_idx=ref_idx)
+        return zeta - model.measurement(x_sensor, this_x, ref_idx=ref_idx, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
@@ -145,7 +146,7 @@ def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, th_init, ref_idx=Non
 
 
 def least_square(x_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
-                 variance_is_toa=False, **kwargs):
+                 variance_is_toa=False, bias=None, **kwargs):
     """
     Computes the least square solution for tdoa processing.
 
@@ -171,7 +172,7 @@ def least_square(x_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None, do
 
     # Initialize measurement error and Jacobian function handles
     def y(this_x):
-        return zeta - model.measurement(x_sensor, this_x, ref_idx=ref_idx)
+        return zeta - model.measurement(x_sensor, this_x, ref_idx=ref_idx, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)

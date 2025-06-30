@@ -92,16 +92,14 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
             bias_search_size.append([pss.default_bias_search_size] * pss.num_measurements)
             sensor_pos_search_epsilon.append([pss.default_sensor_pos_search_epsilon] * pss.num_sensors * self.num_dim)
             sensor_pos_search_size.append([pss.default_sensor_pos_search_size] * pss.num_sensors * self.num_dim)
-        if self.fdoa is not None:
-            sensor_vel_search_epsilon.append([self.fdoa.default_sensor_vel_search_epsilon] * self.num_fdoa_sensors * self.num_dim)
-            sensor_vel_search_size.append([self.fdoa.default_sensor_vel_search_size] * self.num_fdoa_sensors * self.num_dim)
 
         self._bias_search_epsilon = np.concatenate(bias_search_epsilon, axis=None)
         self._bias_search_size = np.concatenate(bias_search_size, axis=None)
         self._sensor_pos_search_epsilon = np.concatenate(sensor_pos_search_epsilon, axis=None)
         self._sensor_pos_search_size = np.concatenate(sensor_pos_search_size, axis=None)
-        self._sensor_vel_search_epsilon = np.concatenate(sensor_vel_search_epsilon, axis=None)
-        self._sensor_vel_search_size = np.concatenate(sensor_vel_search_size, axis=None)
+        if self.fdoa is not None:
+            self._sensor_vel_search_epsilon = self.fdoa.default_sensor_vel_search_epsilon
+            self._sensor_vel_search_size = self.fdoa.default_sensor_vel_search_size
 
         return
 
@@ -123,7 +121,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         # Parse source position and velocity
         if v_source is None:
             # It might be passed as a single input under x_source with 2*num_dim rows
-            x_source, v_source = self.parse_source_pos_vel(x_source)
+            x_source, v_source = self.parse_source_pos_vel(x_source, np.zeros_like(x_source))
 
         # Call component models
         to_concat = []
@@ -149,14 +147,17 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         else:
             x_aoa, x_tdoa, x_fdoa = self.parse_sensor_data(x_sensor)
         if v_sensor is None:
-            v_fdoa = self.fdoa.vel
+            if self.fdoa is not None:
+                v_fdoa = self.fdoa.vel
+            else:
+                v_fdoa = np.zeros_like(x_fdoa)
         else:
             _, _, v_fdoa = self.parse_sensor_data(v_sensor, vel_input=True)
 
         # Parse source position and velocity
         if v_source is None:
             # It might be passed as a single input under x_source with 2*num_dim rows
-            x_source, v_source = self.parse_source_pos_vel(x_source)
+            x_source, v_source = self.parse_source_pos_vel(x_source, np.zeros_like(x_source))
 
         # Call component models
         to_concat = []
@@ -178,7 +179,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         # Parse source position and velocity
         if v_source is None:
             # It might be passed as a single input under x_source with 2*num_dim rows
-            x_source, v_source = self.parse_source_pos_vel(x_source)
+            x_source, v_source = self.parse_source_pos_vel(x_source, np.zeros_like(x_source))
 
         to_concat = []
         if self.aoa is not None:
@@ -203,7 +204,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         # Parse source position and velocity
         if v_source is None:
             # It might be passed as a single input under x_source with 2*num_dim rows
-            x_source, v_source = self.parse_source_pos_vel(x_source)
+            x_source, v_source = self.parse_source_pos_vel(x_source, np.zeros_like(x_source))
 
         result = 0
         if self.aoa is not None:
@@ -299,7 +300,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         # Likelihood function for ML Solvers
         def ell(pos_vel):
             # Determine if the input is position only, or position & velocity
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel)
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
             return self.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor,
                                        zeta=zeta, x_source=this_pos, v_source=this_vel)
 
@@ -355,12 +356,12 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         # Initialize measurement error and jacobian functions
         def y(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel)
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
             return zeta - self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor,
                                            v_sensor=v_sensor, bias=bias)
 
         def this_jacobian(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel)
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
             n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
             j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
             # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
@@ -382,12 +383,12 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         # Initialize measurement error and jacobian functions
         def y(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel)
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
             return zeta - self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor,
                                            v_sensor=v_sensor, bias=bias)
 
         def this_jacobian(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel)
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
             n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
             j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
             # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
@@ -405,7 +406,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         # Generate the PDF
         def measurement(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel)
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
             return self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor,
                                     bias=bias)
 
@@ -447,10 +448,17 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
-    def compute_crlb(self, x_source, **kwargs):
+    def compute_crlb(self, x_source, v_source=None, **kwargs):
+        """
+        If x_source has 2*self.num_dim rows (position and velocity), then the CRLB will be computed across both sets of
+        unknowns.
+
+        If x_source has self.num_dim rows, then it is just position, and the CRLB will be computed across only those
+        uncertainties.
+        """
         def this_jacobian(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel)
-            n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, default_vel=v_source)
+            n_dim, _ = utils.safe_2d_shape(pos_vel) # record the number of output dimensions called for
             j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=self.pos, v_sensor=self.vel)
             # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
             # excise just the position portion
@@ -468,8 +476,8 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         # Intuit reference indices from the components
 
         # First, we generate the test and reference index vectors
-        test_idx_vec_aoa = np.arange(self.num_aoa_sensors)
-        ref_idx_vec_aoa = np.nan * np.ones((self.num_aoa_sensors,))
+        test_idx_vec_aoa = np.arange(self.num_aoa_measurements)
+        ref_idx_vec_aoa = np.nan * np.ones((self.num_aoa_measurements,))
 
         if self.tdoa is not None:
             test_idx_vec_tdoa, ref_idx_vec_tdoa = utils.parse_reference_sensor(self.tdoa.ref_idx, self.num_tdoa_sensors)
@@ -485,11 +493,11 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         # Second, we assemble them into a single vector
         test_idx_vec = np.concatenate((test_idx_vec_aoa,
-                                       self.num_aoa_sensors + test_idx_vec_tdoa,
-                                       self.num_aoa_sensors + self.num_tdoa_sensors + test_idx_vec_fdoa), axis=0)
+                                       self.num_aoa_measurements + test_idx_vec_tdoa,
+                                       self.num_aoa_measurements + self.num_tdoa_sensors + test_idx_vec_fdoa), axis=0)
         ref_idx_vec = np.concatenate((ref_idx_vec_aoa,
-                                      self.num_aoa_sensors + ref_idx_vec_tdoa,
-                                      self.num_aoa_sensors + self.num_tdoa_sensors + ref_idx_vec_fdoa), axis=0)
+                                      self.num_aoa_measurements + ref_idx_vec_tdoa,
+                                      self.num_aoa_measurements + self.num_tdoa_sensors + ref_idx_vec_fdoa), axis=0)
 
         ref_idx = np.array([test_idx_vec, ref_idx_vec]) # store in object's field
         return ref_idx # return as well
@@ -611,12 +619,12 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         return theta_aoa, theta_tdoa, theta_fdoa
 
-    def parse_source_pos_vel(self, pos_vel):
+    def parse_source_pos_vel(self, pos_vel, default_vel):
         num_dim, _ = utils.safe_2d_shape(pos_vel)
         if num_dim==self.num_dim:
             # Position only; return zero for velocity
             pos = pos_vel
-            vel = np.zeros_like(pos)
+            vel = default_vel
         elif num_dim==2*self.num_dim:
             # Position/Velocity
             pos = pos_vel[:self.num_dim]

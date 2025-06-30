@@ -1,6 +1,8 @@
+from utils import utils
 from . import model, perf, solvers
 from utils.system import PassiveSurveillanceSystem
-
+from utils.covariance import CovarianceMatrix
+import numpy as np
 
 class DirectionFinder(PassiveSurveillanceSystem):
     do_2d_aoa: bool = False
@@ -9,6 +11,16 @@ class DirectionFinder(PassiveSurveillanceSystem):
     _default_aoa_bias_search_size = 1 # degrees
 
     def __init__(self,x, cov, do_2d_aoa=False, **kwargs):
+        # Handle empty covariance matrix inputs
+        if cov is None:
+            # Make a dummy; unit variance
+            num_dim, num_sensors = utils.safe_2d_shape(x)
+            if do_2d_aoa:
+                num_measurements = 2*num_sensors
+            else:
+                num_measurements = num_sensors
+            cov = CovarianceMatrix(np.eye(num_measurements))
+
         super().__init__(x, cov, **kwargs)
 
         self.do_2d_aoa = do_2d_aoa
@@ -76,7 +88,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
             x_sensor, v_sensor, bias = self.pos, None, self.bias
 
         return solvers.gradient_descent(x_sensor=x_sensor, psi=zeta, cov=self.cov, bias=bias, do_2d_aoa=self.do_2d_aoa,
-                                        **kwargs)
+                                        x_init=x_init, **kwargs)
 
     def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration

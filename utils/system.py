@@ -81,7 +81,7 @@ class PassiveSurveillanceSystem(ABC):
         pass
 
     def sensor_calibration(self, zeta_cal, x_cal, v_cal=None, pos_search: dict=None, vel_search: dict=None,
-                           bias_search: dict=None):
+                           bias_search: dict=None, do_pos_cal=True, do_vel_cal=False, do_bias_cal=False):
         """
         This function attempts to calibrate sensor uncertainties given a series of measurements (zeta_cal)
         against a set of calibration emitters. Relies on the method log_likelihood to compute a Maximum Likelihood
@@ -100,13 +100,19 @@ class PassiveSurveillanceSystem(ABC):
         :param pos_search: optional dictionary with parameters for the ML search for sensor positions
         :param vel_search: optional dictionary with parameters for the ML search for sensor positions
         :param bias_search: optional dictionary with parameters for the ML search for measurement bias
+        :param do_pos_cal: boolean flag (default True); if True calibration data will be used to estimate sensor
+                           positions
+        :param do_vel_cal: boolean flag (default False); if True calibration data will be used to estimate sensor
+                           velocities
+        :param do_bias_cal: boolean flag (default False); if True calibration data will be used to estimate sensor
+                            measurement biases
         :return x_sensor_est: Estimated sensor positions (None if ignored)
         :return bias_est: Estimated measurement biases (None if ignored)
         """
 
         # TODO: Test
         # ================ Parse inputs =========================
-        if pos_search is None and bias_search is None:
+        if not do_pos_cal and not do_vel_cal and not do_bias_cal:
             # No calibration called for
             return self.pos, self.vel, self.bias
 
@@ -125,9 +131,9 @@ class PassiveSurveillanceSystem(ABC):
             v_cal = np.zeros_like(x_cal)  # assume zero velocity; simplified code later on
 
         # ==================== Initialize Search Space ========================
-        pos_search = self.initialize_sensor_pos_search(pos_search)
-        vel_search = self.initialize_sensor_vel_search(vel_search)
-        bias_search = self.initialize_bias_search(bias_search)
+        pos_search = self.initialize_sensor_pos_search(pos_search, do_pos_search=do_pos_cal)
+        vel_search = self.initialize_sensor_vel_search(vel_search, do_vel_search=do_vel_cal)
+        bias_search = self.initialize_bias_search(bias_search, do_bias_search=do_bias_cal)
 
         # ==================== Log-Likelihood Wrapper Function ================
         # Accepts a 1D vector of measurement biases and a 1D vector of sensor positions
@@ -150,7 +156,7 @@ class PassiveSurveillanceSystem(ABC):
                 bias_est)
 
 
-    def initialize_bias_search(self, bias_search: dict=None):
+    def initialize_bias_search(self, bias_search: dict=None, do_bias_search: bool=False):
         if bias_search is None:
             return None
 
@@ -165,9 +171,14 @@ class PassiveSurveillanceSystem(ABC):
         if 'search_size' not in bias_search.keys() or bias_search['search_size'] is None:
             bias_search['search_size'] = self.default_bias_search_size
 
+        if not do_bias_search:
+            # The flag has been set to suppress a search across measurement biases; return a search size
+            # of 1.
+            bias_search['search_size'] = 1
+
         return bias_search
 
-    def initialize_sensor_pos_search(self, pos_search: dict=None):
+    def initialize_sensor_pos_search(self, pos_search: dict=None, do_pos_search: bool=True):
         if pos_search is None:
             return None
 
@@ -180,9 +191,14 @@ class PassiveSurveillanceSystem(ABC):
         if 'search_size' not in pos_search.keys() or pos_search['search_size'] is None:
             pos_search['search_size'] = self.default_sensor_pos_search_size
 
+        if not do_pos_search:
+            # The flag has been set to suppress a search across sensor positions; return a search size
+            # of 1.
+            pos_search['search_size'] = 1
+
         return pos_search
 
-    def initialize_sensor_vel_search(self, vel_search: dict=None):
+    def initialize_sensor_vel_search(self, vel_search: dict=None, do_vel_search: bool=False):
         if vel_search is None:
             return None
 
@@ -194,6 +210,11 @@ class PassiveSurveillanceSystem(ABC):
 
         if 'search_size' not in vel_search.keys() or vel_search['search_size'] is None:
             vel_search['search_size'] =self.default_sensor_vel_search_size
+
+        if not do_vel_search:
+            # The flag has been set to suppress a search across sensor velocities; return a search size
+            # of 1.
+            vel_search['search_size'] = 1
 
         return vel_search
 
