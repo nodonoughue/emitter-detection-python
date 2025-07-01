@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import utils
+from utils import SearchSpace
 from utils.covariance import CovarianceMatrix
 from numpy import typing as npt
 
@@ -309,7 +310,7 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
     return t
 
 
-def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
+def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
               prior=None, prior_wt: float = 0.):
     """
     Execute ML estimation through brute force computational methods.
@@ -321,9 +322,7 @@ def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constr
 
     :param ell: Function handle for the likelihood of a given position must accept x_ctr (and similar sized vectors)
                 as the sole input.
-    :param x_ctr: Center position for search space (x, x/y, or z/y/z).
-    :param search_size: Search space size (same units as x_ctr)
-    :param epsilon: Search space resolution (same units as x_ctr)
+    :param search_space: SearchSpace object defining the space over which to search
     :param eq_constraints: List of equality constraint functions (see utils.constraints)
     :param ineq_constraints: List of inequality constraint functions (see utils.constraints)
     :param constraint_tolerance: Tolerance to apply to equality constraints (default = 1e-6); any deviations with a
@@ -338,7 +337,7 @@ def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constr
     """
 
     # Set up the search space
-    x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
+    x_set, x_grid, out_shape = utils.make_nd_grid(search_space)
 
     # Constrain the likelihood, if needed
     if ineq_constraints is not None or eq_constraints is not None:
@@ -360,7 +359,7 @@ def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constr
     return x_est, likelihood, x_grid
 
 
-def bestfix(pdfs, x_ctr, search_size, epsilon):
+def bestfix(pdfs, search_space: SearchSpace):
     """
     Based on the BESTFIX algorithm, invented in 1990 by Eric Hodson (R&D Associates, now with Naval Postgraduate
     School).  Patent is believed to be in the public domain.
@@ -376,16 +375,13 @@ def bestfix(pdfs, x_ctr, search_size, epsilon):
 
     :param pdfs: Lx1 cell list of PDF functions, each of which represents the probability that an input position
                  (Ndim x 3 array) is the true source position for one of the measurements.
-    :param x_ctr: Center position for search space (x, x/y, or z/y/z).
-    :param search_size: Search space size (same units as x_ctr)
-    :param epsilon: Search space resolution (same units as x_ctr)
     :return x_est: Estimated position
     :return result: Likelihood computed at each x position in the search space
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
     """
 
     # Set up the search space
-    x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
+    x_set, x_grid, out_shape = utils.make_nd_grid(search_space)
 
     # Apply each PDF to all input coordinates and then multiply across PDFs
     result = np.asarray([np.prod(np.asarray([this_pdf(this_x) for this_pdf in pdfs])) for this_x in x_set.T])
@@ -400,9 +396,9 @@ def bestfix(pdfs, x_ctr, search_size, epsilon):
     return x_est, result, x_grid
 
 def sensor_calibration(ell,
-                       pos_search: dict,
-                       vel_search: dict,
-                       bias_search: dict,
+                       pos_search: SearchSpace,
+                       vel_search: SearchSpace,
+                       bias_search: SearchSpace,
                        num_iterations=1):
     """
     This function attempts to calibrate sensor uncertainties given a series of measurements (AOA, TDOA, and/or FDOA)
@@ -429,52 +425,41 @@ def sensor_calibration(ell,
     :return bias_est: Estimated measurement biases
     """
 
-    # Check dictionaries
-    # pos_search, vel_search, and bias_search need to have fields 'x_ctr', 'search_size', and 'epsilon' in order to be
-    # passed to utils.solvers.maximum_likelihood as named arguments
-    _needed_fields = ['x_ctr', 'epsilon', 'search_size']
-    if pos_search is not None:
-        assert np.all([x in pos_search.keys() for x in _needed_fields]), 'pos_search dictionary missing required fields.'
-    if bias_search is not None:
-        assert np.all([x in bias_search.keys() for x in _needed_fields]), 'bias_search dictionary missing required fields.'
-    if vel_search is not None:
-        assert np.all([x in vel_search.keys() for x in _needed_fields]), 'bias_search dictionary missing required fields.'
-
     # Initialize Outputs
-    bias_est = bias_search['x_ctr']
-    x_sensor_est = pos_search['x_ctr']
-    v_sensor_est = vel_search['x_ctr']
+    bias_est = bias_search.x_ctr
+    x_sensor_est = pos_search.x_ctr
+    v_sensor_est = vel_search.x_ctr
 
     for _ in np.arange(num_iterations):
 
         # ================= Estimate Measurement Bias ========================
-        if bias_search['search_size'] > 1:
-            x_sensor_vec = pos_search['x_ctr']
-            v_sensor_vec = vel_search['x_ctr']
+        if bias_search.points_per_dim > 1:
+            x_sensor_vec = pos_search.x_ctr
+            v_sensor_vec = vel_search.x_ctr
             def ell_bias(bias):
                 return ell(bias, x_sensor_vec, v_sensor_vec)
 
-            result = ml_solver(ell=ell_bias, *bias_search)
+            result = utils.solvers.ml_solver(ell=ell_bias, search_space=bias_search)
             bias_est = result[0]
-            bias_search['x_ctr'] = bias_est # store result as center for next iteration
+            bias_search.x_ctr = bias_est # store result as center for next iteration
 
         # =================== Estimate Sensor Position =========================
-        if pos_search['search_size'] > 1:
-            v_sensor_vec = vel_search['x_ctr']
+        if pos_search.points_per_dim > 1:
+            v_sensor_vec = vel_search.x_ctr
             def ell_pos(x):
                 return ell(bias_est, x, v_sensor_vec)
 
-            result = utils.solvers.ml_solver(ell=ell_pos, *pos_search)
+            result = utils.solvers.ml_solver(ell=ell_pos, search_space=pos_search)
             x_sensor_est = result[0]
-            pos_search['x_ctr'] = x_sensor_est # store result as center for next iteration
+            pos_search.x_ctr = x_sensor_est # store result as center for next iteration
 
         # =================== Estimate Sensor Velocity =========================
-        if vel_search['search_size'] > 1:
+        if vel_search.points_per_dim > 1:
             def ell_vel(v):
                 return ell(bias_est, x_sensor_est, v)
 
-            result = utils.solvers.ml_solver(ell=ell_vel, *vel_search)
+            result = utils.solvers.ml_solver(ell=ell_vel, search_space=vel_search)
             v_sensor_est = result[0]
-            vel_search['x_ctr'] = v_sensor_est # store result as center for next iteration
+            vel_search.x_ctr = v_sensor_est # store result as center for next iteration
 
     return x_sensor_est, v_sensor_est, bias_est

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 import utils
 import time
+from utils import SearchSpace
 from utils.covariance import CovarianceMatrix
 from triang import DirectionFinder
 from tdoa import TDOAPassiveSurveillanceSystem
@@ -236,7 +237,10 @@ def example2(colors=None):
     search_size = np.array([1., 1., 0.]) * max_offset  # only search East-North dimensions, not Up
     num_points_per_axis = 201  # MATLAB code uses 1,001, but the image appears properly resolved with just 201
     grid_res = 2*max_offset/num_points_per_axis
-    x_source_enu, x_grid, grid_shape = utils.make_nd_grid(x_ctr, search_size, grid_res)  # make the grid
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=search_size,
+                               epsilon=grid_res)
+    x_source_enu, x_grid, grid_shape = utils.make_nd_grid(search_space)  # make the grid
     extent = tuple(np.array([x_ctr[0] - max_offset, x_ctr[0] + max_offset,
                              x_ctr[1] - max_offset, x_ctr[1] + max_offset])/1e3)
 

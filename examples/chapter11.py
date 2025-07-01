@@ -4,6 +4,7 @@ import time
 import utils
 from utils.covariance import CovarianceMatrix
 import tdoa
+from utils import SearchSpace
 
 
 def run_all_examples():
@@ -96,10 +97,7 @@ def example1(rng=np.random.default_rng()):
                'do_resample': False
                }
 
-    ml_args = {'x_ctr': x_init,
-               'search_size': x_extent,
-               'epsilon': grid_res
-               }
+    ml_args = {'search_space': SearchSpace(x_ctr=x_init, max_offset=x_extent, epsilon=grid_res)}
 
     ls_args = {'x_init': x_init,
                'max_num_iterations': num_iterations,
@@ -256,18 +254,6 @@ def _mc_iteration(rx_args: dict, ml_args: dict, ls_args: dict, gd_args: dict, mc
     """
     Executes a single iteration of the Monte Carlo simulation in Example 11.1.
 
-    :param args: Dictionary of arguments for monte carlo simulation in Example 11.1. Fields are:
-                rng: random number generator
-                rho_act: true range difference of arrival (meters)
-                covar_rho: measurement error covariance matrix
-                covar_lower: lower triangular Cholesky decomposition of the measurement error covariance matrix
-                num_measurements: number of TDOA sensor pair measurements
-                x_sensor: position of TDOA sensors
-                x_init: initial solution guess (also used as center of search grid for ML and Bestfix)
-                x_extent: search grid extent
-                epsilon: stopping condition for LS and GD
-                grid_res: search grid spacing
-                num_iterations: maximum number of iterations for GD and LS solvers
     :return estimates: Dictionary with estimated target position using several algorithms.  Fields are:
                 ml: Maximum Likelihood solution
                 bf: Bestfix solution

@@ -279,7 +279,7 @@ def make_figure_2(prefix=None):
     return fig2
 
 
-def make_figure_3(prefix=None, rng=np.random):
+def make_figure_3(prefix=None, rng=np.random.default_rng()):
     """
     Figure 3 - Plot of leading edge detection
 

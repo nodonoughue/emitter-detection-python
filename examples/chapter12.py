@@ -4,6 +4,7 @@ import time
 import utils
 import fdoa
 from utils.covariance import CovarianceMatrix
+from utils import SearchSpace
 
 
 def run_all_examples():
@@ -90,10 +91,7 @@ def example1(rng=np.random.default_rng()):
                'do_resample': False
                }
 
-    ml_args = {'x_ctr': x_init,
-               'search_size': x_extent,
-               'epsilon': grid_res
-               }
+    ml_args = {SearchSpace(x_ctr=x_init, max_offset=x_extent, epsilon=grid_res)}
 
     ls_args = {'max_num_iterations': num_iterations,
                'force_full_calc': True,

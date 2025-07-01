@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import utils
 from utils.covariance import CovarianceMatrix
+from utils import SearchSpace
 import matplotlib.pyplot as plt
 
 
@@ -19,11 +20,11 @@ class PassiveSurveillanceSystem(ABC):
 
     # Default Values
     default_bias_search_epsilon = 0
-    default_bias_search_size = 0
+    default_bias_search_size = 1
     default_sensor_pos_search_epsilon = 2.5
     default_sensor_pos_search_size = 25
     default_sensor_vel_search_epsilon = 1
-    default_sensor_vel_search_size = 0  # By default, we can't search across sensor velocity
+    default_sensor_vel_search_size = 1  # By default, we can't search across sensor velocity
 
     def __init__(self, x: np.ndarray, cov: CovarianceMatrix or None, bias=None, cov_pos=None, vel=None):
         if len(np.shape(x))==0: x = np.expand_dims(x, 1) # Add a second dimension, if there isn't one
@@ -59,18 +60,135 @@ class PassiveSurveillanceSystem(ABC):
         pass
 
     @abstractmethod
-    def log_likelihood_uncertainty(self, zeta, theta, **kwargs):
-        pass
+    def log_likelihood_uncertainty(self, zeta, theta, do_sensor_bias=False, do_sensor_pos=False,
+                                   do_sensor_vel=False, **kwargs):
+        if not do_sensor_bias and not do_sensor_pos and not do_sensor_vel:
+            # None of the uncertainty parameters are being called for; theta is just x_source
+            return self.log_likelihood(theta, zeta, **kwargs)
+
+        # Parse the uncertainty vector
+        indices = self.parse_uncertainty_indices(theta, do_bias=do_sensor_bias, do_sensor_pos=do_sensor_pos,
+                                                 do_sensor_vel=do_sensor_vel)
+
+        # Write a parsing function
+        def _parse_uncertainty_vector(th):
+            x = th[indices['source_pos_indices']]
+            v = th[indices['source_vel_indices']] if do_source_vel else np.zeros_like(x)
+            b = th[indices['bias_indices']] if do_sensor_bias else self.bias
+            xs = np.reshape(th[indices['pos_indices']], self.pos.shape) if do_sensor_pos else self.pos
+            xv = np.reshape(th[indices['vel_indices']], self.pos.shape) if do_sensor_vel else self.vel
+            return x, v, b, xs, vs
+
+        num_parameters, num_source_pos = utils.safe_2d_shape(theta)
+        ell = np.zeros((num_source_pos, ))
+
+        # Make sure the source pos is a matrix, rather than simply a vector
+        if num_source_pos == 1:
+            theta = theta[:, np.newaxis]
+
+        # ToDo: add a beta term for sensor velocity; and an accompanying cov_vel param.
+        beta = np.ravel(self.pos) if do_sensor_pos else np.array([])
+
+        for idx_source, th_i in enumerate(theta.T):
+            x_i, v_i, b_i, xs_i, vs_i = _parse_uncertainty_vector(th_i)
+
+            # Generate the ideal measurement matrix for this position
+            zeta_i = self.measurement(x_sensor=xs_i, v_sensor=vs_i, x_source=x_i, v_source=v_i,
+                                      bias=b_i)
+
+            # Evaluate the measurement error
+            err = zeta - zeta_i
+            if do_sensor_pos:
+                err_pos = beta - np.ravel(xs_i)
+
+            # Compute the scaled log likelihood
+            ell_x = - self.cov.solve_aca(err)
+            if do_sensor_pos:
+                ell_b = - self.cov_pos.solve_aca(err_b)
+            else:
+                ell_b = 0
+
+            ell[idx_source] = ell_x + ell_b
+
+        return ell
 
     # ==================== Solver Methods ===================
     # These methods define the basic solver methods, and associated utilities, and must be implemented.
     @abstractmethod
-    def max_likelihood(self, zeta, x_ctr, search_size, epsilon, bias, cal_data, **kwargs):
+    def max_likelihood(self, zeta, source_search: SearchSpace, bias, cal_data, **kwargs):
         pass
 
-    @abstractmethod
-    def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon, do_sensor_bias, **kwargs):
-        pass
+    def max_likelihood_uncertainty(self, zeta, source_search: SearchSpace,
+                                   do_sensor_bias: bool, do_sensor_pos: bool, do_sensor_vel:bool,
+                                   bias_search: SearchSpace, pos_search: SearchSpace, vel_search: SearchSpace,
+                                   **kwargs):
+        """
+        To perform a Max Likelihood Search with extra uncertainty parameters (e.g., sensor bias,
+        sensor position, or sensor velocity), we must encapsulate those extra variables in a broader
+        SearchSpace object
+
+        :param zeta: Measurement vector
+        :param source_search: Definition of the source position (or pos/vel) search space; utils.solvers.SearchSpace instance
+        :param do_sensor_bias: flag controlling whether this function will account for unknown measurement bias
+        :param do_sensor_pos: flag controlling whether this function will account for sensor position errors
+        :param do_sensor_vel: flag controlling whether this function will account for sensor velocity errors
+        :param bias_search: utils.solvers.SearchSpace for measurement bias search
+        :param pos_search: utils.solvers.SearchSpace for sensor position
+        :param vel_search: utils.solvers.SearchSpace for sensor velocity
+        :return x_est:  estimated source position (or position and velocity)
+        :return likelihood: array of likelihood values at each position in the combined SearchSpace
+        :return th_grid: grid of search positions
+        :return parameter_est: dict containing the estimated bias, sensor position, and sensor velocity terms
+        """
+
+        # Make sure at least one term is true; otherwise this is just ML
+        if not do_sensor_bias and not do_sensor_pos and not do_sensor_vel:
+            x_est, likelihood, x_grid = self.max_likelihood(zeta, source_search, **kwargs)
+            return x_est, likelihood, x_grid, None
+
+        # Double check that we actually want to search for sensor velocities...
+        do_sensor_vel = do_sensor_vel and self.vel is not None
+
+        # Build the Search Space
+        # First, we get the center, epsilon, and search_size for the uncertainty terms
+        # (sensor measurement bias, sensor positions, and sensor velocities)
+        unc_search_space = self.make_uncertainty_search_space(source_search,
+                                                              do_bias_search=do_sensor_bias,
+                                                              do_pos_search=do_sensor_pos,
+                                                              do_vel_search=do_sensor_vel,
+                                                              bias_search=bias_search, pos_search=pos_search,
+                                                              vel_search=vel_search)
+
+        search_space = unc_search_space['combined_search']
+        indices = unc_search_space['indices']
+        # dict fields:
+        # source_indices   -- source parameter indices
+        # bias_indices     -- bias parameter indices
+        # pos_indices      -- sensor position indices
+        # vel_indices      -- sensor velocity indices
+
+        def ell(th):
+            # Parse the parameter vector theta
+            pos_vel = th[indices['source_indices']]
+            x_source, v_source = self.parse_source_pos_vel(pos_vel, default_vel=self.vel)
+            bias = th[indices['bias_indices']] if do_sensor_bias else self.bias
+            x_sensor = np.reshape(th[indices['pos_indices']], self.pos.shape) if do_sensor_pos else self.pos
+            v_sensor = np.reshape(th[indices['vel_indices']], self.vel.shape) if do_sensor_vel else self.vel
+
+            return self.log_likelihood(zeta=zeta, x_source=x_source, v_source=v_source,
+                                       x_sensor=x_sensor, v_sensor=v_sensor,
+                                       bias=bias)
+
+        th_est, likelihood, th_grid = utils.solvers.ml_solver(ell=ell, search_space=search_space,
+                                                              **kwargs)
+
+        # Parse the estimates
+        x_est = th_est[indices['source_indices']]
+        th_est = {'bias': th_est[indices['bias_indices']] if do_sensor_bias else None,
+                  'pos': th_est[indices['pos_indices']] if do_sensor_pos else None,
+                  'vel': th_est[indices['vel_indices']] if do_sensor_vel else None}
+
+        return x_est, likelihood, th_grid, th_est
 
     @abstractmethod
     def gradient_descent(self, zeta, x_init, **kwargs):
@@ -80,8 +198,9 @@ class PassiveSurveillanceSystem(ABC):
     def least_square(self, zeta, x_init, **kwargs):
         pass
 
-    def sensor_calibration(self, zeta_cal, x_cal, v_cal=None, pos_search: dict=None, vel_search: dict=None,
-                           bias_search: dict=None, do_pos_cal=True, do_vel_cal=False, do_bias_cal=False):
+    def sensor_calibration(self, zeta_cal, x_cal, v_cal=None,
+                           pos_search: SearchSpace=None, vel_search: SearchSpace=None, bias_search: SearchSpace=None,
+                           do_pos_cal=True, do_vel_cal=False, do_bias_cal=False):
         """
         This function attempts to calibrate sensor uncertainties given a series of measurements (zeta_cal)
         against a set of calibration emitters. Relies on the method log_likelihood to compute a Maximum Likelihood
@@ -155,68 +274,229 @@ class PassiveSurveillanceSystem(ABC):
                 np.reshape(v_sensor_est, shape=self.pos.shape),
                 bias_est)
 
+    def make_uncertainty_search_space(self, source_search: SearchSpace,
+                                      do_bias_search: bool, do_pos_search: bool, do_vel_search: bool,
+                                      bias_search: SearchSpace=None, pos_search: SearchSpace=None,
+                                      vel_search: SearchSpace=None):
+        """
+        Parse an uncertainty search space across sensor measurement biases, sensor positions, and sensor
+        velocities.
 
-    def initialize_bias_search(self, bias_search: dict=None, do_bias_search: bool=False):
-        if bias_search is None:
-            return None
+        This will define a bias_search, pos_search, and vel_search, for each uncertainty component, respectively,
+        as well as a combined search vector for all of them.
 
-        if 'x_ctr' not in bias_search.keys() or bias_search['x_ctr'] is None:
+        :param source_search: Source pos (or pos/vel) search space
+        :param do_bias_search: Boolean flag; if true then a search space will be defined for measurement biases
+        :param do_pos_search: Boolean flag; if true then a search space will be defined for sensor positions
+        :param do_vel_search: Boolean flag; if true, then a search space will be defined for sensor velocities
+        :param bias_search: Optional initial bias search space
+        :param pos_search: Optional initial position search space
+        :param vel_search: Optional initial velocity search space
+        :return search_space: dict with the following fields:
+            combined_search SearchSpace object specifying the combined parameter search
+            source_search   SearchSpace object specifying the source pos (or pos/vel) search
+            bias_search     SearchSpace object specifying the sensor bias search component
+            pos_search`     SearchSpace object specifying the sensor position search component
+            vel_search      SearchSpace object specifying the sensor velocity search component
+            indices         SearchSpace object specifying the indices for x_ctr, epsilon, and search_size, with fields:
+                    num_source -- number of parameters in the source search
+                    num_bias   -- number of parameters in the bias search
+                    num_pos    -- number of parameters in the sensor position search
+                    num_vel    -- number of parameters in the sensor velocity search
+                    source_indices   -- source parameter indices
+                    bias_indices     -- bias parameter indices
+                    pos_indices      -- sensor position indices
+                    vel_indices      -- sensor velocity indices
+        """
+
+        # === Initialize Component Search Spaces ========================
+        bias_search = self.initialize_bias_search(bias_search, do_bias_search=do_bias_search)
+        pos_search = self.initialize_sensor_pos_search(pos_search, do_pos_search=do_pos_search)
+        vel_search = self.initialize_sensor_vel_search(vel_search, do_vel_search=do_vel_search)
+
+        # === Make sure the Search Space is Broadcasted to common size (no scalars)
+        # todo: implement as a SearchSpace method
+        num_params = source_search.num_parameters
+        default_arr = np.ones((num_params, ))
+        if len(source_search.x_ctr) != num_params:
+            source_search.x_ctr = source_search.x_ctr * default_arr
+        if len(source_search.epsilon) != num_params:
+            source_search.epsilon = source_search.epsilon * default_arr
+        if len(source_search.points_per_dim) != num_params:
+            source_search.points_per_dim = source_search.points_per_dim * default_arr
+
+        # === Parse the components for a combined search space =========
+        field_names = ['x_ctr', 'epsilon', 'points_per_dim']
+        combined_search = {}
+        for field_name in field_names:
+            components = [getattr(x, field_name) for x in (source_search, bias_search, pos_search, vel_search) if x is not None]
+            if len(components) > 1:
+                combined_search[field_name] = np.concatenate(components, axis=None)
+            else:
+                combined_search[field_name] = components[0]
+        search_space = SearchSpace(**combined_search)  # pass combined search terms to constructor as kwargs
+
+        # === Compute indices =========================================
+        num_source = source_search.num_parameters
+        num_bias = bias_search.num_parameters if bias_search is not None else 0
+        num_pos = pos_search.num_parameters if pos_search is not None else 0
+        num_vel = vel_search.num_parameters if vel_search is not None else 0
+
+        source_indices = np.arange(num_source)
+        bias_indices = np.arange(num_bias) + num_source
+        pos_indices = np.arange(num_pos) + num_bias + num_source
+        vel_indices = np.arange(num_vel) + num_pos + num_bias + num_source
+        indices = {'num_source': num_source,
+                   'num_bias': num_bias,
+                   'num_pos': num_pos,
+                   'num_vel': num_vel,
+                   'source_indices': source_indices,
+                   'bias_indices': bias_indices,
+                   'pos_indices': pos_indices,
+                   'vel_indices': vel_indices}
+
+        return {'combined_search': search_space,
+                'source_search': source_search,
+                'bias_search': bias_search,
+                'pos_search': pos_search,
+                'vel_search': vel_search,
+                'indices': indices}
+
+    def initialize_bias_search(self, bias_search: SearchSpace=None, do_bias_search: bool=False):
+        if not do_bias_search: return None
+
+        if bias_search.x_ctr is None:
             # If there is a bias specified in the object; use it as the center of the search window. Otherwise,
             # assume zero bias is the center
-            bias_search['x_ctr'] = self.bias if self.bias is not None else np.zeros((self.num_measurements, ))
+            x_ctr = self.bias if self.bias is not None else np.zeros((self.num_measurements, ))
+        else:
+            x_ctr = bias_search.x_ctr
 
-        if 'epsilon' not in bias_search.keys() or bias_search['epsilon'] is None:
-            bias_search['epsilon'] = self.default_bias_search_epsilon
+        if bias_search.epsilon is None:
+            epsilon = self.default_bias_search_epsilon
+        else:
+            epsilon = bias_search.epsilon
 
-        if 'search_size' not in bias_search.keys() or bias_search['search_size'] is None:
-            bias_search['search_size'] = self.default_bias_search_size
+        if bias_search.points_per_dim is None:
+            points_per_dim = self.default_bias_search_size
+        else:
+            points_per_dim = bias_search.points_per_dim
 
-        if not do_bias_search:
-            # The flag has been set to suppress a search across measurement biases; return a search size
-            # of 1.
-            bias_search['search_size'] = 1
+        return SearchSpace(x_ctr=x_ctr, epsilon=epsilon, points_per_dim=points_per_dim)
 
-        return bias_search
+    def initialize_sensor_pos_search(self, pos_search: SearchSpace=None, do_pos_search: bool=True):
+        if not do_pos_search: return None
 
-    def initialize_sensor_pos_search(self, pos_search: dict=None, do_pos_search: bool=True):
-        if pos_search is None:
-            return None
+        if pos_search is None or pos_search.x_ctr is None:
+            x_ctr = self.pos.ravel()
+        else:
+            x_ctr = pos_search.x_ctr
 
-        if 'x_ctr' not in pos_search.keys() or pos_search['x_ctr'] is None:
-            pos_search['x_ctr'] = self.pos.ravel()
+        if pos_search is None or pos_search.epsilon is None:
+            epsilon = self.default_sensor_pos_search_epsilon
+        else:
+            epsilon = pos_search.epsilon
 
-        if 'epsilon' not in pos_search.keys() or pos_search['epsilon'] is None:
-            pos_search['epsilon'] = self.default_sensor_pos_search_epsilon
+        if pos_search is None or pos_search.points_per_dim is None:
+            points_per_dim = self.default_sensor_pos_search_size
+        else:
+            points_per_dim = pos_search.points_per_dim
 
-        if 'search_size' not in pos_search.keys() or pos_search['search_size'] is None:
-            pos_search['search_size'] = self.default_sensor_pos_search_size
+        return SearchSpace(x_ctr=x_ctr, epsilon=epsilon, points_per_dim=points_per_dim)
 
-        if not do_pos_search:
-            # The flag has been set to suppress a search across sensor positions; return a search size
-            # of 1.
-            pos_search['search_size'] = 1
+    def initialize_sensor_vel_search(self, vel_search: SearchSpace=None, do_vel_search: bool=False):
+        if not do_vel_search: return None
 
-        return pos_search
+        if vel_search is None or vel_search.x_ctr is None:
+            x_ctr = self.vel.ravel() if self.vel is not None else np.zeros_like(self.pos).ravel()
+        else:
+            x_ctr = vel_search.x_ctr
 
-    def initialize_sensor_vel_search(self, vel_search: dict=None, do_vel_search: bool=False):
-        if vel_search is None:
-            return None
+        if vel_search is None or vel_search.epsilon is None:
+            epsilon = self.default_sensor_vel_search_epsilon
+        else:
+            epsilon = vel_search.epsilon
 
-        if 'x_ctr' not in vel_search.keys() or vel_search['x_ctr'] is None:
-            vel_search['x_ctr'] = self.vel.ravel() if self.vel is not None else np.zeros_like(self.pos).ravel()
+        if vel_search is None or vel_search.points_per_dim is None:
+            points_per_dim = self.default_sensor_vel_search_size
+        else:
+            points_per_dim = vel_search.points_per_dim
 
-        if 'epsilon' not in vel_search.keys() or vel_search['epsilon'] is None:
-            vel_search['epsilon'] = self.default_sensor_vel_search_epsilon
+        return SearchSpace(x_ctr=x_ctr, epsilon=epsilon, points_per_dim=points_per_dim)
 
-        if 'search_size' not in vel_search.keys() or vel_search['search_size'] is None:
-            vel_search['search_size'] =self.default_sensor_vel_search_size
+    def parse_uncertainty_indices(self, do_source_vel=False, do_bias=False, do_sensor_pos=False,
+                                  do_sensor_vel=False):
+        """
+        Uncertainty parameters take the form:
+           [x_source, v_source, bias, x_sensor.ravel(), v_sensor.ravel()]
 
-        if not do_vel_search:
-            # The flag has been set to suppress a search across sensor velocities; return a search size
-            # of 1.
-            vel_search['search_size'] = 1
+        This function computes the indices for each term.
+        """
 
-        return vel_search
+        # First, compute the number of each component and determine is source velocity is included
+        num_source_pos = self.num_dim
+        num_source_vel = self.num_dim if do_sensor_pos else 0
+        num_source = num_source_pos + num_source_vel
+        num_bias = self.num_measurements if do_bias else 0
+        num_pos = np.size(self.pos) if do_sensor_pos else 0
+        num_vel = np.size(self.pos) if do_sensor_vel else 0
+
+        source_pos_ind = np.arange(num_source_pos)
+        source_vel_ind = np.arange(num_source_vel)
+        bias_ind = num_source + np.arange(num_bias)
+        pos_ind = num_source + num_bias + np.arange(num_pos)
+        vel_ind = num_source + num_bias + num_pos + np.arange(num_vel)
+
+        indices = {'num_source_pos': num_source_pos,
+                   'num_source_vel': num_source_vel,
+                   'num_bias': num_bias,
+                   'num_pos': num_pos,
+                   'num_vel': num_vel,
+                   'source_pos_indices': source_pos_ind,
+                   'source_vel_indices': source_vel_ind,
+                   'bias_indices': bias_ind,
+                   'pos_indices': pos_ind,
+                   'vel_indices': vel_ind}
+        return indices
+
+    # def get_uncertainty_search_space(self, do_source_vel=False, do_sensor_bias=False, do_sensor_pos=False,
+    #                                  do_sensor_vel=False):
+    #     """
+    #     Define and return a dict describing the uncertainty search vector
+    #     """
+    #
+    #     # Source Position Search
+    #     if do_source_vel:
+    #         # The search calls for both position and velocity estimates for the source
+    #         num_source_indices = 2*self.num_dim
+    #     else:
+    #         # The search calls for just position estimates
+    #         num_source_indices = self.num_dim
+    #
+    #     # Sensor Bias Search
+    #     num_bias_indices = self.num_measurements if do_sensor_bias else 0
+    #
+    #     # Sensor Position Search
+    #     num_pos_indices = np.size(self.pos) if do_sensor_pos else 0
+    #
+    #     # Velocity doesn't matter for DirectionFinding
+    #     num_vel_indices = np.size(self.vel) if do_sensor_vel and self.vel is not None else 0
+    #
+    #     # Build the indices
+    #     source_indices = np.arange(num_source_indices)
+    #     bias_indices = num_source_indices + np.arange(num_bias_indices)
+    #     pos_indices = num_source_indices + num_bias_indices + np.arange(num_pos_indices)
+    #     vel_indices = num_source_indices + num_bias_indices + num_pos_indices + np.arange(num_vel_indices)
+    #
+    #     # Assemble the dict and return
+    #     return {'source_idx': source_indices,
+    #             'bias_idx': bias_indices,
+    #             'sensor_pos_idx': pos_indices,
+    #             'sensor_vel_idx': vel_indices,
+    #             'num_source_idx': num_source_indices,
+    #             'num_bias_idx': num_bias_indices,
+    #             'num_pos_idx': num_pos_indices,
+    #             'num_vel_idx': num_vel_indices}
 
     # ==================== Performance Methods ================
     # These methods define basic performance predictions, and must be implemented
@@ -232,6 +512,38 @@ class PassiveSurveillanceSystem(ABC):
             plt.scatter(self.pos[0], self.pos[1], **kwargs)
         return
 
+    def parse_source_pos_vel(self, pos_vel, default_vel):
+        """
+        Parse a possible position/velocity setting for the source.
+
+        Compares the input pos_vel against the number of spatial dimensions in use.
+
+        If pos_vel has length 2*self.num_dim, it is assumed to be both spatial and velocity inputs,
+        and they are separated accordingly.
+
+        If pos_vel has length self.num_dim, then the second input default_vel is used for the source
+        velocity.
+
+        If the length is any other value, an error is raised.
+
+        :param pos_vel: candidate array of position or position/velocity values
+        :param default_vel: velocity value to return if the input is position only
+        :return pos:
+        :return vel:
+        """
+        num_dim, _ = utils.safe_2d_shape(pos_vel)
+        if num_dim==self.num_dim:
+            # Position only; return zero for velocity
+            pos = pos_vel
+            vel = default_vel
+        elif num_dim==2*self.num_dim:
+            # Position/Velocity
+            pos = pos_vel[:self.num_dim]
+            vel = pos_vel[self.num_dim:]
+        else:
+            raise ValueError("Unable to parse source position/velocity; unexpected number of spatial dimensions.")
+
+        return pos, vel
 
 class DifferencePSS(PassiveSurveillanceSystem, ABC):
     """

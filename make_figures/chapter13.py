@@ -18,6 +18,7 @@ import fdoa
 import hybrid
 from examples import chapter13
 from utils.covariance import CovarianceMatrix
+from utils import SearchSpace
 
 
 def make_all_figures(close_figs=False, force_recalc=False):
@@ -283,7 +284,7 @@ def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho: CovarianceM
     return fig
 
 
-def make_figures_3_4(prefix=None, rng=np.random.default_rng(0), force_recalc=False):
+def make_figures_3_4(prefix=None, rng=np.random.default_rng(), force_recalc=False):
     """
     Figures 3 and 4, Example 13.1: Homogeneous (3-mode) Sensors
 
@@ -317,7 +318,7 @@ def make_figures_3_4(prefix=None, rng=np.random.default_rng(0), force_recalc=Fal
     return fig3, fig4
 
 
-def make_figures_5_6(prefix=None, rng=np.random.default_rng(0), force_recalc=False):
+def make_figures_5_6(prefix=None, rng=np.random.default_rng(), force_recalc=False):
     """
     Figures 3 and 4, Example 13.2: Heterogeneous Sensors
 
@@ -394,7 +395,10 @@ def make_figure_7(prefix):
     num_elements = 201
     max_offset = 100e3
     grid_spacing = 2 * max_offset / (num_elements - 1)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=x_ctr, max_offset=max_offset, grid_spacing=grid_spacing)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=max_offset,
+                               epsilon=grid_spacing)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
     # Figure 13.7a
     print('Generating Figure 13.7a...')
@@ -514,7 +518,10 @@ def make_figure_8(prefix):
     num_elements = 201
     max_offset = 100e3
     grid_spacing = 2 * max_offset / (num_elements - 1)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=x_ctr, max_offset=max_offset, grid_spacing=grid_spacing)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=max_offset,
+                               epsilon=grid_spacing)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
     # Figure 13.8a
     print('Generating Figure 13.8a...')
@@ -628,7 +635,10 @@ def make_figure_9(prefix):
     num_elements = 201
     max_offset = 100e3
     grid_spacing = 2 * max_offset / (num_elements - 1)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=x_ctr, max_offset=max_offset, grid_spacing=grid_spacing)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=max_offset,
+                               epsilon=grid_spacing)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
     # Compute CRLB
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning

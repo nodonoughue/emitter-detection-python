@@ -3,7 +3,6 @@ from numpy import typing as npt
 from scipy.special import erfcinv
 from scipy import stats
 
-import utils
 from .unit_conversions import lin_to_db
 from itertools import combinations
 from collections.abc import Iterable
@@ -274,18 +273,18 @@ def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx
     :param ref_idx: numpy 1D array of indices for the reference sensor for each measurement. Any NaN
             entries are treated as test-only measurements (e.g., angle of arrival) that don't require a reference
             measurement. Those entries in the covariance matrix are not resampled.
-            If test_idx is None, then ref_idx is passed to utils.parse_reference_sensor, and may be any valid input
+            If test_idx is None, then ref_idx is passed to parse_reference_sensor, and may be any valid input
             to that function.
     :param test_weights: Optional weights to apply to each measurement when resampling.
     :param ref_weights: Optional weights to apply to each measurement when resampling.
     :return: numpy ndarray of resampled noise; the first dimension has the same length as test_idx and ref_idx.
     """
     # Parse Inputs
-    n_sensor, n_sample = utils.safe_2d_shape(noise)
+    n_sensor, n_sample = safe_2d_shape(noise)
 
     if test_idx is None:
         # We need to use the ref_idx
-        test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
+        test_idx_vec, ref_idx_vec = parse_reference_sensor(ref_idx, n_sensor)
     else:
         test_idx_vec = test_idx
         ref_idx_vec = ref_idx
@@ -328,7 +327,7 @@ def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx
         else:
             b_i_wt = 1.
 
-        noise_ai = np.zeros((len(a_i), utils.safe_2d_shape(noise)[1]))
+        noise_ai = np.zeros((len(a_i), safe_2d_shape(noise)[1]))
         noise_bi = np.zeros_like(noise_ai)
 
         mask_ai = ~np.isnan(a_i)
@@ -553,30 +552,67 @@ def safe_2d_shape(x: np.array) -> np.array:
     return dims_out
 
 
-def make_nd_grid(x_ctr, max_offset, grid_spacing):
+class SearchSpace:
+    num_parameters: int
+    x_ctr: np.ndarray
+    epsilon: np.ndarray
+    points_per_dim: np.ndarray
+    max_offset: np.ndarray
+
+    def __init__(self, x_ctr, epsilon, points_per_dim=None, max_offset=None):
+        self.x_ctr = x_ctr
+        self.epsilon = epsilon
+
+        if points_per_dim is None:
+            # infer from max_offset
+            self.max_offset = max_offset
+            self.points_per_dim = 1 + self.max_offset / self.epsilon
+        elif max_offset is None:
+            # infer from search_size
+            self.points_per_dim = points_per_dim
+            self.max_offset = self.epsilon * (self.points_per_dim - 1)
+        else:
+            # make sure they align
+            assert np.all(np.equal(max_offset, (points_per_dim - 1) * epsilon)), 'Bad inputs to search space.'
+            self.points_per_dim = points_per_dim
+            self.max_offset = max_offset
+
+
+        # Verify sizes
+        attrs = ['x_ctr', 'epsilon', 'points_per_dim', 'max_offset']
+        self.num_parameters = max([np.size(getattr(self, x)) for x in attrs if x is not None])
+        assert all([np.size(x) == 1 or np.size(x) == self.num_parameters for x in [getattr(self, y) for y in attrs]]), \
+            'Search space dimension mismatch; all entries must be None, scalar, or the same size.'
+
+
+def make_nd_grid(search_space: SearchSpace):
     """
     Create and return an ND search grid, based on the specified center of the search space, extent, and grid spacing.
 
     28 December 2021
     Nicholas O'Donoughue
 
-    :param x_ctr: ND array of search grid center, for each dimension.  The size of x_ctr dictates how many dimensions
-                  there are
-    :param max_offset: scalar or ND array of the extent of the search grid in each dimension, taken as the one-sided
-                        maximum offset from x_ctr
-    :param grid_spacing: scalar or ND array of grid spacing in each dimension
     :return x_set: n_dim x N numpy array of positions
     :return x_grid: n_dim-tuple of n_dim-dimensional numpy arrays containing the coordinates for each dimension.
     :return out_shape:  tuple with the size of the generated grid
     """
 
-    n_dim = np.size(x_ctr)
+    n_dim = search_space.num_parameters
 
-    if np.size(max_offset) == 1:
-        max_offset = max_offset * np.ones((n_dim, ))
+    if np.size(search_space.x_ctr) == 1:
+        x_ctr = search_space.x_ctr * np.ones((n_dim, ))
+    else:
+        x_ctr = search_space.x_ctr
 
-    if np.size(grid_spacing) == 1:
-        grid_spacing = grid_spacing * np.ones((n_dim, ))
+    if np.size(search_space.max_offset) == 1:
+        max_offset = search_space.max_offset * np.ones((n_dim, ))
+    else:
+        max_offset = search_space.max_offset
+
+    if np.size(search_space.epsilon) == 1:
+        grid_spacing = search_space.epsilon * np.ones((n_dim, ))
+    else:
+        grid_spacing = search_space.epsilon
 
     assert n_dim == np.size(max_offset) and n_dim == np.size(grid_spacing), \
            'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
@@ -728,277 +764,12 @@ def ensure_iterable(var, flatten=False)->Iterable:
     return var
 
 
-def make_uncertainty_indices(num_dim=2, num_aoa=0, num_tdoa=0, num_fdoa=0, do_2d_aoa=False,
-                             do_aoa_bias=False, do_tdoa_bias=False, do_fdoa_bias=False,
-                             do_aoa_pos_error=False, do_tdoa_pos_error=False, do_fdoa_pos_error=False):
-    """
-    Build the search space for source localization problem with uncertainty. Parameter vector takes the form:
-                Parameter                           Number of Unknowns
-        theta = [x_source,                          num_dim
-                 v_source,                          num_dim (if num_fdoa > 0)
-                 aoa_bias,                          num_aoa (2*num_aoa if do_2d_aoa=True)
-                 tdoa_bias,                         num_tdoa
-                 fdoa_bias,                         num_fdoa
-                 aoa_sensor_position,               num_aoa * num_dim
-                 tdoa_sensor_position,              num_tdoa * num_dim
-                 fdoa_sensor_position,              num_fdoa * num_dim
-                 fdoa_sensor_velocity]              num_fdoa * num_dim
-
-    This follows the description in Table 6.1.
-
-    Nicholas O'Donoughue
-    22 April 2025
-
-    :param num_dim: Number of spatial dimensions in the problem (default=2)
-    :param num_aoa: Number of AOA sensors (default=0)
-    :param num_tdoa: Number of TDOA sensors (default=0)
-    :param num_fdoa: Number of FDOA sensors (default=0)
-    :param do_2d_aoa: Boolean flag (azimuth angle only if False, azimuth/elevation if True; default=False)
-    :param do_aoa_bias: Boolean flag indicating whether to include AOA bias (default=False)
-    :param do_tdoa_bias: Boolean flag indicating whether to include TDOA bias (default=False)
-    :param do_fdoa_bias: Boolean flag indicating whether to include FDOA bias (default=False)
-    :param do_aoa_pos_error: Boolean flag indicating whether to include AOA sensor position errors (default=False)
-    :param do_tdoa_pos_error: Boolean flag indicating whether to include TDOA sensor position errors (default=False)
-    :param do_fdoa_pos_error: Boolean flag indicating whether to include FDOA sensor position errors (default=False)
-    :return indices: dictionary with the following fields, indicating the indices for rows corresponding to each
-        'source_pos'
-        'source_vel'
-        'aoa_bias'
-        'tdoa_bias'
-        'fdoa_bias'
-        'aoa_pos'
-        'tdoa_pos'
-        'fdoa_pos'
-        'fdoa_vel'
-    """
-
-    # Source Position and Velocity
-    source_pos = np.arange(num_dim)
-    source_vel = (num_dim + np.arange(num_dim) if num_fdoa > 0 else None)
-    bias_start_ind = (2*num_dim if num_fdoa > 0 else num_dim)
-
-    # Sensor Measurement Biases
-    num_aoa_bias = num_aoa * (2 if do_2d_aoa else 1) if do_aoa_bias and num_aoa > 0 else 0
-    num_tdoa_bias = num_tdoa if do_tdoa_bias and num_tdoa > 0 else 0
-    num_fdoa_bias = num_fdoa if do_fdoa_bias and num_fdoa > 0 else 0
-    aoa_bias_ind = np.arange(num_aoa_bias) + bias_start_ind if num_aoa_bias > 0 else None
-    tdoa_bias_ind = np.arange(num_tdoa_bias) + num_aoa_bias + bias_start_ind if num_tdoa_bias > 0 else None
-    fdoa_bias_ind = np.arange(num_fdoa_bias) + num_tdoa_bias + num_aoa_bias + bias_start_ind if num_tdoa_bias > 0 else None
-    pos_start_ind = bias_start_ind + num_aoa_bias + num_tdoa_bias + num_fdoa_bias
-
-    # Sensor Position Errors
-    num_aoa_pos = num_dim * num_aoa if do_aoa_pos_error else 0
-    num_tdoa_pos = num_dim * num_tdoa if do_tdoa_pos_error else 0
-    num_fdoa_pos = num_dim * num_fdoa if do_fdoa_pos_error else 0
-    aoa_pos_ind = np.arange(num_aoa_pos) + pos_start_ind if do_aoa_pos_error else None
-    tdoa_pos_ind = np.arange(num_tdoa_pos) + pos_start_ind + num_aoa_pos if do_tdoa_pos_error else None
-    fdoa_pos_ind = np.arange(num_fdoa_pos) + pos_start_ind + num_aoa_pos + num_tdoa_pos if do_fdoa_pos_error else None
-    fdoa_vel_ind = np.arange(num_fdoa_pos) + pos_start_ind + num_aoa_pos + num_tdoa_pos + num_fdoa_pos \
-        if do_fdoa_pos_error else None
-    total_num_params = pos_start_ind + num_aoa_pos + num_tdoa_pos + 2 * num_fdoa_pos
-
-    indices = {'source_pos': source_pos,
-               'source_vel': source_vel,
-               'aoa_bias': aoa_bias_ind,
-               'tdoa_bias': tdoa_bias_ind,
-               'fdoa_bias': fdoa_bias_ind,
-               'aoa_pos': aoa_pos_ind,
-               'tdoa_pos': tdoa_pos_ind,
-               'fdoa_pos': fdoa_pos_ind,
-               'fdoa_vel': fdoa_vel_ind,
-               'source': np.arange(bias_start_ind),
-               'bias': np.arange(start=bias_start_ind, stop=pos_start_ind) if pos_start_ind > bias_start_ind else None,
-               'sensor': np.arange(start=pos_start_ind, stop=total_num_params) if total_num_params > pos_start_ind else None,
-               'num_parameters': total_num_params}
-    return indices
-
-
-def make_uncertainty_search_space(th_center=None, search_size=None, search_resolution=None,
-                                  do_2d_aoa=False, do_aoa_bias=False, do_tdoa_bias=False, do_fdoa_bias=False,
-                                  aoa_bias_search=1, tdoa_bias_search=10, fdoa_bias_search=10,
-                                  sensor_pos_search=25, sensor_vel_search=10, source_pos_search=10e3,
-                                  source_vel_search=100,
-                                  source_search_dim = 101, bias_search_dim=11, sensor_search_dim=11,
-                                  x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None):
-    """
-    Build the search space for source localization problem with uncertainty. Parameter vector takes the form:
-        theta = [x_source,
-                 v_source,
-                 aoa_bias,
-                 tdoa_bias,
-                 fdoa_bias,
-                 aoa_sensor_position,
-                 tdoa_sensor_position,
-                 fdoa_sensor_position,
-                 fdoa_sensor_velocity]
-
-    This follows the description in Table 6.1.
-
-    Nicholas O'Donoughue
-    22 April 2025
-
-    :param th_center: Starting point for search space (optional, set to None for default). If an array of length
-                      n_dim, then assumed to be center of source position search. If array of length 2*n_dim, then
-                      assumed to be center of source position and velocity search. Otherwise, must be the same length
-                      as the number of desired unknowns (source pos/vel, measurement biases, sensor pos/vel)
-    :param search_size: One-sided width of search space for each dimension (optional, set to None for default)
-    :param search_resolution: One-sided grid spacing for search space (optional, set to None for default)
-    :param do_2d_aoa: Optional; default=False
-    :param do_aoa_bias: Optional flag specifying whether AOA measurement bias is needed; default=False
-    :param do_tdoa_bias: Optional flag specifying whether TDOA measurement bias is needed; default=False
-    :param do_fdoa_bias: Optional flag specifying whether FDOA measurement bias is needed; default=False
-    :param aoa_bias_search: Optional search space for AOA biases, default=1 (deg)
-    :param tdoa_bias_search: Optional search space for TDOA biases, default=10 (m)
-    :param fdoa_bias_search: Optional search space for FDOA biases, default=10 (m/s)
-    :param sensor_pos_search: Optional search space for sensor positions errors, default=25 (m)
-    :param sensor_vel_search: Optional search space for sensor velocity errors, default=25 (m)
-    :param source_pos_search: Optional search space for source positions errors, default=10 (km)
-    :param source_vel_search: Optional search space for source velocity errors, default=100 (m/s)
-    :param source_search_dim: Optional, number of search points per dimension for source search (default=11)
-    :param bias_search_dim: Optional, number of search points per dimension for bias search (default=11)
-    :param sensor_search_dim: Optional, number of search points per dimension for sensor search (default=11)
-    :param x_aoa: Optional, nominal AOA sensor positions
-    :param x_tdoa: Optional, nominal TDOA sensor positions
-    :param x_fdoa: Optional, nominal FDOA sensor positions
-    :param v_fdoa: Optional, nominal FDOA sensor velocities
-    :return th_center: Center of search space
-    :return search_size: Size of search space
-    :return search_resolution: Resolution of search space
-    :return param_indices: dict of indices for each uncertainty parameter
-
-    """
-    # Look up parameter indices
-    sensor_dims = parse_sensor_coords(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa)
-    param_indices = make_uncertainty_indices(**sensor_dims,  # num_dim, num_aoa, num_tdoa, num_fdoa
-                                             do_2d_aoa=do_2d_aoa,
-                                             do_aoa_bias=do_aoa_bias,
-                                             do_tdoa_bias=do_tdoa_bias,
-                                             do_fdoa_bias=do_fdoa_bias,
-                                             do_aoa_pos_error=x_aoa is not None,
-                                             do_tdoa_pos_error=x_tdoa is not None,
-                                             do_fdoa_pos_error=x_fdoa is not None)
-
-
-    # Check search space center
-    num_params_in, _ = utils.safe_2d_shape(th_center)
-    if num_params_in == param_indices['num_parameters']:
-        # Do nothing, x_center is already properly defined
-        pass
-    else:
-        # Redefine it; need to specify centers for the bias terms (0) and the sensor position terms (nominal positions)
-        tmp = th_center  # copy the input to a temp variable
-        th_center = np.zeros((param_indices['num_parameters'], ))
-
-        # Source Position/Velocity
-        if tmp is None:
-            pass # leave source pos and vel center points at default (0)
-        elif np.size(tmp) == len(param_indices['source_pos']) or np.size(tmp) == 1: # input matches source_pos
-            th_center[param_indices['source_pos']] = tmp
-            # leave source vel center points at default (0)
-        elif np.size(tmp) == len(param_indices['source']): # input matches source_pos and vel
-            th_center[param_indices['source']] = tmp
-        else:
-            print('Unable to parse input search space center; using defaults.')
-
-        # Bias terms
-        # The default is zero, no reason to do anything here.
-
-        # Sensor Position Terms
-        if param_indices['aoa_pos'] is not None:
-            th_center[param_indices['aoa_pos']] = x_aoa.ravel()
-        if param_indices['tdoa_pos'] is not None:
-            th_center[param_indices['tdoa_pos']] = x_tdoa.ravel()
-        if param_indices['fdoa_pos'] is not None:
-            th_center[param_indices['fdoa_pos']] = x_fdoa.ravel()
-        if param_indices['fdoa_vel'] is not None:
-            th_center[param_indices['fdoa_vel']] = v_fdoa.ravel()
-
-    # Check search size
-    num_params_in, _ = utils.safe_2d_shape(search_size)
-    if num_params_in == param_indices['num_parameters']:
-        # Do nothing, search_center is already properly defined
-        pass
-    else:
-        # Redefine it; need to search size for the bias terms and the sensor position terms
-        tmp = search_size
-        search_size = np.zeros((param_indices['num_parameters'], ))
-
-        # Source Position/Velocity
-        if tmp is None:
-            search_size[param_indices['source_pos']] = source_pos_search  # use default position search
-            search_size[param_indices['source_vel']] = source_vel_search  # use default velocity search
-        elif np.size(tmp) == len(param_indices['source_pos']) or np.size(tmp) == 1: # input matches source_pos
-            search_size[param_indices['source_pos']] = tmp
-            search_size[param_indices['source_vel']] = source_vel_search  # use default velocity search
-        elif np.size(tmp) == len(param_indices['source']): # input matches source_pos and vel
-            search_size[param_indices['source']] = tmp
-        else:
-            print('Unable to parse input search space center; using defaults.')
-            search_size[param_indices['source_vel']] = source_pos_search  # use default position search
-            search_size[param_indices['source_vel']] = source_vel_search  # use default velocity search
-
-        # Bias terms
-        if param_indices['aoa_bias'] is not None:
-            search_size[param_indices['aoa_bias']] = aoa_bias_search
-        if param_indices['tdoa_bias'] is not None:
-            search_size[param_indices['tdoa_bias']] = tdoa_bias_search
-        if param_indices['fdoa_bias'] is not None:
-            search_size[param_indices['fdoa_bias']] = fdoa_bias_search
-
-        # Sensor Position Terms
-        if param_indices['aoa_pos'] is not None:
-            search_size[param_indices['aoa_pos']] = sensor_pos_search
-        if param_indices['tdoa_pos'] is not None:
-            search_size[param_indices['tdoa_pos']] = sensor_pos_search
-        if param_indices['fdoa_pos'] is not None:
-            search_size[param_indices['fdoa_pos']] = sensor_pos_search
-        if param_indices['fdoa_vel'] is not None:
-            search_size[param_indices['fdoa_vel']] = sensor_vel_search
-
-    # Check search resolution
-    num_params_in, _ = utils.safe_2d_shape(search_resolution)
-    if num_params_in == param_indices['num_parameters']:
-        # Do nothing, search_resolution is already properly defined
-        pass
-    else:
-        # Redefine it; need to search size for the bias terms and the sensor position terms
-        tmp = search_resolution
-        search_resolution = np.zeros((param_indices['num_parameters'], ))
-
-        # Source Position/Velocity
-        if tmp is None:
-            search_resolution[param_indices['source_pos']] = (2 * search_size[param_indices['source']] /
-                                                              (source_search_dim - 1))  # use default search dimension size
-        elif np.size(tmp) == len(param_indices['source_pos']) or np.size(tmp) == 1: # input matches source_pos
-            search_resolution[param_indices['source_pos']] = tmp
-            search_resolution[param_indices['source_vel']] = (2 * search_size[param_indices['source_vel']] /
-                                                              (source_search_dim - 1))  # use default search dimension
-        elif np.size(tmp) == len(param_indices['source']): # input matches source_pos and vel
-            search_resolution[param_indices['source']] = tmp
-        else:
-            print('Unable to parse input search space center; using defaults.')
-            search_resolution[param_indices['source']] = (2 * search_size[param_indices['source']] /
-                                                          (source_search_dim - 1))  # use default search dimension size
-
-        # Bias terms
-        if param_indices['bias'] is not None:
-            # use default search dimension size
-            search_resolution[param_indices['bias']] = 2 * search_size[param_indices['bias']] / (bias_search_dim - 1)
-
-        # Sensor Position Terms
-        if param_indices['pos'] is not None:
-            # use default search dimension size
-            search_resolution[param_indices['pos']] = 2 * search_size[param_indices['pos']] / (sensor_search_dim - 1)
-
-    return th_center, search_size, search_resolution, param_indices
-
-
 def parse_sensor_coords(x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, do_2d_aoa=False,
                         tdoa_ref_idx=None, fdoa_ref_idx=None):
-    n_dim1, n_aoa = utils.safe_2d_shape(x_aoa)  # returns 0, 0 if x_aoa is None
-    n_dim2, n_tdoa = utils.safe_2d_shape(x_tdoa)
-    n_dim3, n_fdoa = utils.safe_2d_shape(x_fdoa)
-    n_dim4, _ = utils.safe_2d_shape(v_fdoa)
+    n_dim1, n_aoa = safe_2d_shape(x_aoa)  # returns 0, 0 if x_aoa is None
+    n_dim2, n_tdoa = safe_2d_shape(x_tdoa)
+    n_dim3, n_fdoa = safe_2d_shape(x_fdoa)
+    n_dim4, _ = safe_2d_shape(v_fdoa)
 
     # Check number of dimensions
     n_dim_set = np.array([n_dim1, n_dim2, n_dim3, n_dim4])
@@ -1009,7 +780,7 @@ def parse_sensor_coords(x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, do_2d
     if len(set(n_dim_nonzero)) > 1:
         raise TypeError('Not all defined sensor positions have the same number of dimensions.')
 
-    if x_fdoa is not None and v_fdoa is not None and not utils.is_broadcastable(x_fdoa, v_fdoa):
+    if x_fdoa is not None and v_fdoa is not None and not is_broadcastable(x_fdoa, v_fdoa):
         raise TypeError('FDOA sensor position and velocity inputs must have matching shapes.')
 
     # Determine the Number of Sensor Measurements

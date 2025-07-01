@@ -8,6 +8,7 @@ from fdoa import FDOAPassiveSurveillanceSystem
 from hybrid import HybridPassiveSurveillanceSystem
 from utils.covariance import CovarianceMatrix
 import time
+from utils import SearchSpace
 
 
 _rad2deg = 180.0/np.pi
@@ -122,7 +123,10 @@ def example2(colors=None, do_video_example=False):
     # alt = 5e3
     # x_ctr = np.array([0., 0., alt])                       # It's 3D coordinates, so we need a 3D center point
     # search_size = np.array([max_offset, max_offset, 0])   # don't search the z-dimension, though
-    x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr, search_size, grid_res)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=search_size,
+                               epsilon=grid_res)
+    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
     extent = (x_ctr[0] - max_offset, x_ctr[0] + max_offset, x_ctr[1] - max_offset, x_ctr[1] + max_offset)
 
     # Use a squeeze operation to ensure that the individual dimension indices in x_grid are 2D
@@ -249,8 +253,10 @@ def example3(colors=None):
 
     num_grid_points_per_axis = 301
     grid_res = 2 * max_offset / num_grid_points_per_axis
-
-    x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr, search_size, grid_res)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=search_size,
+                               epsilon=grid_res)
+    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
     extent = (x_ctr[0] - max_offset, x_ctr[0] + max_offset, x_ctr[1] - max_offset, x_ctr[1] + max_offset)
 
     # Use a squeeze operation to ensure that the individual dimension
@@ -352,7 +358,6 @@ def example4(rng=np.random.default_rng()):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    res = {}  # Pre-define to avoid a warning later
     for idx in np.arange(num_mc):
         utils.print_progress(num_mc, idx, iterations_per_marker, iterations_per_row, t_start)
 

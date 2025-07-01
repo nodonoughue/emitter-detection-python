@@ -30,7 +30,7 @@ def run_all_examples(generate_data=True):
     return [fig1, fig2]
 
 
-def generate_ex1_data(rng=None):
+def generate_ex1_data(rng=np.random.default_rng()):
     """
     Generate data for Example 8.1, which will be stored in examples/chapter8_data.csv, and for Problems 8.5 and 8.6,
     which will be stored in hw/problem8_5.csv and hw/problem8_6.csv.
@@ -42,10 +42,6 @@ def generate_ex1_data(rng=None):
 
     :param rng: random number generator
     """
-
-    if rng is None:
-        rng = np.random.default_rng(0)
-
     # ===== Generate Data for Example 8.1 =====
     # Initialize PTT Radio Parameters
     tx_pwr = 10
@@ -213,7 +209,7 @@ def generate_ex1_data(rng=None):
              'd_lam': d_lam})
 
 
-def example1(rng=None):
+def example1(rng=np.random.default_rng()):
     """
     Executes Example 8.1, relying on the sample data in examples/ex8_1.mat, and generates one figure.
 
@@ -272,7 +268,7 @@ def example1(rng=None):
     return fig
 
 
-def example2(rng=None):
+def example2(rng=np.random.default_rng()):
     """
     Executes Example 8.2 and generates one figure
 
@@ -285,9 +281,6 @@ def example2(rng=None):
     :return: figure handle to generated graphic
     """
     
-    if rng is None:
-        rng = np.random.default_rng(0)
-        
     # Define transmitter values
     tx_pwr = 100
     tx_gain = 0

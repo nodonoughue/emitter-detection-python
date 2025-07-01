@@ -2,6 +2,7 @@ import numpy as np
 from scipy.linalg import block_diag
 
 import utils
+from utils import SearchSpace
 from utils.system import DifferencePSS
 from utils.covariance import CovarianceMatrix
 from triang import DirectionFinder
@@ -31,7 +32,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     tdoa_measurement_idx = None
     fdoa_measurement_idx = None
 
-    def __init__(self, cov=None, aoa=None, tdoa=None, fdoa=None, ref_idx=None, do_resample=False, **kwargs):
+    def __init__(self, cov=None, aoa=None, tdoa=None, fdoa=None, ref_idx=None, **kwargs):
         # Parse the provided sensor types
         x_arr = []
         if aoa is not None:
@@ -82,8 +83,6 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         bias_search_size = []
         sensor_pos_search_epsilon = []
         sensor_pos_search_size = []
-        sensor_vel_search_epsilon = []
-        sensor_vel_search_size = []
         for pss in [self.aoa, self.tdoa, self.fdoa]:
             if pss is None: continue
 
@@ -290,7 +289,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle the interface to solvers
     ## ============================================================================================================== ##
-    def max_likelihood(self, zeta, x_ctr, search_size, epsilon=None, cal_data:dict=None, **kwargs):
+    def max_likelihood(self, zeta, search_space: SearchSpace, cal_data:dict=None, **kwargs):
         # Perform sensor calibration
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
@@ -305,47 +304,31 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
                                        zeta=zeta, x_source=this_pos, v_source=this_vel)
 
         # Call the util function
-        x_est, likelihood, x_grid = utils.solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size,
-                                                            epsilon=epsilon, **kwargs)
+        x_est, likelihood, x_grid = utils.solvers.ml_solver(ell=ell, search_space=search_space, **kwargs)
 
         return x_est, likelihood, x_grid
 
-    def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, **kwargs):
-        # Make sure the search space is properly defined, and parse the parameter indices
-        search_params = {'th_center': x_ctr,
-                         'search_size': search_size,
-                         'search_resolution': epsilon,
-                         'do_aoa_bias': do_sensor_bias and self.aoa is not None,
-                         'do_tdoa_bias': do_sensor_bias and self.tdoa is not None,
-                         'do_fdoa_bias': do_sensor_bias and self.fdoa is not None,
-                         'x_aoa': self.aoa.pos if self.aoa is not None else None,
-                         'x_tdoa': self.tdoa.pos if self.tdoa is not None else None,
-                         'x_fdoa': self.fdoa.pos if self.fdoa is not None else None,
-                         'v_fdoa': self.fdoa.vel if self.fdoa is not None else None}
-        search_center, search_size, search_resolution, param_indices = utils.make_uncertainty_search_space(**search_params)
+    def max_likelihood_uncertainty(self, zeta, search_space:SearchSpace,
+                                   do_sensor_bias=False, do_sensor_pos=False, do_sensor_vel=False,
+                                   **kwargs):
 
-        # Set up function handle
-        def ell(theta):
-            return self.log_likelihood_uncertainty(zeta=zeta, theta=theta, **kwargs)
+        # Call the super class to do the search, then re-parse the results
+        x_est, likelihood, th_grid, th_est = super().max_likelihood_uncertainty(zeta, search_space, do_sensor_bias,
+                                                                                do_sensor_pos, do_sensor_vel, **kwargs)
 
-        # Call the util function
-        th_est, likelihood, x_grid = utils.solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size,
-                                                             epsilon=epsilon, **kwargs)
+        bias_aoa, bias_tdoa, bias_fdoa = self.parse_measurement_data(th_est['bias'])
+        pos_aoa, pos_tdoa, pos_fdoa = self.parse_sensor_data(np.reshape(th_est['pos'], (self.num_dim, -1)))
+        _, _, vel_fdoa = self.parse_sensor_data(np.reshape(th_est['vel'], (self.num_dim, -1)), vel_input=True)
 
-        x_est = th_est[param_indices['source_pos']]
-        bias_est = {'aoa': th_est[param_indices['aoa_bias']] if do_sensor_bias and self.aoa is not None else None,
-                    'tdoa': th_est[param_indices['tdoa_bias']] if do_sensor_bias and self.tdoa is not None else None,
-                    'fdoa': th_est[param_indices['fdoa_bias']] if do_sensor_bias and self.fdoa is not None else None}
-        if self.cov_pos is None:
-            sensor_pos_est = None
-            sensor_vel_est = None
-        else:
-            sensor_pos_est = {'aoa': np.reshape(th_est[param_indices['aoa_pos']], (self.num_dim, self.num_aoa_sensors)),
-                              'tdoa': np.reshape(th_est[param_indices['tdoa_pos']], (self.num_dim, self.num_tdoa_sensors)),
-                              'fdoa': np.reshape(th_est[param_indices['fdoa_pos']], (self.num_dim, self.num_fdoa_sensors))}
-            sensor_vel_est = np.reshape(th_est[param_indices['fdoa_vel']], (self.num_dim, self.num_fdoa_sensors))
+        th_est['bias_aoa'] = bias_aoa
+        th_est['bias_tdoa'] = bias_tdoa
+        th_est['bias_fdoa'] = bias_fdoa
+        th_est['pos_aoa'] = pos_aoa
+        th_est['pos_tdoa'] = pos_tdoa
+        th_est['pos_fdoa'] = pos_fdoa
+        th_est['vel_fdoa'] = vel_fdoa
 
-        return x_est, bias_est, sensor_pos_est, sensor_vel_est, likelihood, x_grid
+        return x_est, likelihood, th_grid, th_est
 
     def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
@@ -401,7 +384,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         return x_est, x_full
 
 
-    def bestfix(self, zeta, x_ctr, search_size, epsilon, pdf_type=None, cal_data:dict=None):
+    def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None, cal_data:dict=None):
         x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
 
         # Generate the PDF
@@ -413,7 +396,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         pdfs = utils.make_pdfs(measurement, zeta, pdf_type, self.cov.cov)
 
         # Call the util function
-        x_est, likelihood, x_grid = utils.solvers.bestfix(pdfs, x_ctr, search_size, epsilon)
+        x_est, likelihood, x_grid = utils.solvers.bestfix(pdfs, search_space)
 
         return x_est, likelihood, x_grid
 
@@ -442,6 +425,55 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         #     v_fdoa = None
         #
         # return np.concatenate(x_sensor_list, axis=0), v_fdoa, np.concatenate(b_sensor_list, axis=0)
+
+    def get_uncertainty_search_space(self, do_source_vel=False, do_sensor_bias=False, do_sensor_pos=False,
+                                     do_sensor_vel=False):
+        """
+        Define and return a dict describing the uncertainty search vector
+        """
+
+        # Get Search Space for the Components
+        aoa_search = self.aoa.get_uncertainty_search_space(do_source_vel=do_source_vel, do_sensor_bias=do_sensor_bias,
+                                                           do_sensor_pos=do_sensor_pos) if self.aoa is not None \
+            else None
+        tdoa_search = self.tdoa.get_uncertainty_search_space(do_source_vel=do_source_vel, do_sensor_bias=do_sensor_bias,
+                                                             do_sensor_pos=do_sensor_pos) if self.tdoa is not None \
+            else None
+        fdoa_search = self.aoa.get_uncertainty_search_space(do_source_vel=do_source_vel, do_sensor_bias=do_sensor_bias,
+                                                            do_sensor_pos=do_sensor_pos, do_sensor_vel=do_sensor_vel) \
+            if self.fdoa is not None else None
+
+        # Parse the component search spaces
+        source_indices = aoa_search['source_idx'] if aoa_search is not None \
+            else tdoa_search['source_idx'] if tdoa_search is not None else fdoa_search['source_idx']
+        num_source_indices = len(source_indices)
+
+        num_aoa_bias = aoa_search['num_bias_idx'] if aoa_search is not None else 0
+        num_tdoa_bias = tdoa_search['num_bias_idx'] if tdoa_search is not None else 0
+        num_fdoa_bias = fdoa_search['num_bias_idx'] if fdoa_search is not None else 0
+        num_bias_indices = num_aoa_bias + num_tdoa_bias + num_fdoa_bias
+
+        num_aoa_pos = aoa_search['num_pos_idx'] if aoa_search is not None else 0
+        num_tdoa_pos = tdoa_search['num_pos_idx'] if tdoa_search is not None else 0
+        num_fdoa_pos = fdoa_search['num_pos_idx'] if fdoa_search is not None else 0
+        num_pos_indices = num_aoa_pos + num_tdoa_pos + num_fdoa_pos
+
+        num_vel_indices = fdoa_search['num_vel_idx'] if fdoa_search is not None else 0
+
+        # Construct indices
+        bias_indices = num_source_indices + np.arange(num_bias_indices)
+        pos_indices = num_source_indices + num_bias_indices + np.arange(num_pos_indices)
+        vel_indices = num_source_indices + num_bias_indices + num_vel_indices + np.arange(num_vel_indices)
+
+        # Assemble the dict and return
+        return {'source_idx': source_indices,
+                'bias_idx': bias_indices,
+                'sensor_pos_idx': pos_indices,
+                'sensor_vel_idx': vel_indices,
+                'num_source_idx': num_source_indices,
+                'num_bias_idx': num_bias_indices,
+                'num_pos_idx': num_pos_indices,
+                'num_vel_idx': num_vel_indices}
 
     ## ============================================================================================================== ##
     ## Performance Methods
@@ -529,6 +561,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         return
 
     def parse_sensor_data(self, data, vel_input=False):
+        # todo: implement the vel_input flag; see fdoa/system.py for example
         if data is not None:
             # Split apart a vector of sensor data, must have length equal to self.num_sensors
             # assert len(data) == self.num_sensors or (vel_input and len(data)==self.num_fdoa_sensors), "Unable to parse sensor data; unexpected size."

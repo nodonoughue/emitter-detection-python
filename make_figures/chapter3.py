@@ -40,7 +40,7 @@ def make_all_figures(close_figs=False):
     prefix = utils.init_output_dir('chapter3')
 
     # Activate seaborn for prettier plots
-    sns.set()
+    sns.set_theme()
 
     # Generate all figures
     fig1 = make_figure_1(prefix)
@@ -387,7 +387,7 @@ def make_figure_8(prefix=None):
     return fig8
 
 
-def make_figure_9(prefix=None, rng=None, colors=None):
+def make_figure_9(prefix=None, rng=np.random.default_rng(), colors=None):
     """
     Figures 9, Example 3.1 Monte Carlo Results
 
@@ -414,7 +414,7 @@ def make_figure_9(prefix=None, rng=None, colors=None):
     return fig9
 
 
-def make_figure_10(prefix=None, rng=None, colors=None):
+def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None):
     """
     Figures 10, Example 3.2 Monte Carlo results
 

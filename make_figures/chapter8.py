@@ -353,7 +353,7 @@ def make_figure_7b(prefix=None):
     return fig7b
 
 
-def make_figure_9(prefix=None, rng=None):
+def make_figure_9(prefix=None, rng=np.random.default_rng()):
     """
     Figure 9/11 - Beamscan Images
 
@@ -368,9 +368,6 @@ def make_figure_9(prefix=None, rng=None):
     """
 
     print('Generating Figure 8.9...')
-
-    if rng is None:
-        rng = np.random.default_rng(0)
 
     # Set up array
     num_elements = 25
@@ -459,7 +456,7 @@ def make_figure_10(prefix=None):
     return fig10
 
 
-def make_figure_12(prefix=None, rng=None, force_recalc=True):
+def make_figure_12(prefix=None, rng=np.random.default_rng(), force_recalc=True):
     """
     Figure 12 - CRLB Plot
 
@@ -480,9 +477,6 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
 
     print('Generating Figure 8.12...')
 
-    if rng is None:
-        rng = np.random.default_rng(0)
-                    
     snr_db = np.arange(start=-20, step=.5, stop=0)
     snr_lin = db_to_lin(snr_db)
     psi = 5*np.pi/180
@@ -571,7 +565,7 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
     return fig12
 
 
-def make_figure_13(prefix=None, rng=None, force_recalc=True):
+def make_figure_13(prefix=None, rng=np.random.default_rng(), force_recalc=True):
     """
     Figure 13 - Example 8.2
 
@@ -591,9 +585,6 @@ def make_figure_13(prefix=None, rng=None, force_recalc=True):
         return None
 
     print('Generating Figure 8.13...')
-
-    if rng is None:
-        rng = np.random.default_rng(0)
 
     fig13 = chapter8.example2(rng)
 

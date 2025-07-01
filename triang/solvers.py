@@ -1,5 +1,6 @@
 import utils
 from utils import solvers
+from utils import SearchSpace
 from utils.covariance import CovarianceMatrix
 from . import model
 import numpy as np
@@ -8,7 +9,7 @@ from itertools import combinations
 import numpy.typing as npt
 
 
-def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, do_2d_aoa=False, epsilon=None, bias=None,
+def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, search_space:SearchSpace, do_2d_aoa=False, bias=None,
                    **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
@@ -38,63 +39,9 @@ def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, do_
         return model.log_likelihood(x_sensor, psi, cov, x, do_2d_aoa=do_2d_aoa, bias=bias)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon, **kwargs)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell, search_space=search_space, **kwargs)
 
     return x_est, likelihood, x_grid
-
-
-def max_likelihood_uncertainty(x_sensor, psi, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, x_ctr, search_size,
-                               do_2d_aoa=False, epsilon=None, do_sensor_bias=False, **kwargs):
-    """
-    Construct the ML Estimate by systematically evaluating the log
-    likelihood function at a series of coordinates, and returning the index
-    of the maximum.  Optionally returns the full set of evaluated
-    coordinates, as well.
-
-    Ported from MATLAB Code
-
-    Nicholas O'Donoughue
-    29 April 2025
-
-    :param x_sensor: Sensor positions [m]
-    :param psi: AOA measurement vector [rad]
-    :param cov: Measurement error covariance matrix
-    :param cov_pos: Sensor position error covariance matrix
-    :param x_ctr: Center of search grid [m]
-    :param search_size: 2-D vector of search grid sizes [m]
-    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
-    :param epsilon: Desired resolution of search grid [m]
-    :param do_sensor_bias: Boolean flag; if true, then sensor bias terms will be included in search
-    :return x_est: Estimated source position [m]
-    :return bias_est: Estimated sensor bias [m]
-    :return sensor_pos_est: Estimated sensor positions [m]
-    :return likelihood: Likelihood computed across the entire set of candidate source positions
-    :return x_grid: Candidate source positions
-    """
-    num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
-
-    # Make sure the search space is properly defined, and parse the parameter indices
-    search_params = {'th_center': x_ctr,
-                     'search_size': search_size,
-                     'search_resolution': epsilon,
-                     'do_aoa_bias': do_sensor_bias,
-                     'x_aoa': x_sensor}
-    search_center, search_size, search_resolution, param_indices = utils.make_uncertainty_search_space(**search_params)
-
-    # Set up function handle
-    def ell(theta):
-        return model.log_likelihood_uncertainty(x_sensor=x_sensor, zeta=psi, cov=cov, cov_pos=cov_pos, theta=theta,
-                                                do_2d_aoa=do_2d_aoa, do_sensor_bias=do_sensor_bias)
-
-    # Call the util function
-    th_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=search_center, search_size=search_size,
-                                                   epsilon=search_resolution, **kwargs)
-
-    x_est = th_est[param_indices['source_pos']]
-    bias_est = th_est[param_indices['bias']] if do_sensor_bias else None
-    sensor_pos_est = np.reshape(th_est[param_indices['aoa_pos']], (num_dim, num_sensors)) if cov_pos is not None else None
-
-    return x_est, bias_est, sensor_pos_est, likelihood, x_grid
 
 
 def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias=None, **kwargs):
@@ -159,7 +106,7 @@ def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, 
     return x, x_full
 
 
-def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, pdf_type=None, do_2d_aoa=False):
+def bestfix(x_sensor, psi, cov: CovarianceMatrix, search_space: SearchSpace, pdf_type=None, do_2d_aoa=False):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
     a series of coordinates, and returning the index of the maximum.
@@ -182,9 +129,6 @@ def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, p
     :param x_sensor: Sensor positions [m]
     :param psi: Measurement vector [rad]
     :param cov: Measurement error covariance matrix
-    :param x_ctr: Center of search grid [m]
-    :param search_size: 2-D vector of search grid sizes [m]
-    :param epsilon: Desired resolution of search grid [m]
     :param pdf_type: String indicating the type of distribution to use. See +utils/makePDFs.m for options.
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :return x_est: Estimated source position [m]
@@ -199,7 +143,7 @@ def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, p
     pdfs = utils.make_pdfs(measurement, psi, pdf_type, cov.cov)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.bestfix(pdfs, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.bestfix(pdfs, search_space)
 
     return x_est, likelihood, x_grid
 

@@ -123,7 +123,7 @@ def run_example():
         print('done.')
 
     # Generate the plot
-    sns.set()
+    sns.set_theme()
 
     _, _ = plt.subplots()
 

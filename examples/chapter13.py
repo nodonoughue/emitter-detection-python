@@ -4,6 +4,7 @@ import time
 import utils
 from utils.covariance import CovarianceMatrix
 import hybrid
+from utils import SearchSpace
 
 
 def run_all_examples():
@@ -99,10 +100,7 @@ def example1(rng=np.random.default_rng()):
                'do_resample': False
                }
 
-    ml_args = {'x_ctr': x_init,
-               'search_size': x_extent,
-               'epsilon': grid_res
-               }
+    ml_args = {SearchSpace(x_ctr=x_init, max_offset=x_extent, epsilon=grid_res)}
 
     ls_args = {'x_init': x_init,
                'max_num_iterations': num_iterations,

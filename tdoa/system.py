@@ -1,5 +1,6 @@
 from . import model, perf, solvers
 import utils
+from utils import SearchSpace
 from utils.system import DifferencePSS
 from utils.covariance import CovarianceMatrix
 import numpy as np
@@ -53,10 +54,10 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         return model.log_likelihood(x_sensor=x_sensor, zeta=zeta, x_source=x_source, cov=self.cov, ref_idx=self.ref_idx,
                                     variance_is_toa=False, do_resample=False, bias=bias)
 
-    def log_likelihood_uncertainty(self, zeta, theta, **kwargs):
-        return model.log_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, theta=theta, cov=self.cov,
-                                                cov_pos=self.cov_pos, ref_idx=self.ref_idx,
-                                                variance_is_toa=False, do_resample=False, **kwargs)
+    # def log_likelihood_uncertainty(self, zeta, theta, **kwargs):
+    #     return model.log_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, theta=theta, cov=self.cov,
+    #                                             cov_pos=self.cov_pos, ref_idx=self.ref_idx,
+    #                                             variance_is_toa=False, do_resample=False, **kwargs)
 
     def grad_x(self, x_source):
         return model.grad_x(x_sensor=self.pos, x_source=x_source, ref_idx=self.ref_idx)
@@ -84,14 +85,14 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
                                       search_size=search_size, epsilon=epsilon, bias=bias,
                                       do_resample=False, variance_is_toa=False, **kwargs)
 
-    def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, cov_pos=None,
-                                   **kwargs):
-        if cov_pos is None: cov_pos = self.cov_pos
-
-        return solvers.max_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, cov=self.cov, cov_pos=cov_pos,
-                                                  ref_idx=self.ref_idx, x_ctr=x_ctr, search_size=search_size,
-                                                  epsilon=epsilon, do_resample=False, variance_is_toa=False,
-                                                  do_sensor_bias=do_sensor_bias, **kwargs)
+    # def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, cov_pos=None,
+    #                                **kwargs):
+    #     if cov_pos is None: cov_pos = self.cov_pos
+    #
+    #     return solvers.max_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, cov=self.cov, cov_pos=cov_pos,
+    #                                               ref_idx=self.ref_idx, x_ctr=x_ctr, search_size=search_size,
+    #                                               epsilon=epsilon, do_resample=False, variance_is_toa=False,
+    #                                               do_sensor_bias=do_sensor_bias, **kwargs)
 
     def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
@@ -113,9 +114,9 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         return solvers.least_square(x_sensor=x_sensor, zeta=zeta, cov=self.cov, x_init=x_init, ref_idx=self.ref_idx,
                                     do_resample=False, variance_is_toa=False, **kwargs)
 
-    def bestfix(self, zeta, x_ctr, search_size, epsilon, pdf_type=None):
-        return solvers.bestfix(x_sensor=self.pos, zeta=zeta, cov=self.cov, x_ctr=x_ctr, search_size=search_size,
-                               epsilon=epsilon, pdf_type=pdf_type,
+    def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None):
+        return solvers.bestfix(x_sensor=self.pos, zeta=zeta, cov=self.cov,
+                               search_space=search_space, pdf_type=pdf_type,
                                do_resample=False, variance_is_toa=False)
 
     ## ============================================================================================================== ##

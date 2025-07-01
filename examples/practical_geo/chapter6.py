@@ -2,11 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-import tdoa.model
 import utils
-import hybrid
+from fdoa import FDOAPassiveSurveillanceSystem
+from utils import SearchSpace
 from utils.covariance import CovarianceMatrix
-import triang
+from triang import DirectionFinder
+from tdoa import TDOAPassiveSurveillanceSystem
+from hybrid import HybridPassiveSurveillanceSystem
 
 _rad2deg = utils.unit_conversions.convert(1, "rad", "deg")
 _deg2rad = utils.unit_conversions.convert(1, "deg", "rad")
@@ -39,10 +41,15 @@ def example1():
 
     x_tgt = np.array([5, 3])
 
+    aoa = DirectionFinder(x=x_aoa, cov=None, do_2d_aoa=False)
+
     # Define received signals and covariance matrix
     alpha = np.array([5, 10, -5])*_deg2rad  # AOA bias
-    psi = triang.model.measurement(x_sensor=x_aoa, x_source=x_tgt, do_2d_aoa=False)
-    psi_bias = triang.model.measurement(x_sensor=x_aoa, x_source=x_tgt, do_2d_aoa=False, bias=alpha)
+    psi = aoa.measurement(x_source=x_tgt)
+    psi_bias = aoa.measurement(x_source=x_tgt, bias=alpha)
+    # Alternatively, we can set aoa's bias to have it persist...
+    # aoa.bias = alpha
+    # psi_bias = aoa.measurement(x_source=x_tgt)
 
     # Plot the scenario
     fig = plt.figure()
@@ -51,14 +58,17 @@ def example1():
     plt.grid(True)
 
     # Draw the LOBs
-    xy_lob = triang.model.draw_lob(x_sensor=x_aoa, psi=psi, x_source=x_tgt, scale=1.5)
-    label_set = [None]*n_aoa
-    label_set[0] = 'LOB (w/o bias)'
-    plt.plot(xy_lob[0], xy_lob[1], color=hdl_target.get_facecolor(), label=label_set)
+    xy_lobs = aoa.draw_lobs(zeta=psi, x_source=x_tgt, scale=1.5)
+    label = 'LOB (w/o bias)'
+    for xy_lob in xy_lobs:
+        plt.plot(xy_lob[0], xy_lob[1], color=hdl_target.get_facecolor(), label=label)
+        label = None
 
-    xy_lob_bias = triang.model.draw_lob(x_sensor=x_aoa, psi=psi_bias, x_source=x_tgt, scale=1.5)
-    label_set[0] = 'LOB (w/bias)'
-    plt.plot(xy_lob_bias[0], xy_lob_bias[1], '--', color=hdl_sensors.get_facecolor(), label=label_set)
+    xy_lobs = aoa.draw_lobs(zeta=psi_bias, x_source=x_tgt, scale=1.5)
+    label = 'LOB (w/bias)'
+    for xy_lob in xy_lobs:
+        plt.plot(xy_lob[0], xy_lob[1], '--', color=hdl_sensors.get_facecolor(), label=label)
+        label = None
 
     plt.legend(loc='upper left')
     plt.xlim(-1, 6)
@@ -89,11 +99,14 @@ def example2():
     # Generate a random set of TDOA positions
     x_tdoa_actual = x_tdoa + np.reshape(cov_pos_lower @ np.random.randn(2 * n_tdoa, ), newshape=(2, n_tdoa))
 
+    # Generate PSS System
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=None, ref_idx=None)
+
     # Generate Measurements
     x_tgt = np.array([6, 3])
 
-    zeta = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_tgt, ref_idx=n_tdoa-1)
-    zeta_unc = tdoa.model.measurement(x_sensor=x_tdoa_actual, x_source=x_tgt, ref_idx=n_tdoa-1)
+    zeta = tdoa.measurement(x_source=x_tgt)
+    zeta_unc = tdoa.measurement(x_sensor=x_tdoa_actual, x_source=x_tgt)  # manually specify actual sensor pos.
 
     print('Measurements from sensors 1-3 (w.r.t sensor 0):')
     print('Nominal Positions: {:.2f} m, {:.2f} m'.format(zeta[0], zeta[1]))
@@ -109,12 +122,10 @@ def example2():
     # Draw the Isochrones
     label_nominal = 'Isochrone (nominal positions)'
     label_actual = 'Isochrone (true positions)'
-    for idx in np.arange(n_tdoa - 1):
-        xy_iso = tdoa.model.draw_isochrone(x_ref=x_tdoa[:, -1], x_test=x_tdoa[:, idx],
-                                           range_diff=zeta_unc[idx], num_pts=101, max_ortho=8)
-        xy_iso_unc = tdoa.model.draw_isochrone(x_ref=x_tdoa_actual[:, -1], x_test=x_tdoa_actual[:, idx],
-                                               range_diff=zeta_unc[idx], num_pts=101, max_ortho=8)
+    xy_iso_nominal = tdoa.draw_isochrones(range_diff=zeta_unc, num_pts=101, max_ortho=8)
+    xy_iso_actual = tdoa.draw_isochrones(range_diff=zeta_unc, num_pts=101, max_ortho=8, x_sensor=x_tdoa_actual)
 
+    for xy_iso, xy_iso_unc in zip(xy_iso_nominal, xy_iso_actual):
         plt.plot(xy_iso[0], xy_iso[1], '-', color=hdl_nominal.get_facecolor(), label=label_nominal)
         plt.plot(xy_iso_unc[0], xy_iso_unc[1], '--', color=hdl_true.get_facecolor(), label=label_actual)
 
@@ -176,23 +187,25 @@ def example3():
     # Grab the position offsets and add to the reported TDOA and AOA positions
     x_aoa_true = x_aoa + epsilon[:, :n_aoa]  # first n_dim x n_aoa errors belong to the AOA sensors
     x_tdoa_true = x_tdoa + epsilon[:, n_aoa:]  # latter n_dim x n_tdoa errors belong to the TDOA sensors
+    x_sensor_true = np.concatenate((x_aoa_true, x_tdoa_true), axis=1)
 
     # Let's verify that sensors 2 and 4 are still colocated
     dist_perturbed = utils.geo.calc_range(x1=x_aoa_true, x2=x_tdoa_true)
     assert np.all(np.fabs(dist_perturbed[idx_aoa, idx_tdoa]) < 1e-6), 'Error generating correlated sensor perturbations.'
 
+    # Initialize the PSS
+    aoa = DirectionFinder(x=x_aoa, cov=None, do_2d_aoa=False)
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=None, ref_idx=None)
+    hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=None)
+
     # Generate Measurements
     x_tgt = np.array([6, 3])
-
     alpha_aoa = np.array([5, 10, -5])*_deg2rad  # AOA bias
-    msmt_args = {'x_fdoa': None,
-                 'v_fdoa': None,
-                 'x_source': x_tgt,
-                 'tdoa_ref_idx': n_tdoa-1,
-                 'do_2d_aoa': False}
-    zeta = hybrid.model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, **msmt_args)  # free of pos unc and bias
-    zeta_unc = hybrid.model.measurement(x_aoa=x_aoa_true, x_tdoa=x_tdoa_true, **msmt_args)  # with pos unc, no bias
-    zeta_unc_bias = hybrid.model.measurement(x_aoa=x_aoa_true, x_tdoa=x_tdoa_true, angle_bias=alpha_aoa, **msmt_args)
+    bias = np.concatenate((alpha_aoa, np.zeros((tdoa.num_measurements, ))), axis=0)
+
+    zeta = hybrid.measurement(x_source=x_tgt)
+    zeta_unc = hybrid.measurement(x_source=x_tgt, x_sensor=x_sensor_true)
+    zeta_unc_bias = hybrid.measurement(x_source=x_tgt, x_sensor=x_sensor_true, bias=bias)
     # with pos unc and bias
 
     print('Measurements from ideal sensors (AOA, AOA, AOA, RDOA, RDOA):\n[', end='')
@@ -213,26 +226,19 @@ def example3():
     plt.grid(True)
 
     # Draw the Isochrones and LOBs -- Truth
-    xy_lob = triang.model.draw_lob(x_sensor=x_aoa, psi=zeta_unc_bias[:n_aoa], x_source=x_tgt, scale=1.5)
-    # xy_lob_bias = triang.model.draw_lob(x_sensor=x_aoa_true, psi=zeta_unc_bias[:n_aoa], x_source=x_tgt, scale=1.5)
-    label_set = [None] * n_aoa
-    label_set[0] = 'LOB (nominal positions w/bias)'
-    plt.plot(xy_lob[0],xy_lob[1], color=hdl_nominal_a.get_facecolor(), label=label_set)
-    # label_set[0] = 'LOB (true positions w/bias)'
-    # plt.plot(xy_lob_bias[0], xy_lob_bias[1],'-.', color=hdl_true_a.get_facecolor(), label=label_set)
+    xy_lobs = aoa.draw_lobs(zeta=zeta_unc_bias[:n_aoa], x_source=x_tgt, scale=1.5)
+    # xy_lob_bias = aoa.draw_lobs(x_sensor=x_aoa_true, psi=zeta_unc_bias[:n_aoa], x_source=x_tgt, scale=1.5)
+    label = 'LOB (nominal positions w/bias)'
+    for xy_lob in xy_lobs:
+        plt.plot(xy_lob[0],xy_lob[1], color=hdl_nominal_a.get_facecolor(), label=label)
+        label = None
 
     label_nominal = 'Isochrone (nominal positions w/bias)'
     # label_true = 'Isochrone (true positions w/bias)'
-    for idx in np.arange(n_tdoa-1):
-        xy_iso = tdoa.model.draw_isochrone(x_tdoa[:, -1], x_tdoa[:, idx], range_diff=zeta_unc_bias[n_aoa+idx],
-                                           num_pts=101, max_ortho=8)
-        # xy_iso_true = tdoa.model.draw_isochrone(x_tdoa_true[:, -1], x_tdoa_true[:, idx], range_diff=zeta_unc_bias[n_aoa + idx],
-        #                                    num_pts=101, max_ortho=8)
-
+    xy_isos = tdoa.draw_isochrones(range_diff=zeta_unc_bias[aoa.num_measurements:], num_pts=101, max_ortho=8)
+    for xy_iso in xy_isos:
         plt.plot(xy_iso[0], xy_iso[1], color=hdl_nominal_t.get_facecolor(), label=label_nominal)
-        # plt.plot(xy_iso_true[0], xy_iso_true[1], color=hdl_true_t.get_facecolor(), label=label_true)
         label_nominal = 'None'
-        # label_true = 'None'
 
     plt.legend(loc='lower right')
     plt.xlim(-1, 8)
@@ -259,23 +265,20 @@ def example4(do_iterative=False):
                        [2, 2, 0, 0]])*1e3 # avg position (reported)
     n_dim, n_tdoa = utils.safe_2d_shape(x_tdoa)
 
-    # Generate Measurements
-    x_tgt = np.array([6, 3])*1e3
-
     tdoa_bias = np.array([10, 30, -20, 60])  # TOA bias
-    tdoa_args = {'x_sensor': x_tdoa,
-                 'x_source': x_tgt,
-                 'ref_idx': n_tdoa-1}
-    z = tdoa.model.measurement(**tdoa_args, bias=tdoa_bias)  # free of pos unc, w/bias
-    z_true = tdoa.model.measurement(**tdoa_args)  # free of pos unc, w/o bias
 
     err_toa = 100e-9
     cov_toa = CovarianceMatrix((err_toa**2)*np.eye(n_tdoa))
     cov_roa = cov_toa.multiply(val=utils.constants.speed_of_light**2, overwrite=False)
-    cov_rdoa = cov_roa.resample(ref_idx=n_tdoa-1)
-    lower_rdoa = cov_rdoa.lower
 
-    noise = lower_rdoa @ np.random.randn(n_tdoa-1, )
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=None, variance_is_toa=False)
+
+    # Generate Measurements
+    x_tgt = np.array([6, 3])*1e3
+
+    z = tdoa.measurement(x_source=x_tgt, bias=tdoa_bias)  # free of pos unc, w/bias
+    z_true = tdoa.measurement(x_source=x_tgt)  # free of pos unc, w/o bias
+    noise = tdoa.cov.lower @ np.random.randn(tdoa.num_measurements, )
     zeta = z + noise
     zeta_true = z_true + noise
 
@@ -283,18 +286,15 @@ def example4(do_iterative=False):
     x_ctr = np.array([5e3, 5e3])
     search_size = 5e3
     grid_res = .05e3
-    x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr=x_ctr, max_offset=search_size, grid_spacing=grid_res)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=search_size,
+                               epsilon=grid_res)
+    x_set, x_grid, out_shape = utils.make_nd_grid(search_space)
     extent = ((x_ctr[0]-search_size)/1e3, (x_ctr[0]+search_size)/1e3,
               (x_ctr[1]-search_size)/1e3, (x_ctr[1]+search_size)/1e3)
 
-    tdoa_args = {'x_sensor': x_tdoa,
-                 'x_source': x_set,
-                 'ref_idx': n_tdoa-1,
-                 'do_resample': True,
-                 'cov': cov_roa,
-                 'variance_is_toa': False}
-    ell = tdoa.model.log_likelihood(zeta=zeta, **tdoa_args)
-    ell_true = tdoa.model.log_likelihood(zeta=zeta_true, **tdoa_args)
+    ell = tdoa.log_likelihood(zeta=zeta, x_source=x_set)
+    ell_true = tdoa.log_likelihood(zeta=zeta_true, x_source=x_set)
 
     # Plot Scenario
     levels = [-1000, -100, -50, -20, -10, -5, 0]
@@ -305,7 +305,7 @@ def example4(do_iterative=False):
         cmap.set_under('k', alpha=0)  # Set values below vmin to transparent black
 
         hdl = plt.imshow(this_ell, origin='lower', cmap=cmap, extent=extent)
-        plt.clim([-100, 0])
+        plt.clim(-100, 0)
         plt.colorbar(hdl, format='%d')
 
         # Unlike in MATLAB, contourf does not draw contour edges. Manually add contours
@@ -338,16 +338,11 @@ def example4(do_iterative=False):
     search_size = 5e3
     grid_res = .1e3
 
-    solver_args = {'x_sensor': x_tdoa,
-                   'cov': cov_rdoa,
-                   'x_ctr': x_ctr,
+    solver_args = {'x_ctr': x_ctr,
                    'search_size': search_size,
-                   'epsilon': grid_res,
-                   'ref_idx': n_tdoa-1,
-                   'do_resample': False,
-                   'variance_is_toa': False}
-    x_est_true, _, _ = tdoa.solvers.max_likelihood(zeta=zeta_true, **solver_args)
-    x_est, _, _ = tdoa.solvers.max_likelihood(zeta=zeta, **solver_args)
+                   'epsilon': grid_res}
+    x_est_true, _, _ = tdoa.max_likelihood(zeta=zeta_true, **solver_args)
+    x_est, _, _ = tdoa.max_likelihood(zeta=zeta, **solver_args)
 
     print('True ML Est.: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_true[0]/1e3, x_est_true[1]/1e3,
                                                                       np.linalg.norm(x_est_true-x_tgt)/1e3))
@@ -360,9 +355,9 @@ def example4(do_iterative=False):
                              np.zeros(n_tdoa,),  # unknown ROA bias terms (start at zero bias)
                              x_tdoa.ravel()))    # unknown x/y coordinates of sensors (start at nominal positions)
     search_size = np.concatenate((5e3*np.ones(2,),          # x/y search grid at +/- 5 km
-                                 80*np.ones(n_tdoa-1,),     # assume as much as 80 meters of RDOA error
-                                 np.zeros(1, ),  # the reference sensor can be assumed to have no bias (for simplicity)
+                                 80*np.ones(n_tdoa,),     # assume as much as 80 meters of RDOA error
                                  np.zeros(n_tdoa*n_dim,)))  # assume no sensor position uncertainty
+    search_size[1 + n_tdoa] = 0  # for simplicity, we can assume no bias on the reference sensor
     epsilon = np.concatenate((500*np.ones(2,),      # search target positions with 500 m accuracy
                               10*np.ones(n_tdoa,),  # search bias terms with 10 m RDOA accuracy
                               np.ones(n_tdoa*n_dim,)))  # resolution for x_tdoa doesn't matter; search_size is 0
@@ -373,8 +368,9 @@ def example4(do_iterative=False):
     unc_solver_args['search_size'] = search_size    # dimensions for bias and sensor position uncertainty
     unc_solver_args['epsilon'] = epsilon
     unc_solver_args['cov_pos'] = cov_beta
+    unc_solver_args['do_sensor_bias'] = True
 
-    x_est_bias, bias_est, x_tdoa_est, _, _  = tdoa.solvers.max_likelihood_uncertainty(zeta=zeta, **unc_solver_args)
+    x_est_bias, bias_est, x_tdoa_est, _, _  = tdoa.max_likelihood_uncertainty(zeta=zeta, **unc_solver_args)
     err_km = np.linalg.norm(x_est_bias-x_tgt)/1e3
     print('ML Est. w/Uncertainty: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_bias[0]/1e3,
                                                                                 x_est_bias[1]/1e3,
@@ -393,17 +389,12 @@ def example4(do_iterative=False):
                            ['Sensors', 'Target', 'ML Est.', 'ML Est. w/uncertainty']))
 
     if do_iterative:
-        iter_solver_args = {'x_sensor': x_tdoa,
-                            'cov': cov_rdoa,
-                            'th_init': x_ctr,
-                            'epsilon': grid_res,
-                            'ref_idx': n_tdoa-1,
-                            'do_resample': False,
-                            'variance_is_toa': False}
+        iter_solver_args = {'th_init': x_ctr,
+                            'epsilon': grid_res}
 
         # Iterative Solvers
-        x_est_gd, x_est_gd_full, bias_est_gd = tdoa.solvers.gradient_descent(zeta=zeta, **iter_solver_args)
-        x_est_ls, x_est_ls_full, bias_est_ls = tdoa.solvers.least_square(zeta=zeta, **iter_solver_args)
+        x_est_gd, x_est_gd_full, bias_est_gd = tdoa.gradient_descent(zeta=zeta, **iter_solver_args)
+        x_est_ls, x_est_ls_full, bias_est_ls = tdoa.least_square(zeta=zeta, **iter_solver_args)
 
         with np.printoptions(precision=3, suppress=True):
             print('GD Est. range bias: (', end='')
@@ -417,7 +408,7 @@ def example4(do_iterative=False):
     return figs
 
 
-def example5():
+def example5(do_vel_only_cal=False):
     """
     Executes Example 6.5.
 
@@ -444,22 +435,6 @@ def example5():
     vel_err = np.reshape(cov_vel.lower() @ np.random.randn(n_dim*n_fdoa, 1), (n_dim, n_fdoa))
     v_fdoa_actual = v_fdoa + vel_err
 
-    # Generate Measurements
-    x_source = np.array([-3, 4]) * 1e3
-    x_cal = np.array([-2, -1, 0, 1, 2],
-                     [-5, -5, -5, -5, -5]) * 1e3
-    _, num_cal = utils.safe_2d_shape(x_cal)
-
-    system_args = {'x_aoa': None,
-                   'x_tdoa': x_tdoa,
-                   'x_fdoa': x_fdoa,
-                   'v_fdoa': v_fdoa}
-    system_args_truth = system_args
-    system_args_truth['v_fdoa'] = v_fdoa_actual
-
-    z = hybrid.model.measurement(x_source=x_source, **system_args_truth)
-    z_cal = hybrid.model.measurement(x_source=x_cal, **system_args_truth)
-
     # Build sensor-level covariance matrix
     err_time = 100e-9
     err_freq = 1
@@ -474,19 +449,54 @@ def example5():
     cov_rrdoa = cov_rroa.resample()
     cov_tf = CovarianceMatrix.block_diagonal(cov_rdoa, cov_rrdoa)
 
+    # Construct PSS Object
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, variance_is_toa=False, ref_idx=None)
+    fdoa = FDOAPassiveSurveillanceSystem(x=x_fdoa, vel=v_fdoa, cov=cov_rroa, ref_idx=None)
+    hybrid = HybridPassiveSurveillanceSystem(tdoa=tdoa, fdoa=fdoa)
+
+    # Generate Measurements using the True Sensor Velocities
+    x_source = np.array([-3, 4]) * 1e3
+    x_cal = np.array([-2, -1, 0, 1, 2],
+                     [-5, -5, -5, -5, -5]) * 1e3
+    _, num_cal = utils.safe_2d_shape(x_cal)
+
+    z = hybrid.measurement(x_source=x_source, v_sensor=v_fdoa_actual)
+    z_cal = hybrid.measurement(x_source=x_cal, v_sensor=v_fdoa_actual)
+
     # Generate Noise
-    noise = cov_tf.lower() @ np.random.randn(n_tdoa+n_fdoa-2, n_cal + 1)
+    noise = cov_tf.lower() @ np.random.randn(n_tdoa+n_fdoa-2, num_cal + 1) # one column for target; num_cal for cal data
     zeta = z + noise[:, 0]
     zeta_cal = z_cal + noise[:, 1:]
 
     # Estimate Position
     x_init = np.array([0, 5])*1e3
-    x_est, x_est_full = hybrid.solvers.gradient_descent(zeta=zeta, cov=cov_tf, x_init=x_init, **system_args)
-    x_est_cal, x_est_cal_full, _, _ = hybrid.solvers.gradient_descent(zeta=zeta, cov=cov_tf, x_init=x_init,
-                                                                      x_cal=x_cal, zeta_cal=zeta_cal, **system_args)
+    cal_data = {'zeta_cal': zeta_cal,
+                'x_cal': x_cal,
+                'do_pos_cal': True,
+                'do_vel_cal': True,
+                'do_bias_cal': False}  # don't bother calibrating across measurement biases; let's just do pos/vel
+    _, x_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init)
+    _, x_est_cal, _, _ = hybrid.gradient_descent(zeta=zeta, x_init=x_init, cal_data=cal_data)
     
     # Plot Scenario
+    fig = plt.figure()
+    tdoa.plot_sensors(marker='^', label='Sensors', clip_on=False, zorder=3)
+    plt.scatter(x_source[0], x_source[1], marker='o', label='Target', clip_on=False, zorder=3)
+    plt.scatter(x_cal[0], x_cal[1], marker='v', label='Calibration Sources', clip_on=False, zorder=3)
+
+    # Plot Iterative Solutions
+    plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
+    plt.plot(x_est[0], x_est[1], linestyle='--', marker='s', markevery=[-1], label='Solution (w/o cal)')
+    plt.plot(x_est_cal[0], x_est_cal[1], linestyle='--', marker='s', markevery=[-1], label='Solution (w/pos & vel cal)')
 
     # Bonus: FDOA-only Cal
+    if do_vel_only_cal:
+        # To restrict calibration to velocity alone, we simply adjust the flags in cal_data
+        cal_data['do_pos_cal'] = False  # turn off sensor position calibration; data will be used only for velocity cal
+        _, x_est_fdoa_cal, _, _ = hybrid.gradient_descent(zeta=zeta, x_init=x_init, cal_data=cal_data)
 
-    return []
+        # Plot the scenario
+        plt.plot(x_est_fdoa_cal[0], x_est_fdoa_cal[1], linestyle='-.', marker='s', markevery=[-1],
+                 label='Solution (w/velocity cal)')
+
+    return fig,

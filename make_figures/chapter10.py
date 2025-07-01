@@ -379,7 +379,7 @@ def make_figure_4(prefix=None):
     return fig4
 
 
-def make_figure_5(prefix=None, rng=None, force_recalc=True):
+def make_figure_5(prefix=None, rng=np.random.default_rng(), force_recalc=True):
     """
     Figure 5 - Example Solution
 
@@ -400,9 +400,6 @@ def make_figure_5(prefix=None, rng=None, force_recalc=True):
         return None, None
 
     print('Generating Figure 10.5 (a and b)...')
-
-    if rng is None:
-        rng = np.random.default_rng(0)
 
     fig5a, fig5b = chapter10.example1(rng)
 

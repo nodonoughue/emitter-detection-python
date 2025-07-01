@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import fdoa
 from examples import chapter12
+from utils import SearchSpace
 
 
 def make_all_figures(close_figs=False, force_recalc=False):
@@ -160,7 +161,10 @@ def make_figure_2(prefix=None):
 
     x_sensor0 = np.array([-2., 0.])
     x_sensor1 = np.array([2., 0.])
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0, 0), max_offset=5, grid_spacing=.01)
+    search_space = SearchSpace(x_ctr=np.array([0., 0.]),
+                               max_offset=5,
+                               epsilon=.01)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
     v_sensor0 = np.array([1., 0.])
     v_sensor1 = np.array([1., 0.])
@@ -491,7 +495,10 @@ def make_figure_6(prefix):
     num_grid_points = 501
     grid_extent = 100e3
     grid_spacing = 2*grid_extent/(num_grid_points-1)
-    x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0., 0.), grid_spacing=grid_spacing, max_offset=grid_extent)
+    search_space = SearchSpace(x_ctr=np.array([0., 0.]),
+                               max_offset=grid_extent,
+                               epsilon=grid_spacing)
+    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
     # Compute CRLB
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)

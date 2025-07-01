@@ -1,3 +1,4 @@
+from .utils import *
 from . import constants
 from . import errors
 from . import geo
@@ -7,4 +8,4 @@ from . import unit_conversions
 from . import coordinates
 from . import constraints
 from . import system
-from .utils import *
+from . import tracker

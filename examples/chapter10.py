@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import utils
+from utils import SearchSpace
 from utils.covariance import CovarianceMatrix
 import triang
 import time
@@ -27,7 +28,7 @@ def run_all_examples():
     return [fig1, fig2, fig3]
 
 
-def example1(rng=None, cmap=None):
+def example1(rng=np.random.default_rng(), cmap=None):
     """
     Executes Example 10.1 and generates two figures
 
@@ -43,10 +44,6 @@ def example1(rng=None, cmap=None):
     :return fig_geo: figure handle to generated graphic with geographic layout
     :return fig_err: figure handle to generated graphic with error as a function of iteration
     """
-
-    # Random Number Generator
-    if rng is None:
-        rng = np.random.default_rng(0)
 
     if cmap is None:
         cmap = plt.get_cmap("tab10")
@@ -122,15 +119,14 @@ def example1(rng=None, cmap=None):
     t_start = time.perf_counter()
 
     x_init = np.array([5, 5])
-    x_extent = np.array([50, 50])
+    max_offset = np.array([50, 50])
 
     args = {'psi_act': psi_act,
             'num_sensors': num_sensors,
             'x_sensor': x_sensor,
             'x_init': x_init,
-            'x_extent': x_extent,
+            'search_space': SearchSpace(x_ctr=x_init, max_offset=max_offset, epsilon=epsilon),
             'covar_psi': covar_psi,
-            'epsilon': epsilon,
             'num_iterations': num_iterations,
             'rng': rng}
 
@@ -255,8 +251,7 @@ def _mc_iteration(args):
                 num_sensors: number of AOA sensors
                 x_sensor: position of AOA sensors
                 x_init: initial solution guess (also used as center of search grid for ML and Bestfix)
-                x_extent: search grid extent
-                epsilon: search grid spacing (also used as stopping condition for LS and GD)
+                search_space: ML search space
                 num_iterations: maximum number of iterations for GD and LS solvers
     :return estimates: Dictionary with estimated target position using several algorithms.  Fields are:
                 ml: Maximum Likelihood solution
@@ -277,10 +272,9 @@ def _mc_iteration(args):
 
     # Generate solutions
     res_ml, _, _ = triang.solvers.max_likelihood(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
-                                                 x_ctr=args['x_init'], search_size=args['x_extent'],
-                                                 epsilon=args['epsilon'])
+                                                 search_space=args['search_space'])
     res_bf, _, _ = triang.solvers.bestfix(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
-                                          x_ctr=args['x_init'], search_size=args['x_extent'], epsilon=args['epsilon'])
+                                          search_space=args['search_space'])
     res_centroid = triang.solvers.centroid(x_sensor=args['x_sensor'], psi=psi)
     res_incenter = triang.solvers.angle_bisector(x_sensor=args['x_sensor'], psi=psi)
     _, res_ls = triang.solvers.least_square(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
@@ -331,7 +325,10 @@ def example2():
 
     x_max = 100
     grid_res = 0.25
-    x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr=np.array([0., 0.]), max_offset=x_max, grid_spacing=grid_res)
+    search_space = SearchSpace(x_ctr=np.array([0., 0.]),
+                               max_offset=x_max,
+                               epsilon=grid_res)
+    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
     # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
     grid_shape_2d = [i for i in grid_shape if i > 1]
 

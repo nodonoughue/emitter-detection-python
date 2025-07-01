@@ -66,7 +66,7 @@ def make_figure_1(prefix=None, force_recalc=False):
         print('Skipping Figure 6.1 from Example 6.1 (re-run with force_recalc=True to generate)...')
         return None, None
 
-    print('Generating Figure 6.1...')
+    print('Generating Figure 6.1 (Example 6.1)...')
 
     figs = chapter6.example1()
 
@@ -94,7 +94,7 @@ def make_figure_2(prefix=None, force_recalc=False):
 
     if not force_recalc:
         print('Skipping Figure 6.2 from Examples 6.2 and 6.3 (re-run with force_recalc=True to generate)...')
-        return None, None
+        return None,
 
     print('Generating Figure 6.2 from Examples 6.2 and 6.3...')
 
@@ -134,7 +134,7 @@ def make_figure_3(prefix=None):
     x_aoa_nonun = x_aoa + x_err[:, np.newaxis] @ np.array([[-1, 1]])
 
     # Solve True LOBs and AOAs
-    lob = x_target[:, np.newaxis] - x_aoa
+    # lob = x_target[:, np.newaxis] - x_aoa
     psi = triang.model.measurement(x_sensor=x_aoa, x_source=x_target)
     r = utils.geo.calc_range(x1=x_aoa, x2=x_target)
 
@@ -161,7 +161,7 @@ def make_figure_3(prefix=None):
                 marker='o', color=hdl_true.get_facecolor(), label='Target', clip_on=False)
     plt.scatter(x_tgt_un[0], x_tgt_un[1],
                 marker='o', color=hdl_err.get_facecolor(), label='Est. Target', clip_on=False)
-    hdls = plt.plot(lob_true[0].T, lob_true[1].T, color=hdl_true.get_facecolor(), label=('True LOB', None))
+    plt.plot(lob_true[0].T, lob_true[1].T, color=hdl_true.get_facecolor(), label=('True LOB', None))
     plt.plot(lob_un[0].T, lob_un[1].T, color=hdl_err.get_facecolor(), label=('Perceived LOB', None))
     plt.xlim([-6, 6])
     plt.ylim([0, 11])

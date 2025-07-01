@@ -6,6 +6,7 @@ import utils
 from triang import DirectionFinder
 from tdoa import TDOAPassiveSurveillanceSystem
 from hybrid import HybridPassiveSurveillanceSystem
+from utils import SearchSpace
 from utils.covariance import CovarianceMatrix
 from utils.coordinates import ecef_to_enu, ecef_to_lla, enu_to_ecef, lla_to_ecef
 import triang
@@ -279,9 +280,10 @@ def example3():
     max_offset = int(10e3)
     num_pts = 201
     grid_res = 2*max_offset / (num_pts-1)
-    x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr=x_tgt,
-                                                  max_offset=max_offset*np.array([1, 1, 0]),
-                                                  grid_spacing=grid_res)
+    search_space = SearchSpace(x_ctr=x_tgt,
+                               max_offset=max_offset,
+                               epsilon=grid_res)
+    x_set, x_grid, out_shape = utils.make_nd_grid(search_space)
 
     # Compute CRLB across grid
     crlb_raw_grid = hybrid.compute_crlb(x_source=x_set, print_progress=True)

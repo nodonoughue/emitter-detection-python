@@ -1,4 +1,5 @@
-from . import model, perf, solvers
+from utils import SearchSpace
+from . import model, solvers
 import utils
 from utils.system import DifferencePSS
 from utils.covariance import CovarianceMatrix
@@ -90,11 +91,12 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
                                       ref_idx=self.ref_idx, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
                                       bias=bias, do_resample=False, **kwargs)
 
-    def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, **kwargs):
-        return solvers.max_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, cov=self.cov, cov_pos=self.cov_pos,
-                                                  ref_idx=self.ref_idx, x_ctr=x_ctr, search_size=search_size,
-                                                  epsilon=epsilon, do_resample=False, v_sensor=self.vel,
-                                                  do_sensor_bias=do_sensor_bias, **kwargs)
+    # todo: delete when it's working
+    # def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, **kwargs):
+    #     return solvers.max_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, cov=self.cov, cov_pos=self.cov_pos,
+    #                                               ref_idx=self.ref_idx, x_ctr=x_ctr, search_size=search_size,
+    #                                               epsilon=epsilon, do_resample=False, v_sensor=self.vel,
+    #                                               do_sensor_bias=do_sensor_bias, **kwargs)
 
     def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
@@ -117,9 +119,9 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         return solvers.least_square(x_sensor=x_sensor, v_sensor=self.vel, zeta=zeta, cov=self.cov, x_init=x_init,
                                     ref_idx=self.ref_idx, do_resample=False, **kwargs)
 
-    def bestfix(self, zeta, x_ctr, search_size, epsilon, pdf_type=None):
-        return solvers.bestfix(x_sensor=self.pos, v_sensor=self.vel, zeta=zeta, cov=self.cov, x_ctr=x_ctr,
-                               search_size=search_size, epsilon=epsilon, pdf_type=pdf_type, ref_idx=self.ref_idx,
+    def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None):
+        return solvers.bestfix(x_sensor=self.pos, v_sensor=self.vel, zeta=zeta, cov=self.cov,
+                               search_space=search_space, pdf_type=pdf_type, ref_idx=self.ref_idx,
                                do_resample=False)
 
     ## ============================================================================================================== ##
@@ -128,16 +130,17 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
     def compute_crlb(self, x_source, v_source=None, **kwargs):
+
         def this_jacobian(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, v_source)
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, default_vel=v_source)
             n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
             j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=self.pos, v_sensor=self.vel)
             # Jacobian returns 2*self.n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
             # excise just the position portion
             return j[:n_dim]
 
-        return perf.compute_crlb(x_sensor=self.pos, v_sensor=self.vel, x_source=x_source, cov=self.cov,
-                                 ref_idx=self.ref_idx, do_resample=False, **kwargs)
+        return utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov.cov,
+                                                **kwargs)
 
     ## ============================================================================================================== ##
     ## Helper Methods
