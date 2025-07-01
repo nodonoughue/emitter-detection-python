@@ -60,7 +60,7 @@ class PassiveSurveillanceSystem(ABC):
         pass
 
     @abstractmethod
-    def log_likelihood_uncertainty(self, zeta, theta, do_sensor_bias=False, do_sensor_pos=False,
+    def log_likelihood_uncertainty(self, zeta, theta, do_source_vel=False, do_sensor_bias=False, do_sensor_pos=False,
                                    do_sensor_vel=False, **kwargs):
         if not do_sensor_bias and not do_sensor_pos and not do_sensor_vel:
             # None of the uncertainty parameters are being called for; theta is just x_source
@@ -76,7 +76,7 @@ class PassiveSurveillanceSystem(ABC):
             v = th[indices['source_vel_indices']] if do_source_vel else np.zeros_like(x)
             b = th[indices['bias_indices']] if do_sensor_bias else self.bias
             xs = np.reshape(th[indices['pos_indices']], self.pos.shape) if do_sensor_pos else self.pos
-            xv = np.reshape(th[indices['vel_indices']], self.pos.shape) if do_sensor_vel else self.vel
+            vs = np.reshape(th[indices['vel_indices']], self.pos.shape) if do_sensor_vel else self.vel
             return x, v, b, xs, vs
 
         num_parameters, num_source_pos = utils.safe_2d_shape(theta)
@@ -104,11 +104,11 @@ class PassiveSurveillanceSystem(ABC):
             # Compute the scaled log likelihood
             ell_x = - self.cov.solve_aca(err)
             if do_sensor_pos:
-                ell_b = - self.cov_pos.solve_aca(err_b)
+                ell_pos = - self.cov_pos.solve_aca(err_pos)
             else:
-                ell_b = 0
+                ell_pos = 0
 
-            ell[idx_source] = ell_x + ell_b
+            ell[idx_source] = ell_x + ell_pos
 
         return ell
 
