@@ -59,7 +59,6 @@ class PassiveSurveillanceSystem(ABC):
     def log_likelihood(self, x_source, zeta, x_sensor=None, bias=None, v_sensor=None, v_source=None):
         pass
 
-    @abstractmethod
     def log_likelihood_uncertainty(self, zeta, theta, do_source_vel=False, do_sensor_bias=False, do_sensor_pos=False,
                                    do_sensor_vel=False, **kwargs):
         if not do_sensor_bias and not do_sensor_pos and not do_sensor_vel:
