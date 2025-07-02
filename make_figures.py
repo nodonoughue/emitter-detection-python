@@ -80,4 +80,4 @@ else:
     print('************************************************************************************************')
     print('Skipping ''Practical Geolocation for Electronic Warfare using MATLAB'', 2022.')
     print('************************************************************************************************')
-    print('Re-run with ''do_book_1 = True'' to generate all figures.')
+    print('Re-run with ''do_book_2 = True'' to generate all figures.')
