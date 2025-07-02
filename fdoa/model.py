@@ -78,6 +78,7 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     :param ref_idx: Scalar index of reference sensor, or n_dim x nPair matrix of sensor pairings
     :return j: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
     """
+    # ToDo: Think about refactoring as a two-element response (j_pos, j_vel) for easier parsing at the output
 
     # Parse inputs
     n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)

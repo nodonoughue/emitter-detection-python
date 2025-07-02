@@ -528,6 +528,7 @@ def make_figure_12(prefix=None, rng=np.random.default_rng(), force_recalc=True):
             this_err_beamscan[idx_mc] = np.abs(psi_vec[idx_pk]-psi)
 
             # Compute MVDR beamscan image
+            # TODO: Doesn't look right; why is this plot off?
             pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(x[:, :, idx_mc], v, np.pi/2, 2001)
             idx_pk_mvdr = np.argmax(np.abs(pwr_vec_mvdr))
             this_err_mvdr[idx_mc] = np.abs(psi_vec[idx_pk_mvdr]-psi)

@@ -247,6 +247,7 @@ def example1(rng=np.random.default_rng()):
     th_peaks = 180*psi_peaks/np.pi
 
     # Call MVDR Beamformer
+    # ToDo: Doesn't look right; diagnose and fix.
     pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(data['x'], v, np.pi/2, 1001)
     peaks_mvdr, _ = find_peaks(pwr_vec_mvdr, prominence=.1*np.max(pwr_vec_mvdr))
     psi_peaks_mvdr = psi_vec[peaks_mvdr]
@@ -362,6 +363,7 @@ def example2(rng=np.random.default_rng()):
             this_err_beamscan[idx_mc] = np.abs(psi_vec[idx_pk]-psi)
     
             # Compute beamscan MVDR image
+            # ToDo: plot doesn't look right; diagnose and fix.
             pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(this_rx_signal[:, :, idx_mc], v, np.pi/2, 2001)
             idx_pk = np.argmax(np.abs(pwr_vec_mvdr))
             this_err_mvdr[idx_mc] = np.abs(psi_vec[idx_pk]-psi)
