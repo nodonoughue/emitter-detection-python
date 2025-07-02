@@ -389,7 +389,7 @@ def example4(do_iterative=False):
                            ['Sensors', 'Target', 'ML Est.', 'ML Est. w/uncertainty']))
 
     if do_iterative:
-        iter_solver_args = {'th_init': x_ctr,
+        iter_solver_args = {'x_init': x_ctr,
                             'epsilon': grid_res}
 
         # Iterative Solvers
