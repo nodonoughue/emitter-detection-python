@@ -276,9 +276,9 @@ def _mc_iteration(args):
     rho = args['rho_act'] + covar_lower @ rng.standard_normal(size=(args['num_measurements'], ))
 
     # Generate solutions
-    res_ml, ml_surf, ml_grid = fdoa.solvers.max_likelihood(**args['rx_args'], **args['ml_args'], zeta=rho)
-    res_bf, bf_surf, bf_grid = fdoa.solvers.bestfix(**args['rx_args'], **args['ml_args'], zeta=rho)
-    _, res_ls = fdoa.solvers.least_square(**args['rx_args'], **args['ls_args'], zeta=rho)
-    _, res_gd = fdoa.solvers.gradient_descent(**args['rx_args'], **args['gd_args'], zeta=rho)
+    res_ml, ml_surf, ml_grid = fdoa.solvers.max_likelihood(zeta=rho, **args['rx_args'], **args['ml_args'])
+    res_bf, bf_surf, bf_grid = fdoa.solvers.bestfix(zeta=rho, **args['rx_args'], **args['ml_args'])
+    _, res_ls = fdoa.solvers.least_square(zeta=rho, **args['rx_args'], **args['ls_args'])
+    _, res_gd = fdoa.solvers.gradient_descent(zeta=rho, **args['rx_args'], **args['gd_args'])
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf}
