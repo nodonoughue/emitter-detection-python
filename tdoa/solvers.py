@@ -108,7 +108,7 @@ def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, search_space:SearchSpa
 #     return x_est, bias_est, sensor_pos_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, th_init, ref_idx=None, do_resample=False,
+def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
                      variance_is_toa=False, bias=None, **kwargs):
     """
     Computes the gradient descent solution for tdoa processing.
@@ -121,7 +121,7 @@ def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, th_init, ref_idx=Non
     :param x_sensor: tdoa sensor positions [m]
     :param zeta: Measurement vector
     :param cov: tdoa error covariance matrix
-    :param th_init: Initial estimate of uncertainties (source position, sensor biases, sensor positions)
+    :param x_init: Initial estimate of uncertainties (source position, sensor biases, sensor positions)
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
@@ -141,7 +141,7 @@ def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, th_init, ref_idx=Non
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
 
     # Call generic Gradient Descent solver
-    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, cov=cov, x_init=th_init, **kwargs)
+    x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
 
     return x, x_full
 

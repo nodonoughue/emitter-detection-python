@@ -101,7 +101,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         else:
             x_sensor, v_sensor, bias = self.pos, None, self.bias
 
-        return solvers.gradient_descent(x_sensor=x_sensor, zeta=zeta, cov=self.cov, th_init=x_init, ref_idx=self.ref_idx,
+        return solvers.gradient_descent(x_sensor=x_sensor, zeta=zeta, cov=self.cov, x_init=x_init, ref_idx=self.ref_idx,
                                         do_resample=False, variance_is_toa=False, **kwargs)
 
     def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
