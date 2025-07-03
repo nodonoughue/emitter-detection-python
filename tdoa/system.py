@@ -73,7 +73,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle the interface to solvers
     ## ============================================================================================================== ##
-    def max_likelihood(self, zeta, x_ctr, search_size, epsilon=None, cal_data: dict=None, **kwargs):
+    def max_likelihood(self, zeta, search_space: SearchSpace, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
@@ -81,8 +81,8 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
             x_sensor, v_sensor, bias = self.pos, None, self.bias
 
         # Call the non-calibration solver
-        return solvers.max_likelihood(x_sensor=x_sensor, zeta=zeta, cov=self.cov, ref_idx=self.ref_idx, x_ctr=x_ctr,
-                                      search_size=search_size, epsilon=epsilon, bias=bias,
+        return solvers.max_likelihood(x_sensor=x_sensor, zeta=zeta, cov=self.cov, ref_idx=self.ref_idx,
+                                      search_space=search_space, bias=bias,
                                       do_resample=False, variance_is_toa=False, **kwargs)
 
     # def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, cov_pos=None,
@@ -114,10 +114,28 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         return solvers.least_square(x_sensor=x_sensor, zeta=zeta, cov=self.cov, x_init=x_init, ref_idx=self.ref_idx,
                                     do_resample=False, variance_is_toa=False, **kwargs)
 
-    def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None):
-        return solvers.bestfix(x_sensor=self.pos, zeta=zeta, cov=self.cov,
+    def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None, cal_data: dict=None):
+        # Perform sensor calibration
+        if cal_data is not None:
+            x_sensor, _, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, _, bias = self.pos, None, self.bias
+
+        # ToDo: Get bestfix to accept a bias term
+        return solvers.bestfix(x_sensor=x_sensor, zeta=zeta, cov=self.cov,
                                search_space=search_space, pdf_type=pdf_type,
                                do_resample=False, variance_is_toa=False)
+
+    def chan_ho(self, zeta, cal_data: dict=None):
+        # Perform sensor calibration
+        if cal_data is not None:
+            x_sensor, _, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, _, bias = self.pos, None, self.bias
+
+        # ToDo: Get chan_ho to accept a bias term
+        return solvers.chan_ho(x_sensor=x_sensor, zeta=zeta, cov=self.cov, ref_idx=self.ref_idx, do_resample=False,
+                               variance_is_toa=False)
 
     ## ============================================================================================================== ##
     ## Performance Methods

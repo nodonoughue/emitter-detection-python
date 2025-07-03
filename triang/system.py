@@ -63,7 +63,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
     ##
     ## These methods handle the interface to solvers
     ## ============================================================================================================== ##
-    def max_likelihood(self, zeta, x_ctr, search_size, epsilon, cal_data: dict=None, **kwargs):
+    def max_likelihood(self, zeta, search_space: SearchSpace, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
@@ -71,8 +71,8 @@ class DirectionFinder(PassiveSurveillanceSystem):
             x_sensor, v_sensor, bias = self.pos, None, self.bias
 
         # Call the non-calibration solver
-        return solvers.max_likelihood(x_sensor=x_sensor, psi=zeta, cov=self.cov, do_2d_aoa=self.do_2d_aoa, x_ctr=x_ctr,
-                                      search_size=search_size, epsilon=epsilon, bias=bias, **kwargs)
+        return solvers.max_likelihood(x_sensor=x_sensor, psi=zeta, cov=self.cov, do_2d_aoa=self.do_2d_aoa,
+                                      search_space=search_space, bias=bias, **kwargs)
 
     # def max_likelihood_uncertainty(self, zeta, source_search: SearchSpace,
     #                                do_sensor_bias=False, do_sensor_pos=False, do_sensor_vel=False,

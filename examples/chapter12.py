@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import utils
-import fdoa
+from fdoa import FDOAPassiveSurveillanceSystem
 from utils.covariance import CovarianceMatrix
 from utils import SearchSpace
 
@@ -59,14 +59,17 @@ def example1(rng=np.random.default_rng()):
     fdoa_ref_idx = num_sensors - 1  # Use the last sensor as our reference sensor (the one at the origin)
     rng_rate_standard_deviation = freq_error*utils.constants.speed_of_light/transmit_freq
     covar_sensor = CovarianceMatrix(rng_rate_standard_deviation**2 * np.eye(num_sensors))
-    covar_rho = covar_sensor.resample(ref_idx=fdoa_ref_idx)
+    # covar_rho = covar_sensor.resample(ref_idx=fdoa_ref_idx)
+
+    fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor, v=v_sensor, cov=covar_sensor, ref_idx=fdoa_ref_idx)
 
     # Initialize Transmitter Position
     th = rng.random()*2*np.pi
     x_source = 5*baseline*np.array([np.cos(th), np.sin(th)], )
+    v_source = np.zeros_like(x_source)
 
     # Generate noise free measurement
-    rho_actual = fdoa.model.measurement(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, ref_idx=fdoa_ref_idx)
+    rho_actual = fdoa.measurement(x_source=x_source, v_source=v_source)
 
     # Initialize Solvers
     num_mc_trials = int(1000)
@@ -85,19 +88,12 @@ def example1(rng=np.random.default_rng()):
     x_ls_full = np.zeros(shape=out_iterative_shp)
     x_grad_full = np.zeros(shape=out_iterative_shp)
 
-    rx_args = {'x_sensor': x_sensor,
-               'v_sensor': v_sensor,
-               'cov': covar_rho,
-               'do_resample': False
-               }
-
-    ml_args = {SearchSpace(x_ctr=x_init, max_offset=x_extent, epsilon=grid_res)}
+    ml_search = SearchSpace(x_ctr=x_init, max_offset=x_extent, epsilon=grid_res)
 
     ls_args = {'max_num_iterations': num_iterations,
                'force_full_calc': True,
                'epsilon': epsilon,
-               'x_init': x_init
-               }
+               'x_init': x_init}
 
     gd_args = {'max_num_iterations': num_iterations,
                'force_full_calc': True,
@@ -110,8 +106,6 @@ def example1(rng=np.random.default_rng()):
     args = {'rho_act': rho_actual,
             'num_measurements': num_sensors - 1,
             'rng': rng,
-            'rx_args': rx_args,
-            'ml_args': ml_args,
             'ls_args': ls_args,
             'gd_args': gd_args,
             'covar_sensor': covar_sensor}
@@ -125,7 +119,7 @@ def example1(rng=np.random.default_rng()):
     for idx in np.arange(num_mc_trials):
         utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        result = _mc_iteration(args)
+        result = _mc_iteration(fdoa, ml_search, args)
         x_ml[:, idx] = result['ml']
         x_bf[:, idx] = result['bf']
         x_ls_full[:, :, idx] = result['ls']
@@ -158,8 +152,7 @@ def example1(rng=np.random.default_rng()):
     plt.ylabel('[km]')
 
     # Compute and Plot CRLB and Error Ellipse Expectations
-    err_crlb = np.squeeze(fdoa.perf.compute_crlb(x_sensor=x_sensor, v_sensor=v_sensor,
-                                                 x_source=x_source, cov=covar_rho, do_resample=False))
+    err_crlb = fdoa.compute_crlb(x_source=x_source, v_source=v_source)
     crlb_cep50 = utils.errors.compute_cep50(err_crlb) / 1e3  # [km]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :]/1e3, crlb_ellipse[1, :]/1e3, linewidth=.5, label='90% Error Ellipse')
@@ -244,7 +237,7 @@ def example1(rng=np.random.default_rng()):
     return fig_geo_a, fig_geo_b, fig_err
 
 
-def _mc_iteration(args):
+def _mc_iteration(pss: FDOAPassiveSurveillanceSystem, ml_search: SearchSpace, args):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 11.1.
 
@@ -272,13 +265,15 @@ def _mc_iteration(args):
 
     # Generate a random measurement
     rng = args['rng']
-    covar_lower = args['rx_args']['cov'].lower
-    rho = args['rho_act'] + covar_lower @ rng.standard_normal(size=(args['num_measurements'], ))
+    rho = args['rho_act'] + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
+
+    gd_args = args['gd_args']
+    ls_args = args['ls_args']
 
     # Generate solutions
-    res_ml, ml_surf, ml_grid = fdoa.solvers.max_likelihood(zeta=rho, **args['rx_args'], **args['ml_args'])
-    res_bf, bf_surf, bf_grid = fdoa.solvers.bestfix(zeta=rho, **args['rx_args'], **args['ml_args'])
-    _, res_ls = fdoa.solvers.least_square(zeta=rho, **args['rx_args'], **args['ls_args'])
-    _, res_gd = fdoa.solvers.gradient_descent(zeta=rho, **args['rx_args'], **args['gd_args'])
+    res_ml, ml_surf, ml_grid = pss.max_likelihood(zeta=rho, search_space=ml_search)
+    res_bf, bf_surf, bf_grid = pss.bestfix(zeta=rho, search_space=ml_search)
+    _, res_ls = pss.least_square(zeta=rho, **ls_args)
+    _, res_gd = pss.gradient_descent(zeta=rho, **gd_args)
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf}

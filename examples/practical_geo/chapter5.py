@@ -487,9 +487,9 @@ def example5():
               float(x_tgt[1] - grid_size[1]) / 1e3,
               float(x_tgt[1] + grid_size[1]) / 1e3)  # cast each entry to a float to avoid a PyCharm type warning later
 
-    ml_args = {'zeta': zeta, 'x_ctr': x_center, 'search_size': grid_size, 'epsilon': epsilon}
-    x_ml, score, x_grid = tdoa.max_likelihood(**ml_args)
-    x_ml_prior, score_prior, _ = tdoa.max_likelihood(**ml_args, prior=prior, prior_wt=0.5)
+    ml_search = SearchSpace(x_ctr=x_center, max_offset=grid_size, epsilon=epsilon)
+    x_ml, score, x_grid = tdoa.max_likelihood(zeta=zeta, search_space=ml_search)
+    x_ml_prior, score_prior, _ = tdoa.max_likelihood(zeta=zeta, search_space=ml_search, prior=prior, prior_wt=0.5)
 
     print('Solution w/o prior: {:.2f} km, {:.2f} km, {:.2f} km'.format(x_ml[0]/1e3, x_ml[1]/1e3, x_ml[2]/1e3))
     print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml-x_tgt)/1e3))

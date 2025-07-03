@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import utils
 from utils import SearchSpace
 from utils.covariance import CovarianceMatrix
-import triang
+from triang import DirectionFinder
 import time
 
 
@@ -48,16 +48,17 @@ def example1(rng=np.random.default_rng(), cmap=None):
     if cmap is None:
         cmap = plt.get_cmap("tab10")
 
-    # Define sensor positions
+    # Define sensor positions and PSS object
     x_sensor = 30.0*np.array([[-1., 0., 1.], [0.,  0., 0.]])
     num_dims, num_sensors = utils.safe_2d_shape(x_sensor)
-    
+    covar_psi = CovarianceMatrix((2*np.pi/180)**2 * np.eye(num_sensors))
+    triang = DirectionFinder(x=x_sensor, cov=covar_psi, do_2d_aoa=False)
+
     # Define source position
     x_source = np.array([15, 45])
-    
+
     # Grab a noisy measurement
-    psi_act = triang.model.measurement(x_sensor, x_source)
-    covar_psi = CovarianceMatrix((2*np.pi/180)**2 * np.eye(num_sensors))
+    psi_act = triang.measurement(x_source)
 
     # Compute Ranges
     range_act = utils.geo.calc_range(x_sensor, x_source)
@@ -122,13 +123,11 @@ def example1(rng=np.random.default_rng(), cmap=None):
     max_offset = np.array([50, 50])
 
     args = {'psi_act': psi_act,
-            'num_sensors': num_sensors,
-            'x_sensor': x_sensor,
-            'x_init': x_init,
-            'search_space': SearchSpace(x_ctr=x_init, max_offset=max_offset, epsilon=epsilon),
-            'covar_psi': covar_psi,
-            'num_iterations': num_iterations,
+            'gd_ls_args': {'x_init': x_init,
+                           'num_iterations': num_iterations,
+                           'force_full_calc': True},
             'rng': rng}
+    ml_search = SearchSpace(x_ctr=x_init, max_offset=max_offset, epsilon=epsilon)
 
     iterations_per_marker = 1
     markers_per_row = 40
@@ -136,7 +135,7 @@ def example1(rng=np.random.default_rng(), cmap=None):
     for idx in np.arange(num_mc_trials):
         utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        result = _mc_iteration(args)
+        result = _mc_iteration(pss=triang, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
         x_bf[:, idx] = result['bf']
         x_centroid[:, idx] = result['centroid']
@@ -164,7 +163,7 @@ def example1(rng=np.random.default_rng(), cmap=None):
     plt.ylabel('[km]')
 
     # Compute and Plot CRLB and Error Ellipse Expectations
-    err_crlb = np.squeeze(triang.perf.compute_crlb(x_sensor, x_source, cov=covar_psi))
+    err_crlb = triang.compute_crlb(x_source)
     crlb_cep50 = utils.errors.compute_cep50(err_crlb)  # [km]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linewidth=.5, label='90% Error Ellipse')
@@ -240,7 +239,7 @@ def example1(rng=np.random.default_rng(), cmap=None):
     return fig_geo, fig_err
 
 
-def _mc_iteration(args):
+def _mc_iteration(pss: DirectionFinder, ml_search: SearchSpace, args: dict):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 10.1.
 
@@ -268,21 +267,15 @@ def _mc_iteration(args):
 
     # Generate a random measurement
     rng = args['rng']
-    psi = args['psi_act'] + args['covar_psi'].lower @ rng.standard_normal(size=(args['num_sensors'], ))
+    psi = args['psi_act'] + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
 
     # Generate solutions
-    res_ml, _, _ = triang.solvers.max_likelihood(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
-                                                 search_space=args['search_space'])
-    res_bf, _, _ = triang.solvers.bestfix(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
-                                          search_space=args['search_space'])
-    res_centroid = triang.solvers.centroid(x_sensor=args['x_sensor'], psi=psi)
-    res_incenter = triang.solvers.angle_bisector(x_sensor=args['x_sensor'], psi=psi)
-    _, res_ls = triang.solvers.least_square(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
-                                            x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                            force_full_calc=True)
-    _, res_gd = triang.solvers.gradient_descent(x_sensor=args['x_sensor'], psi=psi, cov=args['covar_psi'],
-                                                x_init=args['x_init'], max_num_iterations=args['num_iterations'],
-                                                force_full_calc=True)
+    res_ml, _, _ = pss.max_likelihood(zeta=psi, search_space=ml_search)
+    res_bf, _, _ = pss.bestfix(zeta=psi, search_space=ml_search)
+    res_centroid = pss.centroid(zeta=psi)
+    res_incenter = pss.angle_bisector(zeta=psi)
+    _, res_ls = pss.least_square(zeta=psi, **args['gd_ls_args'])
+    _, res_gd = pss.gradient_descent(zeta=psi, **args['gd_ls_args'])
 
     return {'ml': res_ml, 'bf': res_bf, 'centroid': res_centroid, 'incenter': res_incenter, 'ls': res_ls, 'gd': res_gd}
 
@@ -310,12 +303,13 @@ def example2():
     # Define measurement accuracy
     sigma_psi = 2.5*np.pi/180
     covar_psi = CovarianceMatrix(sigma_psi**2 * np.eye(num_sensors))  # N x N identity matrix
+    triang=DirectionFinder(x=x_sensor*1e3, cov=covar_psi, do_2d_aoa=False)
 
     # Find maximum cross-range position at 100 km downrange
     cross_range_vec = np.arange(start=-100, stop=101)
     down_range_vec = 100 * np.ones(shape=np.shape(cross_range_vec))
     x_source = np.concatenate((cross_range_vec[np.newaxis, :], down_range_vec[np.newaxis, :]), axis=0)
-    crlb = triang.perf.compute_crlb(x_sensor*1e3, x_source*1e3, cov=covar_psi)
+    crlb = triang.compute_crlb(x_source*1e3)
     cep50 = utils.errors.compute_cep50(crlb)
     
     good_points = np.argwhere(cep50 <= 25e3)
@@ -333,7 +327,7 @@ def example2():
     grid_shape_2d = [i for i in grid_shape if i > 1]
 
     # Compute CRLB
-    crlb = triang.perf.compute_crlb(x_aoa=x_sensor*1e3, x_source=x_source*1e3, cov=covar_psi)
+    crlb = triang.compute_crlb(x_source=x_source*1e3)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape_2d)
 
     # Blank out y=0
@@ -383,9 +377,11 @@ def example3():
     # Define measurement accuracy
     sigma_psi = 2.5*np.pi/180
     covar_psi = CovarianceMatrix(sigma_psi**2 * np.eye(num_sensors))  # N x N identity matrix
-    
+
+    triang = DirectionFinder(x=x_sensor*1e3, cov=covar_psi, do_2d_aoa=False)
+
     # Compute CRLB
-    crlb = triang.perf.compute_crlb(x_sensor*1e3, x0*1e3, cov=covar_psi)
+    crlb = triang.compute_crlb(x0*1e3)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=np.shape(x_mesh))  # m
     
     good_point = cep50 <= 25e3

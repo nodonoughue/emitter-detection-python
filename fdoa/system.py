@@ -60,10 +60,10 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
                                     v_sensor=v_sensor, v_source=v_source, ref_idx=self.ref_idx,
                                     do_resample=False, bias=bias)
 
-    def log_likelihood_uncertainty(self, zeta, theta, **kwargs):
-        return model.log_likelihood_uncertainty(x_sensor=self.pos, rho_dot=zeta, theta=theta, cov=self.cov,
-                                                cov_pos=self.cov_pos, ref_idx=self.ref_idx,
-                                                v_sensor=self.vel, do_resample=False, **kwargs)
+    # def log_likelihood_uncertainty(self, zeta, theta, **kwargs):
+    #     return model.log_likelihood_uncertainty(x_sensor=self.pos, rho_dot=zeta, theta=theta, cov=self.cov,
+    #                                             cov_pos=self.cov_pos, ref_idx=self.ref_idx,
+    #                                             v_sensor=self.vel, do_resample=False, **kwargs)
 
     def grad_x(self, x_source):
         return model.grad_x(x_sensor=self.pos, x_source=x_source, ref_idx=self.ref_idx)
@@ -79,7 +79,7 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle the interface to solvers
     ## ============================================================================================================== ##
-    def max_likelihood(self, zeta, x_ctr, search_size, epsilon=None, cal_data: dict=None, **kwargs):
+    def max_likelihood(self, zeta, search_space:SearchSpace, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
@@ -88,7 +88,7 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
 
         # Call the non-calibration solver
         return solvers.max_likelihood(x_sensor=x_sensor, v_sensor=v_sensor, psi=zeta, cov=self.cov,
-                                      ref_idx=self.ref_idx, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
+                                      ref_idx=self.ref_idx, search_space=search_space,
                                       bias=bias, do_resample=False, **kwargs)
 
     # todo: delete when it's working

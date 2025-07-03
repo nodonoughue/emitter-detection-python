@@ -220,8 +220,8 @@ def example3():
     fig = plt.figure()
     hdl_nominal_a = plt.scatter(x_aoa[0], x_aoa[1], marker='s', label='AOA Sensors (nominal positions)')
     hdl_nominal_t = plt.scatter(x_tdoa[0], x_tdoa[1], marker='s', label='TDOA Sensors (nominal positions)')
-    hdl_true_a = plt.scatter(x_aoa_true[0], x_aoa_true[1], marker='o', label='AOA Sensors (true positions)')
-    hdl_true_t = plt.scatter(x_tdoa_true[0], x_tdoa_true[1], marker='o', label='TDOA Sensors (true positions)')
+    plt.scatter(x_aoa_true[0], x_aoa_true[1], marker='o', label='AOA Sensors (true positions)')
+    plt.scatter(x_tdoa_true[0], x_tdoa_true[1], marker='o', label='TDOA Sensors (true positions)')
     plt.scatter(x_tgt[0], x_tgt[1],marker='^', color='k', label='Target')
     plt.grid(True)
 
@@ -338,11 +338,11 @@ def example4(do_iterative=False):
     search_size = 5e3
     grid_res = .1e3
 
-    solver_args = {'x_ctr': x_ctr,
-                   'search_size': search_size,
-                   'epsilon': grid_res}
-    x_est_true, _, _ = tdoa.max_likelihood(zeta=zeta_true, **solver_args)
-    x_est, _, _ = tdoa.max_likelihood(zeta=zeta, **solver_args)
+    ml_search = SearchSpace(x_ctr=x_ctr,
+                            max_offset=search_size,
+                            epsilon=grid_res)
+    x_est_true, _, _ = tdoa.max_likelihood(zeta=zeta_true, search_space=ml_search)
+    x_est, _, _ = tdoa.max_likelihood(zeta=zeta, search_space=ml_search)
 
     print('True ML Est.: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_true[0]/1e3, x_est_true[1]/1e3,
                                                                       np.linalg.norm(x_est_true-x_tgt)/1e3))
@@ -363,12 +363,12 @@ def example4(do_iterative=False):
                               np.ones(n_tdoa*n_dim,)))  # resolution for x_tdoa doesn't matter; search_size is 0
     cov_beta = CovarianceMatrix(.001*np.eye(n_tdoa*n_dim))  # position covariance error
 
-    unc_solver_args = solver_args
-    unc_solver_args['x_ctr'] = th_ctr               # overwrite search parameters using new, larger versions with
-    unc_solver_args['search_size'] = search_size    # dimensions for bias and sensor position uncertainty
-    unc_solver_args['epsilon'] = epsilon
-    unc_solver_args['cov_pos'] = cov_beta
-    unc_solver_args['do_sensor_bias'] = True
+    ml_search = SearchSpace(x_ctr=th_ctr,               # overwrite search parameters using new, larger versions with
+                            max_offset=search_size,    # dimensions for bias and sensor position uncertainty
+                            epsilon=epsilon)
+    unc_solver_args = {'cov_pos': cov_beta,
+                       'search_space': ml_search,
+                       'do_sensor_bias': True}
 
     x_est_bias, bias_est, x_tdoa_est, _, _  = tdoa.max_likelihood_uncertainty(zeta=zeta, **unc_solver_args)
     err_km = np.linalg.norm(x_est_bias-x_tgt)/1e3

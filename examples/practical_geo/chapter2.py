@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colormaps as cm
 import utils
+from utils import SearchSpace
 from triang import DirectionFinder
 from tdoa import TDOAPassiveSurveillanceSystem
 from fdoa import FDOAPassiveSurveillanceSystem
@@ -278,24 +279,21 @@ def example2(colors=None):
 
     # ---- Set Up Solution Parameters ----
     # ML Search Parameters
-    ml_args = {
-        'x_ctr': np.array([2.5, 2.5]) * 1e3,
-        'search_size': np.array([5, 5]) * 1e3,
-        'epsilon': 25  # meters, grid resolution
-    }
+    search_space = SearchSpace(x_ctr=np.array([2.5, 2.5]) * 1e3,
+                               epsilon=25, max_offset=np.array([5, 5])*1e3)
 
     # GD and LS Search Parameters
     x_init = np.array([1, 1]) * 1e3
     gd_ls_args = {
         'x_init': x_init,
-        'epsilon': ml_args['epsilon'],  # desired convergence step size, same as grid resolution
+        'epsilon': search_space.epsilon,  # desired convergence step size, same as grid resolution
         'max_num_iterations': 100,
         'force_full_calc': True,
         'plot_progress': False
     }
     # ---- Apply Various Solvers ----
     # ML Solution
-    x_ml, _, _ = pss.max_likelihood(zeta=zeta, **ml_args)
+    x_ml, _, _ = pss.max_likelihood(zeta=zeta, search_space=search_space)
 
     # GD Solution
     x_gd, x_gd_full = pss.gradient_descent(zeta=zeta, **gd_ls_args)
@@ -518,7 +516,7 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
     return fig_err, fig_full
 
 
-def _mc_iteration(z, pss: HybridPassiveSurveillanceSystem, rng, ml_args, gd_ls_args):
+def _mc_iteration(z, pss: HybridPassiveSurveillanceSystem, rng, ml_search:SearchSpace, gd_ls_args):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 2.3.
 
@@ -536,7 +534,7 @@ def _mc_iteration(z, pss: HybridPassiveSurveillanceSystem, rng, ml_args, gd_ls_a
 
     # ---- Apply Various Solvers ----
     # ML Solution
-    x_ml, _, _ = pss.max_likelihood(zeta=zeta, **ml_args)
+    x_ml, _, _ = pss.max_likelihood(zeta=zeta, search_space=ml_search)
 
     # GD Solution
     _, x_gd = pss.gradient_descent(zeta=zeta, **gd_ls_args)

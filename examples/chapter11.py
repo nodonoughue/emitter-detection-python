@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import utils
+from tdoa import TDOAPassiveSurveillanceSystem
 from utils.covariance import CovarianceMatrix
-import tdoa
 from utils import SearchSpace
 
 
@@ -55,21 +55,22 @@ def example1(rng=np.random.default_rng()):
     # Define Sensor Performance
     time_measurement_standard_deviation = 1e-7
     rng_measurement_standard_deviation = time_measurement_standard_deviation * utils.constants.speed_of_light
-    # covar_roa = CovarianceMatrix(rng_measurement_standard_deviation**2 * np.eye(num_sensors))
-    covar_rho = CovarianceMatrix(rng_measurement_standard_deviation**2 * (1 + np.eye(num_sensors-1)))
+    covar_roa = CovarianceMatrix(rng_measurement_standard_deviation**2 * np.eye(num_sensors))
+    # covar_rho = CovarianceMatrix(rng_measurement_standard_deviation**2 * (1 + np.eye(num_sensors-1)))
+
+    # Create PSS Object
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_sensor, cov=covar_roa, variance_is_toa=False, ref_idx=None)
 
     # Initialize Transmitter Position
     th = rng.random()*2*np.pi
     x_source = 5*baseline*np.array([np.cos(th), np.sin(th)],)
 
     # Compute Range
-    rho_actual = tdoa.model.measurement(x_sensor, x_source)
+    rho_actual = tdoa.measurement(x_source)
 
     # Find Isochrones
     # Could be useful for overlaying isochrones onto plot
-    # x_isochrone1 = tdoa.model.draw_isochrone(x_sensor[:, -1], x_sensor[:, 0], dR[0], 1000, 5*baseline)
-    # x_isochrone2 = tdoa.model.draw_isochrone(x_sensor[:, -1], x_sensor[:, 1], dR[1], 1000, 5*baseline)
-    # x_isochrone3 = tdoa.model.draw_isochrone(x_sensor[:, -1], x_sensor[:, 2], dR[2], 1000, 5*baseline)
+    # xy_isochrones = tdoa.draw_isochrones(range_diff=rho_actual, num_pts=1e3, max_ortho=5*baseline)
 
     # Set up the Monte Carlo Trial
     num_mc_trials = int(1000)
@@ -92,18 +93,14 @@ def example1(rng=np.random.default_rng()):
     print('Performing Monte Carlo simulation for TDOA performance...')
     t_start = time.perf_counter()
 
-    rx_args = {'x_sensor': x_sensor,
-               'cov': covar_rho,
-               'do_resample': False
-               }
-
-    ml_args = {'search_space': SearchSpace(x_ctr=x_init, max_offset=x_extent, epsilon=grid_res)}
+    search_space = SearchSpace(x_ctr=x_init, max_offset=x_extent, epsilon=grid_res)
 
     ls_args = {'x_init': x_init,
                'max_num_iterations': num_iterations,
                'epsilon': epsilon
                }
 
+    # TODO: Debug; something isn't right with GD in this example; failing to converge.
     gd_args = {'x_init': x_init,
                'max_num_iterations': num_iterations,
                'epsilon': epsilon,
@@ -122,7 +119,7 @@ def example1(rng=np.random.default_rng()):
     for idx in np.arange(num_mc_trials):
         utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        result = _mc_iteration(rx_args, ml_args, ls_args, gd_args, mc_args)
+        result = _mc_iteration(pss=tdoa, ml_search=search_space, ls_args=ls_args, gd_args=gd_args, mc_args=mc_args)
         x_ml[:, idx] = result['ml']
         x_bf[:, idx] = result['bf']
         x_ls_full[:, :, idx] = result['ls']
@@ -152,8 +149,7 @@ def example1(rng=np.random.default_rng()):
     plt.ylabel('[km]')
 
     # Compute and Plot CRLB and Error Ellipse Expectations
-    err_crlb = np.squeeze(tdoa.perf.compute_crlb(x_sensor, x_source, cov=covar_rho, variance_is_toa=False,
-                                                 do_resample=False))
+    err_crlb = tdoa.compute_crlb(x_source)
     crlb_cep50 = utils.errors.compute_cep50(err_crlb)/1e3  # [km]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :]/1e3, crlb_ellipse[1, :]/1e3, linewidth=.5, label='90% Error Ellipse')
@@ -250,7 +246,8 @@ def example1(rng=np.random.default_rng()):
     return fig_geo_a, fig_geo_b, fig_err
 
 
-def _mc_iteration(rx_args: dict, ml_args: dict, ls_args: dict, gd_args: dict, mc_args: dict):
+def _mc_iteration(pss: TDOAPassiveSurveillanceSystem, ml_search: SearchSpace, ls_args: dict, gd_args: dict,
+                  mc_args: dict):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 11.1.
 
@@ -266,13 +263,13 @@ def _mc_iteration(rx_args: dict, ml_args: dict, ls_args: dict, gd_args: dict, mc
 
     # Generate a random measurement
     rng = mc_args['rng']
-    rho = mc_args['rho_act'] + rx_args['cov'].lower @ rng.standard_normal(size=(mc_args['num_measurements'], ))
+    rho = mc_args['rho_act'] + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
 
     # Generate solutions
-    res_ml, _, _ = tdoa.solvers.max_likelihood(**rx_args, **ml_args, zeta=rho)
-    res_bf, _, _ = tdoa.solvers.bestfix(**rx_args, **ml_args, zeta=rho)
-    _, res_ls = tdoa.solvers.least_square(**rx_args, **ls_args, zeta=rho)
-    _, res_gd = tdoa.solvers.gradient_descent(**rx_args, **gd_args, zeta=rho)
-    res_chan_ho = tdoa.solvers.chan_ho(x_sensor=rx_args['x_sensor'], zeta=rho, cov=rx_args['cov'])
+    res_ml, _, _ = pss.max_likelihood(zeta=rho, search_space=ml_search)
+    res_bf, _, _ = pss.bestfix(zeta=rho, search_space=ml_search)
+    _, res_ls = pss.least_square(zeta=rho, **ls_args)
+    _, res_gd = pss.gradient_descent(zeta=rho, **gd_args)
+    res_chan_ho = pss.chan_ho(zeta=rho)
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf, 'chan_ho': res_chan_ho}
