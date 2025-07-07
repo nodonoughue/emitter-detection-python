@@ -163,8 +163,11 @@ def example1(colors=None):
     # assert np.sum(np.fabs(z-z_test))<=1e-10, "Measurement mismatch; something went wrong."
 
     # Draw DF line
-    xy_lob = pss.aoa.draw_lob(zeta=psi_act, x_source=x_source, scale=5)
-    plt.plot(xy_lob[0], xy_lob[1], color=colors[1], linestyle='-', label='AOA Solution')
+    xy_lobs = pss.aoa.draw_lobs(zeta=psi_act, x_source=x_source, scale=5)
+    lob_label = 'AOA Solution'
+    for xy_lob in xy_lobs:
+        plt.plot(xy_lob[0], xy_lob[1], color=colors[1], linestyle='-', label=lob_label)
+        lob_label=None
 
     # Draw isochrone
     # Transpose the x_tdoa array before indexing; so [0] and [1] refer to sensors, not dimensions
