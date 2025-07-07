@@ -124,7 +124,7 @@ def example1(rng=np.random.default_rng(), cmap=None):
 
     args = {'psi_act': psi_act,
             'gd_ls_args': {'x_init': x_init,
-                           'num_iterations': num_iterations,
+                           'max_num_iterations': num_iterations,
                            'force_full_calc': True},
             'rng': rng}
     ml_search = SearchSpace(x_ctr=x_init, max_offset=max_offset, epsilon=epsilon)
