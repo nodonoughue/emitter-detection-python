@@ -4,7 +4,7 @@ from . import model
 from utils.covariance import CovarianceMatrix
 
 
-def compute_crlb(x_aoa, x_source, cov: CovarianceMatrix, do_2d_aoa=False, print_progress=False, **kwargs):
+def compute_crlb(x_sensor, x_source, cov: CovarianceMatrix, do_2d_aoa=False, print_progress=False, **kwargs):
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_aoa (Ndim x N).  C is an NxN matrix of TOA
@@ -15,7 +15,7 @@ def compute_crlb(x_aoa, x_source, cov: CovarianceMatrix, do_2d_aoa=False, print_
     Nicholas O'Donoughue
     22 February 2021
 
-    :param x_aoa: (Ndim x N) array of AOA sensor positions
+    :param x_sensor: (Ndim x N) array of AOA sensor positions
     :param x_source: (Ndim x M) array of source positions over which to calculate CRLB
     :param cov: AOA measurement error covariance matrix; object of the CovarianceMatrix class
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
@@ -25,7 +25,7 @@ def compute_crlb(x_aoa, x_source, cov: CovarianceMatrix, do_2d_aoa=False, print_
     """
 
     # Parse inputs
-    num_dimension, num_sensors = utils.safe_2d_shape(x_aoa)
+    num_dimension, num_sensors = utils.safe_2d_shape(x_sensor)
     num_dimension2, num_sources = utils.safe_2d_shape(x_source)
 
     assert num_dimension == num_dimension2, "Sensor and Target positions must have the same number of dimensions"
@@ -36,7 +36,7 @@ def compute_crlb(x_aoa, x_source, cov: CovarianceMatrix, do_2d_aoa=False, print_
 
     # Define a wrapper for the jacobian matrix that accepts only the position 'x'
     def jacobian(x):
-        return model.jacobian(x_sensor=x_aoa, x_source=x, do_2d_aoa=do_2d_aoa)
+        return model.jacobian(x_sensor=x_sensor, x_source=x, do_2d_aoa=do_2d_aoa)
 
     crlb = utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=jacobian, cov=cov,
                                             print_progress=print_progress, **kwargs)
