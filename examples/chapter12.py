@@ -61,7 +61,7 @@ def example1(rng=np.random.default_rng()):
     covar_sensor = CovarianceMatrix(rng_rate_standard_deviation**2 * np.eye(num_sensors))
     # covar_rho = covar_sensor.resample(ref_idx=fdoa_ref_idx)
 
-    fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor, v=v_sensor, cov=covar_sensor, ref_idx=fdoa_ref_idx)
+    fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor, vel=v_sensor, cov=covar_sensor, ref_idx=fdoa_ref_idx)
 
     # Initialize Transmitter Position
     th = rng.random()*2*np.pi
