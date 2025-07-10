@@ -27,7 +27,7 @@ class PassiveSurveillanceSystem(ABC):
     default_sensor_vel_search_size = 1  # By default, we can't search across sensor velocity
 
     def __init__(self, x: np.ndarray, cov: CovarianceMatrix or None, bias=None, cov_pos=None, vel=None):
-        if len(np.shape(x))==0: x = np.expand_dims(x, 1) # Add a second dimension, if there isn't one
+        if len(np.shape(x))<2: x = np.expand_dims(x, 1) # Add a second dimension, if there isn't one
         self.pos = x
         self.cov = cov
 
