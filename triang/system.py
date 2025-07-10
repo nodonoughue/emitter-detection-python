@@ -71,7 +71,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
             x_sensor, v_sensor, bias = self.pos, None, self.bias
 
         # Call the non-calibration solver
-        return solvers.max_likelihood(x_sensor=x_sensor, psi=zeta, cov=self.cov, do_2d_aoa=self.do_2d_aoa,
+        return solvers.max_likelihood(x_sensor=x_sensor, zeta=zeta, cov=self.cov, do_2d_aoa=self.do_2d_aoa,
                                       search_space=search_space, bias=bias, **kwargs)
 
     # def max_likelihood_uncertainty(self, zeta, source_search: SearchSpace,
@@ -119,7 +119,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
         else:
             x_sensor, v_sensor, bias = self.pos, None, self.bias
 
-        return solvers.gradient_descent(x_sensor=x_sensor, psi=zeta, cov=self.cov, bias=bias, do_2d_aoa=self.do_2d_aoa,
+        return solvers.gradient_descent(x_sensor=x_sensor, zeta=zeta, cov=self.cov, bias=bias, do_2d_aoa=self.do_2d_aoa,
                                         x_init=x_init, **kwargs)
 
     def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
@@ -129,11 +129,11 @@ class DirectionFinder(PassiveSurveillanceSystem):
         else:
             x_sensor, v_sensor, bias = self.pos, None, self.bias
 
-        return solvers.least_square(x_sensor=self.pos, psi=zeta, cov=self.cov, x_init=x_init, bias=bias,
+        return solvers.least_square(x_sensor=self.pos, zeta=zeta, cov=self.cov, x_init=x_init, bias=bias,
                                     do_2d_aoa=self.do_2d_aoa, **kwargs)
 
     def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None):
-        return solvers.bestfix(x_sensor=self.pos, psi=zeta, cov=self.cov,
+        return solvers.bestfix(x_sensor=self.pos, zeta=zeta, cov=self.cov,
                                search_space=search_space, pdf_type=pdf_type)
 
     def angle_bisector(self, zeta):
