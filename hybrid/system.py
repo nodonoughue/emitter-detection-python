@@ -385,7 +385,11 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
 
     def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None, cal_data:dict=None):
-        x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        # Perform sensor calibration
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
         # Generate the PDF
         def measurement(pos_vel):
