@@ -1,5 +1,5 @@
 from utils import SearchSpace
-from . import model, solvers
+from . import model
 import utils
 from utils.system import DifferencePSS
 from utils.covariance import CovarianceMatrix
@@ -86,10 +86,17 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         else:
             x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
-        # Call the non-calibration solver
-        return solvers.max_likelihood(x_sensor=x_sensor, v_sensor=v_sensor, psi=zeta, cov=self.cov,
-                                      ref_idx=self.ref_idx, search_space=search_space,
-                                      bias=bias, do_resample=False, **kwargs)
+        # Likelihood function for ML Solvers
+        def ell(pos_vel):
+            # Determine if the input is position only, or position & velocity
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+            return self.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor,
+                                       zeta=zeta, x_source=this_pos, v_source=this_vel)
+
+        # Call the util function
+        x_est, likelihood, x_grid = utils.solvers.ml_solver(ell=ell, search_space=search_space, **kwargs)
+
+        return x_est, likelihood, x_grid
 
     # todo: delete when it's working
     # def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, **kwargs):
@@ -105,9 +112,24 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         else:
             x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
-        return solvers.gradient_descent(x_sensor=x_sensor, v_sensor=self.vel, zeta=zeta, cov=self.cov,
-                                        x_init=x_init, ref_idx=self.ref_idx,
-                                        do_resample=False, **kwargs)
+        # Initialize measurement error and jacobian functions
+        def y(pos_vel):
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+            return zeta - self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor,
+                                           v_sensor=v_sensor, bias=bias)
+
+        def this_jacobian(pos_vel):
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+            n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
+            j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
+            # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
+            # excise just the position portion
+            return j[:n_dim]
+
+        # Call generic Gradient Descent solver
+        x_est, x_full = utils.solvers.gd_solver(y=y, jacobian=this_jacobian, cov=self.cov, x_init=x_init, **kwargs)
+
+        return x_est, x_full
 
     def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
@@ -116,13 +138,45 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         else:
             x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
-        return solvers.least_square(x_sensor=x_sensor, v_sensor=self.vel, zeta=zeta, cov=self.cov, x_init=x_init,
-                                    ref_idx=self.ref_idx, do_resample=False, **kwargs)
+            # Initialize measurement error and jacobian functions
+            def y(pos_vel):
+                this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+                return zeta - self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor,
+                                               v_sensor=v_sensor, bias=bias)
 
-    def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None):
-        return solvers.bestfix(x_sensor=self.pos, v_sensor=self.vel, zeta=zeta, cov=self.cov,
-                               search_space=search_space, pdf_type=pdf_type, ref_idx=self.ref_idx,
-                               do_resample=False)
+            def this_jacobian(pos_vel):
+                this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+                n_dim, _ = utils.safe_2d_shape(pos_vel)  # is the calling function asking for just pos or pos/vel?
+                j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
+                # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
+                # excise just the position portion
+                return j[:n_dim]
+
+            # Call generic Gradient Descent solver
+            x_est, x_full = utils.solvers.ls_solver(zeta=y, jacobian=this_jacobian, cov=self.cov, x_init=x_init,
+                                                    **kwargs)
+
+            return x_est, x_full
+
+    def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None, cal_data: dict=None):
+        # Perform sensor calibration
+        if cal_data is not None:
+            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+        else:
+            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
+
+        # Generate the PDF
+        def measurement(pos_vel):
+            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+            return self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor,
+                                    bias=bias)
+
+        pdfs = utils.make_pdfs(measurement, zeta, pdf_type, self.cov.cov)
+
+        # Call the util function
+        x_est, likelihood, x_grid = utils.solvers.bestfix(pdfs, search_space)
+
+        return x_est, likelihood, x_grid
 
     ## ============================================================================================================== ##
     ## Performance Methods
@@ -139,7 +193,7 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
             # excise just the position portion
             return j[:n_dim]
 
-        return utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov.cov,
+        return utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov,
                                                 **kwargs)
 
     ## ============================================================================================================== ##
