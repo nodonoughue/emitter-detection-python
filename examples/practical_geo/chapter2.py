@@ -352,13 +352,13 @@ def example3(rng=np.random.default_rng(), colors=None):
 
     # ---- Set Up Solution Parameters ----
     # ML Search Parameters
-    ml_args = {'x_ctr': np.array([2.5, 2.5]) * 1e3,
-               'search_size': np.array([5, 5]) * 1e3,
-               'epsilon': 20}  # meters, grid resolution
+    ml_args = SearchSpace(x_ctr=np.array([2.5, 2.5]) * 1e3,
+               max_offset=np.array([5, 5]) * 1e3,
+               epsilon=20)  # meters, grid resolution
 
     # GD and LS Search Parameters
     gd_ls_args = {'x_init': np.array([1, 1]) * 1e3,
-                  'epsilon': ml_args['epsilon'],  # desired convergence step size, same as grid resolution
+                  'epsilon': ml_args.epsilon,  # desired convergence step size, same as grid resolution
                   'max_num_iterations': 50,
                   'force_full_calc': True,
                   'plot_progress': False}
@@ -438,13 +438,13 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
 
     # ---- Set Up Solution Parameters ----
     # ML Search Parameters
-    ml_args = {'x_ctr': np.array([2.5, 2.5]) * 1e3,
-               'search_size': np.array([5, 5]) * 1e3,
-               'epsilon': 25}
+    ml_args = SearchSpace(x_ctr=np.array([2.5, 2.5]) * 1e3,
+                          max_offset=np.array([5, 5]) * 1e3,
+                          epsilon=25)
 
     # GD and LS Search Parameters
     gd_ls_args = {'x_init': np.array([1, 1]) * 1e3,
-                  'epsilon': ml_args['epsilon'],  # desired convergence step size, same as grid resolution
+                  'epsilon': ml_args.epsilon,  # desired convergence step size, same as grid resolution
                   'max_num_iterations': 50,
                   'force_full_calc': True,
                   'plot_progress': False}
