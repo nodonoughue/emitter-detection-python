@@ -278,7 +278,7 @@ def example3():
     # Plot for x/y grid
     # Initialize grid
     max_offset = int(10e3)
-    num_pts = 201
+    num_pts = np.array([201, 201, 1])
     grid_res = 2*max_offset / (num_pts-1)
     search_space = SearchSpace(x_ctr=x_tgt,
                                max_offset=max_offset,
