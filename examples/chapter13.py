@@ -423,3 +423,8 @@ def _plot_mc_iteration_result(pss: HybridPassiveSurveillanceSystem, args, result
     plt.legend(loc='upper right')
 
     return fig_geo, fig_err
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

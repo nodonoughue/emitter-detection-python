@@ -527,3 +527,8 @@ def example5():
     fig2 = _do_plot(np.reshape(score_prior, out_shape), title='Likelihood Estimate w/Prior', do_prior=True)
 
     return [fig1, fig2]
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

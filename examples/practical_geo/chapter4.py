@@ -310,3 +310,8 @@ def example2(colors=None):
 # https://jakevdp.github.io/PythonDataScienceHandbook/04.13-geographic-data-with-basemap.html
 
 # TODO: Implement the code from book2_vid4_1.m
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

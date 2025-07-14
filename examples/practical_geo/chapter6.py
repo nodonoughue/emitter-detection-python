@@ -21,7 +21,7 @@ def run_all_examples():
     :return figs: list of figure handles
     """
 
-    return list(example1())
+    return list(example1()) + list(example2()) + list(example3()) + list(example4()) + list(example5())
 
 
 def example1():
@@ -363,12 +363,12 @@ def example4(do_iterative=False):
                               np.ones(n_tdoa*n_dim,)))  # resolution for x_tdoa doesn't matter; search_size is 0
     cov_beta = CovarianceMatrix(.001*np.eye(n_tdoa*n_dim))  # position covariance error
 
-    ml_search = SearchSpace(x_ctr=th_ctr,               # overwrite search parameters using new, larger versions with
-                            max_offset=search_size,    # dimensions for bias and sensor position uncertainty
-                            epsilon=epsilon)
-    unc_solver_args = {'cov_pos': cov_beta,
-                       'search_space': ml_search,
-                       'do_sensor_bias': True}
+    x_est_bias, bias_est, x_tdoa_est, _, _  = tdoa.max_likelihood_uncertainty(zeta=zeta,
+                                                                              source_search=ml_search,
+                                                                              bias_search=bias_search,
+                                                                              do_sensor_bias=True,
+                                                                              do_sensor_pos=False,
+                                                                              do_sensor_vel=False)
 
     x_est_bias, bias_est, x_tdoa_est, _, _  = tdoa.max_likelihood_uncertainty(zeta=zeta, **unc_solver_args)
     err_km = np.linalg.norm(x_est_bias-x_tgt)/1e3
@@ -500,3 +500,8 @@ def example5(do_vel_only_cal=False):
                  label='Solution (w/velocity cal)')
 
     return fig,
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

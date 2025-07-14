@@ -594,3 +594,7 @@ def make_figure_13(prefix=None, rng=np.random.default_rng(), force_recalc=True):
         fig13.savefig(prefix + 'fig13.svg')
 
     return fig13
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)

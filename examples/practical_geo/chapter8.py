@@ -509,3 +509,8 @@ def example2(rng=np.random.default_rng()):
     # ===  Return Figure Handles
     figs = [fig1, fig2, fig3]
     return figs
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

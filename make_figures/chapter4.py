@@ -619,3 +619,7 @@ def make_figure_8(prefix=None, colors=None):
         fig8.savefig(prefix + 'fig8.png')
 
     return fig8
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False)

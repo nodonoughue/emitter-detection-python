@@ -518,3 +518,8 @@ def _plot_contourf(x_grid, extent, grid_shape_2d, z, x_sensors, v_sensors, level
     plt.grid(False)
 
     return this_fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

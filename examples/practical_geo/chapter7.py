@@ -485,3 +485,8 @@ def example4(rng=np.random.default_rng()):
         print('{:.2f} s required to achieve {:.2f} m CEP50.'.format(time_vec[good_index], desired_cep))    
     
     return fig1, fig2
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

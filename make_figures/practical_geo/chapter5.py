@@ -327,3 +327,7 @@ def make_figure_14(prefix=None, force_recalc=False):
                 fig.savefig(prefix + label + '.png')
 
     return figs
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)

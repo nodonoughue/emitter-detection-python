@@ -257,3 +257,8 @@ def example4(fig=None):
     plt.legend(loc='upper left')
 
     return fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

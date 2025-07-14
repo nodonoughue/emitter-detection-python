@@ -273,3 +273,8 @@ def _mc_iteration(pss: TDOAPassiveSurveillanceSystem, ml_search: SearchSpace, ls
     res_chan_ho = pss.chan_ho(zeta=rho)
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf, 'chan_ho': res_chan_ho}
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

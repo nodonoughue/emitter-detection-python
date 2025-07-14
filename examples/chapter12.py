@@ -277,3 +277,8 @@ def _mc_iteration(pss: FDOAPassiveSurveillanceSystem, ml_search: SearchSpace, ar
     _, res_gd = pss.gradient_descent(zeta=rho, **gd_args)
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf}
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

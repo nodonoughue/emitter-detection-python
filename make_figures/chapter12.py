@@ -634,3 +634,7 @@ def make_figures_7_8(prefix, force_recalc=False):
         fig8.savefig(prefix + 'fig8.svg')
 
     return fig7a, fig7b, fig8
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)

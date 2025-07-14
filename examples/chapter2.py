@@ -53,3 +53,8 @@ def example2():
     plt.ylim([0, 1])
 
     return fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

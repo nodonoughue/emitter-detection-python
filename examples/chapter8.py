@@ -394,3 +394,8 @@ def example2(rng=np.random.default_rng()):
     plt.legend(loc='upper left')
 
     return fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

@@ -256,3 +256,8 @@ def example2(rng=np.random.default_rng(), colors=None):
     plt.legend(loc='lower left')
 
     return fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

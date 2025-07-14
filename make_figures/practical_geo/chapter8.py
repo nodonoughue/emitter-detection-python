@@ -105,3 +105,7 @@ def make_figures_6_7(prefix=None, force_recalc=False):
                 fig.savefig(prefix + label + '.png')
 
     return figs
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)

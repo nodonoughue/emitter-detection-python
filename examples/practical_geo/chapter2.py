@@ -546,3 +546,8 @@ def _mc_iteration(z, pss: HybridPassiveSurveillanceSystem, rng, ml_search:Search
     _, x_ls = pss.least_square(zeta=zeta, **gd_ls_args)
 
     return {'ml': x_ml, 'ls': x_ls, 'gd': x_gd}
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

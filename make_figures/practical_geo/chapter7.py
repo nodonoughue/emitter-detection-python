@@ -353,3 +353,7 @@ def make_figure_8(prefix=None, rng=np.random.default_rng()):
                 fig.savefig(prefix + label + '.png')
 
     return figs
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)
