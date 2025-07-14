@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+import matplotlib.colormaps as cm
 
 import utils
 from fdoa import FDOAPassiveSurveillanceSystem
