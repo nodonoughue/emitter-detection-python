@@ -202,7 +202,17 @@ def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, ref_idx=None
 
     for idx_source, x_i in enumerate(x_source.T):
         # Generate the ideal measurement matrix for this position
-        rho = measurement(x_sensor=x_sensor, x_source=x_i, ref_idx=ref_idx, bias=bias)
+        if len(np.shape(bias)) > 1:  # there's more than one bias term
+            bias_i = bias[:, idx_source]
+        else:
+            bias_i = bias
+
+        if len(np.shape(x_sensor)) > 2: # there are multiple sets of sensor positions
+            x_sensor_i = x_sensor[:, :, idx_source]
+        else:
+            x_sensor_i = x_sensor
+
+        rho = measurement(x_sensor=x_sensor_i, x_source=x_i, ref_idx=ref_idx, bias=bias_i)
 
         # Evaluate the measurement error
         err = zeta - rho

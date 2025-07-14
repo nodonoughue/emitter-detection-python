@@ -119,7 +119,8 @@ class PassiveSurveillanceSystem(ABC):
 
     def max_likelihood_uncertainty(self, zeta, source_search: SearchSpace,
                                    do_sensor_bias: bool, do_sensor_pos: bool, do_sensor_vel:bool,
-                                   bias_search: SearchSpace, pos_search: SearchSpace, vel_search: SearchSpace,
+                                   bias_search: SearchSpace=None, pos_search: SearchSpace=None,
+                                   vel_search: SearchSpace=None,
                                    **kwargs):
         """
         To perform a Max Likelihood Search with extra uncertainty parameters (e.g., sensor bias,
@@ -139,6 +140,13 @@ class PassiveSurveillanceSystem(ABC):
         :return th_grid: grid of search positions
         :return parameter_est: dict containing the estimated bias, sensor position, and sensor velocity terms
         """
+
+        # ToDo: Add support for a bias covariance term, sensor position error covariance, and sensor velocity error covariance
+
+        # Check for missing info
+        if do_sensor_pos: assert pos_search is not None, 'Missing argument ''pos_search''.'
+        if do_sensor_vel: assert vel_search is not None, 'Missing argument ''vel_search''.'
+        if do_sensor_bias: assert bias_search is not None, 'Missing argument ''bias_search''.'
 
         # Make sure at least one term is true; otherwise this is just ML
         if not do_sensor_bias and not do_sensor_pos and not do_sensor_vel:
@@ -317,18 +325,18 @@ class PassiveSurveillanceSystem(ABC):
         # todo: implement as a SearchSpace method
         num_params = source_search.num_parameters
         default_arr = np.ones((num_params, ))
-        if len(source_search.x_ctr) != num_params:
+        if np.size(source_search.x_ctr) != num_params:
             source_search.x_ctr = source_search.x_ctr * default_arr
-        if len(source_search.epsilon) != num_params:
+        if np.size(source_search.epsilon) != num_params:
             source_search.epsilon = source_search.epsilon * default_arr
-        if len(source_search.points_per_dim) != num_params:
+        if np.size(source_search.points_per_dim) != num_params:
             source_search.points_per_dim = source_search.points_per_dim * default_arr
 
         # === Parse the components for a combined search space =========
         field_names = ['x_ctr', 'epsilon', 'points_per_dim']
         combined_search = {}
         for field_name in field_names:
-            components = [getattr(x, field_name) for x in (source_search, bias_search, pos_search, vel_search) if x is not None]
+            components = [np.broadcast_to(getattr(x, field_name), x.num_parameters) for x in (source_search, bias_search, pos_search, vel_search) if x is not None]
             if len(components) > 1:
                 combined_search[field_name] = np.concatenate(components, axis=None)
             else:

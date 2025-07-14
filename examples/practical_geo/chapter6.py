@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colormaps as cm
+import matplotlib
 
 import utils
 from fdoa import FDOAPassiveSurveillanceSystem
@@ -301,7 +301,7 @@ def example4(do_iterative=False):
     def _make_plot(this_ell, x_plot, label_set, title=None):
         this_fig, this_ax = plt.subplots()
 
-        cmap = cm.get_cmap('viridis')  # Choose a colormap
+        cmap = matplotlib.colormaps['viridis']  # Choose a colormap
         cmap.set_under('k', alpha=0)  # Set values below vmin to transparent black
 
         hdl = plt.imshow(this_ell, origin='lower', cmap=cmap, extent=extent)
@@ -350,18 +350,9 @@ def example4(do_iterative=False):
                                                                          np.linalg.norm(x_est-x_tgt)/1e3))
 
     # ML Solver with Bias Estimation
-    # In this solver, we'll let the ML search grid include possible bias terms, but not sensor position uncertainties
-    th_ctr = np.concatenate((x_ctr,              # unknown x/y coordinates of source (start at center of search grid)
-                             np.zeros(n_tdoa,),  # unknown ROA bias terms (start at zero bias)
-                             x_tdoa.ravel()))    # unknown x/y coordinates of sensors (start at nominal positions)
-    search_size = np.concatenate((5e3*np.ones(2,),          # x/y search grid at +/- 5 km
-                                 80*np.ones(n_tdoa,),     # assume as much as 80 meters of RDOA error
-                                 np.zeros(n_tdoa*n_dim,)))  # assume no sensor position uncertainty
-    search_size[1 + n_tdoa] = 0  # for simplicity, we can assume no bias on the reference sensor
-    epsilon = np.concatenate((500*np.ones(2,),      # search target positions with 500 m accuracy
-                              10*np.ones(n_tdoa,),  # search bias terms with 10 m RDOA accuracy
-                              np.ones(n_tdoa*n_dim,)))  # resolution for x_tdoa doesn't matter; search_size is 0
-    cov_beta = CovarianceMatrix(.001*np.eye(n_tdoa*n_dim))  # position covariance error
+    bias_search = SearchSpace(x_ctr=np.zeros((tdoa.num_sensors, )),
+                              max_offset=np.array([80]*tdoa.num_measurements+[0]), # assume the ref sensor has no bias
+                              epsilon=10)
 
     x_est_bias, bias_est, x_tdoa_est, _, _  = tdoa.max_likelihood_uncertainty(zeta=zeta,
                                                                               source_search=ml_search,
@@ -370,7 +361,6 @@ def example4(do_iterative=False):
                                                                               do_sensor_pos=False,
                                                                               do_sensor_vel=False)
 
-    x_est_bias, bias_est, x_tdoa_est, _, _  = tdoa.max_likelihood_uncertainty(zeta=zeta, **unc_solver_args)
     err_km = np.linalg.norm(x_est_bias-x_tgt)/1e3
     print('ML Est. w/Uncertainty: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_bias[0]/1e3,
                                                                                 x_est_bias[1]/1e3,

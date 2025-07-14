@@ -584,6 +584,8 @@ class SearchSpace:
         assert all([np.size(x) == 1 or np.size(x) == self.num_parameters for x in [getattr(self, y) for y in attrs]]), \
             'Search space dimension mismatch; all entries must be None, scalar, or the same size.'
 
+        for attr in attrs:
+            setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=(self.num_parameters, )))
 
 def make_nd_grid(search_space: SearchSpace):
     """
