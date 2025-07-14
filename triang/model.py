@@ -56,12 +56,12 @@ def measurement(x_sensor, x_source, do_2d_aoa=False, bias=None):
     dx = np.reshape(x_source, (n_dim1, 1, n_source)) - np.reshape(x_sensor, (n_dim1, n_sensor, 1))
 
     # Compute angle in radians
-    az = np.reshape(np.arctan2(dx[1, :, :], dx[0, :, :]) + angle_bias_az, newshape=out_dims)
+    az = np.reshape(np.arctan2(dx[1, :, :], dx[0, :, :]) + angle_bias_az, shape=out_dims)
 
     # Elevation angle, if desired
     if do_2d_aoa and n_dim1 == 3:
         ground_rng = np.expand_dims(np.sqrt(np.sum(dx[0:2, :, :]**2, axis=0)), axis=0)
-        el = np.reshape(np.arctan2(dx[2, :, :], ground_rng) + angle_bias_el, newshape=out_dims)
+        el = np.reshape(np.arctan2(dx[2, :, :], ground_rng) + angle_bias_el, shape=out_dims)
 
         # Stack az/el along the first dimension
         psi = np.concatenate((az, el), axis=0)

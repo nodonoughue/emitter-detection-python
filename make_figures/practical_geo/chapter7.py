@@ -169,7 +169,7 @@ def make_figure_6(prefix=None):
     _, num_sensors = utils.safe_2d_shape(x_tdoa)
     num_t = len(t)
 
-    x_tdoa_full = x_tdoa[:, :, np.newaxis] + v_tdoa[:, :, np.newaxis] * np.reshape(t, newshape=(1, 1, num_t))
+    x_tdoa_full = x_tdoa[:, :, np.newaxis] + v_tdoa[:, :, np.newaxis] * np.reshape(t, shape=(1, 1, num_t))
 
     # Plot Geometry
     fig6a = plt.figure()

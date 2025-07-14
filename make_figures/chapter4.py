@@ -225,9 +225,9 @@ def make_figure_2a(prefix=None, rng=np.random.default_rng()):
     out_bits_full = out_bits_full.astype(int)
 
     # Convert from bits to symbols
-    data_symbols = np.reshape(np.exp(1j*np.pi*data_bits_full), newshape=(num_full_bits, 1))
-    code_symbols = np.reshape(np.exp(1j*np.pi*code_bits_full), newshape=(num_full_bits, 1))
-    out_symbols = np.reshape(np.exp(1j*np.pi*out_bits_full), newshape=(num_full_bits, 1))
+    data_symbols = np.reshape(np.exp(1j*np.pi*data_bits_full), shape=(num_full_bits, 1))
+    code_symbols = np.reshape(np.exp(1j*np.pi*code_bits_full), shape=(num_full_bits, 1))
+    out_symbols = np.reshape(np.exp(1j*np.pi*out_bits_full), shape=(num_full_bits, 1))
 
     # Generate the signals
     osf = 16  # Samples per cycle

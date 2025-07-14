@@ -110,8 +110,8 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     else:
         out_dims = (n_dim, num_measurements)
 
-    result_pos = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], newshape=out_dims)
-    result_vel = np.reshape(dx_norm[:, test_idx_vec, :] - dx_norm[:, ref_idx_vec, :], newshape=out_dims)
+    result_pos = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], shape=out_dims)
+    result_vel = np.reshape(dx_norm[:, test_idx_vec, :] - dx_norm[:, ref_idx_vec, :], shape=out_dims)
 
     return np.concatenate((result_pos, result_vel), axis=0)  # 2*n_dim x nPair x n_source
 
@@ -473,18 +473,18 @@ def grad_sensor_pos(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=No
     n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
 
     # Compute pointing vectors and projection matrix
-    dx = x_sensor - np.reshape(x_source, newshape=(n_dim, 1, n_source))
-    dv = v_sensor - np.reshape(v_source, newshape=(n_dim, 1, n_source))
+    dx = x_sensor - np.reshape(x_source, shape=(n_dim, 1, n_source))
+    dv = v_sensor - np.reshape(v_source, shape=(n_dim, 1, n_source))
     rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # (1, n_sensor, n_source)
     dx_norm = dx / rn
     dv_norm = dv / rn
 
-    proj_x = (np.reshape(dx_norm, newshape=(n_dim, 1, n_sensor, n_source)) *
-              np.reshape(np.conjugate(dx_norm), newshape=(1, n_dim, n_sensor, n_source)))
+    proj_x = (np.reshape(dx_norm, shape=(n_dim, 1, n_sensor, n_source)) *
+              np.reshape(np.conjugate(dx_norm), shape=(1, n_dim, n_sensor, n_source)))
 
     # Compute the gradient of R_n
     nabla_rn = np.squeeze(np.sum((np.eye(n_dim) - proj_x) *
-                                 np.reshape(dv_norm, newshape=(1, n_dim, n_sensor, n_source)), axis=1))
+                                 np.reshape(dv_norm, shape=(1, n_dim, n_sensor, n_source)), axis=1))
     # (n_dim, n_sensor, n_source)
 
     # Parse the reference index

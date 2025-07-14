@@ -97,7 +97,7 @@ def example2():
     cov_pos_lower = np.linalg.cholesky(cov_pos_full, upper=False)
 
     # Generate a random set of TDOA positions
-    x_tdoa_actual = x_tdoa + np.reshape(cov_pos_lower @ np.random.randn(2 * n_tdoa, ), newshape=(2, n_tdoa))
+    x_tdoa_actual = x_tdoa + np.reshape(cov_pos_lower @ np.random.randn(2 * n_tdoa, ), shape=(2, n_tdoa))
 
     # Generate PSS System
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=None, ref_idx=None)
@@ -182,7 +182,7 @@ def example3():
     # definite (it has some eigenvalues that are zero)
     singular_vectors, singular_values, _ = np.linalg.svd(cov_pos)
     cov_lower = singular_vectors @ np.diag(np.sqrt(singular_values))
-    epsilon = np.reshape(cov_lower @ np.random.randn(num_dims*(n_aoa+n_tdoa), 1), newshape=(n_aoa+n_tdoa, num_dims)).T
+    epsilon = np.reshape(cov_lower @ np.random.randn(num_dims*(n_aoa+n_tdoa), 1), shape=(n_aoa+n_tdoa, num_dims)).T
 
     # Grab the position offsets and add to the reported TDOA and AOA positions
     x_aoa_true = x_aoa + epsilon[:, :n_aoa]  # first n_dim x n_aoa errors belong to the AOA sensors

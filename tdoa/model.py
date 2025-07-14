@@ -104,7 +104,7 @@ def jacobian(x_sensor, x_source, ref_idx=None):
     else:
         out_dims = (n_dim, num_measurements)
 
-    j = np.reshape(j, newshape=out_dims)
+    j = np.reshape(j, shape=out_dims)
     # j = np.delete(j, np.unique(ref_idx_vec), axis=1) # remove reference id b/c it is all zeros
     # not needed when parse_ref_sensors is fixed
     return j
@@ -492,7 +492,7 @@ def grad_sensor_pos(x_sensor, x_source, ref_idx=None):
     _, n_source = utils.safe_2d_shape(x_source)
 
     # Compute pointing vectors and projection matrix
-    dx = x_sensor - np.reshape(x_source, newshape=(n_dim, 1, n_source))
+    dx = x_sensor - np.reshape(x_source, shape=(n_dim, 1, n_source))
     rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # (1, n_sensor, n_source)
     dx_norm = dx / rn
 

@@ -348,7 +348,7 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
     likelihood = ell(x_set)
 
     if prior is not None and prior_wt > 0:
-        pdf_prior = np.reshape(prior(x_set), newshape=likelihood.shape)
+        pdf_prior = np.reshape(prior(x_set), shape=likelihood.shape)
 
         likelihood = (1 - prior_wt) * likelihood + prior_wt * np.log10(pdf_prior)
 

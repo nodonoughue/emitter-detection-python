@@ -290,8 +290,8 @@ def example3():
     crlb_fix_grid = hybrid.compute_crlb(x_source=x_set, print_progress=True, eq_constraints_grad=[a_grad])
 
     # Compute RMSE of each grid point
-    rmse_raw = np.reshape(np.sqrt(np.trace(crlb_raw_grid, axis1=0, axis2=1)), newshape=out_shape)
-    rmse_fix = np.reshape(np.sqrt(np.trace(crlb_fix_grid, axis1=0, axis2=1)), newshape=out_shape)
+    rmse_raw = np.reshape(np.sqrt(np.trace(crlb_raw_grid, axis1=0, axis2=1)), shape=out_shape)
+    rmse_fix = np.reshape(np.sqrt(np.trace(crlb_fix_grid, axis1=0, axis2=1)), shape=out_shape)
 
     # Plot RMSE
     fig, axes = plt.subplots(ncols=2)

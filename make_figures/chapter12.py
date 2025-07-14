@@ -175,7 +175,7 @@ def make_figure_2(prefix=None):
                                        x_sensor1, v_sensor1, transmit_freq)
 
     fig2a, ax2a = plt.subplots()
-    ax2a.contour(x_grid[0], x_grid[1], np.reshape(ddop, newshape=grid_shape), levels=20)
+    ax2a.contour(x_grid[0], x_grid[1], np.reshape(ddop, shape=grid_shape), levels=20)
     handle0 = plt.scatter(x_sensor0[0], x_sensor0[1], marker='o', s=10, color='k', zorder=3)
     handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k', zorder=3)
 
@@ -211,7 +211,7 @@ def make_figure_2(prefix=None):
                                        x_sensor1, v_sensor1, transmit_freq)
 
     fig2b, ax2b = plt.subplots()
-    ax2b.contour(x_grid[0], x_grid[1], np.reshape(ddop, newshape=grid_shape), levels=11)
+    ax2b.contour(x_grid[0], x_grid[1], np.reshape(ddop, shape=grid_shape), levels=11)
     handle0 = plt.scatter(x_sensor0[0], x_sensor0[1], marker='o', s=10, color='k', zorder=3)
     handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k', zorder=3)
 
@@ -502,7 +502,7 @@ def make_figure_6(prefix):
 
     # Compute CRLB
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
 
     # Set up contours
     contour_levels = [.1, 1, 5, 10, 50, 100, 1000]
@@ -530,7 +530,7 @@ def make_figure_6(prefix):
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
 
     # Draw Figure
     fig6b, ax = plt.subplots()
@@ -561,7 +561,7 @@ def make_figure_6(prefix):
 
     # Compute CRLB
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
 
     # Draw Figure
     fig6c, ax = plt.subplots()
@@ -581,7 +581,7 @@ def make_figure_6(prefix):
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
 
     # Draw Figure
     fig6d, ax = plt.subplots()

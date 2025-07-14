@@ -258,8 +258,8 @@ class PassiveSurveillanceSystem(ABC):
 
         def ell(b, x, v):
             # Reshape the sensor position
-            this_x_sensor = np.reshape(x, newshape=self.pos.shape)
-            this_v_sensor = np.reshape(v, newshape=self.vel.shape)
+            this_x_sensor = np.reshape(x, shape=self.pos.shape)
+            this_v_sensor = np.reshape(v, shape=self.vel.shape)
             res = 0
             for this_zeta, this_x, this_v in zip(zeta_cal.T, x_cal.T, v_cal.T):
                 this_ell = self.log_likelihood(x_sensor=this_x_sensor, v_sensor=this_v_sensor, zeta=this_zeta,

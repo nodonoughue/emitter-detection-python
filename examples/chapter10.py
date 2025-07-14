@@ -328,7 +328,7 @@ def example2():
 
     # Compute CRLB
     crlb = triang.compute_crlb(x_source=x_source*1e3)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape_2d)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape_2d)
 
     # Blank out y=0
     nan_mask = np.abs(x_grid[1]) < 1e-6  # x_grid is a list of meshgrid outputs; search the y-dimension
@@ -382,11 +382,11 @@ def example3():
 
     # Compute CRLB
     crlb = triang.compute_crlb(x0*1e3)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=np.shape(x_mesh))  # m
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=np.shape(x_mesh))  # m
     
     good_point = cep50 <= 25e3
     rng_val = np.sqrt(np.sum(np.abs(x0)**2, axis=0))  # km
-    max_range = np.max(rng_val[np.reshape(good_point, newshape=np.shape(rng_val))])  # km
+    max_range = np.max(rng_val[np.reshape(good_point, shape=np.shape(rng_val))])  # km
     print('Maximum range that satisfies CEP < 25 km is {:.2f} km'.format(max_range))
 
     # Plot

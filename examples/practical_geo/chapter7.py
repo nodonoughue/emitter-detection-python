@@ -118,7 +118,7 @@ def example1(colors=None):
     for this_k in k_vec:
         aoa.cov = cov_psi.multiply(1/this_k, overwrite=False)
         this_crlb = aoa.compute_crlb(x_source=x_set)
-        cep = np.reshape(utils.errors.compute_cep50(this_crlb), newshape=grid_shape_2d)
+        cep = np.reshape(utils.errors.compute_cep50(this_crlb), shape=grid_shape_2d)
 
         # Start with the image plot
         this_fig = plt.figure()

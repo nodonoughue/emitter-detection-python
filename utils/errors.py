@@ -43,7 +43,7 @@ def compute_cep50(covariance):
         # Multiple 2x2 matrices, keep track of the input size, and then reshape for easier looping
         out_shape = in_shape[2:]
         num_matrices = np.prod(out_shape)
-        covariance = np.reshape(covariance, newshape=(in_shape[0], in_shape[1], num_matrices))
+        covariance = np.reshape(covariance, shape=(in_shape[0], in_shape[1], num_matrices))
     else:
         # Only one input matrix
         out_shape = (1,)
@@ -85,7 +85,7 @@ def compute_cep50(covariance):
     if num_matrices == 1:
         return cep[0]  # convert to a scalar
     else:
-        return np.reshape(cep, newshape=out_shape)  # reshape to match dimensions 2:end of input size
+        return np.reshape(cep, shape=out_shape)  # reshape to match dimensions 2:end of input size
 
 
 def compute_rmse_scaling(conf_interval):
