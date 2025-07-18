@@ -565,22 +565,27 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         return
 
     def parse_sensor_data(self, data, vel_input=False):
-        # todo: implement the vel_input flag; see fdoa/system.py for example
+
         if data is not None:
-            # Split apart a vector of sensor data, must have length equal to self.num_sensors
+            # Split apart a vector of sensor data; must have length equal to self.num_sensors
             # assert len(data) == self.num_sensors or (vel_input and len(data)==self.num_fdoa_sensors), "Unable to parse sensor data; unexpected size."
 
             # todo: make this cleaner
-            if len(data.shape) == 1:
+            if vel_input:
+                # It's a velocity input, so it's not going to be relevant to AOA or TDOA
+                data_aoa = None
+                data_tdoa = None
+                data_fdoa = data
+            elif len(data.shape) == 1:
                 # Parse the AOA, TDOA, and FDOA sensor indices
-                data_aoa = data[self.aoa_sensor_idx]
-                data_tdoa = data[self.tdoa_sensor_idx]
-                data_fdoa = data[self.fdoa_sensor_idx]
+                data_aoa = data[self.aoa_sensor_idx] if self.aoa is not None else None
+                data_tdoa = data[self.tdoa_sensor_idx] if self.tdoa is not None else None
+                data_fdoa = data[self.fdoa_sensor_idx] if self.fdoa is not None else None
             else:
                 # Parse the AOA, TDOA, and FDOA sensor indices
-                data_aoa = data[:,self.aoa_sensor_idx]
-                data_tdoa = data[:,self.tdoa_sensor_idx]
-                data_fdoa = data[:,self.fdoa_sensor_idx]
+                data_aoa = data[:,self.aoa_sensor_idx] if self.aoa is not None else None
+                data_tdoa = data[:,self.tdoa_sensor_idx] if self.tdoa is not None else None
+                data_fdoa = data[:,self.fdoa_sensor_idx] if self.fdoa is not None else None
         else:
             data_aoa = None
             data_tdoa = None
