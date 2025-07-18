@@ -11,7 +11,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
     bias = None
 
     _default_tdoa_bias_search_epsilon = 1 # meters
-    _default_tdoa_bias_search_size = 10 # meters
+    _default_tdoa_bias_search_size = 11 # num search points per dimension
 
     def __init__(self,x, cov, variance_is_toa=True, **kwargs):
         # Handle empty covariance matrix inputs

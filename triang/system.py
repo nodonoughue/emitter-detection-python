@@ -9,7 +9,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
     do_2d_aoa: bool = False
 
     _default_aoa_bias_search_epsilon = 0.1 # degrees
-    _default_aoa_bias_search_size = 1 # degrees
+    _default_aoa_bias_search_size = 11 # num search points per dimension
 
     def __init__(self,x, cov, do_2d_aoa=False, **kwargs):
         # Handle empty covariance matrix inputs

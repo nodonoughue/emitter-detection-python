@@ -19,11 +19,15 @@ class PassiveSurveillanceSystem(ABC):
     cov_pos: CovarianceMatrix or None = None     # Assumed sensor position error covariance
 
     # Default Values
+    # --- No default sensor bias search resolution; let each PSS type overwrite this
     default_bias_search_epsilon = 0
     default_bias_search_size = 1
+    # --- Default sensor position error search is to use 11 points per dimension,
+    #     with a maximum offset of 25 meters and resolution of 2.5 meters.
     default_sensor_pos_search_epsilon = 2.5
-    default_sensor_pos_search_size = 25
-    default_sensor_vel_search_epsilon = 1
+    default_sensor_pos_search_size = 11
+    # --- No default sensor velocity search resolution; let FDOA type overwrite this
+    default_sensor_vel_search_epsilon = 0
     default_sensor_vel_search_size = 1  # By default, we can't search across sensor velocity
 
     def __init__(self, x: np.ndarray, cov: CovarianceMatrix or None, bias=None, cov_pos=None, vel=None):

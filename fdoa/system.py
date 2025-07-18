@@ -11,9 +11,9 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     bias = None
 
     _default_fdoa_bias_search_epsilon = 1 # meters/second
-    _default_fdoa_bias_search_size = 10 # meters/second
+    _default_fdoa_bias_search_size = 11 # num elements per search dimension
     _default_fdoa_vel_search_epsilon = 1 # meters/second
-    _default_fdoa_vel_search_size = 10 # meters/second
+    _default_fdoa_vel_search_size = 11 # num elements per search dimensions
 
     def __init__(self,x, cov, **kwargs):
         # Handle empty covariance matrix inputs
