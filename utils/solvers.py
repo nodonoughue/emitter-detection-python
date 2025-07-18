@@ -426,14 +426,14 @@ def sensor_calibration(ell,
     """
 
     # Initialize Outputs
-    bias_est = bias_search.x_ctr
-    x_sensor_est = pos_search.x_ctr
-    v_sensor_est = vel_search.x_ctr
+    bias_est = bias_search.x_ctr if bias_search is not None else None
+    x_sensor_est = pos_search.x_ctr if pos_search is not None else None
+    v_sensor_est = vel_search.x_ctr if vel_search is not None else None
 
     for _ in np.arange(num_iterations):
 
         # ================= Estimate Measurement Bias ========================
-        if bias_search.points_per_dim > 1:
+        if bias_search is not None and np.any(bias_search.points_per_dim > 1):
             x_sensor_vec = pos_search.x_ctr
             v_sensor_vec = vel_search.x_ctr
             def ell_bias(bias):
@@ -444,7 +444,7 @@ def sensor_calibration(ell,
             bias_search.x_ctr = bias_est # store result as center for next iteration
 
         # =================== Estimate Sensor Position =========================
-        if pos_search.points_per_dim > 1:
+        if pos_search is not None and np.any(pos_search.points_per_dim > 1):
             v_sensor_vec = vel_search.x_ctr
             def ell_pos(x):
                 return ell(bias_est, x, v_sensor_vec)
@@ -454,7 +454,7 @@ def sensor_calibration(ell,
             pos_search.x_ctr = x_sensor_est # store result as center for next iteration
 
         # =================== Estimate Sensor Velocity =========================
-        if vel_search.points_per_dim > 1:
+        if vel_search is not None and np.any(vel_search.points_per_dim > 1):
             def ell_vel(v):
                 return ell(bias_est, x_sensor_est, v)
 
