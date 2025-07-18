@@ -66,7 +66,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
     def max_likelihood(self, zeta, search_space: SearchSpace, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
         if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, None, self.bias
 
@@ -115,7 +115,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
     def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
         if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, None, self.bias
 
@@ -125,7 +125,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
     def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
         if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, None, self.bias
 

@@ -292,7 +292,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     def max_likelihood(self, zeta, search_space: SearchSpace, cal_data:dict=None, **kwargs):
         # Perform sensor calibration
         if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
@@ -333,7 +333,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
         if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
@@ -360,7 +360,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
         # Perform sensor calibration
         if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
@@ -387,7 +387,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None, cal_data:dict=None):
         # Perform sensor calibration
         if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(*cal_data)
+            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
