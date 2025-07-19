@@ -556,7 +556,7 @@ class SearchSpace:
     num_parameters: int
     x_ctr: np.ndarray
     epsilon: np.ndarray
-    points_per_dim: np.ndarray
+    points_per_dim: np.ndarray[np.int_]
     max_offset: np.ndarray
 
     def __init__(self, x_ctr, epsilon, points_per_dim=None, max_offset=None):
@@ -566,26 +566,23 @@ class SearchSpace:
         if points_per_dim is None:
             # infer from max_offset
             self.max_offset = max_offset
-            self.points_per_dim = 1 + self.max_offset / self.epsilon
+            self.points_per_dim = np.floor(1 + 2 * self.max_offset / self.epsilon).astype(int)
         elif max_offset is None:
             # infer from search_size
-            self.points_per_dim = points_per_dim
-            self.max_offset = self.epsilon * (self.points_per_dim - 1)
+            self.points_per_dim = np.array(points_per_dim, dtype=int)
+            self.max_offset = self.epsilon * (self.points_per_dim - 1) / 2
         else:
             # make sure they align
-            assert np.all(np.equal(max_offset, (points_per_dim - 1) * epsilon)), 'Bad inputs to search space.'
-            self.points_per_dim = points_per_dim
+            assert np.all(np.equal(max_offset, (points_per_dim - 1)/2 * epsilon)), 'Bad inputs to search space.'
+            self.points_per_dim = np.array(points_per_dim, dtype=int)
             self.max_offset = max_offset
 
-
-        # Verify sizes
+        # Verify sizes and broadcast
         attrs = ['x_ctr', 'epsilon', 'points_per_dim', 'max_offset']
-        self.num_parameters = max([np.size(getattr(self, x)) for x in attrs if x is not None])
-        assert all([np.size(x) == 1 or np.size(x) == self.num_parameters for x in [getattr(self, y) for y in attrs]]), \
-            'Search space dimension mismatch; all entries must be None, scalar, or the same size.'
-
+        b = np.broadcast(*[getattr(self, attr) for attr in attrs])
+        self.num_parameters = np.prod(b.shape)
         for attr in attrs:
-            setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=(self.num_parameters, )))
+            setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=b.shape))
 
 def make_nd_grid(search_space: SearchSpace):
     """
@@ -604,32 +601,36 @@ def make_nd_grid(search_space: SearchSpace):
     if np.size(search_space.x_ctr) == 1:
         x_ctr = search_space.x_ctr * np.ones((n_dim, ))
     else:
-        x_ctr = search_space.x_ctr
+        x_ctr = search_space.x_ctr.ravel()
 
     if np.size(search_space.max_offset) == 1:
         max_offset = search_space.max_offset * np.ones((n_dim, ))
     else:
-        max_offset = search_space.max_offset
+        max_offset = search_space.max_offset.ravel()
 
     if np.size(search_space.epsilon) == 1:
         grid_spacing = search_space.epsilon * np.ones((n_dim, ))
     else:
-        grid_spacing = search_space.epsilon
+        grid_spacing = search_space.epsilon.ravel()
+
+    if np.size(search_space.points_per_dim) == 1:
+        points_per_dim = search_space.points_per_dim * np.ones((n_dim, ))
+    else:
+        points_per_dim = search_space.points_per_dim.ravel()
 
     assert n_dim == np.size(max_offset) and n_dim == np.size(grid_spacing), \
            'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
 
-    n_elements = np.fix(1 + 2 * max_offset / grid_spacing).astype(int)
 
     # Check Search Size
     max_elements = 1e8  # Set a conservative limit
-    assert np.prod(n_elements) < max_elements, \
+    assert np.prod(points_per_dim) < max_elements, \
            'Search size is too large; python is likely to crash or become unresponsive. Reduce your search size, or' \
            + ' increase the max allowed.'
 
     # Make a set of axes, one for each dimension, that are centered on x_ctr
-    dims = [x + np.linspace(start=-x_max, stop=x_max*(1+n)/n, num=n) for (x, x_max, n)
-            in zip(x_ctr, max_offset, n_elements)]
+    dims = [x + np.linspace(start=-x_max, stop=x_max, num=n) if n > 1 else x for (x, x_max, n)
+            in zip(x_ctr, max_offset, points_per_dim)]
 
     # Use meshgrid expansion; each element of x_grid is now a full n_dim dimensioned grid
     x_grid = np.meshgrid(*dims)
@@ -637,7 +638,7 @@ def make_nd_grid(search_space: SearchSpace):
     # Rearrange to a single 2D array of grid locations (n_dim x N)
     x_set = np.asarray([x.flatten() for x in x_grid])
 
-    return x_set, x_grid, n_elements
+    return x_set, x_grid, points_per_dim
 
 
 def is_broadcastable(a, b):
