@@ -269,9 +269,9 @@ class PassiveSurveillanceSystem(ABC):
         # Accepts a 1D vector of measurement biases and a 1D vector of sensor positions
 
         def ell(b, x, v):
-            # Reshape the sensor position
+            # Reshape the sensor position and velocity
             this_x_sensor = np.reshape(x, shape=self.pos.shape)
-            this_v_sensor = np.reshape(v, shape=self.vel.shape)
+            this_v_sensor = np.reshape(v, shape=self.pos.shape) if v is not None else None
             res = 0
             for this_zeta, this_x, this_v in zip(zeta_cal.T, x_cal.T, v_cal.T):
                 this_ell = self.log_likelihood(x_sensor=this_x_sensor, v_sensor=this_v_sensor, zeta=this_zeta,
@@ -281,9 +281,11 @@ class PassiveSurveillanceSystem(ABC):
 
         x_sensor_est, v_sensor_est, bias_est = utils.solvers.sensor_calibration(ell, pos_search, vel_search, bias_search)
 
-        return (np.reshape(x_sensor_est, shape=self.pos.shape),
-                np.reshape(v_sensor_est, shape=self.pos.shape),
-                bias_est)
+        # Handle response shapes
+        x_sensor_est = np.reshape(x_sensor_est, shape=(self.num_dim, -1)) if x_sensor_est is not None else None
+        v_sensor_est = np.reshape(v_sensor_est, shape=(self.num_dim, -1)) if v_sensor_est is not None else None
+
+        return x_sensor_est, v_sensor_est, bias_est
 
     def make_uncertainty_search_space(self, source_search: SearchSpace,
                                       do_bias_search: bool, do_pos_search: bool, do_vel_search: bool,
@@ -399,7 +401,7 @@ class PassiveSurveillanceSystem(ABC):
         if not do_pos_search: return None
 
         if pos_search is None or pos_search.x_ctr is None:
-            x_ctr = self.pos.ravel()
+            x_ctr = self.pos
         else:
             x_ctr = pos_search.x_ctr
 
@@ -419,7 +421,7 @@ class PassiveSurveillanceSystem(ABC):
         if not do_vel_search: return None
 
         if vel_search is None or vel_search.x_ctr is None:
-            x_ctr = self.vel.ravel() if self.vel is not None else np.zeros_like(self.pos).ravel()
+            x_ctr = self.vel if self.vel is not None else np.zeros_like(self.pos)
         else:
             x_ctr = vel_search.x_ctr
 
@@ -446,7 +448,7 @@ class PassiveSurveillanceSystem(ABC):
 
         # First, compute the number of each component and determine is source velocity is included
         num_source_pos = self.num_dim
-        num_source_vel = self.num_dim if do_sensor_pos else 0
+        num_source_vel = self.num_dim if do_source_vel else 0
         num_source = num_source_pos + num_source_vel
         num_bias = self.num_measurements if do_bias else 0
         num_pos = np.size(self.pos) if do_sensor_pos else 0

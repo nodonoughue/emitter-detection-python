@@ -21,7 +21,7 @@ def run_all_examples():
     :return figs: list of figure handles
     """
 
-    return list(example1()) + list(example2()) + list(example3()) + list(example4()) + list(example5())
+    return list(example1()) + list(example2()) + list(example3()) + list(example4()) + list(example5(True))
 
 
 def example1():
@@ -345,23 +345,23 @@ def example4(do_iterative=False):
     x_est, _, _ = tdoa.max_likelihood(zeta=zeta, search_space=ml_search)
 
     print('True ML Est.: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_true[0]/1e3, x_est_true[1]/1e3,
-                                                                      np.linalg.norm(x_est_true-x_tgt)/1e3))
+                                                                      np.linalg.norm(x_est_true-x_tgt)/1000.))
     print('Biased ML Est.: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est[0]/1e3, x_est[1]/1e3,
-                                                                         np.linalg.norm(x_est-x_tgt)/1e3))
+                                                                         np.linalg.norm(x_est-x_tgt)/1000))
 
     # ML Solver with Bias Estimation
     bias_search = SearchSpace(x_ctr=np.zeros((tdoa.num_sensors, )),
                               max_offset=np.array([80]*tdoa.num_measurements+[0]), # assume the ref sensor has no bias
                               epsilon=10)
 
-    x_est_bias, bias_est, x_tdoa_est, _, _  = tdoa.max_likelihood_uncertainty(zeta=zeta,
-                                                                              source_search=ml_search,
-                                                                              bias_search=bias_search,
-                                                                              do_sensor_bias=True,
-                                                                              do_sensor_pos=False,
-                                                                              do_sensor_vel=False)
+    x_est_bias, _, _, th_est  = tdoa.max_likelihood_uncertainty(zeta=zeta,
+                                                                source_search=ml_search,
+                                                                bias_search=bias_search,
+                                                                do_sensor_bias=True,
+                                                                do_sensor_pos=False,
+                                                                do_sensor_vel=False)
 
-    err_km = np.linalg.norm(x_est_bias-x_tgt)/1e3
+    err_km = np.linalg.norm(x_est_bias-x_tgt)/1000
     print('ML Est. w/Uncertainty: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_bias[0]/1e3,
                                                                                 x_est_bias[1]/1e3,
                                                                                 err_km))
@@ -370,7 +370,7 @@ def example4(do_iterative=False):
         print('True range bias: (', end='')
         print(*tdoa_bias, sep=', ', end=') m\n')
         print('Estimated range bias: (', end='')
-        print(*bias_est[:n_tdoa], sep=', ', end=') m\n')
+        print(*th_est['bias'][:n_tdoa], sep=', ', end=') m\n')
 
     # Plot Solutions
     figs.append(_make_plot(ell_plot, [x_tdoa, x_tgt, x_est_true],
@@ -422,7 +422,7 @@ def example5(do_vel_only_cal=False):
 
     # Generate Random Velocity Errors
     cov_vel = CovarianceMatrix(100**2 * np.eye(n_dim * n_fdoa))
-    vel_err = np.reshape(cov_vel.lower() @ np.random.randn(n_dim*n_fdoa, 1), (n_dim, n_fdoa))
+    vel_err = np.reshape(cov_vel.lower @ np.random.randn(n_dim*n_fdoa, 1), (n_dim, n_fdoa))
     v_fdoa_actual = v_fdoa + vel_err
 
     # Build sensor-level covariance matrix
@@ -431,9 +431,9 @@ def example5(do_vel_only_cal=False):
     freq_hz = 10e9
     lam = utils.constants.speed_of_light / freq_hz  # wavelength
     cov_toa = CovarianceMatrix(err_time**2 * np.eye(n_tdoa))
-    cov_roa = cov_toa.multiply(utils.constants.speed_of_light**2)
+    cov_roa = cov_toa.multiply(utils.constants.speed_of_light**2, overwrite=False)
     cov_foa = CovarianceMatrix(err_freq**2 * np.eye(n_fdoa))
-    cov_rroa = cov_foa.multiply(lam**2)
+    cov_rroa = cov_foa.multiply(lam**2, overwrite=False)
 
     cov_rdoa = cov_roa.resample()
     cov_rrdoa = cov_rroa.resample()
@@ -446,15 +446,15 @@ def example5(do_vel_only_cal=False):
 
     # Generate Measurements using the True Sensor Velocities
     x_source = np.array([-3, 4]) * 1e3
-    x_cal = np.array([-2, -1, 0, 1, 2],
-                     [-5, -5, -5, -5, -5]) * 1e3
+    x_cal = np.array([[-2, -1, 0, 1, 2],
+                      [-5, -5, -5, -5, -5]]) * 1e3
     _, num_cal = utils.safe_2d_shape(x_cal)
 
     z = hybrid.measurement(x_source=x_source, v_sensor=v_fdoa_actual)
     z_cal = hybrid.measurement(x_source=x_cal, v_sensor=v_fdoa_actual)
 
     # Generate Noise
-    noise = cov_tf.lower() @ np.random.randn(n_tdoa+n_fdoa-2, num_cal + 1) # one column for target; num_cal for cal data
+    noise = cov_tf.lower @ np.random.randn(n_tdoa+n_fdoa-2, num_cal + 1) # one column for target; num_cal for cal data
     zeta = z + noise[:, 0]
     zeta_cal = z_cal + noise[:, 1:]
 
@@ -466,7 +466,7 @@ def example5(do_vel_only_cal=False):
                 'do_vel_cal': True,
                 'do_bias_cal': False}  # don't bother calibrating across measurement biases; let's just do pos/vel
     _, x_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init)
-    _, x_est_cal, _, _ = hybrid.gradient_descent(zeta=zeta, x_init=x_init, cal_data=cal_data)
+    _, x_est_cal = hybrid.gradient_descent(zeta=zeta, x_init=x_init, cal_data=cal_data)
     
     # Plot Scenario
     fig = plt.figure()
@@ -483,7 +483,7 @@ def example5(do_vel_only_cal=False):
     if do_vel_only_cal:
         # To restrict calibration to velocity alone, we simply adjust the flags in cal_data
         cal_data['do_pos_cal'] = False  # turn off sensor position calibration; data will be used only for velocity cal
-        _, x_est_fdoa_cal, _, _ = hybrid.gradient_descent(zeta=zeta, x_init=x_init, cal_data=cal_data)
+        _, x_est_fdoa_cal = hybrid.gradient_descent(zeta=zeta, x_init=x_init, cal_data=cal_data)
 
         # Plot the scenario
         plt.plot(x_est_fdoa_cal[0], x_est_fdoa_cal[1], linestyle='-.', marker='s', markevery=[-1],

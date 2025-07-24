@@ -76,7 +76,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         self.aoa_measurement_idx = np.arange(self.num_aoa_measurements)
         self.tdoa_measurement_idx = np.arange(self.num_tdoa_measurements) + self.num_aoa_measurements
         self.fdoa_measurement_idx = (np.arange(self.num_fdoa_measurements) + self.num_tdoa_measurements
-                                     + self.num_fdoa_measurements)
+                                     + self.num_aoa_measurements)
 
         # Overwrite the uncertainty search defaults
         bias_search_epsilon = []
@@ -120,7 +120,8 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         # Parse source position and velocity
         if v_source is None:
             # It might be passed as a single input under x_source with 2*num_dim rows
-            x_source, v_source = self.parse_source_pos_vel(x_source, np.zeros_like(x_source))
+            x_source, v_source = self.parse_source_pos_vel(pos_vel=x_source,
+                                                           default_vel=np.zeros_like(x_source))
 
         # Call component models
         to_concat = []
@@ -131,7 +132,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
             to_concat.append(self.tdoa.measurement(x_source, x_sensor=x_tdoa, bias=b_aoa))
 
         if self.fdoa is not None:
-            to_concat.append(self.fdoa.measurement(x_source, x_sensor=x_fdoa, v_sensor=v_fdoa, v_source=v_fdoa,
+            to_concat.append(self.fdoa.measurement(x_source, x_sensor=x_fdoa, v_sensor=v_fdoa, v_source=v_source,
                                                    bias=b_aoa))
 
         z = np.concatenate(to_concat, axis=0)
@@ -565,47 +566,65 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         return
 
     def parse_sensor_data(self, data, vel_input=False):
+        if data is None:
+            # There's nothing to split; all three returns should be Nones
+            return None, None, None
 
-        if data is not None:
-            # Split apart a vector of sensor data; must have length equal to self.num_sensors
-            # assert len(data) == self.num_sensors or (vel_input and len(data)==self.num_fdoa_sensors), "Unable to parse sensor data; unexpected size."
+        # Possible configurations for data:
+        #  2D; num_dim x num_sensors
+        #      num_dim x self.fdoa.num_sensors (if vel_input=True)
+        #  1D; num_sensors
+        data_shape = np.shape(data)
 
-            # todo: make this cleaner
-            if vel_input:
-                # It's a velocity input, so it's not going to be relevant to AOA or TDOA
-                data_aoa = None
-                data_tdoa = None
-                data_fdoa = data
-            elif len(data.shape) == 1:
+        # Initialize outputs
+        data_aoa = None
+        data_tdoa = None
+        data_fdoa = None
+
+        if len(data_shape) == 1: # 1D array
+            if data_shape[0] == self.num_sensors:
                 # Parse the AOA, TDOA, and FDOA sensor indices
                 data_aoa = data[self.aoa_sensor_idx] if self.aoa is not None else None
                 data_tdoa = data[self.tdoa_sensor_idx] if self.tdoa is not None else None
                 data_fdoa = data[self.fdoa_sensor_idx] if self.fdoa is not None else None
+            elif vel_input and data_shape[0] == self.num_fdoa_sensors:
+                # It's a velocity input and is sized one-per-sensor
+                data_fdoa = data
             else:
+                raise ValueError('Unexpected number of entries in 1D data input.')
+        elif len(data_shape) == 2: # 2D array
+            # The assumption with a 2D array is that the first dimension is spatial (x/y/z) and the second iterates
+            # across the sensors
+            if data_shape[1] == self.num_sensors:
                 # Parse the AOA, TDOA, and FDOA sensor indices
                 data_aoa = data[:,self.aoa_sensor_idx] if self.aoa is not None else None
                 data_tdoa = data[:,self.tdoa_sensor_idx] if self.tdoa is not None else None
                 data_fdoa = data[:,self.fdoa_sensor_idx] if self.fdoa is not None else None
-        else:
-            data_aoa = None
-            data_tdoa = None
-            data_fdoa = None
+            elif vel_input and data_shape[1] == self.num_fdoa_sensors:
+                data_fdoa = data
+            else:
+                raise ValueError('Unexpected number of columns in 2D data input.')
 
         return data_aoa, data_tdoa, data_fdoa
 
     def parse_measurement_data(self, data):
-        if data is not None:
-            # Split apart a vector of measurement data, must have length equal to self.num_measurements
-            assert len(data) == self.num_measurements, "Unable to parse sensor data; unexpected size."
+        if data is None:
+            # There's nothing to split; all three returns should be Nones
+            return None, None, None
 
-            # Parse the AOA, TDOA, and FDOA sensor indices
-            data_aoa = data[self.aoa_measurement_idx]
-            data_tdoa = data[self.tdoa_measurement_idx]
-            data_fdoa = data[self.fdoa_measurement_idx]
-        else:
-            data_aoa = None
-            data_tdoa = None
-            data_fdoa = None
+        # Assume that one of the dimensions matches the expected number of measurements; split along that dimension
+        data_shape = np.shape(data)
+        matching_dims = np.nonzero(np.equal(data_shape, self.num_measurements))[0]  # the comparison is 1D
+        assert matching_dims.size > 0, 'Unexpected data shape; at least one dimension must match the number of measurements.'
+
+        # Break the array into 3 sections, with breakpoints at the end of the number of AOA and AOA+TDOA measurements
+        slice_index = [self.num_aoa_measurements, self.num_aoa_measurements + self.num_tdoa_measurements]
+        data_split = np.split(data, slice_index, axis=matching_dims[0]) # use the first matching dimensions
+
+        # Parse the AOA, TDOA, and FDOA sensor indices
+        data_aoa = data_split[0] if self.aoa is not None else None
+        data_tdoa = data_split[1] if self.tdoa is not None else None
+        data_fdoa = data_split[2] if self.fdoa is not None else None
 
         return data_aoa, data_tdoa, data_fdoa
 

@@ -353,7 +353,7 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
         likelihood = (1 - prior_wt) * likelihood + prior_wt * np.log10(pdf_prior)
 
     # Find the peak
-    idx_pk = likelihood.argmax()
+    idx_pk = np.argmax(likelihood)
     x_est = x_set[:, idx_pk]
 
     return x_est, likelihood, x_grid
@@ -437,7 +437,8 @@ def sensor_calibration(ell,
             x_sensor_vec = pos_search.x_ctr
             v_sensor_vec = vel_search.x_ctr
             def ell_bias(bias):
-                return ell(bias, x_sensor_vec, v_sensor_vec)
+                # Input is num_parameters x num_test_points; iterate over test points
+                return [ell(this_bias, x_sensor_vec, v_sensor_vec) for this_bias in bias.T]
 
             result = utils.solvers.ml_solver(ell=ell_bias, search_space=bias_search)
             bias_est = result[0]
@@ -447,19 +448,42 @@ def sensor_calibration(ell,
         if pos_search is not None and np.any(pos_search.points_per_dim > 1):
             v_sensor_vec = vel_search.x_ctr
             def ell_pos(x):
-                return ell(bias_est, x, v_sensor_vec)
+                # Input is num_parameters x num_test_points; iterate over test points
+                return [ell(bias_est, this_x, v_sensor_vec) for this_x in x.T]
 
-            result = utils.solvers.ml_solver(ell=ell_pos, search_space=pos_search)
-            x_sensor_est = result[0]
-            pos_search.x_ctr = x_sensor_est # store result as center for next iteration
+            # Do them one at a time; set the points_per_dim to 1 on the others
+            points_per_dim = pos_search.points_per_dim
+            _, num_sensors = utils.safe_2d_shape(points_per_dim)
+
+            for idx in np.arange(num_sensors):
+                # Only search the current sensor's position error
+                this_ppd = np.ones_like(points_per_dim)
+                this_ppd[:,idx] = points_per_dim[:, idx]
+                pos_search.points_per_dim = this_ppd
+                result = utils.solvers.ml_solver(ell=ell_pos, search_space=pos_search)
+                x_sensor_est = result[0]
+                # store result as center for next iteration
+                pos_search.x_ctr = np.reshape(x_sensor_est, shape=np.shape(points_per_dim))
 
         # =================== Estimate Sensor Velocity =========================
         if vel_search is not None and np.any(vel_search.points_per_dim > 1):
             def ell_vel(v):
-                return ell(bias_est, x_sensor_est, v)
+                # Input is num_parameters x num_test_points; iterate over test points
+                return [ell(bias_est, x_sensor_est, this_v) for this_v in v.T]
 
-            result = utils.solvers.ml_solver(ell=ell_vel, search_space=vel_search)
-            v_sensor_est = result[0]
-            vel_search.x_ctr = v_sensor_est # store result as center for next iteration
+            # Do them one at a time; set the points_per_dim to 1 on the others
+            points_per_dim = vel_search.points_per_dim
+            _, num_sensors = utils.safe_2d_shape(points_per_dim)
+
+            for idx in np.arange(num_sensors):
+                # Only search the current sensor's position error
+                this_ppd = np.ones_like(points_per_dim)
+                this_ppd[:,idx] = points_per_dim[:, idx]
+                vel_search.points_per_dim = this_ppd
+                result = utils.solvers.ml_solver(ell=ell_vel, search_space=vel_search)
+                v_sensor_est = result[0]
+                # store result as center for next iteration
+                vel_search.x_ctr = np.reshape(v_sensor_est, shape=np.shape(points_per_dim))
+
 
     return x_sensor_est, v_sensor_est, bias_est

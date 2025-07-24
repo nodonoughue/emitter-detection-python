@@ -197,11 +197,15 @@ def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
     n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source=x_source, v_source=v_source,
                                                                   x_sensor=x_sensor, v_sensor=v_sensor)
 
-    # Handle vector input
-    if n_source == 1:
-        # x_source is a vector; 2D indexing below will fail.
-        # Let's add a new axis
+    # x_source and v_source might be vectors; 2D indexing below will fail.
+    # Let's add a new axis
+    if len(np.shape(x_source))==1:
         x_source = x_source[:, np.newaxis]
+    if len(np.shape(v_source))==1:
+        v_source = v_source[:, np.newaxis]
+
+    # Make sure v_source and x_source have the same shape
+    v_source = np.broadcast_to(array=v_source, shape=x_source.shape)
 
     if do_resample:
         cov = cov.resample(ref_idx=ref_idx)
