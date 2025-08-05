@@ -9,7 +9,7 @@ from numpy import typing as npt
 
 class CovarianceMatrix:
     def __init__(self, cov: npt.ArrayLike, do_cholesky: bool=True, do_inverse: bool=True):
-        self._cov = cov.copy()  # Store the covariance matrix; use copy to make sure it's a fresh copy
+        self._cov = np.asarray(cov)  # Store the covariance matrix; use copy to make sure it's a fresh copy
         self._inv = None
         self._lower = None
         self._do_parse = True
