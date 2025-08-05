@@ -160,7 +160,50 @@ class DirectionFinder(PassiveSurveillanceSystem):
                            do_2d_aoa=self.do_2d_aoa)
 
     def draw_lobs(self, zeta, x_sensor=None, **kwargs):
+        """
+        Draw lines of bearing from each sensor corresponding to each measurement
+
+        :param zeta: ndarray; first dimension must match self.num_measurements
+        :param x_sensor: optional ndarray; if empty, then self.pos will be used
+        :param kwargs: other named arguments will be passed to triang.model.draw_lob().
+        :return lobs: nested list of tuples; one for each sensor.
+        """
+
+        # Parse the sensors
         if x_sensor is None:
             x_sensor = self.pos
+            num_sensors= self.num_measurements
+            num_measurements = self.num_measurements
+        else:
+            num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
+            assert num_sensors == self.num_sensors, "Sensor position dimension mismatch."
+            num_measurements = num_sensors * (2 if self.do_2d_aoa else 1)
 
-        return [model.draw_lob(x_sensor=this_x_sensor.T, psi=this_zeta, **kwargs) for this_x_sensor, this_zeta in zip(x_sensor.T, zeta)]
+        if num_sensors == 1 & len(x_sensor.shape) == 1:
+            x_sensor = x_sensor[:, np.newaxis]  # make sure it's not a 1d array; that'll mess up indexing later
+
+        # Parse the input measurements
+        num_zeta, num_cases = utils.safe_2d_shape(zeta)
+        assert num_zeta == num_measurements, "Sensor measurement dimension mismatch."
+        zeta_reshape = np.reshape(zeta, shape=(num_zeta, num_cases))
+
+        # Initialize the outputs
+        # Dimensions are: (2 or 3) x 2 x num_sensors x num_cases
+        lobs_out = np.zeros(shape=((3 if self.do_2d_aoa else 2), 2, num_sensors, num_cases))
+
+        # Loop over lobs
+        for idx_sensor in range(num_sensors):
+            this_x = x_sensor[:, idx_sensor]
+
+            for idx_case in range(num_cases):
+                if self.do_2d_aoa:
+                    this_zeta = zeta_reshape[idx_sensor:num_sensors, idx_case]
+                else:
+                    this_zeta = zeta_reshape[idx_sensor, idx_case]
+
+                # TODO: Test LOBs with 2D AOA measurements
+
+                this_lob = model.draw_lob(x_sensor=this_x, psi=this_zeta, **kwargs)
+                lobs_out[:, :, idx_sensor, idx_case] = np.asarray(this_lob).squeeze()
+
+        return lobs_out
