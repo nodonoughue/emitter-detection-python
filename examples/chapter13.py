@@ -127,6 +127,7 @@ def example1(rng=np.random.default_rng()):
     for idx in np.arange(num_mc_trials):
         utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
+        # TODO: Debug -- ML solution is wrong; seems fixed at [0, 0]
         result = _mc_iteration(pss=hybrid, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
         x_bf[:, idx] = result['bf']
