@@ -20,8 +20,8 @@ def calc_range(x1, x2):
     """
 
     # Find the input dimensions and test for compatibility
-    sz_1 = np.shape(x1)
-    sz_2 = np.shape(x2)
+    sz_1 = utils.safe_2d_shape(x1)
+    sz_2 = utils.safe_2d_shape(x2)
     if sz_1[0] != sz_2[0]:
         raise TypeError('First dimension of both inputs must match.')
 
