@@ -45,7 +45,7 @@ def example1(colors=None):
     _, n_sensors = utils.safe_2d_shape(x_aoa)
     sigma_theta = 5
     sigma_psi = sigma_theta * _deg2rad
-    cov_psi = CovarianceMatrix(sigma_psi^2 * np.eye(n_sensors))
+    cov_psi = CovarianceMatrix(sigma_psi**2 * np.eye(n_sensors))
 
     # Make PSS Object
     aoa = DirectionFinder(x=x_aoa, cov=cov_psi, do_2d_aoa=False)
@@ -57,7 +57,7 @@ def example1(colors=None):
 
     cep50_desired = 100
     est_k_min = np.ceil((cep50/cep50_desired)**2)
-    print('Estimate {:d} samples required.'.format(est_k_min))
+    print('Estimate {:d} samples required.'.format(np.astype(est_k_min, int)))
 
     # Iterate over number of samples
     num_samples = np.kron(10**np.arange(5), np.arange(start=1,stop=10))
@@ -78,7 +78,7 @@ def example1(colors=None):
         plt.loglog(num_samples, this_cep, label='\\sigma_\\theta={:d}^\\circ'.format(this_sigma))
 
     plt.plot(num_samples, 100*np.ones_like(num_samples), '--', label='CEP=100 m')
-    plt.plot(est_k_min*[1,1],[1e1,1e4],'--',label='K={:d}'.format(est_k_min))
+    plt.plot(est_k_min*np.array([1,1]),[1e1,1e4],'--',label='K={:d}'.format(np.astype(est_k_min, int)))
     plt.ylim([10, 10e3])
     plt.xlabel('Number of Samples [K]')
     plt.ylabel('$CEP_{50}$ [m]')
@@ -208,7 +208,7 @@ def example2(rng=np.random.default_rng()):
         print('{:.2f} s required to achieve {:.2f} m CEP50.'.format(time_vec[good_index], desired_cep))
 
     int_time = time_vec[good_index]
-    num_pulses = np.floor(int_time/pri)+1
+    num_pulses = np.floor(int_time/pri).astype(int)+1
     
     # Compute CRLB
     cov = cov_roa.multiply(1/num_pulses, overwrite=False)
@@ -219,7 +219,7 @@ def example2(rng=np.random.default_rng()):
     
     # Demonstrate geolocation
     z = tdoa.measurement(x_source=x_tgt)
-    zeta = z + tdoa.cov.lower @ rng.standard_normal(size=(tdoa.num_measurements,num_pulses))  # noisy measurement
+    zeta = z[:, np.newaxis] + tdoa.cov.lower @ rng.standard_normal(size=(tdoa.num_measurements, num_pulses))  # noisy measurement
     
     # Sample Mean
     zeta_mn = np.cumsum(zeta,axis=1)/(1+np.arange(num_pulses))
@@ -252,14 +252,14 @@ def example2(rng=np.random.default_rng()):
     plt.plot(ell_full[0], ell_full[1], label='Error Ellipse (sample mean)')
     
     # Plot error as a function of time
-    err = np.sqrt(np.sum(np.fabs(x_ls-x_tgt)**2, axis=0))
-    err_mn = np.sqrt(np.sum(np.fabs(x_ls_mn-x_tgt)**2, axis=0))
+    err = np.sqrt(np.sum(np.fabs(x_ls-x_tgt[:, np.newaxis])**2, axis=0))
+    err_mn = np.sqrt(np.sum(np.fabs(x_ls_mn-x_tgt[:, np.newaxis])**2, axis=0))
     
     fig3 = plt.figure()
     time_vec = pri * (1+np.arange(num_pulses))
-    plt.semilogy(time_vec,err, label='Error (single sample)')
-    plt.semilogy(time_vec,err_mn, label='Error (sample mean)')
-    plt.plot(time_vec, cep_single_sample*np.ones_like(num_pulses), label='CRLB (single sample)')
+    plt.semilogy(time_vec, err, label='Error (single sample)')
+    plt.semilogy(time_vec, err_mn, label='Error (sample mean)')
+    plt.plot(time_vec, cep_single_sample*np.ones_like(time_vec), label='CRLB (single sample)')
     plt.plot(time_vec, cep_single_sample/np.sqrt(1+np.arange(num_pulses)), label='CRLB (sample mean)')
     plt.xlabel('Time [s]')
     plt.ylabel('Error [m]')
@@ -296,11 +296,11 @@ def example3(rng=np.random.default_rng()):
     # Define pulse timing
     pri = 1e-3
     int_time = 30 # observation period
-    num_pulses = np.floor(int_time/pri)+1
+    num_pulses = np.floor(int_time/pri).astype(int)+1
 
     # Generate noisy measurements
     psi = aoa.measurement(x_tgt)
-    zeta = psi + aoa.cov.lower @ rng.standard_normal(size=(aoa.num_measurements, num_pulses))
+    zeta = psi[:, np.newaxis] + aoa.cov.lower @ rng.standard_normal(size=(aoa.num_measurements, num_pulses))
 
     # Define measurement and Jacobian functions
     z_fun = aoa.measurement
@@ -320,7 +320,8 @@ def example3(rng=np.random.default_rng()):
 
         if idx==0:
             # Initialization
-            this_x = aoa.least_square(zeta=this_zeta, x_init=x_init)
+            res = aoa.least_square(zeta=this_zeta, x_init=x_init)
+            this_x = res[0]
             this_p = aoa.compute_crlb(x_source=this_x)
         else:
             # EKF Update
@@ -336,7 +337,7 @@ def example3(rng=np.random.default_rng()):
 
     fig1=plt.figure()
     plt.plot(x_est[0], x_est[1], '-.', label='Estimated Position')
-    plt.scatter(x_tgt[0], x_tgt[1], '^', label='Target')
+    plt.scatter(x_tgt[0], x_tgt[1], marker='^', label='Target')
     plt.grid(True)
     plt.legend(loc='upper right')
 
@@ -353,7 +354,7 @@ def example3(rng=np.random.default_rng()):
     plt.ylim(x_tgt[1] + .6*offset*np.array([-1, 1]))
 
     # Compute Errors
-    err = np.sqrt(np.sum(np.fabs(x_est - x_tgt)**2, axis=0))
+    err = np.sqrt(np.sum(np.fabs(x_est - x_tgt[:, np.newaxis])**2, axis=0))
     time_vec = pri*(1+np.arange(num_pulses))
 
     fig2=plt.figure()

@@ -45,7 +45,7 @@ def make_all_figures(close_figs=False, force_recalc=False):
     figs3_4 = make_figures_3_4(prefix, force_recalc)
     fig5 = make_figure_5(prefix, force_recalc)
     fig6 = make_figure_6(prefix)
-    fig7 = make_figure_7(prefix)
+    fig7 = make_figure_7(prefix, force_recalc)
     fig8 = make_figure_8(prefix)
 
     figs = list(figs1_2) +  list(figs3_4) + list(fig5) + list(fig6) + list(fig7) + list(fig8)
@@ -190,7 +190,7 @@ def make_figure_6(prefix=None):
         zeta[:, idx] = tdoa.measurement(x_source=x_tgt)
 
     fig6b=plt.figure()
-    plt.plot(t, zeta)
+    plt.plot(t, zeta.T)
     plt.legend('TDOA_{1,2}','TDOA_{1,3}')
     plt.grid(True)
     plt.xlabel('Time [s]')
@@ -256,19 +256,20 @@ def make_figure_8(prefix=None, rng=np.random.default_rng()):
     t_full = 2*t_turn
     dt = 1
     t_vec = np.arange(start=dt, step=dt, stop=t_full)
-    a_aoa = np.concatenate((np.array([0, 0]), a_init * ((t_vec < t_turn) - (t_vec > t_turn))), axis=1)
-    v_aoa = v_init + np.cumsum(a_aoa * dt, axis=1)
-    x_aoa = x_init + np.cumsum(v_aoa * dt, axis=1)
+    turn_dir = np.sign(t_turn - t_vec)
+    a_aoa = np.concatenate((np.array([[0], [0]]), a_init[:, np.newaxis] * turn_dir[np.newaxis, :]), axis=1)
+    v_aoa = v_init[:, np.newaxis] + np.cumsum(a_aoa * dt, axis=1)
+    x_aoa = x_init[:, np.newaxis] + np.cumsum(v_aoa * dt, axis=1)
 
     theta_unc = 5 # +/- 5 degree uncertainty interval
-    cov_df = CovarianceMatrix((theta_unc*_deg2rad)**2)
+    cov_df = CovarianceMatrix([(theta_unc*_deg2rad)**2])
     aoa = DirectionFinder(x=x_aoa, do_2d_aoa=False, cov=cov_df)
 
     fig8a=plt.figure()
     hdl_traj = plt.plot(x_aoa[0], x_aoa[1], label='Sensor Trajectory')
 
     # Draw bearings at time markers
-    idx_set = [1, np.floor(len(t_vec)/2), len(t_vec)]
+    idx_set = [1, np.floor(len(t_vec)/2).astype(int), len(t_vec)]
     label_fill = 'Uncertainty Interval'
     label_lob = 'LOB'
     color = hdl_traj[0].get_color()
@@ -294,13 +295,17 @@ def make_figure_8(prefix=None, rng=np.random.default_rng()):
         psi_high = psi + theta_unc * _deg2rad
         psi_low =  psi - theta_unc * _deg2rad
 
-        xy_lob = aoa.draw_lobs(zeta=psi, x_source=x_tgt, scale=5)
-        xy_lob_high = aoa.draw_lobs(zeta=psi_high, x_source=x_tgt, scale=5)
-        xy_lob_low = aoa.draw_lobs(zeta=psi_low, x_source=x_tgt, scale=5)
+        # Generate all the LOBs at once; return will be 2 x 2 x num_sensors x num_cases. There's only one sensor
+        xy_lobs = aoa.draw_lobs(zeta=np.concatenate((psi[:, np.newaxis],
+                                                     psi_high[:, np.newaxis],
+                                                     psi_low[:, np.newaxis]), axis=1), x_source=x_tgt, scale=5)
+        xy_lob = xy_lobs[:, :, 0, 0]
+        xy_lob_high = xy_lobs[:, :, 0, 1] # aoa.draw_lobs(zeta=psi_high, x_source=x_tgt, scale=5)[0,:,:,0]
+        xy_lob_low = xy_lobs[:, :, 0, 2] #aoa.draw_lobs(zeta=psi_low, x_source=x_tgt, scale=5)[0,:,:,0]
 
         # Make a patch; unlike MATLAB, we don't have to close it
-        lob_fill = np.concatenate((xy_lob_high,xy_lob_low[:, -1]), axis=1)
-        fill_patch = plt.Polygon(lob_fill, linestyle='--', edgecolor='k', facecolor=color, alpha=.2,
+        lob_fill = np.concatenate((xy_lob_high,xy_lob_low[:, [-1]]), axis=1)
+        fill_patch = plt.Polygon(lob_fill.T, linestyle='--', edgecolor='k', facecolor=color, alpha=.2,
                                  label=label_fill)
         fig8a.gca().add_patch(fill_patch)
         plt.plot(xy_lob[0], xy_lob[1], '-.', label=label_lob,color=color)
@@ -319,8 +324,10 @@ def make_figure_8(prefix=None, rng=np.random.default_rng()):
     x_prev = np.array([0, 1e3])
     p_prev = np.diag([1e3, 10e3])**2
 
+    lower = np.sqrt(aoa.cov.cov)  # the covariance matrix is a scalar; so just take the square root
+
     cep_vec = np.zeros_like(t_vec)
-    for idx in np.arange(t_vec):
+    for idx in np.arange(t_vec.size):
         this_x_aoa = x_aoa[:,idx]
         aoa.pos = this_x_aoa
 
@@ -328,7 +335,7 @@ def make_figure_8(prefix=None, rng=np.random.default_rng()):
         h_fun = lambda x: aoa.jacobian(x).T
 
         # ToDo: Make a noisy_measurement function for PSS classes and use it
-        this_psi = aoa.measurement(x_tgt) + aoa.cov.lower @ rng.standard_normal(1)
+        this_psi = aoa.measurement(x_tgt) + lower @ rng.standard_normal(1)
 
         this_x, this_p = tracker.ekf_update(x_prev, p_prev, this_psi, aoa.cov.cov, z_fun, h_fun)
         cep_vec[idx] = utils.errors.compute_cep50(this_p)

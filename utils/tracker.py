@@ -49,7 +49,7 @@ def ekf_update(x_prev, p_prev, zeta, cov, z_fun, h_fun):
     s = h @ p_prev @ h.T + cov
 
     # Compute the Kalman Gain
-    k = p_prev @ h/s
+    k = p_prev @ h.T @ np.linalg.inv(s)
 
     # Update the Estimate
     x = x_prev + k @ y
