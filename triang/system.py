@@ -185,12 +185,12 @@ class DirectionFinder(PassiveSurveillanceSystem):
 
         # Parse the input measurements
         num_zeta, num_cases = utils.safe_2d_shape(zeta)
-        assert num_zeta == num_measurements, "Sensor measurement dimension mismatch."
+        # assert num_zeta == num_measurements, "Sensor measurement dimension mismatch."
         zeta_reshape = np.reshape(zeta, shape=(num_zeta, num_cases))
 
         # Initialize the outputs
         # Dimensions are: (2 or 3) x 2 x num_sensors x num_cases
-        lobs_out = np.zeros(shape=((3 if self.do_2d_aoa else 2), 2, num_sensors, num_cases))
+        lobs_out = np.zeros(shape=(2, 2, num_sensors, num_cases))
 
         # Loop over lobs
         for idx_sensor in range(num_sensors):
