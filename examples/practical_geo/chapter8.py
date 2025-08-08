@@ -340,11 +340,13 @@ def example2(rng=np.random.default_rng()):
         psi_err_plus = psi_true + sigma_psi
         psi_err_minus = psi_true - sigma_psi
 
-    #     lob = triang.drawLob(this_ac_pos, psi_true, this_tgt_pos,2)
-        lob_plus = aoa.draw_lobs(x_source=this_tgt_pos, zeta=psi_err_plus, scale=2, x_sensor=this_ac_pos)[0]
-        lob_minus = aoa.draw_lobs(x_source=this_tgt_pos, zeta=psi_err_minus, scale=2, x_sensor=this_ac_pos)[0]
-        lob_fill = np.concatenate((lob_plus,lob_minus[:, -1]), axis=1)
-        fill_patch = plt.Polygon(lob_fill, linestyle='--', edgecolor='k', facecolor=fill_color, alpha=.3,
+        # Lobs are returned as num_dim x 2 x num_sensor x num_cases
+        zeta_full = np.concatenate((psi_err_plus[:, np.newaxis], psi_err_minus[:, np.newaxis]), axis=1)
+        lobs = aoa.draw_lobs(x_source=this_tgt_pos, zeta=zeta_full, scale=2, x_sensor=this_ac_pos)
+        lob_plus = np.squeeze(lobs[:, :, 0, 0])
+        lob_minus = np.squeeze(lobs[:, :, 0, 1])
+        lob_fill = np.concatenate((lob_plus,lob_minus[:, [-1]]), axis=1)
+        fill_patch = plt.Polygon(lob_fill.T, linestyle='--', edgecolor='k', facecolor=fill_color, alpha=.3,
                                  label=label_fill)
         fig1.gca().add_patch(fill_patch)
         label_fill = None
