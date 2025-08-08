@@ -79,7 +79,7 @@ def compute_df(s, psi_samples, g, psi_res=0.1, min_psi=-np.pi, max_psi=np.pi):
         psi_diff = np.expand_dims(psi_samples, axis=1) - np.expand_dims(psi_vec, axis=0)
 
         # Compute the expected gain pattern for each candidate AoA value
-        g_vec = np.reshape(np.asarray([g(psi) for psi in psi_diff]), newshape=psi_diff.shape)
+        g_vec = np.reshape(np.asarray([g(psi) for psi in psi_diff]), shape=psi_diff.shape)
     
         # Find the candidate AoA value that minimizes the MSE between the
         # expected and received gain patterns.

@@ -9,7 +9,7 @@ lin_to_db = utils.unit_conversions.lin_to_db
 db_to_lin = utils.unit_conversions.db_to_lin
 
 
-def run_all_examples(rng=None, colors=None):
+def run_all_examples(rng=np.random.default_rng(), colors=None):
     """
     Run all chapter 3 examples and return a list of figure handles
 
@@ -21,7 +21,7 @@ def run_all_examples(rng=None, colors=None):
     return [example1(rng, colors), example2(rng, colors)]
 
 
-def example1(rng=None, colors=None):
+def example1(rng=np.random.default_rng(), colors=None):
     """
     Executes Example 3.1.
 
@@ -34,10 +34,6 @@ def example1(rng=None, colors=None):
     :param colors: colormap
     :return: figure handle to generated graphic
     """
-
-    # Initialize random number generator and colormap
-    if rng is None:
-        rng = np.random.default_rng()
 
     if colors is None:
         colors = plt.get_cmap('tab10')
@@ -129,7 +125,7 @@ def example1(rng=None, colors=None):
     return fig
 
     
-def example2(rng=None, colors=None):
+def example2(rng=np.random.default_rng(), colors=None):
     """
     Executes Example 3.2.
     
@@ -142,10 +138,6 @@ def example2(rng=None, colors=None):
     :param colors: colormap
     :return: figure handle to generated graphic
     """
-
-    # Initialize random number generator and colormap
-    if rng is None:
-        rng = np.random.default_rng()
 
     if colors is None:
         colors = plt.get_cmap('tab10')
@@ -264,3 +256,8 @@ def example2(rng=None, colors=None):
     plt.legend(loc='lower left')
 
     return fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

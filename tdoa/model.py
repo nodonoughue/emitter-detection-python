@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import utils
 from utils.covariance import CovarianceMatrix
@@ -5,7 +6,7 @@ unit_conversions = utils.unit_conversions
 geo = utils.geo
 
 
-def measurement(x_sensor, x_source, ref_idx=None):
+def measurement(x_sensor, x_source, ref_idx=None, bias=None):
     """
     Computes TDOA measurements and converts to range difference of arrival (by compensating for the speed of light).
 
@@ -17,6 +18,7 @@ def measurement(x_sensor, x_source, ref_idx=None):
     :param x_sensor: nDim x nTDOA array of TDOA sensor positions
     :param x_source: nDim x n_source array of source positions
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
+    :param bias: (optional) nSensor x 1 vector of range bias terms [default=None]
     :return rdoa: nAoa + nTDOA + nFDOA - 2 x n_source array of range difference of arrival measurements
     """
 
@@ -30,13 +32,31 @@ def measurement(x_sensor, x_source, ref_idx=None):
     # Parse sensor pairs
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
 
+    # Parse TDOA bias
+    rdoa_bias = 0
+    if bias is not None:
+        rdoa_bias = bias[test_idx_vec] - bias[ref_idx_vec]
+
     # Compute range from each source to each sensor
     # dx = np.reshape(x_source, (n_dim1, 1, n_source)) - x_sensor
     # r = np.reshape(np.sqrt(np.sum(np.fabs(dx)**2, axis=0)), (n_sensor, n_source))  # n_sensor x n_source
     r = utils.geo.calc_range(x_sensor, x_source)
 
     # Compute range difference for each pair of sensors
-    rdoa = r[test_idx_vec] - r[ref_idx_vec]
+    if n_source > 1:
+        # There are multiple sources; they must traverse the second dimension
+        out_dims = (np.size(test_idx_vec), n_source)
+        bias_dims = (out_dims[0], 1)
+    else:
+        # Single source, make it an array
+        out_dims = (np.size(test_idx_vec), )
+        bias_dims = out_dims
+
+    rdoa = np.reshape(r[test_idx_vec] - r[ref_idx_vec], out_dims)
+
+    if bias is not None:
+        rdoa = rdoa + np.reshape(rdoa_bias, bias_dims)
+
     return rdoa
 
 
@@ -85,17 +105,67 @@ def jacobian(x_sensor, x_source, ref_idx=None):
     else:
         out_dims = (n_dim, num_measurements)
 
-    j = np.reshape(j, newshape=out_dims)
+    j = np.reshape(j, shape=out_dims)
     # j = np.delete(j, np.unique(ref_idx_vec), axis=1) # remove reference id b/c it is all zeros
     # not needed when parse_ref_sensors is fixed
     return j
 
 
-def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None, do_resample=False,
-                   variance_is_toa=True):
+def jacobian_uncertainty(x_sensor, x_source, ref_idx=None, do_bias=False, do_pos_error=False):
+    """
+    Returns the Jacobian matrix for a set of TDOA measurements in the presence of sensor
+    uncertainty, in the form of measurement bias and/or sensor position errors..
+
+    Ported from MATLAB Code
+
+    Nicholas O'Donoughue
+    30 April 2025
+
+    :param x_sensor: nDim x nTDOA array of TDOA sensor positions
+    :param x_source: nDim x n_source array of source positions
+    :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
+    :param do_bias: if True, jacobian includes gradient w.r.t. measurement biases
+    :param do_pos_error: if True, jacobian includes gradient w.r.t. sensor pos/vel errors
+    :return: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
+    """
+
+    # Parse inputs
+    n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_source = utils.safe_2d_shape(x_source)
+
+    if n_dim1 != n_dim2:
+        raise TypeError('Input variables must match along first dimension.')
+
+    # Make a dict with the args for all three gradient function calls
+    jacob_args = {'x_sensor': x_sensor,
+                  'x_source': x_source,
+                  'ref_idx': ref_idx}
+
+    # Gradient w.r.t source position
+    j_source = grad_x(**jacob_args)
+    j_list = [j_source]
+
+    # Gradient w.r.t measurement biases
+    if do_bias:
+        j_bias = grad_bias(**jacob_args)
+        j_list.append(j_bias)
+
+    # Gradient w.r.t sensor position
+    if do_pos_error:
+        j_sensor_pos = grad_sensor_pos(**jacob_args)
+        j_list.append(j_sensor_pos)
+
+    # Combine component Jacobians
+    j = np.concatenate(j_list, axis=0)
+
+    return j
+
+
+def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, ref_idx=None, do_resample=False,
+                   variance_is_toa=True, bias=None, print_progress=False):
     """
     Computes the Log Likelihood for TDOA sensor measurement, given the received range difference measurement vector
-    rho, covariance matrix cov, and set of candidate source positions x_source.
+    zeta, covariance matrix cov, and set of candidate source positions x_source.
 
     Ported from MATLAB Code.
 
@@ -103,18 +173,19 @@ def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None,
     11 March 2021
 
     :param x_sensor: nDim x nTDOA array of TDOA sensor positions
-    :param rho: Combined TDOA measurement vector (range difference)
+    :param zeta: Combined TDOA measurement vector (range difference)
     :param cov: measurement error covariance matrix
     :param x_source: Candidate source positions
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
     it is in m^2
+    :param bias: sensor measurement biases
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
     n_dim, n_source_pos = utils.safe_2d_shape(x_source)
-    ell = np.zeros((n_source_pos, 1))
+    ell = np.zeros((n_source_pos, ))
 
     # Make sure the source pos is a matrix, rather than simply a vector
     if n_source_pos == 1:
@@ -130,17 +201,51 @@ def log_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_source, ref_idx=None,
     if do_resample:
         cov = cov.resample(ref_idx=ref_idx)
 
-    for idx_source in np.arange(n_source_pos):
-        x_i = x_source[:, idx_source]
+    if print_progress:
+        t_start = time.perf_counter()
+        max_num_rows = 20
+        desired_iter_per_row = np.ceil(n_source_pos / max_num_rows).astype(int)
+        markers_per_row = 40
+        desired_iter_per_marker = np.ceil(desired_iter_per_row / markers_per_row).astype(int)
+
+        # Make sure we don't exceed the min/max iter per marker
+        min_iter_per_marker = 10
+        max_iter_per_marker = 1e6
+        iter_per_marker = np.maximum(min_iter_per_marker, np.minimum(max_iter_per_marker, desired_iter_per_marker))
+        iter_per_row = iter_per_marker * markers_per_row
+
+        print('Computing Log Likelihood...')
+
+    for idx_source, x_i in enumerate(x_source.T):
+        if print_progress:
+            utils.print_progress(num_total=n_source_pos, curr_idx=idx_source,
+                                 iterations_per_marker=iter_per_marker,
+                                 iterations_per_row=iter_per_row,
+                                 t_start=t_start)
 
         # Generate the ideal measurement matrix for this position
-        rho_dot = measurement(x_sensor, x_i, ref_idx)
+        if len(np.shape(bias)) > 1:  # there's more than one bias term
+            bias_i = bias[:, idx_source]
+        else:
+            bias_i = bias
+
+        if len(np.shape(x_sensor)) > 2: # there are multiple sets of sensor positions
+            x_sensor_i = x_sensor[:, :, idx_source]
+        else:
+            x_sensor_i = x_sensor
+
+        rho = measurement(x_sensor=x_sensor_i, x_source=x_i, ref_idx=ref_idx, bias=bias_i)
 
         # Evaluate the measurement error
-        err = (rho - rho_dot)
+        err = zeta - rho
 
         # Compute the scaled log likelihood
         ell[idx_source] = - cov.solve_aca(err)
+
+    if print_progress:
+        print('done')
+        t_elapsed = time.perf_counter() - t_start
+        utils.print_elapsed(t_elapsed)
 
     return ell
 
@@ -258,7 +363,7 @@ def toa_error_cross_corr(snr, bandwidth, pulse_len, bandwidth_rms=None):
     return 1/(8*np.pi*a)
 
 
-def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
+def draw_isochrone(x_ref, x_test, range_diff, num_pts, max_ortho):
     """
     Finds the isochrone with the stated range difference from points x1
     and x2.  Generates an arc with 2*numPts-1 points, that spans up to
@@ -269,8 +374,8 @@ def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
     Nicholas O'Donoughue
     11 March 2021
 
-    :param x1: Position of first sensor (Ndim x 1) [m]
-    :param x2: Position of second sensor (Ndim x 1) [m]
+    :param x_ref: Position of first sensor (Ndim x 1) [m]
+    :param x_test: Position of second sensor (Ndim x 1) [m]
     :param range_diff: Desired range difference [m]
     :param num_pts: Number of points to compute
     :param max_ortho: Maximum offset from line of sight between x1 and x2 [m]
@@ -278,12 +383,16 @@ def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
     :return y_iso: Second dimension of isochrone [m]
     """
 
+    # This function is only defined for 2D inputs
+    x_ref = x_ref[:2]
+    x_test = x_test[:2]
+
     # Generate pointing vectors u and v in rotated coordinate space
     #  u = unit vector from x1 to x2
     #  v = unit vector orthogonal to u
     rot_mat = np.array(((0, 1), (-1, 0)))
-    r = geo.calc_range(x1, x2)
-    u = (x2-x1)/r
+    r = geo.calc_range(x_ref, x_test)
+    u = (x_test - x_ref) / r
     v = rot_mat.dot(u)
     x_proj = np.array([u, v])
 
@@ -330,8 +439,138 @@ def draw_isochrone(x1, x2, range_diff, num_pts, max_ortho):
     xuv = np.concatenate((xuv_mirror, xuv), axis=1)
 
     # Convert to x/y space and re-center at origin
-    iso = x_proj.dot(xuv) + x1[:, np.newaxis]
+    iso = x_proj.dot(xuv) + x_ref[:, np.newaxis]
     x_iso = iso[0, :]
     y_iso = iso[1, :]
 
     return x_iso, y_iso
+
+
+def grad_x(x_sensor, x_source, ref_idx=None):
+    """
+    Return the gradient of TDOA measurements, with sensor uncertainties, with respect to target position, x.
+    Equation 6.27. The sensor uncertainties don't impact the gradient for TDOA, so this reduces to the previously
+    defined Jacobian. This function is merely a wrapper for calls to tdoa.model.jacobian, with the optional argument
+    'bias' ignored.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    TDOA sensor positions
+    :param x_source:    Source positions
+    :param ref_idx:     Reference index (optional)
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Sensor uncertainties don't impact the gradient with respect to target position; this is the same as the previously
+    # defined function tdoa.model.jacobian.
+    return jacobian(x_sensor=x_sensor, x_source=x_source, ref_idx=ref_idx)
+
+
+def grad_bias(x_sensor, x_source, ref_idx=None):
+    """
+    Return the gradient of TDOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
+    terms, from equation 6.31.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    TDOA sensor positions
+    :param x_source:    Source positions
+    :param ref_idx:     Reference index (optional)
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Parse the reference index
+    _, num_sensors = utils.safe_2d_shape(x_sensor)
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
+
+    # According to eq 6.32, the m-th row is 1 for every column in which the m-th sensor is a test index, and -1 for
+    # every column in which the m-th sensor is a reference index.
+    num_measurements = np.size(test_idx_vec)
+    grad = np.zeros((num_sensors, num_measurements))
+    for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
+        grad[i, test] = 1
+        grad[i, ref] = -1
+
+    # Repeat for each source position
+    _, num_sources = utils.safe_2d_shape(x_source)
+    if num_sources > 1:
+        grad = np.repeat(grad, num_sources, axis=2)
+
+    return grad
+
+
+def grad_sensor_pos(x_sensor, x_source, ref_idx=None):
+    """
+    Compute the gradient of TDOA measurements, with sensor uncertainties, with respect to sensor position,
+    equation 6.31.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    TDOA sensor positions
+    :param x_source:    Source positions
+    :param ref_idx:     Reference index (optional)
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Parse inputs
+    n_dim, n_sensor = utils.safe_2d_shape(x_sensor)
+    _, n_source = utils.safe_2d_shape(x_source)
+
+    # Compute pointing vectors and projection matrix
+    dx = x_sensor - np.reshape(x_source, shape=(n_dim, 1, n_source))
+    rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # (1, n_sensor, n_source)
+    dx_norm = dx / rn
+
+    # Parse the reference index
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
+
+    # Build the Gradient
+    n_measurement = np.size(test_idx_vec)
+    grad_pos = np.zeros((n_dim * n_sensor, n_measurement, n_source))
+
+    for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
+        # Gradient w.r.t. sensor pos, eq 6.38
+        start_test = n_dim * test
+        end_test = start_test + n_dim  # add +1 because of the way python indexing works
+        grad_pos[start_test:end_test, i, :] = -dx_norm[:, test, :]
+
+        start_ref = n_dim * ref
+        end_ref = start_ref + n_dim
+        grad_pos[start_ref:end_ref, i, :] = dx_norm[:, ref, :]
+
+    return grad_pos
+
+
+def generate_parameter_indices(x_sensor, do_bias=True):
+    """
+    Return index mapping for parameter estimation, using the assumed standard mapping of
+        theta = [x_source, sensor_bias, x_sensor]
+
+    Adapted from MATLAB code
+    22 April 2025
+
+    Nicholas O'Donoughue
+
+    :param x_sensor: n_dim x n_sensor array of sensor positions
+    :param do_bias: Option (default=True) boolean. If false, then sensor measurement biases are ignored.
+    :return: dictionary with fields 'target_pos', 'bias', and 'sensor_pos' indicating the indices corresponding
+    to each parameter.
+    """
+    num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
+
+    indices = {'target_pos': np.arange(num_dim),
+               'bias': np.arange(num_sensors) + num_dim if do_bias else None,
+               'sensor_pos': np.arange(num_dim * num_sensors) + num_dim + (num_sensors if do_bias else 0)}
+    return indices

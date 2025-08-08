@@ -280,3 +280,7 @@ def make_figure_5(prefix=None):
         fig5.savefig(prefix + 'fig5.svg')
 
     return fig5
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False)

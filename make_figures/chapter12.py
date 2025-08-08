@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import fdoa
 from examples import chapter12
+from utils import SearchSpace
 
 
 def make_all_figures(close_figs=False, force_recalc=False):
@@ -160,7 +161,10 @@ def make_figure_2(prefix=None):
 
     x_sensor0 = np.array([-2., 0.])
     x_sensor1 = np.array([2., 0.])
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0, 0), max_offset=5, grid_spacing=.01)
+    search_space = SearchSpace(x_ctr=np.array([0., 0.]),
+                               max_offset=5,
+                               epsilon=.01)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
     v_sensor0 = np.array([1., 0.])
     v_sensor1 = np.array([1., 0.])
@@ -171,7 +175,7 @@ def make_figure_2(prefix=None):
                                        x_sensor1, v_sensor1, transmit_freq)
 
     fig2a, ax2a = plt.subplots()
-    ax2a.contour(x_grid[0], x_grid[1], np.reshape(ddop, newshape=grid_shape), levels=20)
+    ax2a.contour(x_grid[0], x_grid[1], np.reshape(ddop, shape=grid_shape), levels=20)
     handle0 = plt.scatter(x_sensor0[0], x_sensor0[1], marker='o', s=10, color='k', zorder=3)
     handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k', zorder=3)
 
@@ -207,7 +211,7 @@ def make_figure_2(prefix=None):
                                        x_sensor1, v_sensor1, transmit_freq)
 
     fig2b, ax2b = plt.subplots()
-    ax2b.contour(x_grid[0], x_grid[1], np.reshape(ddop, newshape=grid_shape), levels=11)
+    ax2b.contour(x_grid[0], x_grid[1], np.reshape(ddop, shape=grid_shape), levels=11)
     handle0 = plt.scatter(x_sensor0[0], x_sensor0[1], marker='o', s=10, color='k', zorder=3)
     handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k', zorder=3)
 
@@ -379,12 +383,12 @@ def make_figure_4(prefix):
                  fontsize=12, color=this_color)
 
         # Draw isodoppler lines
-        vdiff = utils.geo.calc_doppler_diff(x0=x_source, v0=np.array([0, 0]),
-                                            x1=x_now[0], v1=v_sensor[0],
-                                            x2=x_now[1], v2=v_sensor[1],
+        vdiff = utils.geo.calc_doppler_diff(x_source=x_source, v_source=np.array([0, 0]),
+                                            x_ref=x_now[0], v_ref=v_sensor[0],
+                                            x_test=x_now[1], v_test=v_sensor[1],
                                             f=utils.constants.speed_of_light)
-        x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x1=x_now[0], v1=v_sensor[0],
-                                                                x2=x_now[1], v2=v_sensor[1],
+        x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x_ref=x_now[0], v_ref=v_sensor[0],
+                                                                x_test=x_now[1], v_test=v_sensor[1],
                                                                 vdiff=vdiff, num_pts=1000, max_ortho=20)
         plt.plot(x_isodoppler, y_isodoppler, linestyle='-.', label=None, color=this_color)
 
@@ -491,11 +495,14 @@ def make_figure_6(prefix):
     num_grid_points = 501
     grid_extent = 100e3
     grid_spacing = 2*grid_extent/(num_grid_points-1)
-    x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0., 0.), grid_spacing=grid_spacing, max_offset=grid_extent)
+    search_space = SearchSpace(x_ctr=np.array([0., 0.]),
+                               max_offset=grid_extent,
+                               epsilon=grid_spacing)
+    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
     # Compute CRLB
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
 
     # Set up contours
     contour_levels = [.1, 1, 5, 10, 50, 100, 1000]
@@ -523,7 +530,7 @@ def make_figure_6(prefix):
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
 
     # Draw Figure
     fig6b, ax = plt.subplots()
@@ -554,7 +561,7 @@ def make_figure_6(prefix):
 
     # Compute CRLB
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
 
     # Draw Figure
     fig6c, ax = plt.subplots()
@@ -574,7 +581,7 @@ def make_figure_6(prefix):
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
 
     # Draw Figure
     fig6d, ax = plt.subplots()
@@ -627,3 +634,7 @@ def make_figures_7_8(prefix, force_recalc=False):
         fig8.savefig(prefix + 'fig8.svg')
 
     return fig7a, fig7b, fig8
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)

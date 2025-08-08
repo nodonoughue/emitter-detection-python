@@ -1,12 +1,14 @@
 import utils
 from utils import solvers
+from utils import SearchSpace
 from utils.covariance import CovarianceMatrix
 from . import model
 
 
-def max_likelihood(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                   x_ctr=0., search_size=1., epsilon=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None,
-                   do_resample=False, **kwargs):
+def max_likelihood(zeta, cov: CovarianceMatrix, search_space: SearchSpace,
+                   x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
+                   do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None,
+                   do_resample=False, angle_bias=None, range_bias=None, range_rate_bias=None, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -20,9 +22,6 @@ def max_likelihood(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=
     :param v_source: Source velocity [m/s] [assumed zero if not provided]
     :param zeta: Combined measurement vector
     :param cov: Measurement error covariance matrix
-    :param x_ctr: Center of search grid [m]
-    :param search_size: 2-D vector of search grid sizes [m]
-    :param epsilon: Desired resolution of search grid [m]
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
@@ -32,23 +31,29 @@ def max_likelihood(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=
     :return x_grid: Candidate source positions
     """
 
+    if do_resample:
+        cov = cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
+                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+
     # Set up function handle
     def ell(x):
         return model.log_likelihood(x_aoa=x_aoa, x_tdoa=x_tdoa,
                                     x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                     zeta=zeta, x_source=x, v_source=v_source,
                                     cov=cov, do_2d_aoa=do_2d_aoa,
-                                    tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx, do_resample=do_resample)
+                                    tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx, do_resample=False,
+                                    angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
+    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, search_space=search_space,
                                                   **kwargs)
 
     return x_est, likelihood, x_grid
 
 
 def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
-                     v_source=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False, **kwargs):
+                     v_source=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
+                     angle_bias=None, range_bias=None, range_rate_bias=None, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -77,7 +82,8 @@ def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=Non
     def y(this_x):
         return zeta - model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                         x_source=this_x, v_source=v_source, do_2d_aoa=do_2d_aoa,
-                                        tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+                                        tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
+                                        angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
 
     def jacobian(this_x):
         return model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
@@ -96,7 +102,8 @@ def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=Non
 
 
 def least_square(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                 do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False, **kwargs):
+                 do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
+                 angle_bias=None, range_bias=None, range_rate_bias=None, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -125,7 +132,8 @@ def least_square(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x
     def y(this_x):
         return zeta - model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                         x_source=this_x, v_source=v_source, do_2d_aoa=do_2d_aoa,
-                                        tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+                                        tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
+                                        angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
 
     def jacobian(this_x):
         return model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
@@ -143,8 +151,9 @@ def least_square(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x
     return x, x_full
 
 
-def bestfix(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None, x_ctr=0.,
-            search_size=1., epsilon=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
+def bestfix(zeta, cov: CovarianceMatrix, search_space: SearchSpace,
+            x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
+            do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
             pdf_type=None):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
@@ -172,9 +181,6 @@ def bestfix(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v
     :param x_fdoa: FDOA sensor positions [m]
     :param v_fdoa: FDOA sensor velocities [m/s]
     :param v_source: Source velocity [m/s] [assumed zero if not provided]
-    :param x_ctr: Center of search grid [m]
-    :param search_size: 2-D vector of search grid sizes [m]
-    :param epsilon: Desired resolution of search grid [m]
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :param tdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
@@ -199,6 +205,6 @@ def bestfix(zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v
     pdfs = utils.make_pdfs(measurement, zeta, pdf_type, cov.cov)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.bestfix(pdfs, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.bestfix(pdfs, search_space)
 
     return x_est, likelihood, x_grid

@@ -120,3 +120,8 @@ def example3():
     plt.legend(loc='upper right')
     
     return fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

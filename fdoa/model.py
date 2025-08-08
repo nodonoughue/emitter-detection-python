@@ -1,10 +1,12 @@
+import time
 import numpy as np
 import utils
 from utils.covariance import CovarianceMatrix
 import matplotlib.pyplot as plt
+from utils import SearchSpace
 
 
-def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
+def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=None):
     """
     # Computed range rate difference measurements, using the
     # final sensor as a common reference for all FDOA measurements.
@@ -19,31 +21,42 @@ def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     :param v_sensor: nDim x nSensor array of sensor velocities
     :param v_source: nDim x n_source array of source velocities
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
+    :param bias: nSensor x 1 array of range-rate bias terms
     :return rrdoa: nSensor -1 x n_source array of RRDOA measurements
     """
 
     # Parse inputs
     n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
-    
+
+    # Parse FDOA bias
+    rrdoa_bias = 0
+    if bias is not None:
+        rrdoa_bias = bias[test_idx_vec] - bias[ref_idx_vec]
+
     # Compute distance from each source position to each sensor
     dx = np.reshape(x_source, (n_dim, 1, n_source)) - np.reshape(x_sensor, (n_dim, n_sensor, 1))
-    r = np.sqrt(np.sum(dx**2, axis=0))  # 1 x nSensor1 x n_source1
+    r = np.sqrt(np.sum(dx**2, axis=0, keepdims=True))  # 1 x nSensor1 x n_source1
     
     # Compute range rate from range and velocity
     dv = np.reshape(v_sensor, (n_dim, n_sensor, 1)) - np.reshape(v_source, (n_dim, 1, n_source))
-    rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor, n_source))  # nSensor x n_source
+    rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor, n_source)) + rrdoa_bias  # nSensor x n_source
     
     # Apply reference sensors to compute range rate difference for each sensor
     # pair
     if n_source > 1:
         # There are multiple sources; they must traverse the second dimension
         out_dims = (np.size(test_idx_vec), n_source)
+        bias_dims = (out_dims[0], 1)
     else:
         # Single source, make it an array
         out_dims = (np.size(test_idx_vec), )
+        bias_dims = out_dims
 
-    rrdoa = np.reshape(rr[test_idx_vec, :] - rr[ref_idx_vec, :], newshape=out_dims)
+    rrdoa = np.reshape(rr[test_idx_vec] - rr[ref_idx_vec], out_dims)
+
+    if bias is not None:
+        rrdoa = rrdoa + np.reshape(rrdoa_bias, bias_dims)
 
     return rrdoa
 
@@ -66,6 +79,7 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     :param ref_idx: Scalar index of reference sensor, or n_dim x nPair matrix of sensor pairings
     :return j: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
     """
+    # ToDo: Think about refactoring as a two-element response (j_pos, j_vel) for easier parsing at the output
 
     # Parse inputs
     n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
@@ -97,14 +111,68 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     else:
         out_dims = (n_dim, num_measurements)
 
-    result = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], newshape=out_dims)
-    # result = np.delete(result, np.unique(ref_idx_vec), axis=1) # rm ref_sensor column b/c all zeros
-    # not needed when parse_ref_sensors is fixed
-    return result  # n_dim x nPair x n_source
+    result_pos = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], shape=out_dims)
+    result_vel = np.reshape(dx_norm[:, test_idx_vec, :] - dx_norm[:, ref_idx_vec, :], shape=out_dims)
+
+    return np.concatenate((result_pos, result_vel), axis=0)  # 2*n_dim x nPair x n_source
+
+
+def jacobian_uncertainty(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, do_bias=False, do_pos_error=False):
+    """
+    Returns the Jacobian matrix for a set of FDOA measurements in the presence of sensor
+    uncertainty, in the form of measurement bias and/or sensor position errors..
+
+    Ported from MATLAB Code
+
+    Nicholas O'Donoughue
+    30 April 2025
+
+    :param x_sensor: nDim x nTDOA array of TDOA sensor positions
+    :param x_source: nDim x n_source array of source positions
+    :param v_sensor: n_dim x n_sensor vector of sensor velocities
+    :param v_source: n_dim x n_source vector of source velocities
+    :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
+    :param do_bias: if True, jacobian includes gradient w.r.t. measurement biases
+    :param do_pos_error: if True, jacobian includes gradient w.r.t. sensor pos/vel errors
+    :return: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
+    """
+
+    # Parse inputs
+    n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
+    n_dim2, n_source = utils.safe_2d_shape(x_source)
+
+    if n_dim1 != n_dim2:
+        raise TypeError('Input variables must match along first dimension.')
+
+    # Make a dict with the args for all three gradient function calls
+    jacob_args = {'x_sensor': x_sensor,
+                  'x_source': x_source,
+                  'v_sensor': v_sensor,
+                  'v_source': v_source,
+                  'ref_idx': ref_idx}
+
+    # Gradient w.r.t source position
+    j_source = grad_x(**jacob_args)
+    j_list = [j_source]
+
+    # Gradient w.r.t measurement biases
+    if do_bias:
+        j_bias = grad_bias(**jacob_args)
+        j_list.append(j_bias)
+
+    # Gradient w.r.t sensor position
+    if do_pos_error:
+        j_sensor_pos = grad_sensor_pos(**jacob_args)
+        j_list.append(j_sensor_pos)
+
+    # Combine component Jacobians
+    j = np.concatenate(j_list, axis=0)
+
+    return j
 
 
 def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
-                   v_sensor=None, v_source=None, ref_idx=None, do_resample=False):
+                   v_sensor=None, v_source=None, ref_idx=None, do_resample=False, bias=None, print_progress=False):
     """
     # Computes the Log Likelihood for FDOA sensor measurement, given the
     # received measurement vector rho_dot, covariance matrix C,
@@ -127,35 +195,65 @@ def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
     """
 
     # Parse inputs
-    n_dim, n_sensors = utils.safe_2d_shape(x_sensor)
-    n_dim2, n_source_pos = utils.safe_2d_shape(x_source)
-    assert n_dim == n_dim2, 'Input dimension mismatch.'
+    n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source=x_source, v_source=v_source,
+                                                                  x_sensor=x_sensor, v_sensor=v_sensor)
 
-    # Handle vector input
-    if n_source_pos == 1 and len(x_source.shape) == 1:
-        # x_source is a vector; 2D indexing below will fail.
-        # Let's add a new axis
+    # x_source and v_source might be vectors; 2D indexing below will fail.
+    # Let's add a new axis
+    if len(np.shape(x_source))==1:
         x_source = x_source[:, np.newaxis]
+    if len(np.shape(v_source))==1:
+        v_source = v_source[:, np.newaxis]
+
+    # Make sure v_source and x_source have the same shape
+    v_source = np.broadcast_to(array=v_source, shape=x_source.shape)
 
     if do_resample:
         cov = cov.resample(ref_idx=ref_idx)
 
     # Initialize output
-    ell = np.zeros((n_source_pos, ))
+    ell = np.zeros((n_source, ))
 
-    for idx_source in np.arange(n_source_pos):
+    if print_progress:
+        t_start = time.perf_counter()
+        max_num_rows = 20
+        desired_iter_per_row = np.ceil(n_source / max_num_rows).astype(int)
+        markers_per_row = 40
+        desired_iter_per_marker = np.ceil(desired_iter_per_row / markers_per_row).astype(int)
+
+        # Make sure we don't exceed the min/max iter per marker
+        min_iter_per_marker = 10
+        max_iter_per_marker = 1e6
+        iter_per_marker = np.maximum(min_iter_per_marker, np.minimum(max_iter_per_marker, desired_iter_per_marker))
+        iter_per_row = iter_per_marker * markers_per_row
+
+        print('Computing Log Likelihood...')
+
+    for idx_source in np.arange(n_source):
+        if print_progress:
+            utils.print_progress(num_total=n_source, curr_idx=idx_source,
+                                 iterations_per_marker=iter_per_marker,
+                                 iterations_per_row=iter_per_row,
+                                 t_start=t_start)
+
         x_i = x_source[:, idx_source]
-        
+        v_i = v_source[:, idx_source]
+
         # Generate the ideal measurement matrix for this position
         r_dot = measurement(x_sensor=x_sensor, x_source=x_i,
-                            v_sensor=v_sensor, v_source=v_source,
-                            ref_idx=ref_idx)
+                            v_sensor=v_sensor, v_source=v_i,
+                            ref_idx=ref_idx, bias=bias)
         
         # Evaluate the measurement error
         err = (rho_dot - r_dot)
 
         # Compute the scaled log likelihood
         ell[idx_source] = - cov.solve_aca(err)
+
+    if print_progress:
+        print('done')
+        t_elapsed = time.perf_counter() - t_start
+        utils.print_elapsed(t_elapsed)
 
     return ell
 
@@ -199,7 +297,10 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts,
 
     # Set up test points
     grid_res = 2*x_max / (num_pts-1)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0., 0.), max_offset=x_max, grid_spacing=grid_res)
+    search_space = SearchSpace(x_ctr=np.array([0., 0.]),
+                               max_offset=x_max,
+                               epsilon=grid_res)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
     x_vec = x_grid[0][0, :]
     y_vec = x_grid[1][:, 0]
 
@@ -214,7 +315,7 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts,
     return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
 
 
-def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
+def draw_isodoppler(x_ref, v_ref, x_test, v_test, vdiff, num_pts, max_ortho, v_source=None):
     """
     # Finds the isochrone with the stated range rate difference from points x1
     # and x2.  Generates an arc with 2*numPts-1 points, that spans up to
@@ -225,10 +326,10 @@ def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
     Nicholas O'Donoughue
     21 January 2021
 
-    :param x1: Position of first sensor (Ndim x 1) [m]
-    :param v1: Velocity vector of first sensor (Ndim x 1) [m/s]
-    :param x2: Position of second sensor (Ndim x 1) [m]
-    :param v2: Velocity vector of second sensor (Ndim x 1) [m/s]
+    :param x_ref: Position of first sensor (Ndim x 1) [m]
+    :param v_ref: Velocity vector of first sensor (Ndim x 1) [m/s]
+    :param x_test: Position of second sensor (Ndim x 1) [m]
+    :param v_test: Velocity vector of second sensor (Ndim x 1) [m/s]
     :param vdiff: Desired velocity difference [m/s]
     :param num_pts: Number of points to compute
     :param max_ortho: Maximum offset from line of sight between x1 and x2 [m]
@@ -242,11 +343,15 @@ def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
 
     # Set up test points
     grid_spacing = 2 * max_ortho / (num_pts - 1)  # Compute grid density
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=(0., 0.),
-                                                   max_offset=max_ortho,
-                                                   grid_spacing=grid_spacing)
+    search_space = SearchSpace(x_ctr=np.array([0., 0.]),
+                               max_offset=max_ortho,
+                               epsilon=grid_spacing)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
-    df_plot = utils.geo.calc_doppler_diff(x_set, np.zeros_like(x_set), x1, v1, x2, v2, f_0)
+    if v_source is None:
+        v_source = np.zeros_like(x_set)
+    df_plot = utils.geo.calc_doppler_diff(x_source=x_set, v_source=v_source,
+                                          x_ref=x_ref, v_ref=v_ref, x_test=x_test, v_test=v_test, f=f_0)
 
     # Generate Levels
     if np.size(vdiff) > 1:
@@ -314,6 +419,133 @@ def draw_isodoppler(x1, v1, x2, v2, vdiff, num_pts, max_ortho):
     return x_iso, y_iso
 
 
+def grad_x(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
+    """
+    Return the gradient of FDOA measurements, with sensor uncertainties, with respect to target position, x.
+    Equation 6.31. The sensor uncertainties don't impact the gradient for FDOA, so this reduces to the previously
+    defined Jacobian. This function is merely a wrapper for calls to fdoa.model.jacobian, with the optional argument
+    'bias' ignored.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    FDOA sensor positions
+    :param x_source:    Source positions
+    :param v_sensor:    Optional FDOA sensor velocities (0 if not defined)
+    :param v_source:    Optional FDOA source velocities (0 if not defined)
+    :param ref_idx:     Reference index (optional)
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Sensor uncertainties don't impact the gradient with respect to target position; this is the same as the previously
+    # defined function fdoa.model.jacobian.
+    return jacobian(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source, ref_idx=ref_idx)
+
+
+def grad_bias(x_sensor, x_source, ref_idx=None):
+    """
+    Return the gradient of FDOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
+    terms.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    FDOA sensor positions
+    :param x_source:    Source positions
+    :param ref_idx:     Reference index (optional)
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Parse the reference index
+    _, num_sensors = utils.safe_2d_shape(x_sensor)
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, num_sensors)
+
+    # According to eq 6.42, the m-th row is 1 for every column in which the m-th sensor is a test index, and -1 for
+    # every column in which the m-th sensor is a reference index.
+    num_measurements = np.size(test_idx_vec)
+    grad = np.zeros((num_sensors, num_measurements))
+    for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
+        grad[i, test] = 1
+        grad[i, ref] = -1
+
+    # Repeat for each source position
+    _, num_sources = utils.safe_2d_shape(x_source)
+    if num_sources > 1:
+        grad = np.repeat(grad, num_sources, axis=2)
+
+    return grad
+
+
+def grad_sensor_pos(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
+    """
+    Compute the gradient of FDOA measurements, with sensor uncertainties, with respect to sensor position and velocity.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    FDOA sensor positions
+    :param x_source:    Source positions
+    :param v_sensor:    Optional FDOA sensor velocities (0 if not defined)
+    :param v_source:    Optional FDOA source velocities (0 if not defined)
+    :param ref_idx:     Reference index (optional)
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+    # TODO: Debug
+
+    # Parse inputs
+    n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
+
+    # Compute pointing vectors and projection matrix
+    dx = x_sensor - np.reshape(x_source, shape=(n_dim, 1, n_source))
+    dv = v_sensor - np.reshape(v_source, shape=(n_dim, 1, n_source))
+    rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # (1, n_sensor, n_source)
+    dx_norm = dx / rn
+    dv_norm = dv / rn
+
+    proj_x = (np.reshape(dx_norm, shape=(n_dim, 1, n_sensor, n_source)) *
+              np.reshape(np.conjugate(dx_norm), shape=(1, n_dim, n_sensor, n_source)))
+
+    # Compute the gradient of R_n
+    nabla_rn = np.squeeze(np.sum((np.eye(n_dim) - proj_x) *
+                                 np.reshape(dv_norm, shape=(1, n_dim, n_sensor, n_source)), axis=1))
+    # (n_dim, n_sensor, n_source)
+
+    # Parse the reference index
+    test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
+
+    # Build the Gradient
+    n_measurement = np.size(test_idx_vec)
+    grad_pos = np.zeros((n_dim * n_sensor, n_measurement, n_source))
+    grad_vel = np.zeros((n_dim * n_sensor, n_measurement, n_source))
+    for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
+        # Gradient w.r.t. sensor pos, eq 6.38
+        start_test = n_dim * test
+        end_test = start_test + n_dim  # add +1 because of the way python indexing works
+        grad_pos[start_test:end_test, i, :] = nabla_rn[:, test, :]
+
+        start_ref = n_dim * ref
+        end_ref = start_ref + n_dim
+        grad_pos[start_ref:end_ref, i, :] = -nabla_rn[:, ref, :]
+
+        # Gradient w.r.t. sensor vel, eq 6.40
+        grad_vel[start_test:end_test, i, :] = dx_norm[:, test, :]
+        grad_vel[start_ref:end_ref, i, :] = -dx_norm[:, ref, :]
+
+    # Combine the gradient w.r.t. sensor pos and sensor vel
+    # eq 6.36
+    grad = np.concatenate((grad_pos, grad_vel), axis=1)
+
+    return grad
+
+
 def _check_inputs(x_source, v_source, x_sensor, v_sensor):
     if v_sensor is None and v_source is None:
         raise ValueError('At least one of either v_sensor or v_source must be defined to use FDOA.')
@@ -338,9 +570,5 @@ def _check_inputs(x_source, v_source, x_sensor, v_sensor):
 
     n_sensor = np.amax((n_sensor1, n_sensor2))
     n_source = np.amax((n_source1, n_source2))
-
-    # Handle any nones (make them zeros of the appropriate size)
-    if v_source is None: v_source = np.zeros_like(x_source)
-    if v_sensor is None: v_sensor = np.zeros_like(x_sensor)
 
     return n_dim1, n_source, n_sensor, v_source, v_sensor

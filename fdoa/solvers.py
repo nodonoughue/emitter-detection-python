@@ -1,12 +1,13 @@
 import utils
 from utils import solvers
+from utils import SearchSpace
 from . import model
 import numpy as np
 from utils.covariance import CovarianceMatrix
 
 
-def max_likelihood(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon=None, ref_idx=None,
-                   do_resample=False, **kwargs):
+def max_likelihood(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, search_space: SearchSpace, ref_idx=None,
+                   do_resample=False, bias=None, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -15,13 +16,14 @@ def max_likelihood(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search
 
     :param x_sensor: Sensor positions [m]
     :param v_sensor: Sensor velocities [m/s]
-    :param rho: Measurement vector [Hz]
+    :param zeta: Measurement vector [Hz]
     :param cov: Measurement error covariance matrix
     :param x_ctr: Center of search grid [m]
     :param search_size: 2-D vector of search grid sizes [m]
     :param epsilon: Desired resolution of search grid [m]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param bias: measurement bias (optional)
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions
@@ -33,18 +35,17 @@ def max_likelihood(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search
 
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor, rho_dot=rho, cov=cov,
-                                    x_source=x, v_source=None, ref_idx=ref_idx, do_resample=False)
+        return model.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor, rho_dot=zeta, cov=cov,
+                                    x_source=x, v_source=None, ref_idx=ref_idx, do_resample=False, bias=bias)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
-                                                  **kwargs)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, search_space=search_space, **kwargs)
 
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, v_source=None, ref_idx=None,
-                     do_resample=False, **kwargs):
+def gradient_descent(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, v_source=None, ref_idx=None,
+                     do_resample=False, bias=None, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -55,7 +56,7 @@ def gradient_descent(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, v_s
 
     :param x_sensor: FDOA sensor positions [m]
     :param v_sensor: FDOA sensor velocities [m/s]
-    :param rho: Measurement vector
+    :param zeta: Measurement vector
     :param cov: FDOA error covariance matrix
     :param x_init: Initial estimate of source position [m]
     :param v_source: Source velocity (assumed to be true) [m/s]
@@ -67,8 +68,8 @@ def gradient_descent(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, v_s
 
     # Initialize measurement error and jacobian functions
     def y(this_x):
-        return rho - model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
-                                       x_source=this_x, v_source=v_source, ref_idx=ref_idx)
+        return zeta - model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
+                                        x_source=this_x, v_source=v_source, ref_idx=ref_idx, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor=x_sensor, v_sensor=v_sensor,
@@ -85,8 +86,8 @@ def gradient_descent(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, v_s
     return x, x_full
 
 
-def least_square(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
-                 **kwargs):
+def least_square(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
+                 bias=None, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -97,7 +98,7 @@ def least_square(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx
 
     :param x_sensor: Sensor positions [m]
     :param v_sensor: Sensor velocities [m/s]
-    :param rho: Range Rate-Difference Measurements [m/s]
+    :param zeta: Range Rate-Difference Measurements [m/s]
     :param cov: Measurement Error Covariance Matrix [(m/s)^2]
     :param x_init: Initial estimate of source position [m]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
@@ -108,9 +109,9 @@ def least_square(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx
 
     # Initialize measurement error and Jacobian function handles
     def y(this_x):
-        return rho - model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
-                                       x_source=this_x, v_source=None,
-                                       ref_idx=ref_idx)
+        return zeta - model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
+                                        x_source=this_x, v_source=None,
+                                        ref_idx=ref_idx, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor=x_sensor, v_sensor=v_sensor,
@@ -127,7 +128,7 @@ def least_square(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx
     return x, x_full
 
 
-def bestfix(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon, ref_idx=None, pdf_type=None,
+def bestfix(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, search_space: SearchSpace, ref_idx=None, pdf_type=None,
             do_resample=False):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
@@ -150,11 +151,8 @@ def bestfix(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, 
 
     :param x_sensor: Sensor positions [m]
     :param v_sensor: Sensor velocities [m/s]
-    :param rho: Measurement vector [Hz]
+    :param zeta: Measurement vector [Hz]
     :param cov: Measurement error covariance matrix
-    :param x_ctr: Center of search grid [m]
-    :param search_size: 2-D vector of search grid sizes [m]
-    :param epsilon: Desired resolution of search grid [m]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param pdf_type: String indicating the type of distribution to use. See +utils/makePDFs.m for options.
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
@@ -169,7 +167,7 @@ def bestfix(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, 
 
     # Make sure that rho is a vector -- the pdf functions choke if the mean value
     # is a Nx1 matrix
-    rho = np.squeeze(rho)
+    zeta = np.squeeze(zeta)
 
     # Generate the PDF
     def msmt(x):
@@ -177,9 +175,10 @@ def bestfix(x_sensor, v_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, 
         return np.squeeze(model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
                                             x_source=x, v_source=None, ref_idx=ref_idx))
 
-    pdfs = utils.make_pdfs(msmt, rho, pdf_type, cov.cov)
+    pdfs = utils.make_pdfs(msmt, zeta, pdf_type, cov.cov)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.bestfix(pdfs, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.bestfix(pdfs, search_space)
 
     return x_est, likelihood, x_grid
+

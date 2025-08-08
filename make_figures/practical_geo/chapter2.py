@@ -240,3 +240,7 @@ def make_figure_10(prefix=None, force_recalc=False):
         fig10b.savefig(prefix + 'fig10b.png')
 
     return fig10a, fig10b
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)

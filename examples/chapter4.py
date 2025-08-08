@@ -203,3 +203,8 @@ def example2(colors=None):
     plt.ylabel(r'$\xi$ [dB]')
 
     return fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

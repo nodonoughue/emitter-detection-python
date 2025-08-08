@@ -3,7 +3,6 @@ from numpy import typing as npt
 from scipy.special import erfcinv
 from scipy import stats
 
-import utils
 from .unit_conversions import lin_to_db
 from itertools import combinations
 from collections.abc import Iterable
@@ -274,18 +273,18 @@ def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx
     :param ref_idx: numpy 1D array of indices for the reference sensor for each measurement. Any NaN
             entries are treated as test-only measurements (e.g., angle of arrival) that don't require a reference
             measurement. Those entries in the covariance matrix are not resampled.
-            If test_idx is None, then ref_idx is passed to utils.parse_reference_sensor, and may be any valid input
+            If test_idx is None, then ref_idx is passed to parse_reference_sensor, and may be any valid input
             to that function.
     :param test_weights: Optional weights to apply to each measurement when resampling.
     :param ref_weights: Optional weights to apply to each measurement when resampling.
     :return: numpy ndarray of resampled noise; the first dimension has the same length as test_idx and ref_idx.
     """
     # Parse Inputs
-    n_sensor, n_sample = utils.safe_2d_shape(noise)
+    n_sensor, n_sample = safe_2d_shape(noise)
 
     if test_idx is None:
         # We need to use the ref_idx
-        test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
+        test_idx_vec, ref_idx_vec = parse_reference_sensor(ref_idx, n_sensor)
     else:
         test_idx_vec = test_idx
         ref_idx_vec = ref_idx
@@ -352,7 +351,7 @@ def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx
     return noise_out
 
 
-def ensure_invertible(covariance, epsilon=1e-20):
+def ensure_invertible(covariance, epsilon=1e-10):
     """
     Check the input matrix by finding the eigenvalues and checking that they are all >= a small value
     (epsilon), to ensure that it can be inverted.
@@ -553,49 +552,85 @@ def safe_2d_shape(x: np.array) -> np.array:
     return dims_out
 
 
-def make_nd_grid(x_ctr, max_offset, grid_spacing, max_elements=1e8):
+class SearchSpace:
+    num_parameters: int
+    x_ctr: np.ndarray
+    epsilon: np.ndarray
+    points_per_dim: np.ndarray[np.int_]
+    max_offset: np.ndarray
+
+    def __init__(self, x_ctr, epsilon, points_per_dim=None, max_offset=None):
+        self.x_ctr = x_ctr
+        self.epsilon = epsilon
+
+        if points_per_dim is None:
+            # infer from max_offset
+            self.max_offset = max_offset
+            self.points_per_dim = np.floor(1 + 2 * self.max_offset / self.epsilon).astype(int)
+        elif max_offset is None:
+            # infer from search_size
+            self.points_per_dim = np.array(points_per_dim, dtype=int)
+            self.max_offset = self.epsilon * (self.points_per_dim - 1) / 2
+        else:
+            # make sure they align
+            assert np.all(np.equal(max_offset, (points_per_dim - 1)/2 * epsilon)), 'Bad inputs to search space.'
+            self.points_per_dim = np.array(points_per_dim, dtype=int)
+            self.max_offset = max_offset
+
+        # Verify sizes and broadcast
+        attrs = ['x_ctr', 'epsilon', 'points_per_dim', 'max_offset']
+        b = np.broadcast(*[getattr(self, attr) for attr in attrs])
+        self.num_parameters = np.prod(b.shape)
+        for attr in attrs:
+            setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=b.shape))
+
+def make_nd_grid(search_space: SearchSpace):
     """
     Create and return an ND search grid, based on the specified center of the search space, extent, and grid spacing.
 
     28 December 2021
     Nicholas O'Donoughue
 
-    :param x_ctr: ND array of search grid center, for each dimension.  The size of x_ctr dictates how many dimensions
-                  there are
-    :param max_offset: scalar or ND array of the extent of the search grid in each dimension, taken as the one-sided
-                        maximum offset from x_ctr
-    :param grid_spacing: scalar or ND array of grid spacing in each dimension
-    :param max_elements: maximum number of elements in search grid; will return an error if the desired grid will be
-    too large (default=1e8)
     :return x_set: n_dim x N numpy array of positions
     :return x_grid: n_dim-tuple of n_dim-dimensional numpy arrays containing the coordinates for each dimension.
     :return out_shape:  tuple with the size of the generated grid
     """
 
-    n_dim = np.size(x_ctr)
+    n_dim = search_space.num_parameters
 
-    if n_dim < 1 or n_dim > 3:
-        raise AttributeError('Number of spatial dimensions must be between 1 and 3')
+    if np.size(search_space.x_ctr) == 1:
+        x_ctr = search_space.x_ctr * np.ones((n_dim, ))
+    else:
+        x_ctr = search_space.x_ctr.ravel()
 
-    if np.size(max_offset) == 1:
-        max_offset = max_offset * np.ones((n_dim, ))
+    if np.size(search_space.max_offset) == 1:
+        max_offset = search_space.max_offset * np.ones((n_dim, ))
+    else:
+        max_offset = search_space.max_offset.ravel()
 
-    if np.size(grid_spacing) == 1:
-        grid_spacing = grid_spacing * np.ones((n_dim, ))
+    if np.size(search_space.epsilon) == 1:
+        grid_spacing = search_space.epsilon * np.ones((n_dim, ))
+    else:
+        grid_spacing = search_space.epsilon.ravel()
+
+    if np.size(search_space.points_per_dim) == 1:
+        points_per_dim = search_space.points_per_dim * np.ones((n_dim, ))
+    else:
+        points_per_dim = search_space.points_per_dim.ravel()
 
     assert n_dim == np.size(max_offset) and n_dim == np.size(grid_spacing), \
            'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
 
-    n_elements = np.fix(2 * max_offset / grid_spacing).astype(int)  # don't add +1 here; linspace takes care of that
 
     # Check Search Size
-    assert np.prod(n_elements) < max_elements, \
+    max_elements = 1e8  # Set a conservative limit
+    assert np.prod(points_per_dim) < max_elements, \
            'Search size is too large; python is likely to crash or become unresponsive. Reduce your search size, or' \
            + ' increase the max allowed.'
 
     # Make a set of axes, one for each dimension, that are centered on x_ctr
-    dims = [x + np.linspace(start=-x_max, stop=x_max, num=n, endpoint=True) for (x, x_max, n)
-            in zip(x_ctr, max_offset, n_elements)]
+    dims = [x + np.linspace(start=-x_max, stop=x_max, num=n) if n > 1 else x for (x, x_max, n)
+            in zip(x_ctr, max_offset, points_per_dim)]
 
     # Use meshgrid expansion; each element of x_grid is now a full n_dim dimensioned grid
     x_grid = np.meshgrid(*dims)
@@ -603,7 +638,7 @@ def make_nd_grid(x_ctr, max_offset, grid_spacing, max_elements=1e8):
     # Rearrange to a single 2D array of grid locations (n_dim x N)
     x_set = np.asarray([x.flatten() for x in x_grid])
 
-    return x_set, x_grid, n_elements
+    return x_set, x_grid, points_per_dim
 
 
 def is_broadcastable(a, b):
@@ -730,3 +765,50 @@ def ensure_iterable(var, flatten=False)->Iterable:
             var = var_out  # overwrite the variable
 
     return var
+
+
+def parse_sensor_coords(x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, do_2d_aoa=False,
+                        tdoa_ref_idx=None, fdoa_ref_idx=None):
+    n_dim1, n_aoa = safe_2d_shape(x_aoa)  # returns 0, 0 if x_aoa is None
+    n_dim2, n_tdoa = safe_2d_shape(x_tdoa)
+    n_dim3, n_fdoa = safe_2d_shape(x_fdoa)
+    n_dim4, _ = safe_2d_shape(v_fdoa)
+
+    # Check number of dimensions
+    n_dim_set = np.array([n_dim1, n_dim2, n_dim3, n_dim4])
+    n_dim_nonzero = n_dim_set[n_dim_set != 0]
+    if len(n_dim_nonzero) <= 0:
+        raise TypeError('At least one sensor position must be specified (they can\'t all be none).')
+
+    if len(set(n_dim_nonzero)) > 1:
+        raise TypeError('Not all defined sensor positions have the same number of dimensions.')
+
+    if x_fdoa is not None and v_fdoa is not None and not is_broadcastable(x_fdoa, v_fdoa):
+        raise TypeError('FDOA sensor position and velocity inputs must have matching shapes.')
+
+    # Determine the Number of Sensor Measurements
+    n_aoa_msmt = n_aoa * (2 if do_2d_aoa else 1)
+
+    if n_tdoa > 0:
+        tdoa_ref_vec, _ = parse_reference_sensor(ref_idx=tdoa_ref_idx, num_sensors=n_tdoa)
+        n_tdoa_msmt = len(tdoa_ref_vec)
+    else:
+        n_tdoa_msmt = 0
+
+    if n_fdoa > 0:
+        fdoa_ref_vec, _ = parse_reference_sensor(ref_idx=fdoa_ref_idx, num_sensors=n_fdoa)
+        n_fdoa_msmt = len(fdoa_ref_vec)
+    else:
+        n_fdoa_msmt = 0
+
+    # Package Response
+    sensor_coords = {'num_dim': n_dim_nonzero[0],
+                     'num_aoa': n_aoa,
+                     'num_tdoa': n_tdoa,
+                     'num_fdoa': n_fdoa,
+                     'num_aoa_msmt': n_aoa_msmt,
+                     'num_tdoa_msmt': n_tdoa_msmt,
+                     'num_fdoa_msmt': n_fdoa_msmt}
+
+    return sensor_coords
+

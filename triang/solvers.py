@@ -1,5 +1,6 @@
 import utils
 from utils import solvers
+from utils import SearchSpace
 from utils.covariance import CovarianceMatrix
 from . import model
 import numpy as np
@@ -8,7 +9,8 @@ from itertools import combinations
 import numpy.typing as npt
 
 
-def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, do_2d_aoa=False, epsilon=None, **kwargs):
+def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, search_space:SearchSpace, do_2d_aoa=False, bias=None,
+                   **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -21,7 +23,7 @@ def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, do_
     22 February 2021
     
     :param x_sensor: Sensor positions [m]
-    :param psi: AOA measurement vector [rad]
+    :param zeta: AOA measurement vector [rad]
     :param cov: Measurement error covariance matrix
     :param x_ctr: Center of search grid [m]
     :param search_size: 2-D vector of search grid sizes [m]
@@ -34,15 +36,15 @@ def max_likelihood(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, do_
 
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_sensor, psi, cov, x, do_2d_aoa=do_2d_aoa)
+        return model.log_likelihood(x_sensor, zeta, cov, x, do_2d_aoa=do_2d_aoa, bias=bias)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell, x_ctr, search_size, epsilon, **kwargs)
+    x_est, likelihood, x_grid = solvers.ml_solver(ell, search_space=search_space, **kwargs)
 
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, **kwargs):
+def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias=None, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -52,7 +54,7 @@ def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=Fal
     22 February 2021
 
     :param x_sensor: Sensor positions [m]
-    :param psi: AOA Measurement vector [rad]
+    :param zeta: AOA Measurement vector [rad]
     :param cov: Measurement error covariance matrix
     :param x_init: Initial estimate of source position [m]
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
@@ -62,7 +64,7 @@ def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=Fal
 
     # Initialize measurement error and jacobian functions
     def y(this_x):
-        return psi - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
+        return zeta - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
@@ -73,7 +75,7 @@ def gradient_descent(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=Fal
     return x, x_full
 
 
-def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, **kwargs):
+def least_square(x_sensor, zeta, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias=None, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -83,7 +85,7 @@ def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, 
     22 February 2021
 
     :param x_sensor: Sensor positions [m]
-    :param psi: AOA Measurements [rad]
+    :param zeta: AOA Measurements [rad]
     :param cov: Measurement Error Covariance Matrix [(m/s)^2]
     :param x_init: Initial estimate of source position [m]
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
@@ -93,7 +95,7 @@ def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, 
 
     # Initialize measurement error and Jacobian function handles
     def y(this_x):
-        return psi - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
+        return zeta - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
@@ -104,7 +106,7 @@ def least_square(x_sensor, psi, cov: CovarianceMatrix, x_init, do_2d_aoa=False, 
     return x, x_full
 
 
-def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, pdf_type=None, do_2d_aoa=False):
+def bestfix(x_sensor, zeta, cov: CovarianceMatrix, search_space: SearchSpace, pdf_type=None, do_2d_aoa=False):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
     a series of coordinates, and returning the index of the maximum.
@@ -125,11 +127,8 @@ def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, p
     21 February 2021
 
     :param x_sensor: Sensor positions [m]
-    :param psi: Measurement vector [rad]
+    :param zeta: Measurement vector [rad]
     :param cov: Measurement error covariance matrix
-    :param x_ctr: Center of search grid [m]
-    :param search_size: 2-D vector of search grid sizes [m]
-    :param epsilon: Desired resolution of search grid [m]
     :param pdf_type: String indicating the type of distribution to use. See +utils/makePDFs.m for options.
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :return x_est: Estimated source position [m]
@@ -141,19 +140,19 @@ def bestfix(x_sensor, psi, cov: CovarianceMatrix, x_ctr, search_size, epsilon, p
     def measurement(x):
         return model.measurement(x_sensor, x, do_2d_aoa=do_2d_aoa)
 
-    pdfs = utils.make_pdfs(measurement, psi, pdf_type, cov.cov)
+    pdfs = utils.make_pdfs(measurement, zeta, pdf_type, cov.cov)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.bestfix(pdfs, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.bestfix(pdfs, search_space)
 
     return x_est, likelihood, x_grid
 
 
-def angle_bisector(x_sensor, psi):
+def angle_bisector(x_sensor, zeta):
     """
     Compute the center via intersection of angle bisectors for  
     3 or more LOBs given by sensor positions xi and angle 
-    of arrival measurements psi.
+    of arrival measurements zeta.
 
     If more than 3 measurements are provided, this method repeats on each set
     of 3 measurements, and then takes the average of the solutions.
@@ -164,7 +163,7 @@ def angle_bisector(x_sensor, psi):
     22 February 2021
     
     :param x_sensor: N x 2 matrix of sensor positions
-    :param psi: N x 1 vector of AOA measurements (radians)
+    :param zeta: N x 1 vector of AOA measurements (radians)
     :return x_est: 2 x 1 vector of estimated source position
     """
 
@@ -176,7 +175,7 @@ def angle_bisector(x_sensor, psi):
 
     for sensor_set in sensor_sets:
         # Find vertices
-        v0, v1, v2 = _find_vertices(x_sensor[:, np.asarray(sensor_set)], psi[np.asarray(sensor_set)])
+        v0, v1, v2 = _find_vertices(x_sensor[:, np.asarray(sensor_set)], zeta[np.asarray(sensor_set)])
 
         # Find angle bisectors
         th_fwd0 = np.arctan2(v1[1]-v0[1], v1[0]-v0[0])
@@ -205,10 +204,10 @@ def angle_bisector(x_sensor, psi):
     return x_est/num_sets
 
 
-def centroid(x_sensor, psi):
+def centroid(x_sensor, zeta):
     """
     Compute the centroid of the intersection of 3 or more LOBs given by
-    sensor positions x_source and angle of arrival measurements psi.
+    sensor positions x_source and angle of arrival measurements zeta.
 
     If more than 3 measurements are provided, this method repeats on each set
     of 3 measurements, and then takes the average of the solutions.
@@ -219,7 +218,7 @@ def centroid(x_sensor, psi):
     22 February 2021
 
     :param x_sensor: 2 x N matrix of sensor positions
-    :param psi: N x 1 vector of AOA measurements (radians)
+    :param zeta: N x 1 vector of AOA measurements (radians)
     :return x_est: 2 x 1 vector of estimated source position
     """
 
@@ -231,7 +230,7 @@ def centroid(x_sensor, psi):
 
     for sensor_set in sensor_sets:
         # Find vertices
-        v0, v1, v2 = _find_vertices(x_sensor[:, np.asarray(sensor_set)], psi[np.asarray(sensor_set)])
+        v0, v1, v2 = _find_vertices(x_sensor[:, np.asarray(sensor_set)], zeta[np.asarray(sensor_set)])
 
         # Find Centroid by averaging the three vertices
         this_cntr = (v0 + v1 + v2) / 3
@@ -264,10 +263,10 @@ def _parse_sensor_triplets(x_sensor):
     return sensor_sets, num_sets
 
 
-def _find_vertices(x: npt.ArrayLike, psi: npt.ArrayLike) -> (npt.ArrayLike, npt.ArrayLike, npt.ArrayLike):
+def _find_vertices(x: npt.ArrayLike, zeta: npt.ArrayLike) -> (npt.ArrayLike, npt.ArrayLike, npt.ArrayLike):
     # Find vertices
-    v0 = utils.geo.find_intersect(x[:, 0], psi[0], x[:, 1], psi[1])
-    v1 = utils.geo.find_intersect(x[:, 1], psi[1], x[:, 2], psi[2])
-    v2 = utils.geo.find_intersect(x[:, 2], psi[2], x[:, 0], psi[0])
+    v0 = utils.geo.find_intersect(x[:, 0], zeta[0], x[:, 1], zeta[1])
+    v1 = utils.geo.find_intersect(x[:, 1], zeta[1], x[:, 2], zeta[2])
+    v2 = utils.geo.find_intersect(x[:, 2], zeta[2], x[:, 0], zeta[0])
 
     return v0, v1, v2

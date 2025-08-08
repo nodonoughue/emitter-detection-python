@@ -353,7 +353,7 @@ def make_figure_7b(prefix=None):
     return fig7b
 
 
-def make_figure_9(prefix=None, rng=None):
+def make_figure_9(prefix=None, rng=np.random.default_rng()):
     """
     Figure 9/11 - Beamscan Images
 
@@ -368,9 +368,6 @@ def make_figure_9(prefix=None, rng=None):
     """
 
     print('Generating Figure 8.9...')
-
-    if rng is None:
-        rng = np.random.default_rng(0)
 
     # Set up array
     num_elements = 25
@@ -459,7 +456,7 @@ def make_figure_10(prefix=None):
     return fig10
 
 
-def make_figure_12(prefix=None, rng=None, force_recalc=True):
+def make_figure_12(prefix=None, rng=np.random.default_rng(), force_recalc=True):
     """
     Figure 12 - CRLB Plot
 
@@ -480,9 +477,6 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
 
     print('Generating Figure 8.12...')
 
-    if rng is None:
-        rng = np.random.default_rng(0)
-                    
     snr_db = np.arange(start=-20, step=.5, stop=0)
     snr_lin = db_to_lin(snr_db)
     psi = 5*np.pi/180
@@ -534,6 +528,7 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
             this_err_beamscan[idx_mc] = np.abs(psi_vec[idx_pk]-psi)
 
             # Compute MVDR beamscan image
+            # TODO: Doesn't look right; why is this plot off?
             pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(x[:, :, idx_mc], v, np.pi/2, 2001)
             idx_pk_mvdr = np.argmax(np.abs(pwr_vec_mvdr))
             this_err_mvdr[idx_mc] = np.abs(psi_vec[idx_pk_mvdr]-psi)
@@ -571,7 +566,7 @@ def make_figure_12(prefix=None, rng=None, force_recalc=True):
     return fig12
 
 
-def make_figure_13(prefix=None, rng=None, force_recalc=True):
+def make_figure_13(prefix=None, rng=np.random.default_rng(), force_recalc=True):
     """
     Figure 13 - Example 8.2
 
@@ -592,9 +587,6 @@ def make_figure_13(prefix=None, rng=None, force_recalc=True):
 
     print('Generating Figure 8.13...')
 
-    if rng is None:
-        rng = np.random.default_rng(0)
-
     fig13 = chapter8.example2(rng)
 
     if prefix is not None:
@@ -602,3 +594,7 @@ def make_figure_13(prefix=None, rng=None, force_recalc=True):
         fig13.savefig(prefix + 'fig13.svg')
 
     return fig13
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)

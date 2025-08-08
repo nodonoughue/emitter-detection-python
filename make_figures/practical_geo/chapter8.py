@@ -1,18 +1,18 @@
 """
-Draw Figures - Chapter 4
+Draw Figures - Chapter 7
 
-This script generates all the figures that appear in Chapter 4 of the textbook.
+This script generates all the figures that appear in Chapter 7 of the textbook.
 
 Ported from MATLAB Code
 
 Nicholas O'Donoughue
-7 February 2025
+28 June 2025
 """
 
 import utils
 import matplotlib.pyplot as plt
 
-from examples.practical_geo import chapter4
+from examples.practical_geo import chapter8
 
 
 def make_all_figures(close_figs=False, force_recalc=False):
@@ -29,28 +29,27 @@ def make_all_figures(close_figs=False, force_recalc=False):
     # rng = np.random.default_rng()
 
     # Find the output directory
-    prefix = utils.init_output_dir('practical_geo/chapter4')
+    prefix = utils.init_output_dir('practical_geo/chapter8')
     utils.init_plot_style()
 
     # Generate all figures
-    figs_10_11 = make_figures_10_11(prefix, force_recalc)
-    fig12 = make_figure_12(prefix, force_recalc)
+    figs3_4_5 = make_figures_3_4_5(prefix, force_recalc)
+    figs6_7 = make_figures_6_7(prefix, force_recalc)
 
-    figs = list(figs_10_11) + list(fig12)
+    figs = list(figs3_4_5) +  list(figs6_7)
     if close_figs:
-        for fig in figs:
-            plt.close(fig)
-
+        [plt.close(fig) for fig in figs]
         return None
     else:
+        # Display the plots
         plt.show()
 
     return figs
 
 
-def make_figures_10_11(prefix=None, force_recalc=False):
+def make_figures_3_4_5(prefix=None, force_recalc=False):
     """
-    Figure 4.10 and 4.11 from Example 4.1
+    Figures 8.3, 8.4, and 8.5 from Example 8.1
 
     :param prefix: output directory to place generated figure
     :param force_recalc: optional flag (default=True), if False then the example does not run
@@ -58,21 +57,18 @@ def make_figures_10_11(prefix=None, force_recalc=False):
     """
 
     if not force_recalc:
-        print('Skipping Figures 4.10, and 4.11 (re-run with force_recalc=True to generate)...')
-        return None, None
+        print('Skipping Figures 8.3, 8.4, and 8.5 (re-run with force_recalc=True to generate)...')
+        return None,
 
-    print('Generating Figures 4.10, 4.11 (from Example 4.1)...')
+    print('Generating Figures 8.3, 8.4, and 8.5 (Example 8.1)...')
 
-    figs = chapter4.example1()
-
-    # Display the plot
-    plt.draw()
+    figs = chapter8.example1()
 
     # Output to file
     if prefix is not None:
-        labels = ['fig10', 'fig11']
+        labels = ['fig3', 'fig4', 'fig5']
         if len(labels) != len(figs):
-            print('**Error saving figures 4.10 and 4.11; unexpected number of figures returned from Example 4.1.')
+            print('**Error saving figure 8.3, 8.4, and 8.5; unexpected number of figures returned from Example 8.1.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')
@@ -81,9 +77,9 @@ def make_figures_10_11(prefix=None, force_recalc=False):
     return figs
 
 
-def make_figure_12(prefix=None, force_recalc=False):
+def make_figures_6_7(prefix=None, force_recalc=False):
     """
-    Figure 4.12 from Example 4.2
+    Figures 8.6 and 8.7 from Example 7.2
 
     :param prefix: output directory to place generated figure
     :param force_recalc: optional flag (default=True), if False then the example does not run
@@ -91,21 +87,18 @@ def make_figure_12(prefix=None, force_recalc=False):
     """
 
     if not force_recalc:
-        print('Skipping Figure 4.12 (re-run with force_recalc=True to generate)...')
-        return None, None
+        print('Skipping Figures 8.6 and 8.7 (re-run with force_recalc=True to generate)...')
+        return None,
 
-    print('Generating Figure 4.12 (from Example 4.2)...')
+    print('Generating Figures 8.6 and 8.7 (Example 8.2)...')
 
-    figs = chapter4.example2()
-
-    # Display the plot
-    plt.draw()
+    figs = chapter8.example2()
 
     # Output to file
     if prefix is not None:
-        labels = ['fig12']
+        labels = ['fig6a', 'fig6b', 'fig7']
         if len(labels) != len(figs):
-            print('**Error saving figure 4.12; unexpected number of figures returned from Example 4.2.')
+            print('**Error saving figure 8.6 and 8.7; unexpected number of figures returned from Example 8.2.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')

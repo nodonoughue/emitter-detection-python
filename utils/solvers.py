@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import utils
+from utils import SearchSpace
 from utils.covariance import CovarianceMatrix
 from numpy import typing as npt
 
@@ -144,7 +145,7 @@ def gd_solver(y,
     Ported from MATLAB code.
     
     Nicholas O'Donoughue
-    14 January 2021
+    29 April 2025
         
     :param y: Measurement vector function handle (accepts n_dim vector of source position estimate, responds with error 
               between received and modeled data vector)
@@ -202,7 +203,7 @@ def gd_solver(y,
     num_expanding_iterations = 0
     max_num_expanding_iterations = 5
     prev_error = np.inf
-    
+
     # Loop until either the desired tolerance is achieved or the maximum
     # number of iterations have occurred
     while current_iteration < (max_num_iterations-1) and (force_full_calc or error >= epsilon):
@@ -309,8 +310,8 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
     return t
 
 
-def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
-              prior=None, prior_wt: float=0.):
+def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
+              prior=None, prior_wt: float = 0.):
     """
     Execute ML estimation through brute force computational methods.
 
@@ -321,9 +322,7 @@ def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constr
 
     :param ell: Function handle for the likelihood of a given position must accept x_ctr (and similar sized vectors)
                 as the sole input.
-    :param x_ctr: Center position for search space (x, x/y, or z/y/z).
-    :param search_size: Search space size (same units as x_ctr)
-    :param epsilon: Search space resolution (same units as x_ctr)
+    :param search_space: SearchSpace object defining the space over which to search
     :param eq_constraints: List of equality constraint functions (see utils.constraints)
     :param ineq_constraints: List of inequality constraint functions (see utils.constraints)
     :param constraint_tolerance: Tolerance to apply to equality constraints (default = 1e-6); any deviations with a
@@ -338,7 +337,7 @@ def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constr
     """
 
     # Set up the search space
-    x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
+    x_set, x_grid, out_shape = utils.make_nd_grid(search_space)
 
     # Constrain the likelihood, if needed
     if ineq_constraints is not None or eq_constraints is not None:
@@ -349,18 +348,18 @@ def ml_solver(ell, x_ctr, search_size, epsilon, eq_constraints=None, ineq_constr
     likelihood = ell(x_set)
 
     if prior is not None and prior_wt > 0:
-        pdf_prior = np.reshape(prior(x_set), newshape=likelihood.shape)
+        pdf_prior = np.reshape(prior(x_set), shape=likelihood.shape)
 
         likelihood = (1 - prior_wt) * likelihood + prior_wt * np.log10(pdf_prior)
 
     # Find the peak
-    idx_pk = likelihood.argmax()
+    idx_pk = np.argmax(likelihood)
     x_est = x_set[:, idx_pk]
 
     return x_est, likelihood, x_grid
 
 
-def bestfix(pdfs, x_ctr, search_size, epsilon):
+def bestfix(pdfs, search_space: SearchSpace):
     """
     Based on the BESTFIX algorithm, invented in 1990 by Eric Hodson (R&D Associates, now with Naval Postgraduate
     School).  Patent is believed to be in the public domain.
@@ -376,16 +375,13 @@ def bestfix(pdfs, x_ctr, search_size, epsilon):
 
     :param pdfs: Lx1 cell list of PDF functions, each of which represents the probability that an input position
                  (Ndim x 3 array) is the true source position for one of the measurements.
-    :param x_ctr: Center position for search space (x, x/y, or z/y/z).
-    :param search_size: Search space size (same units as x_ctr)
-    :param epsilon: Search space resolution (same units as x_ctr)
     :return x_est: Estimated position
     :return result: Likelihood computed at each x position in the search space
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
     """
 
     # Set up the search space
-    x_set, x_grid, out_shape = utils.make_nd_grid(x_ctr, search_size, epsilon)
+    x_set, x_grid, out_shape = utils.make_nd_grid(search_space)
 
     # Apply each PDF to all input coordinates and then multiply across PDFs
     result = np.asarray([np.prod(np.asarray([this_pdf(this_x) for this_pdf in pdfs])) for this_x in x_set.T])
@@ -398,3 +394,96 @@ def bestfix(pdfs, x_ctr, search_size, epsilon):
     x_est = x_set[:, idx_pk]
 
     return x_est, result, x_grid
+
+def sensor_calibration(ell,
+                       pos_search: SearchSpace,
+                       vel_search: SearchSpace,
+                       bias_search: SearchSpace,
+                       num_iterations=1):
+    """
+    This function attempts to calibrate sensor uncertainties given a series of measurements (AOA, TDOA, and/or FDOA)
+    against a set of calibration emitters. Sensor uncertainties can take the form of unknown measurement bias or
+    position/velocity errors.
+
+    This follows the logic in Figure 6.11 of the 2022 text, loosely summarized:
+    1. Assume that the sensor positions and velocities are accurate, and estimate measurement biases.
+    2. Use the estimated measurement biases to update the sensor positions.
+    3. Use the estimated measurement biases and sensor positions to update sensor velocities.
+    4. (Optionally) Repeat Steps 1-3 num_iterations times.
+
+    Figure 6.11 shows this as a linear operation, but if the estimates are not accurate enough, repeated iterations
+    of the process may be desired. This can be achieved by calling the sensor_calibration function again with the
+    updated position and measurement bias estimates.
+
+    :param ell: function handle that accepts two inputs: (bias, x_sensor); bias being an array of measurement biases,
+                and x_sensor a 2D array of sensor positions.
+    :param pos_search: dictionary with parameters for the ML search for sensor positions
+    :param vel_search: dictionary with parameters for the ML search for sensor velocities
+    :param bias_search: dictionary with parameters for the ML search for measurement bias
+    :param num_iterations: number of times to repeat the calibration search
+    :return x_sensor_est: Estimated sensor positions
+    :return bias_est: Estimated measurement biases
+    """
+
+    # Initialize Outputs
+    bias_est = bias_search.x_ctr if bias_search is not None else None
+    x_sensor_est = pos_search.x_ctr if pos_search is not None else None
+    v_sensor_est = vel_search.x_ctr if vel_search is not None else None
+
+    for _ in np.arange(num_iterations):
+
+        # ================= Estimate Measurement Bias ========================
+        if bias_search is not None and np.any(bias_search.points_per_dim > 1):
+            x_sensor_vec = pos_search.x_ctr
+            v_sensor_vec = vel_search.x_ctr
+            def ell_bias(bias):
+                # Input is num_parameters x num_test_points; iterate over test points
+                return [ell(this_bias, x_sensor_vec, v_sensor_vec) for this_bias in bias.T]
+
+            result = utils.solvers.ml_solver(ell=ell_bias, search_space=bias_search)
+            bias_est = result[0]
+            bias_search.x_ctr = bias_est # store result as center for next iteration
+
+        # =================== Estimate Sensor Position =========================
+        if pos_search is not None and np.any(pos_search.points_per_dim > 1):
+            v_sensor_vec = vel_search.x_ctr
+            def ell_pos(x):
+                # Input is num_parameters x num_test_points; iterate over test points
+                return [ell(bias_est, this_x, v_sensor_vec) for this_x in x.T]
+
+            # Do them one at a time; set the points_per_dim to 1 on the others
+            points_per_dim = pos_search.points_per_dim
+            _, num_sensors = utils.safe_2d_shape(points_per_dim)
+
+            for idx in np.arange(num_sensors):
+                # Only search the current sensor's position error
+                this_ppd = np.ones_like(points_per_dim)
+                this_ppd[:,idx] = points_per_dim[:, idx]
+                pos_search.points_per_dim = this_ppd
+                result = utils.solvers.ml_solver(ell=ell_pos, search_space=pos_search)
+                x_sensor_est = result[0]
+                # store result as center for next iteration
+                pos_search.x_ctr = np.reshape(x_sensor_est, shape=np.shape(points_per_dim))
+
+        # =================== Estimate Sensor Velocity =========================
+        if vel_search is not None and np.any(vel_search.points_per_dim > 1):
+            def ell_vel(v):
+                # Input is num_parameters x num_test_points; iterate over test points
+                return [ell(bias_est, x_sensor_est, this_v) for this_v in v.T]
+
+            # Do them one at a time; set the points_per_dim to 1 on the others
+            points_per_dim = vel_search.points_per_dim
+            _, num_sensors = utils.safe_2d_shape(points_per_dim)
+
+            for idx in np.arange(num_sensors):
+                # Only search the current sensor's position error
+                this_ppd = np.ones_like(points_per_dim)
+                this_ppd[:,idx] = points_per_dim[:, idx]
+                vel_search.points_per_dim = this_ppd
+                result = utils.solvers.ml_solver(ell=ell_vel, search_space=vel_search)
+                v_sensor_est = result[0]
+                # store result as center for next iteration
+                vel_search.x_ctr = np.reshape(v_sensor_est, shape=np.shape(points_per_dim))
+
+
+    return x_sensor_est, v_sensor_est, bias_est

@@ -24,7 +24,7 @@ def compute_array_factor(v_fun, h, psi):
     """
 
     # Normalize the beamformer and make it a column vector
-    h = np.reshape(h, newshape=(np.size(h), 1))/np.max(np.abs(h))
+    h = np.reshape(h, shape=(np.size(h), 1))/np.max(np.abs(h))
 
     # Generate the steering vectors
     vv = v_fun(psi)  # should be N x numel(psi)

@@ -108,7 +108,7 @@ def make_figure_1(prefix=None):
     return fig1
 
 
-def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
+def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, force_recalc=True):
     """
     Figure 3, Adcock CRLB
 
@@ -129,9 +129,6 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
         return None
 
     print('Generating Figure 7.3...')
-
-    if rng is None:
-        rng = np.random.default_rng(0)
 
     if colors is None:
         colors = plt.get_cmap('tab10')
@@ -235,7 +232,7 @@ def make_figure_3(prefix=None, rng=None, colors=None, force_recalc=True):
     return fig3
 
 
-def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
+def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, force_recalc=True):
     """
     Figure 5, Rectangular Aperture CRLB
 
@@ -256,9 +253,6 @@ def make_figure_5(prefix=None, rng=None, colors=None, force_recalc=True):
         return None
 
     print('Generating Figure 7.5...')
-
-    if rng is None:
-        rng = np.random.default_rng(0)
 
     if colors is None:
         colors = plt.get_cmap('tab10')
@@ -397,7 +391,7 @@ def make_figure_6b(prefix=None):
     return fig6b
 
 
-def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
+def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, force_recalc=True):
     """
     Figure 7, Watson-Watt Performance
 
@@ -418,9 +412,6 @@ def make_figure_7(prefix=None, rng=None, colors=None, force_recalc=True):
         return None
 
     print('Generating Figure 7.7...')
-
-    if rng is None:
-        rng = np.random.default_rng(0)
 
     if colors is None:
         colors = plt.get_cmap('tab10')
@@ -562,7 +553,7 @@ def make_figure_8(prefix=None):
     return fig8b
 
 
-def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
+def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, force_recalc=True):
     """
     Figure 10, Doppler CRLB
 
@@ -583,9 +574,6 @@ def make_figure_10(prefix=None, rng=None, colors=None, force_recalc=True):
         return None
 
     print('Generating Figure 7.10...')
-
-    if rng is None:
-        rng = np.random.default_rng(0)
 
     if colors is None:
         colors = plt.get_cmap('tab10')
@@ -843,3 +831,7 @@ def make_figure_16(prefix=None):
         fig16.savefig(prefix + 'fig16.png')
 
     return fig16
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)

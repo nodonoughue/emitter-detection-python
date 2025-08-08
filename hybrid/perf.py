@@ -45,9 +45,10 @@ def compute_crlb(x_source, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdo
 
     # Define a wrapper for the jacobian matrix that accepts only the position 'x'
     def jacobian(x):
-        return model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
-                              x_source=x, do_2d_aoa=do_2d_aoa,
-                              tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+        j = model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
+                           x_source=x, do_2d_aoa=do_2d_aoa,
+                           tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+        return j[:n_dim] # just return the jacobian w.r.t. source position
 
     crlb = utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=jacobian, cov=cov,
                                             print_progress=print_progress, **kwargs)

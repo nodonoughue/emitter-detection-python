@@ -268,7 +268,7 @@ def make_figure_4(prefix=None):
     return fig4
 
 
-def make_figure_5(prefix=None, rng=None):
+def make_figure_5(prefix=None, rng=np.random.default_rng()):
     """
     Figure 5, CFAR
 
@@ -283,9 +283,6 @@ def make_figure_5(prefix=None, rng=None):
     """
 
     print('Generating Figure 2.5...')
-
-    if rng is None:
-        rng = np.random.default_rng()
 
     # Noise Level
     s2 = 1
@@ -333,3 +330,7 @@ def make_figure_5(prefix=None, rng=None):
         fig5.savefig(prefix + 'fig5.png')
 
     return fig5
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False)

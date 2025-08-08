@@ -2,8 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import utils
+from hybrid import HybridPassiveSurveillanceSystem
+from fdoa import FDOAPassiveSurveillanceSystem
+from tdoa import TDOAPassiveSurveillanceSystem
+from triang import DirectionFinder
 from utils.covariance import CovarianceMatrix
-import hybrid
+from utils import SearchSpace
 
 
 def run_all_examples():
@@ -58,20 +62,23 @@ def example1(rng=np.random.default_rng()):
     covar_ang = CovarianceMatrix(ang_err**2 * np.eye(num_sensors))
     covar_roa = CovarianceMatrix(rng_err**2 * np.eye(num_sensors))
     covar_rroa = CovarianceMatrix(rng_rate_err**2 * np.eye(num_sensors))
-    covar_rdoa = covar_roa.resample(ref_idx=tdoa_ref_idx)
-    covar_rrdoa = covar_rroa.resample(ref_idx=fdoa_ref_idx)
+    # covar_rdoa = covar_roa.resample(ref_idx=tdoa_ref_idx)
+    # covar_rrdoa = covar_rroa.resample(ref_idx=fdoa_ref_idx)
 
-    covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
+    # covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
+
+    # Initialize PSS Objects
+    aoa = DirectionFinder(x=x_sensor, cov=covar_ang, do_2d_aoa=False)
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_sensor, cov=covar_roa, variance_is_toa=False, ref_idx=tdoa_ref_idx)
+    fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor, vel=v_sensor, cov=covar_rroa, ref_idx=fdoa_ref_idx)
+    hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=fdoa)
 
     # Initialize Transmitter Position
     x_source = np.ones((2,)) * 30e3
     x_init = np.array([0, 10e3])
 
     # True measurement vector
-    rho_actual = hybrid.model.measurement(x_aoa=x_sensor, x_tdoa=x_sensor, 
-                                          x_fdoa=x_sensor, v_fdoa=v_sensor, 
-                                          x_source=x_source, 
-                                          tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+    rho_actual = hybrid.measurement(x_source=x_source)
 
     # Initialize Solvers
     num_mc_trials = int(1000)
@@ -89,20 +96,7 @@ def example1(rng=np.random.default_rng()):
     x_ls_full = np.zeros(shape=out_iterative_shp)
     x_grad_full = np.zeros(shape=out_iterative_shp)
 
-    rx_args = {'x_aoa': x_sensor,
-               'x_tdoa': x_sensor,
-               'tdoa_ref_idx': tdoa_ref_idx,
-               'x_fdoa': x_sensor,
-               'v_fdoa': v_sensor,
-               'fdoa_ref_idx': fdoa_ref_idx,
-               'cov': covar_rho,
-               'do_resample': False
-               }
-
-    ml_args = {'x_ctr': x_init,
-               'search_size': x_extent,
-               'epsilon': grid_res
-               }
+    ml_search = SearchSpace(x_ctr=x_init, max_offset=x_extent, epsilon=grid_res)
 
     ls_args = {'x_init': x_init,
                'max_num_iterations': num_iterations,
@@ -119,10 +113,7 @@ def example1(rng=np.random.default_rng()):
                }
 
     args = {'rho_act': rho_actual,
-            'num_measurements': rho_actual.size,
             'rng': rng,
-            'rx_args': rx_args,
-            'ml_args': ml_args,
             'gd_args': gd_args,
             'ls_args': ls_args,
             }
@@ -136,7 +127,8 @@ def example1(rng=np.random.default_rng()):
     for idx in np.arange(num_mc_trials):
         utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        result = _mc_iteration(args)
+        # TODO: Debug -- ML solution is wrong; seems fixed at [0, 0]
+        result = _mc_iteration(pss=hybrid, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
         x_bf[:, idx] = result['bf']
         x_ls_full[:, :, idx] = result['ls']
@@ -153,11 +145,12 @@ def example1(rng=np.random.default_rng()):
                'grad': x_grad_full}
 
     # Call the common plot generator for both examples
-    rx_args['x_init'] = x_init  # Add the initial position estimate, for plotting
-    rx_args['x_source'] = x_source  # Add the true source position, for plotting
-    rx_args['x_sensor'] = x_sensor  # Set the 'x_sensor' flag, to plot all three sensors as a single type
-    rx_args['num_iterations'] = num_iterations
-    fig_geo, fig_err = _plot_mc_iteration_result(rx_args, results)
+    args = {'x_source': x_source,  # Add the true source position, for plotting
+            'x_init': x_init,  # Add the initial position estimate, for plotting
+            'num_iterations': num_iterations,
+            'plot_sensors_together': True} # if True, they're all plotted together
+    fig_geo, fig_err = _plot_mc_iteration_result(hybrid, args, results)
+
 
     return fig_geo, fig_err
 
@@ -199,20 +192,23 @@ def example2(rng=np.random.default_rng()):
     covar_ang = CovarianceMatrix(ang_err**2 * np.eye(num_aoa))
     covar_roa = CovarianceMatrix(rng_err**2 * np.eye(num_time_freq))
     covar_rroa = CovarianceMatrix(rng_rate_err**2 * np.eye(num_time_freq))
-    covar_rdoa = covar_roa.resample(ref_idx=tdoa_ref_idx)
-    covar_rrdoa = covar_rroa.resample(ref_idx=fdoa_ref_idx)
+    # covar_rdoa = covar_roa.resample(ref_idx=tdoa_ref_idx)
+    # covar_rrdoa = covar_rroa.resample(ref_idx=fdoa_ref_idx)
 
-    covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
+    # covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa)
+
+    # Construct PSS Objects
+    aoa = DirectionFinder(x=x_aoa, cov=covar_ang, do_2d_aoa=False)
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_time_freq, cov=covar_roa, variance_is_toa=False, ref_idx=tdoa_ref_idx)
+    fdoa = FDOAPassiveSurveillanceSystem(x=x_time_freq, vel=v_time_freq, cov=covar_rroa, ref_idx=fdoa_ref_idx)
+    hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=fdoa)
 
     # Initialize Transmitter Position
     x_source = np.ones((2,)) * 30e3
     x_init = np.array([0, 10e3])
 
     # True measurement vector
-    rho_actual = hybrid.model.measurement(x_aoa=x_aoa, x_tdoa=x_time_freq,
-                                          x_fdoa=x_time_freq, v_fdoa=v_time_freq,
-                                          x_source=x_source,
-                                          tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+    rho_actual = hybrid.measurement(x_source=x_source)
 
     # Initialize Solvers
     num_mc_trials = int(1000)
@@ -230,20 +226,9 @@ def example2(rng=np.random.default_rng()):
     x_ls_full = np.zeros(shape=out_iterative_shp)
     x_grad_full = np.zeros(shape=out_iterative_shp)
 
-    rx_args = {'x_aoa': x_aoa,
-               'x_tdoa': x_time_freq,
-               'tdoa_ref_idx': tdoa_ref_idx,
-               'x_fdoa': x_time_freq,
-               'v_fdoa': v_time_freq,
-               'fdoa_ref_idx': fdoa_ref_idx,
-               'cov': covar_rho,
-               'do_resample': False
-               }
-
-    ml_args = {'x_ctr': x_init,
-               'search_size': x_extent,
-               'epsilon': grid_res
-               }
+    ml_search = SearchSpace(x_ctr=x_init,
+                            max_offset=x_extent,
+                            epsilon=grid_res)
 
     ls_args = {'x_init': x_init,
                'max_num_iterations': num_iterations,
@@ -259,12 +244,9 @@ def example2(rng=np.random.default_rng()):
                'beta': beta
                }
 
-    args = {'rx_args': rx_args,  # arguments to pass on to solvers that represent the receiver system
-            'ml_args': ml_args,  # arguments to pass on to ML solver
-            'ls_args': ls_args,  # arguments to pass on to LS solver
+    args = {'ls_args': ls_args,  # arguments to pass on to LS solver
             'gd_args': gd_args,  # arguments to pass on to GD solver
             'rho_act': rho_actual,
-            'num_measurements': num_aoa + 2 * (num_time_freq - 1),
             'rng': rng
             }
 
@@ -277,7 +259,7 @@ def example2(rng=np.random.default_rng()):
     for idx in np.arange(num_mc_trials):
         utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        result = _mc_iteration(args)
+        result = _mc_iteration(pss=hybrid, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
         x_bf[:, idx] = result['bf']
         x_ls_full[:, :, idx] = result['ls']
@@ -294,16 +276,16 @@ def example2(rng=np.random.default_rng()):
                'grad': x_grad_full}
 
     # Call the common plot generator for both examples
-    rx_args['x_source'] = x_source  # Add the true source position, for plotting
-    rx_args['x_sensor'] = None  # Set the 'x_sensor' flag to none, so that AOA and T/FDOA sensors are plotted separately
-    rx_args['x_init'] = x_init  # Add the initial position estimate, for plotting
-    rx_args['num_iterations'] = num_iterations
-    fig_geo, fig_err = _plot_mc_iteration_result(rx_args, results)
+    args = {'x_source': x_source,  # Add the true source position, for plotting
+            'x_init': x_init,  # Add the initial position estimate, for plotting
+            'num_iterations': num_iterations,
+            'plot_sensors_together': False} # if True, they're all plotted together
+    fig_geo, fig_err = _plot_mc_iteration_result(hybrid, args, results)
 
     return fig_geo, fig_err
 
 
-def _mc_iteration(args):
+def _mc_iteration(pss:HybridPassiveSurveillanceSystem, ml_search: SearchSpace, args):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 11.1.
 
@@ -334,34 +316,36 @@ def _mc_iteration(args):
     # Generate a random measurement
     rng = args['rng']
     zeta_act = args['rho_act']
-    cov_lower = args['rx_args']['cov'].lower
-    zeta = zeta_act + cov_lower @ rng.standard_normal(size=(args['num_measurements'], ))
+    zeta = zeta_act + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
+
+    gd_args = args['gd_args']
+    ls_args = args['ls_args']
 
     # Generate solutions
-    res_ml, ml_surf, ml_grid = hybrid.solvers.max_likelihood(**args['rx_args'], **args['ml_args'], zeta=zeta)
-    res_bf, bf_surf, bf_grid = hybrid.solvers.bestfix(**args['rx_args'], **args['ml_args'], zeta=zeta)
-    _, res_ls = hybrid.solvers.least_square(**args['rx_args'], **args['ls_args'], zeta=zeta)
-    _, res_gd = hybrid.solvers.gradient_descent(**args['rx_args'], **args['gd_args'], zeta=zeta)
+    res_ml, ml_surf, ml_grid = pss.max_likelihood(zeta=zeta, search_space=ml_search)
+    res_bf, bf_surf, bf_grid = pss.bestfix(zeta=zeta, search_space=ml_search)
+    _, res_ls = pss.least_square(zeta=zeta, **ls_args)
+    _, res_gd = pss.gradient_descent(zeta=zeta, **gd_args)
 
     return {'ml': res_ml, 'ls': res_ls, 'gd': res_gd, 'bf': res_bf}
 
 
-def _plot_mc_iteration_result(args, results):
+def _plot_mc_iteration_result(pss: HybridPassiveSurveillanceSystem, args, results):
 
     # Generate plot of geographic laydown
     fig_geo, ax = plt.subplots()
-    if args['x_sensor'] is not None:
+    if args['plot_sensors_together']:
         # Plot all sensors together
-        time_freq_handle = plt.scatter(args['x_sensor'][0] / 1e3, args['x_sensor'][1] / 1e3,
+        time_freq_handle = plt.scatter(pss.pos[0] / 1e3, pss.pos[1] / 1e3,
                                        marker='o', label='Sensor')
     else:
         # Plot AOA and TDOA/FDOA separately
-        plt.scatter(args['x_aoa'][0] / 1e3, args['x_aoa'][1] / 1e3, marker='^', label='AOA Sensor')
-        time_freq_handle = plt.scatter(args['x_tdoa'][0] / 1e3, args['x_tdoa'][1] / 1e3,
+        plt.scatter(pss.aoa.pos[0] / 1e3, pss.aoa.pos[1] / 1e3, marker='^', label='AOA Sensor')
+        time_freq_handle = plt.scatter(pss.tdoa.pos[0] / 1e3, pss.tdoa.pos[1] / 1e3,
                                        marker='o', label='Time/Freq Sensor')
 
     # Add velocity arrows to FDOA sensors
-    for this_x, this_v in zip(args['x_fdoa'].T, args['v_fdoa'].T):
+    for this_x, this_v in zip(pss.fdoa.pos.T, pss.fdoa.vel.T):
         plt.arrow(x=this_x[0] / 1e3, y=this_x[1] / 1e3, dx=this_v[0] / 100, dy=this_v[1] / 100,
                   width=.1, head_width=.5, color=time_freq_handle.get_edgecolor())
 
@@ -381,12 +365,7 @@ def _plot_mc_iteration_result(args, results):
     plt.ylabel('[km]')
 
     # Compute and Plot CRLB and Error Ellipse Expectations
-    err_crlb = np.squeeze(hybrid.perf.compute_crlb(x_aoa=args['x_aoa'], x_tdoa=args['x_tdoa'],
-                                                   x_fdoa=args['x_fdoa'], v_fdoa=args['v_fdoa'],
-                                                   cov=args['cov'], x_source=args['x_source'],
-                                                   tdoa_ref_idx=args['tdoa_ref_idx'],
-                                                   fdoa_ref_idx=args['fdoa_ref_idx'],
-                                                   do_resample=args['do_resample']))
+    err_crlb = pss.compute_crlb(x_source=args['x_source'])
     crlb_cep50 = utils.errors.compute_cep50(err_crlb)/1e3  # [m]
     crlb_ellipse = utils.errors.draw_error_ellipse(x=args['x_source'], covariance=err_crlb,
                                                    num_pts=100, conf_interval=90)
@@ -445,3 +424,8 @@ def _plot_mc_iteration_result(args, results):
     plt.legend(loc='upper right')
 
     return fig_geo, fig_err
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

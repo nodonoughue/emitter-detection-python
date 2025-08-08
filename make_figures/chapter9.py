@@ -194,3 +194,7 @@ def make_figure_4(prefix=None):
         fig4.savefig(prefix + 'fig4.svg')
 
     return fig4
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)

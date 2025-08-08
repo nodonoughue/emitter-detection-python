@@ -18,6 +18,7 @@ import fdoa
 import hybrid
 from examples import chapter13
 from utils.covariance import CovarianceMatrix
+from utils import SearchSpace
 
 
 def make_all_figures(close_figs=False, force_recalc=False):
@@ -124,8 +125,8 @@ def make_figure_1(prefix=None, colors=None):
     plt.plot(xy_isochrone[0], xy_isochrone[1], color=colors(3), linestyle=':', label='Isochrone')
 
     # Draw isodoppler line
-    x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x1=x_sensor[0], v1=v_sensor[0],
-                                                            x2=x_sensor[1], v2=v_sensor[1],
+    x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x_ref=x_sensor[0], v_ref=v_sensor[0],
+                                                            x_test=x_sensor[1], v_test=v_sensor[1],
                                                             vdiff=velocity_diff, num_pts=1000, max_ortho=5)
 
     plt.plot(x_isodoppler, y_isodoppler, color=colors(4), linestyle='-.', label='Lines of Constant FDOA')
@@ -283,7 +284,7 @@ def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho: CovarianceM
     return fig
 
 
-def make_figures_3_4(prefix=None, rng=np.random.default_rng(0), force_recalc=False):
+def make_figures_3_4(prefix=None, rng=np.random.default_rng(), force_recalc=False):
     """
     Figures 3 and 4, Example 13.1: Homogeneous (3-mode) Sensors
 
@@ -317,7 +318,7 @@ def make_figures_3_4(prefix=None, rng=np.random.default_rng(0), force_recalc=Fal
     return fig3, fig4
 
 
-def make_figures_5_6(prefix=None, rng=np.random.default_rng(0), force_recalc=False):
+def make_figures_5_6(prefix=None, rng=np.random.default_rng(), force_recalc=False):
     """
     Figures 3 and 4, Example 13.2: Heterogeneous Sensors
 
@@ -394,7 +395,10 @@ def make_figure_7(prefix):
     num_elements = 201
     max_offset = 100e3
     grid_spacing = 2 * max_offset / (num_elements - 1)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=x_ctr, max_offset=max_offset, grid_spacing=grid_spacing)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=max_offset,
+                               epsilon=grid_spacing)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
     # Figure 13.7a
     print('Generating Figure 13.7a...')
@@ -403,7 +407,7 @@ def make_figure_7(prefix):
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
     # Set up contours
@@ -439,7 +443,7 @@ def make_figure_7(prefix):
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
     # Draw Figure
@@ -514,7 +518,10 @@ def make_figure_8(prefix):
     num_elements = 201
     max_offset = 100e3
     grid_spacing = 2 * max_offset / (num_elements - 1)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=x_ctr, max_offset=max_offset, grid_spacing=grid_spacing)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=max_offset,
+                               epsilon=grid_spacing)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
     # Figure 13.8a
     print('Generating Figure 13.8a...')
@@ -523,7 +530,7 @@ def make_figure_8(prefix):
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=None, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
     # Set up contours
@@ -559,7 +566,7 @@ def make_figure_8(prefix):
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=None, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
     # Draw Figure
@@ -628,13 +635,16 @@ def make_figure_9(prefix):
     num_elements = 201
     max_offset = 100e3
     grid_spacing = 2 * max_offset / (num_elements - 1)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(x_ctr=x_ctr, max_offset=max_offset, grid_spacing=grid_spacing)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=max_offset,
+                               epsilon=grid_spacing)
+    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
 
     # Compute CRLB
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=None, v_fdoa=None,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), newshape=grid_shape)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
     # Set up contours
@@ -662,3 +672,7 @@ def make_figure_9(prefix):
         fig9.savefig(prefix + 'fig9.svg')
 
     return fig9
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False, force_recalc=True)

@@ -104,3 +104,8 @@ def example2():
     plt.text(2.2, 2.3, r'$CEP_{50}$', fontsize=12)
 
     return fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

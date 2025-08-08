@@ -30,7 +30,7 @@ def run_all_examples(generate_data=True):
     return [fig1, fig2]
 
 
-def generate_ex1_data(rng=None):
+def generate_ex1_data(rng=np.random.default_rng()):
     """
     Generate data for Example 8.1, which will be stored in examples/chapter8_data.csv, and for Problems 8.5 and 8.6,
     which will be stored in hw/problem8_5.csv and hw/problem8_6.csv.
@@ -42,10 +42,6 @@ def generate_ex1_data(rng=None):
 
     :param rng: random number generator
     """
-
-    if rng is None:
-        rng = np.random.default_rng(0)
-
     # ===== Generate Data for Example 8.1 =====
     # Initialize PTT Radio Parameters
     tx_pwr = 10
@@ -213,7 +209,7 @@ def generate_ex1_data(rng=None):
              'd_lam': d_lam})
 
 
-def example1(rng=None):
+def example1(rng=np.random.default_rng()):
     """
     Executes Example 8.1, relying on the sample data in examples/ex8_1.mat, and generates one figure.
 
@@ -251,6 +247,7 @@ def example1(rng=None):
     th_peaks = 180*psi_peaks/np.pi
 
     # Call MVDR Beamformer
+    # ToDo: Doesn't look right; diagnose and fix.
     pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(data['x'], v, np.pi/2, 1001)
     peaks_mvdr, _ = find_peaks(pwr_vec_mvdr, prominence=.1*np.max(pwr_vec_mvdr))
     psi_peaks_mvdr = psi_vec[peaks_mvdr]
@@ -272,7 +269,7 @@ def example1(rng=None):
     return fig
 
 
-def example2(rng=None):
+def example2(rng=np.random.default_rng()):
     """
     Executes Example 8.2 and generates one figure
 
@@ -285,9 +282,6 @@ def example2(rng=None):
     :return: figure handle to generated graphic
     """
     
-    if rng is None:
-        rng = np.random.default_rng(0)
-        
     # Define transmitter values
     tx_pwr = 100
     tx_gain = 0
@@ -369,6 +363,7 @@ def example2(rng=None):
             this_err_beamscan[idx_mc] = np.abs(psi_vec[idx_pk]-psi)
     
             # Compute beamscan MVDR image
+            # ToDo: plot doesn't look right; diagnose and fix.
             pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(this_rx_signal[:, :, idx_mc], v, np.pi/2, 2001)
             idx_pk = np.argmax(np.abs(pwr_vec_mvdr))
             this_err_mvdr[idx_mc] = np.abs(psi_vec[idx_pk]-psi)
@@ -399,3 +394,8 @@ def example2(rng=None):
     plt.legend(loc='upper left')
 
     return fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

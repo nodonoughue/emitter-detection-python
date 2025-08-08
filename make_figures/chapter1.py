@@ -48,7 +48,7 @@ def make_all_figures(close_figs=False):
         return figs
 
 
-def make_figure_1(prefix=None, rng=None):
+def make_figure_1(prefix=None, rng=np.random.default_rng()):
     """
     Figure 1, Detection Threshold
 
@@ -258,3 +258,7 @@ def make_figure_3(prefix=None):
         fig3.savefig(prefix + 'fig3.png')
 
     return fig3
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False)

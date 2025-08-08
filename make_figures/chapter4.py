@@ -115,7 +115,7 @@ def make_figure_1a(prefix=None):
     return fig1a
 
 
-def make_figure_1b(prefix=None, rng=None):
+def make_figure_1b(prefix=None, rng=np.random.default_rng()):
     """
     Figure 1b - Figure 1b, Bandwidth
 
@@ -130,9 +130,6 @@ def make_figure_1b(prefix=None, rng=None):
     """
 
     print('Generating Figure 4.1b...')
-
-    if rng is None:
-        rng = np.random.default_rng()
 
     num_samples = 16  # Number of samples per cycle
     num_code_bits = 128  # Length of transmit code in bits
@@ -197,7 +194,7 @@ def make_figure_1b(prefix=None, rng=None):
     return fig1b
 
 
-def make_figure_2a(prefix=None, rng=None):
+def make_figure_2a(prefix=None, rng=np.random.default_rng()):
     """
     Figure 2a - Chip Rate
 
@@ -212,9 +209,6 @@ def make_figure_2a(prefix=None, rng=None):
     """
 
     print('Generating Figure 4.2a...')
-
-    if rng is None:
-        rng = np.random.default_rng()
 
     # Generate the digital signals
     rate_data = 4   # bits/sec
@@ -231,8 +225,8 @@ def make_figure_2a(prefix=None, rng=None):
     out_bits_full = out_bits_full.astype(int)
 
     # Convert from bits to symbols
-    data_symbols = np.reshape(np.exp(1j*np.pi*data_bits_full), newshape=(num_full_bits, 1))
-    code_symbols = np.reshape(np.exp(1j*np.pi*code_bits_full), newshape=(num_full_bits, 1))
+    data_symbols = np.reshape(np.exp(1j*np.pi*data_bits_full), shape=(num_full_bits, 1))
+    code_symbols = np.reshape(np.exp(1j*np.pi*code_bits_full), shape=(num_full_bits, 1))
     out_symbols = np.reshape(np.exp(1j*np.pi*out_bits_full), newshape=(num_full_bits, 1))
 
     # Generate the signals
@@ -277,7 +271,7 @@ def make_figure_2a(prefix=None, rng=None):
     return fig2a
 
 
-def make_figure_2b(prefix=None, rng=None):
+def make_figure_2b(prefix=None, rng=np.random.default_rng()):
     """
     Figure 2b - Spectrum
 
@@ -292,9 +286,6 @@ def make_figure_2b(prefix=None, rng=None):
     """
 
     print('Generating Figure 4.2b...')
-
-    if rng is None:
-        rng = np.random.default_rng(0)
 
     num_monte_carlo = 1000
 
@@ -457,7 +448,7 @@ def make_figure_5(prefix=None, colors=None):
     return fig5
 
 
-def make_figure_6(prefix=None, rng=None, colors=None):
+def make_figure_6(prefix=None, rng=np.random.default_rng(), colors=None):
     """
     Figures 6, Comparison of Performance
 
@@ -628,3 +619,7 @@ def make_figure_8(prefix=None, colors=None):
         fig8.savefig(prefix + 'fig8.png')
 
     return fig8
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False)

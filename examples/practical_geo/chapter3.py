@@ -3,10 +3,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 import utils
+from tdoa import TDOAPassiveSurveillanceSystem
+from fdoa import FDOAPassiveSurveillanceSystem
+from hybrid import HybridPassiveSurveillanceSystem
 from utils.covariance import CovarianceMatrix
-import tdoa
-import hybrid
 import time
+from utils import SearchSpace
 
 
 _rad2deg = 180.0/np.pi
@@ -98,7 +100,9 @@ def example2(colors=None, do_video_example=False):
     # Define Covariance Matrix
     err_time = 100e-9
     cov_full = CovarianceMatrix(err_time**2 * np.eye(num_sensors))
-    # cov_full.multiply(utils.constants.speed_of_light**2)  # Convert from TOA to ROA
+
+    # Make the PSS Object
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_sensors, ref_idx=None, cov=cov_full, variance_is_toa=True)
 
     # Plot geometry
     fig = plt.figure()
@@ -119,7 +123,10 @@ def example2(colors=None, do_video_example=False):
     # alt = 5e3
     # x_ctr = np.array([0., 0., alt])                       # It's 3D coordinates, so we need a 3D center point
     # search_size = np.array([max_offset, max_offset, 0])   # don't search the z-dimension, though
-    x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr, search_size, grid_res)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=search_size,
+                               epsilon=grid_res)
+    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
     extent = (x_ctr[0] - max_offset, x_ctr[0] + max_offset, x_ctr[1] - max_offset, x_ctr[1] + max_offset)
 
     # Use a squeeze operation to ensure that the individual dimension indices in x_grid are 2D
@@ -132,9 +139,11 @@ def example2(colors=None, do_video_example=False):
     levels = [.01, 1, 5, 10, 25, 50, 100, 200]
 
     for this_ref_set in ref_set:
+        # Update the PSS system's reference index
+        tdoa.ref_idx = this_ref_set
+
         # Compute CRLB
-        this_crlb = tdoa.perf.compute_crlb(x_sensor=x_sensors, x_source=x_source, cov=cov_full, variance_is_toa=True,
-                                           ref_idx=this_ref_set, print_progress=True)
+        this_crlb = tdoa.compute_crlb(x_source=x_source, print_progress=True)
         # Response should be N x N x 3, where grid_shape = N x N x 1
 
         # Compute CEP50
@@ -152,12 +161,15 @@ def example2(colors=None, do_video_example=False):
         c[0, 0] = 10 * c[0, 0]          # Multiply the first sensor's error by 10
         cov_full = CovarianceMatrix(c)  # Make a new covariance matrix object
 
+        # Make a new TDOA object
+        tdoa = TDOAPassiveSurveillanceSystem(x=x_sensors, cov=cov_full, ref_idx=None, variance_is_toa=True)
         ref_set = [0, 'full']
 
         for this_ref_set in ref_set:
+            tdoa.ref_idx = this_ref_set
+
             # Compute CRLB
-            this_crlb = tdoa.perf.compute_crlb(x_sensor=x_sensors, x_source=x_source, cov=cov_full, variance_is_toa=True,
-                                               ref_idx=this_ref_set, print_progress=True)
+            this_crlb = tdoa.compute_crlb(x_source=x_source, print_progress=True)
 
             # Compute CEP50
             this_cep = utils.errors.compute_cep50(this_crlb)
@@ -209,8 +221,14 @@ def example3(colors=None):
     rng_err = utils.constants.speed_of_light * time_err  # meters (ROA)
     rng_rate_err = lam * freq_err                        # meters/second (RROA)
     cov_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
-    cov_foa = CovarianceMatrix(rng_rate_err ** 2 * np.eye(num_sensors))
-    cov_full = CovarianceMatrix.block_diagonal(cov_roa, cov_foa)  # Measurement level error (ROA/RROA)
+    cov_rroa = CovarianceMatrix(rng_rate_err ** 2 * np.eye(num_sensors))
+    # cov_full = CovarianceMatrix.block_diagonal(cov_roa, cov_rroa)  # Measurement level error (ROA/RROA)
+
+    # Make the PSS Objects
+    aoa = None
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_sensors, cov=cov_roa, variance_is_toa=False, ref_idx=None)
+    fdoa = FDOAPassiveSurveillanceSystem(x=x_sensors, vel=v_sensors, cov=cov_rroa, ref_idx=None)
+    hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=fdoa)
 
     # Plot geometry
     fig = plt.figure()
@@ -235,8 +253,10 @@ def example3(colors=None):
 
     num_grid_points_per_axis = 301
     grid_res = 2 * max_offset / num_grid_points_per_axis
-
-    x_source, x_grid, grid_shape = utils.make_nd_grid(x_ctr, search_size, grid_res)
+    search_space = SearchSpace(x_ctr=x_ctr,
+                               max_offset=search_size,
+                               epsilon=grid_res)
+    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
     extent = (x_ctr[0] - max_offset, x_ctr[0] + max_offset, x_ctr[1] - max_offset, x_ctr[1] + max_offset)
 
     # Use a squeeze operation to ensure that the individual dimension
@@ -252,11 +272,13 @@ def example3(colors=None):
     levels = [0.1, 0.5, 1, 5, 10, 25]
 
     for this_ref in ref_set:
+        tdoa.ref_idx = this_ref
+        fdoa.ref_idx = this_ref
+        # We updated the reference indices; we need to alert the Hybrid system to update its version
+        hybrid.update_reference_indices()
 
         # Use the same sensors and reference indices for both TDOA and FDOA; set AOA to none
-        this_crlb = hybrid.perf.compute_crlb(x_aoa=None, x_tdoa=x_sensors, x_fdoa=x_sensors, v_fdoa=v_sensors,
-                                             x_source=x_source, cov=cov_full, do_resample=True,
-                                             tdoa_ref_idx=this_ref, fdoa_ref_idx=this_ref, print_progress=True)
+        this_crlb = hybrid.compute_crlb(x_source=x_source, print_progress=True)
 
         this_rmse = np.sqrt(np.trace(this_crlb, axis1=0, axis2=1))
 
@@ -293,12 +315,12 @@ def example4(rng=np.random.default_rng()):
     cov_toa = CovarianceMatrix((time_err**2) * np.eye(num_tdoa))
     cov_roa = cov_toa.multiply(utils.constants.speed_of_light**2, overwrite=False)
 
-    # TDOA Measurement and Combined Covariance Matrix
-    z_common = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_source, ref_idx=None)  # num_tdoa x num_mc
-    z_full = tdoa.model.measurement(x_sensor=x_tdoa, x_source=x_source, ref_idx='full')
+    pss_common = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=None, variance_is_toa=False)
+    pss_full = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx='full', variance_is_toa=False)
 
-    cov_z_common = cov_roa.resample(ref_idx=None)  # RDOA
-    cov_z_full = cov_roa.resample(ref_idx='full')  # RDOA
+    # TDOA Measurement and Combined Covariance Matrix
+    z_common = pss_common.measurement(x_source=x_source)  # num_tdoa x num_mc
+    z_full = pss_full.measurement(x_source=x_source)
 
     # Generate random noise
     noise_sensor = cov_roa.lower @ rng.standard_normal(size=(num_tdoa, num_mc))
@@ -311,12 +333,16 @@ def example4(rng=np.random.default_rng()):
 
     # ---- Set Up Solution Parameters ----
     # ML Search Parameters
-    ml_args = dict(x_ctr=np.array([2.5, 2.5]) * 1e3, search_size=np.array([5, 5]) * 1e3,
-                   epsilon=20)  # meters, grid resolution
+    ml_search = SearchSpace(x_ctr=np.array([2.5, 2.5]) * 1e3,
+                            max_offset=np.array([5, 5]) * 1e3,
+                            epsilon=20)  # meters, grid resolution
 
     # GD and LS Search Parameters
-    gd_ls_args = dict(x_init=np.array([1, 1]) * 1e3, epsilon=ml_args['epsilon'], max_num_iterations=200,
-                      force_full_calc=True, plot_progress=False)
+    gd_ls_args = dict(x_init=np.array([1, 1]) * 1e3,
+                      epsilon=ml_search.epsilon,
+                      max_num_iterations=200,
+                      force_full_calc=True,
+                      plot_progress=False)
 
     rmse_ml = np.zeros((num_mc,))
     rmse_gd = np.zeros((num_mc, gd_ls_args['max_num_iterations']))
@@ -332,7 +358,6 @@ def example4(rng=np.random.default_rng()):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    res = {}  # Pre-define to avoid a warning later
     for idx in np.arange(num_mc):
         utils.print_progress(num_mc, idx, iterations_per_marker, iterations_per_row, t_start)
 
@@ -340,15 +365,17 @@ def example4(rng=np.random.default_rng()):
         this_zeta_common = zeta_common[:, idx]
         this_zeta_full = zeta_full[:, idx]
 
-        res = _mc_iteration(x_tdoa, this_zeta_common, this_zeta_full, cov_z_common, cov_z_full, ml_args, gd_ls_args)
+        res_common = _mc_iteration(pss_common, this_zeta_common, ml_search, gd_ls_args)
+        res_full = _mc_iteration(pss_full, this_zeta_full, ml_search, gd_ls_args)
 
-        rmse_ml[idx] = np.linalg.norm(res['ml'] - this_source)
-        rmse_gd[idx, :] = np.linalg.norm(res['gd'] - this_source[:, np.newaxis], axis=0)
-        rmse_ls[idx, :] = np.linalg.norm(res['ls'] - this_source[:, np.newaxis], axis=0)
+        rmse_ml[idx] = np.linalg.norm(res_common['ml'] - this_source)
+        rmse_gd[idx, :] = np.linalg.norm(res_common['gd'] - this_source[:, np.newaxis], axis=0)
+        rmse_ls[idx, :] = np.linalg.norm(res_common['ls'] - this_source[:, np.newaxis], axis=0)
 
-        rmse_ml_full[idx] = np.linalg.norm(res['ml_full'] - this_source)
-        rmse_gd_full[idx, :] = np.linalg.norm(res['gd_full'] - this_source[:, np.newaxis], axis=0)
-        rmse_ls_full[idx, :] = np.linalg.norm(res['ls_full'] - this_source[:, np.newaxis], axis=0)
+        rmse_ml_full[idx] = np.linalg.norm(res_full['ml'] - this_source)
+        rmse_gd_full[idx, :] = np.linalg.norm(res_full['gd'] - this_source[:, np.newaxis], axis=0)
+        rmse_ls_full[idx, :] = np.linalg.norm(res_full['ls'] - this_source[:, np.newaxis], axis=0)
+
     print('done')
     t_elapsed = time.perf_counter() - t_start
     utils.print_elapsed(t_elapsed)
@@ -382,10 +409,9 @@ def example4(rng=np.random.default_rng()):
 
     # ---- Estimate Error Bounds ----
     # CRLB
-    crlb_common = np.squeeze(tdoa.perf.compute_crlb(x_source=x_source_ctr, x_sensor=x_tdoa, cov=cov_z_common,
-                                                    ref_idx=None, do_resample=False, variance_is_toa=False))
-    crlb_full = np.squeeze(tdoa.perf.compute_crlb(x_source=x_source_ctr, x_sensor=x_tdoa, cov=cov_z_full,
-                                                  ref_idx='full', do_resample=False, variance_is_toa=False))
+    crlb_common = np.squeeze(pss_common.compute_crlb(x_source=x_source_ctr))
+    crlb_full = np.squeeze(pss_full.compute_crlb(x_source=x_source_ctr))
+
     print('CRLB (using common sensor:')
     print('{} m^2'.format(np.matrix(crlb_common)))
     print('CRLB (using full sensor:')
@@ -412,12 +438,12 @@ def example4(rng=np.random.default_rng()):
 
     # ---- Plot Results from the final Monte Carlo iteration----
     # x_init = gd_ls_args['x_init']
-    x_ml = res['ml']
-    x_ls = res['ls']
-    x_gd = res['gd']
-    x_ml_full = res['ml_full']
-    x_ls_full = res['ls_full']
-    x_gd_full = res['gd_full']
+    x_ml = res_common['ml']
+    x_ls = res_common['ls']
+    x_gd = res_common['gd']
+    x_ml_full = res_full['ml']
+    x_ls_full = res_full['ls']
+    x_gd_full = res_full['gd']
 
     fig_full = plt.figure()
     plt.scatter(x_source[0, -1], x_source[1, -1], marker='x', color='k', label='Target', clip_on=False, zorder=3)
@@ -445,8 +471,7 @@ def example4(rng=np.random.default_rng()):
     return fig_err, fig_full
 
 
-def _mc_iteration(x_tdoa, zeta_common, zeta_full, cov_z_common: CovarianceMatrix, cov_z_full: CovarianceMatrix,
-                  ml_args, gd_ls_args):
+def _mc_iteration(pss:TDOAPassiveSurveillanceSystem, zeta, ml_search: SearchSpace, gd_ls_args):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 3.4.
 
@@ -454,9 +479,6 @@ def _mc_iteration(x_tdoa, zeta_common, zeta_full, cov_z_common: CovarianceMatrix
                 ml:         Maximum Likelihood solution with default common sensor
                 gd:         Gradient Descent solution with default common sensor
                 ls:         Least Squares solution with default common sensor
-                ml_full     Maximum Likelihood solution with 'full' sensor pairs
-                gd_full     Gradient Descent solution with 'full' sensor pairs
-                ls_full:    Least Squares solution with 'full' sensor pairs
 
     Nicholas O'Donoughue
     28 January 2025
@@ -464,30 +486,15 @@ def _mc_iteration(x_tdoa, zeta_common, zeta_full, cov_z_common: CovarianceMatrix
 
     # ---- Apply Various Solvers ----
     # ML Solution
-    x_ml, _, _ = tdoa.solvers.max_likelihood(rho=zeta_common, cov=cov_z_common, x_sensor=x_tdoa, ref_idx=None,
-                                             do_resample=False, **ml_args)
+    x_ml, _, _ = pss.max_likelihood(zeta=zeta, search_space=ml_search)
 
     # GD Solution
-    _, x_gd = tdoa.solvers.gradient_descent(rho=zeta_common, cov=cov_z_common, x_sensor=x_tdoa, ref_idx=None,
-                                            do_resample=False, **gd_ls_args)
+    _, x_gd = pss.gradient_descent(zeta=zeta, **gd_ls_args)
 
     # LS Solution
-    _, x_ls = tdoa.solvers.least_square(rho=zeta_common, cov=cov_z_common, x_sensor=x_tdoa, ref_idx=None,
-                                        do_resample=False, **gd_ls_args)
+    _, x_ls = pss.least_square(zeta=zeta, **gd_ls_args)
 
-    # ML Solution -- Full Sensor Pairs
-    x_ml_full, _, _ = tdoa.solvers.max_likelihood(rho=zeta_full, cov=cov_z_full, x_sensor=x_tdoa, ref_idx='full',
-                                                  do_resample=False, **ml_args)
-
-    # GD Solution -- Full Sensor Pairs
-    _, x_gd_full = tdoa.solvers.gradient_descent(rho=zeta_full, cov=cov_z_full, x_sensor=x_tdoa, ref_idx='full',
-                                                 do_resample=False, **gd_ls_args)
-
-    # LS Solution -- Full Sensor Pairs
-    _, x_ls_full = tdoa.solvers.least_square(rho=zeta_full, cov=cov_z_full, x_sensor=x_tdoa, ref_idx='full',
-                                             do_resample=False, ** gd_ls_args)
-
-    return {'ml': x_ml, 'ls': x_ls, 'gd': x_gd, 'ml_full': x_ml_full, 'ls_full': x_ls_full, 'gd_full': x_gd_full}
+    return {'ml': x_ml, 'ls': x_ls, 'gd': x_gd}
 
 
 def _plot_contourf(x_grid, extent, grid_shape_2d, z, x_sensors, v_sensors, levels, colors):
@@ -511,3 +518,8 @@ def _plot_contourf(x_grid, extent, grid_shape_2d, z, x_sensors, v_sensors, level
     plt.grid(False)
 
     return this_fig
+
+
+if __name__ == '__main__':
+    run_all_examples()
+    plt.show()

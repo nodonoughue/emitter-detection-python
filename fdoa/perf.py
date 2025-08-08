@@ -31,7 +31,7 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov: CovarianceMatrix, v_source=N
     """
 
     # Parse inputs
-    _, n_source = utils.safe_2d_shape(x_source)
+    n_dim, n_source = utils.safe_2d_shape(x_source)
 
     # Make sure that xs is 2D
     if n_source == 1:
@@ -42,8 +42,11 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov: CovarianceMatrix, v_source=N
 
     # Define a wrapper for the jacobian matrix that accepts only the position 'x'
     def jacobian(x):
-        return model.jacobian(x_sensor=x_sensor, v_sensor=v_sensor,
-                              x_source=x, v_source=v_source, ref_idx=ref_idx)
+        j= model.jacobian(x_sensor=x_sensor, v_sensor=v_sensor,
+                          x_source=x, v_source=v_source, ref_idx=ref_idx)
+        # the jacobian will return the gradient with respect to both position and velocity, if asked for
+        # just grab the first num_dim rows
+        return j[:n_dim]
 
     crlb = utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=jacobian, cov=cov,
                                             print_progress=print_progress, **kwargs)

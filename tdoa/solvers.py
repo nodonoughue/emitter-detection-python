@@ -1,5 +1,5 @@
 import utils
-# from ..utils import solvers
+from utils import SearchSpace
 from . import model
 import numpy as np
 from utils.covariance import CovarianceMatrix
@@ -7,8 +7,8 @@ from scipy.linalg import pinvh
 solvers = utils.solvers
 
 
-def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon=None, ref_idx=None,
-                   do_resample=False, **kwargs):
+def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, search_space:SearchSpace, ref_idx=None,
+                   do_resample=False, variance_is_toa=False, bias=None, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -16,34 +16,100 @@ def max_likelihood(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, eps
     coordinates, as well.
 
     :param x_sensor: Sensor positions [m]
-    :param rho: Measurement vector [m]
+    :param zeta: Measurement vector [m]
     :param cov: Measurement error covariance matrix
     :param x_ctr: Center of search grid [m]
     :param search_size: 2-D vector of search grid sizes [m]
     :param epsilon: Desired resolution of search grid [m]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+    it is in m^2
+    :param bias: measurement bias (optional)
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions
     """
 
-    # Resample the covariance matrix
-    if do_resample:
-        cov = cov.resample(ref_idx=ref_idx)
+    # Resample the covariance matrix, if needed
+    cov = preprocess_cov(cov=cov, do_resample=do_resample, variance_is_toa=variance_is_toa, ref_idx=ref_idx)
 
     # Set up function handle
     def ell(x):
-        return model.log_likelihood(x_sensor, rho, cov, x, ref_idx, do_resample=False, variance_is_toa=False)
+        return model.log_likelihood(x_sensor, zeta, cov, x, ref_idx, do_resample=False, variance_is_toa=False,
+                                    bias=bias)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
+    x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, search_space=search_space,
                                                   **kwargs)
 
     return x_est, likelihood, x_grid
 
+# todo: delete this, once the new max_likelihood_uncertainty functions are good
+# def max_likelihood_uncertainty(x_sensor, zeta, cov: CovarianceMatrix, cov_pos: CovarianceMatrix, x_ctr, search_size,
+#                                epsilon=None, ref_idx=None, do_resample=False, variance_is_toa=False,
+#                                do_sensor_bias=False, **kwargs):
+#     """
+#     Construct the ML Estimate with uncertainty. Uses the utility function utils.make_uncertainty_search_space to handle
+#     defaults, such as the number of grid points and search size to use for sensor bias terms and sensor position
+#     uncertainty. To ignore these, fully define the x_ctr, search_size, and epsilon terms to consider those
+#     parameters (in which case, each should have (n_dim+1)*(n_sensor+1) entries to reflect source position,
+#     sensor measurement bias, and sensor position uncertainty).
+#
+#     :param x_sensor: Sensor positions [m]
+#     :param zeta: Measurement vector [m]
+#     :param cov: Measurement error covariance matrix
+#     :param cov_pos: Sensor position error covariance matrix
+#     :param x_ctr: Center of search grid [m]; scalar or array with n_dim or (n_dim+1)*(n_sensor+1) entries.
+#     :param search_size: vector of search grid sizes [m]; scalar or array with n_dim or (n_dim+1)*(n_sensor+1) entries.
+#     :param epsilon: Desired resolution of search grid [m]; scalar or array with n_dim or (n_dim+1)*(n_sensor+1) entries.
+#     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
+#     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+#     :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+#     it is in m^2
+#     :param do_sensor_bias: Boolean flag; if true, then sensor bias terms will be included in search
+#     :return x_est: Estimated source position [m]
+#     :return bias_est: Estimated sensor bias [m]
+#     :return sensor_pos_est: Estimated sensor positions [m]
+#     :return likelihood: Likelihood computed across the entire set of candidate source positions
+#     :return x_grid: Candidate source positions
+#     """
+#
+#     num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
+#
+#     # Resample the covariance matrix, if needed
+#     cov = preprocess_cov(cov=cov, do_resample=do_resample, variance_is_toa=variance_is_toa, ref_idx=ref_idx)
+#
+#     # Make sure the search space is properly defined, and parse the parameter indices
+#     search_params = {'th_center': x_ctr,
+#                      'search_size': search_size,
+#                      'search_resolution': epsilon,
+#                      'do_tdoa_bias': do_sensor_bias,
+#                      'x_tdoa': x_sensor}
+#     search_center, search_size, search_resolution, param_indices = utils.make_uncertainty_search_space(**search_params)
+#
+#     # Set up function handle
+#     # We must take care to ensure that it can handle an n_th x N matrix of
+#     # inputs; for compatibility with how utils.solvers.ml_solver will call it.
+#     def ell(theta):
+#         return model.log_likelihood_uncertainty(x_sensor=x_sensor, zeta=zeta, cov=cov,
+#                                                 cov_pos=cov_pos, theta=theta, ref_idx=ref_idx,
+#                                                 do_resample=False, variance_is_toa=False,
+#                                                 do_sensor_bias=do_sensor_bias)
+#
+#     # Call the util function
+#     th_est, likelihood, x_grid = solvers.ml_solver(ell=ell, x_ctr=x_ctr, search_size=search_size, epsilon=epsilon,
+#                                                    **kwargs)
+#
+#     x_est = th_est[param_indices['source_pos']]
+#     bias_est = th_est[param_indices['bias']] if do_sensor_bias else None
+#     sensor_pos_est = np.reshape(th_est[param_indices['tdoa_pos']], (num_dim, num_sensors)) if cov_pos is not None else None
+#
+#     return x_est, bias_est, sensor_pos_est, likelihood, x_grid
 
-def gradient_descent(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False, **kwargs):
+
+def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
+                     variance_is_toa=False, bias=None, **kwargs):
     """
     Computes the gradient descent solution for tdoa processing.
 
@@ -53,24 +119,26 @@ def gradient_descent(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None,
     21 February 2021
 
     :param x_sensor: tdoa sensor positions [m]
-    :param rho: Measurement vector
+    :param zeta: Measurement vector
     :param cov: tdoa error covariance matrix
-    :param x_init: Initial estimate of source position [m]
+    :param x_init: Initial estimate of uncertainties (source position, sensor biases, sensor positions)
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+    it is in m^2
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
 
+    # Resample the covariance matrix, if needed
+    cov = preprocess_cov(cov=cov, do_resample=do_resample, variance_is_toa=variance_is_toa, ref_idx=ref_idx)
+
     # Initialize measurement error and jacobian functions
     def y(this_x):
-        return rho - model.measurement(x_sensor, this_x, ref_idx=ref_idx)
+        return zeta - model.measurement(x_sensor, this_x, ref_idx=ref_idx, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
-
-    if do_resample:
-        cov = cov.resample(ref_idx=ref_idx)
 
     # Call generic Gradient Descent solver
     x, x_full = solvers.gd_solver(y=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
@@ -78,7 +146,8 @@ def gradient_descent(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None,
     return x, x_full
 
 
-def least_square(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False, **kwargs):
+def least_square(x_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
+                 variance_is_toa=False, bias=None, **kwargs):
     """
     Computes the least square solution for tdoa processing.
 
@@ -88,24 +157,26 @@ def least_square(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None, do_
     21 February 2021
 
     :param x_sensor: Sensor positions [m]
-    :param rho: Range Difference Measurements [m/s]
+    :param zeta: Range Difference Measurements [m/s]
     :param cov: Measurement Error Covariance Matrix [(m/s)^2]
     :param x_init: Initial estimate of source position [m]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+    it is in m^2
     :return x: Estimated source position
     :return x_full: Iteration-by-iteration estimated source positions
     """
 
+    # Resample the covariance matrix, if needed
+    cov = preprocess_cov(cov=cov, do_resample=do_resample, variance_is_toa=variance_is_toa, ref_idx=ref_idx)
+
     # Initialize measurement error and Jacobian function handles
     def y(this_x):
-        return rho - model.measurement(x_sensor, this_x, ref_idx=ref_idx)
+        return zeta - model.measurement(x_sensor, this_x, ref_idx=ref_idx, bias=bias)
 
     def jacobian(this_x):
         return model.jacobian(x_sensor, this_x, ref_idx=ref_idx)
-
-    if do_resample:
-        cov = cov.resample(ref_idx=ref_idx)
 
     # Call the generic Least Square solver
     x, x_full = solvers.ls_solver(zeta=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
@@ -113,8 +184,8 @@ def least_square(x_sensor, rho, cov: CovarianceMatrix, x_init, ref_idx=None, do_
     return x, x_full
 
 
-def bestfix(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon, ref_idx=None, pdf_type=None,
-            do_resample=False):
+def bestfix(x_sensor, zeta, cov: CovarianceMatrix, search_space: SearchSpace, ref_idx=None, pdf_type=None,
+            do_resample=False, variance_is_toa=False):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
     a series of coordinates, and returning the index of the maximum.
@@ -135,36 +206,34 @@ def bestfix(x_sensor, rho, cov: CovarianceMatrix, x_ctr, search_size, epsilon, r
     21 February 2021
 
     :param x_sensor: Sensor positions [m]
-    :param rho: Measurement vector [Hz]
+    :param zeta: Measurement vector [Hz]
     :param cov: Measurement error covariance matrix
-    :param x_ctr: Center of search grid [m]
-    :param search_size: 2-D vector of search grid sizes [m]
-    :param epsilon: Desired resolution of search grid [m]
     :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings
     :param pdf_type: String indicating the type of distribution to use. See +utils/makePDFs.m for options.
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+    it is in m^2
     :return x_est: Estimated source position [m]
     :return likelihood: Likelihood computed across the entire set of candidate source positions
     :return x_grid: Candidate source positions
     """
 
+    # Resample the covariance matrix, if needed
+    cov = preprocess_cov(cov=cov, do_resample=do_resample, variance_is_toa=variance_is_toa, ref_idx=ref_idx)
+
     # Generate the PDF
     def measurement(x):
         return model.measurement(x_sensor, x, ref_idx)
 
-    # Resample the covariance matrix
-    if do_resample:
-        cov = cov.resample(ref_idx=ref_idx)
-
-    pdfs = utils.make_pdfs(measurement, rho, pdf_type, cov.cov)
+    pdfs = utils.make_pdfs(measurement, zeta, pdf_type, cov.cov)
 
     # Call the util function
-    x_est, likelihood, x_grid = solvers.bestfix(pdfs, x_ctr, search_size, epsilon)
+    x_est, likelihood, x_grid = solvers.bestfix(pdfs, search_space)
 
     return x_est, likelihood, x_grid
 
 
-def chan_ho(x_sensor, rho, cov: CovarianceMatrix, ref_idx=None, do_resample=False):
+def chan_ho(x_sensor, zeta, cov: CovarianceMatrix, ref_idx=None, do_resample=False, variance_is_toa=False):
     """
     Computes the Chan-Ho solution for TDOA processing.
 
@@ -178,14 +247,19 @@ def chan_ho(x_sensor, rho, cov: CovarianceMatrix, ref_idx=None, do_resample=Fals
     11 March 2021
     
     :param x_sensor: sensor positions [m]
-    :param rho: range-difference measurements [m]
+    :param zeta: range-difference measurements [m]
     :param cov: error covariance matrix for range-difference [m]
     :param ref_idx: index of the reference sensor for TDOA processing. Default is the last sensor. Must be scalar.
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
+    it is in m^2
     :return: estimated source position [m]
     """
 
     # TODO: Debug
+
+    # Resample the covariance matrix, if needed
+    cov = preprocess_cov(cov=cov, do_resample=do_resample, variance_is_toa=variance_is_toa, ref_idx=ref_idx)
 
     # Accept an arbitrary reference position
     n_dims, n_sensor = np.shape(x_sensor)
@@ -202,10 +276,6 @@ def chan_ho(x_sensor, rho, cov: CovarianceMatrix, ref_idx=None, do_resample=Fals
         # the following code block will handle its resampling to account
         # for the test and reference indices.
 
-    # Resample the covariance matrix
-    if do_resample:
-        cov = cov.resample(ref_idx=ref_idx)
-
     # Stage 1: Initial Position Estimate
     # Compute system matrix overline(A) according to 11.23
 
@@ -213,10 +283,10 @@ def chan_ho(x_sensor, rho, cov: CovarianceMatrix, ref_idx=None, do_resample=Fals
     # NOTE: In python, indexing with [-1] is the final entry, while [:-1] is all
     # entries *except* the last entry in a list or array.
     r = np.sqrt(np.sum(np.fabs(x_sensor) ** 2, axis=0))
-    y1 = (rho**2-r[:-1]**2+r[-1]**2)
+    y1 = (zeta ** 2 - r[:-1] ** 2 + r[-1] ** 2)
     last_sensor = x_sensor[:, -1]
     dx = x_sensor[:, :-1] - last_sensor[:, np.newaxis]
-    g1 = -2*np.concatenate((np.transpose(dx), rho[:, np.newaxis]), axis=1)
+    g1 = -2*np.concatenate((np.transpose(dx), zeta[:, np.newaxis]), axis=1)
 
     # Compute initial position estimate overline(theta) according to 11.25
     b = np.eye(n_sensor-1)
@@ -325,3 +395,16 @@ def _chan_ho_theta_hat(cov_mod, b2, g1, g2, y2):
     theta = np.linalg.lstsq(g2wg2, g2wy, rcond=None)[0]
 
     return theta
+
+
+def preprocess_cov(cov: CovarianceMatrix, ref_idx=None, do_resample=False, variance_is_toa=False):
+    if variance_is_toa:
+        # Convert from TOA/TDOA to ROA/RDOA -- copy to a new object for sanity's sake
+        cov_out = cov.multiply(utils.constants.speed_of_light ** 2, overwrite=False)
+    else:
+        cov_out = cov.copy()
+
+    if do_resample:
+        cov_out = cov_out.resample(ref_idx=ref_idx)
+
+    return cov_out

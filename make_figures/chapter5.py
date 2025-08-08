@@ -118,3 +118,7 @@ def make_figure_7(prefix=None):
         fig7.savefig(prefix + 'fig7.png')
 
     return fig7
+
+
+if __name__ == "__main__":
+    make_all_figures(close_figs=False)
