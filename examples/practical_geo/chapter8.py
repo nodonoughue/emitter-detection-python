@@ -327,7 +327,7 @@ def example2(rng=np.random.default_rng()):
     sigma_psi = sigma_theta*_deg2rad # rad
     num_msmt=2 # az/el
     cov_psi = CovarianceMatrix(sigma_psi**2*np.eye(num_msmt)) # measurement error covariance
-    aoa = DirectionFinder(x_aoa_full, cov=cov_psi, do_2d_aoa=False)
+    aoa = DirectionFinder(x_aoa_full[:, 0], cov=cov_psi, do_2d_aoa=True)
 
     # Add DF overlays
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
@@ -337,6 +337,9 @@ def example2(rng=np.random.default_rng()):
         this_ac_pos = x_aoa_full[:2, idx_overlay]
         this_tgt_pos = x_tgt_full[:2,idx_overlay]
 
+        # Az/El
+        # Since we only fed in 2D sensor/tgt positions, that overrides the do_2d_aoa flag and forces a return
+        # of just azimuth measurement
         psi_true = aoa.measurement(x_source=this_tgt_pos, x_sensor=this_ac_pos)
         psi_err_plus = psi_true + sigma_psi
         psi_err_minus = psi_true - sigma_psi
@@ -357,8 +360,9 @@ def example2(rng=np.random.default_rng()):
 
     # ===  Generate Measurements
     do2daoa = aoa.do_2d_aoa
+    num_msmt = aoa.num_measurements
     z = np.array([aoa.measurement(x_source=this_x_source.T, x_sensor=this_x_sensor.T) 
-                  for this_x_source, this_x_sensor in zip(x_tgt_full.T, x_aoa_full.T)])
+                  for this_x_source, this_x_sensor in zip(x_tgt_full.T, x_aoa_full.T)]).T
     noise = sigma_psi * rng.standard_normal((num_msmt, num_time))
     zeta = z + noise
 
@@ -369,13 +373,13 @@ def example2(rng=np.random.default_rng()):
 
     f_fun, q_fun, state_space = tracker.make_kinematic_model('cv',num_dims,sigma_a**2)
     num_states = state_space['num_states']
-    pos_idx = state_space['pos_idx']
-    vel_idx = state_space['vel_idx']
+    pos_slice = state_space['pos_slice']
+    vel_slice = state_space['vel_slice']
     f = f_fun(t_inc) # generate state transition matrix
     q = q_fun(t_inc) # generate process noise covariance matrix
 
     # ===  Initialize Track State
-    x_pred = np.zeros((num_states,1))
+    x_pred = np.zeros((num_states,))
     p_pred = np.zeros((num_states, num_states))
 
     # Initialize position with AOA estimate from first three measurement
@@ -387,20 +391,19 @@ def example2(rng=np.random.default_rng()):
     
     x_init_guess = np.array([10e3, 10e3, 0])
     bnd, bnd_grad = utils.constraints.fixed_alt(0, 'flat')
-    x_init = aoa_init.gradient_descent(zeta=z_init, x_init=x_init_guess, eq_constraints=[bnd])
+    x_init, _ = aoa_init.gradient_descent(zeta=z_init, x_init=x_init_guess, eq_constraints=[bnd])
     p_init = aoa_init.compute_crlb(x_source=x_init, eq_constraints_grad=[bnd_grad])
-    # x_init = triang.gdSoln(x_aoa_init,z_init,C_init,x_init_guess)
-    # P_init = triang.computeCRLB(x_aoa_init,x_init,C_init)
 
-    x_pred[pos_idx] = x_init[:num_dims]
-    p_pred[pos_idx, pos_idx] = p_init[:num_dims, :num_dims]
+    x_pred[pos_slice] = x_init[:num_dims]
+    p_pred[pos_slice, pos_slice] = p_init[:num_dims, :num_dims]
 
     # Bound initial velocity uncertainty by assumed max velocity of 10 m/s
     # (~20 knots)
     max_vel = 30
-    p_pred[vel_idx, vel_idx] = max_vel**2*np.eye(num_dims)
-    p_pred[vel_idx[-1], :] = 0
-    p_pred[:, vel_idx[-1]] = 0
+    p_vel = max_vel**2*np.eye(num_dims)
+    p_vel[-1, :] = 0
+    p_vel[:, -1] = 0
+    p_pred[vel_slice, vel_slice] = p_vel
 
     # ===  Step Through Time
     print('Iterating through EKF tracker time steps...')
@@ -413,8 +416,8 @@ def example2(rng=np.random.default_rng()):
     
     x_ekf_est = np.zeros((num_dims,num_time))
     x_ekf_pred = np.zeros((num_dims, num_time))
-    rmse_cov_est = np.zeros((1,num_time))
-    rmse_cov_pred = np.zeros((1, num_time))
+    rmse_cov_est = np.zeros((num_time,))
+    rmse_cov_pred = np.zeros((num_time,))
     num_ell_pts = 101 # number of points for ellipse drawing
     x_ell_est = np.zeros((2,num_ell_pts,num_time))
     for idx in np.arange(num_time):
@@ -436,32 +439,52 @@ def example2(rng=np.random.default_rng()):
         x_est, p_est = tracker.ekf_update(x_pred, p_pred, this_zeta, aoa.cov.cov, z_fun, h_fun)
 
         # Enforce known altitude
-        x_est[pos_idx[-1]] = 0
-        x_est[vel_idx[-1]] = 0
-        p_est[pos_idx[-1], :] = 0
-        p_est[:, pos_idx[-1]] = 0
-        p_est[vel_idx[-1],:] = 0
-        p_est[:, vel_idx[-1]] = 0
+        pos_est = x_est[pos_slice]
+        pos_est[-1] = 0
+        x_est[pos_slice] = pos_est
+        vel_est = x_est[vel_slice]
+        vel_est[-1] = 0
+        x_est[vel_slice] = vel_est
+        p_pos = p_est[pos_slice, pos_slice]
+        p_pos[-1, :] = 0
+        p_pos[:, -1] = 0
+        p_est[pos_slice, pos_slice] = p_pos
+        p_vel = p_est[vel_slice, vel_slice]
+        p_vel[-1, :] = 0
+        p_vel[:, -1] = 0
+        p_est[vel_slice, vel_slice] = p_vel
 
         # Predict state to the next time step
         x_pred, p_pred = tracker.kf_predict(x_est, p_est, q, f)
-        x_pred[pos_idx[-1]] = 0
-        x_pred[vel_idx[-1]] = 0
-        p_pred[pos_idx[-1],:] = 0
-        p_pred[:, pos_idx[-1]] = 0
-        p_pred[vel_idx[-1], :] = 0
-        p_pred[:, vel_idx[-1]] = 0
+
+        # Enforce known altitude
+        pos_pred = x_pred[pos_slice]
+        pos_pred[-1] = 0
+        x_pred[pos_slice] = pos_pred
+        vel_pred = x_pred[vel_slice]
+        vel_pred[-1] = 0
+        x_pred[vel_slice] = vel_pred
+        p_pos = p_pred[pos_slice, pos_slice]
+        p_pos[-1, :] = 0
+        p_pos[:, -1] = 0
+        p_pred[pos_slice, pos_slice] = p_pos
+        p_vel = p_pred[vel_slice, vel_slice]
+        p_vel[-1, :] = 0
+        p_vel[:, -1] = 0
+        p_pred[vel_slice, vel_slice] = p_vel
 
         # Output the current prediction/estimation state
-        x_ekf_est[:, idx] = x_est[pos_idx]
-        x_ekf_pred[:,idx] = x_pred[pos_idx]
+        pos_est = x_est[pos_slice]
+        p_pos_est = p_est[pos_slice, pos_slice]
+        x_ekf_est[:, idx] = pos_est
+        x_ekf_pred[:,idx] = x_pred[pos_slice]
 
-        rmse_cov_est[:,idx] = np.sqrt(np.linalg.trace(p_est[pos_idx, pos_idx]))
-        rmse_cov_pred[:,idx]= np.sqrt(np.linalg.trace(p_pred[pos_idx, pos_idx]))
+        rmse_cov_est[idx] = np.sqrt(np.linalg.trace(p_est[pos_slice, pos_slice]))
+        rmse_cov_pred[idx]= np.sqrt(np.linalg.trace(p_pred[pos_slice, pos_slice]))
 
         # Draw an error ellipse
-        x_ell_est[:, :, idx] = utils.errors.draw_error_ellipse(x=x_est[pos_idx[:2]],
-                                                               covariance=p_est[pos_idx[:2], pos_idx[:2]],
+        x_ell_est[:, :, idx] = utils.errors.draw_error_ellipse(x=pos_est[:2],
+                                                               covariance=p_pos_est[:2, :2],
                                                                num_pts=num_ell_pts)
 
     print('done')
@@ -485,15 +508,15 @@ def example2(rng=np.random.default_rng()):
     # ===  Zoomed plt.plot on Target
     fig2=plt.figure()
     plt.plot(x_tgt_full[0], x_tgt_full[1],'-<', markevery=[-1], label='Target Trajectory')
-    plt.plot(x_init(1), x_init(2), '+',label='Initial Position Estimate')
+    plt.plot(x_init[0], x_init[1], '+',label='Initial Position Estimate')
     plt.plot(x_ekf_est[0],x_ekf_est[1],'-',label='EKF (est.)')
     plt.plot(x_ekf_pred[0],x_ekf_pred[1],'-',label='EKF (pred.)')
     plt.grid(True)
     plt.xlim([30e3,50e3])
-    plt.legend(loc='NorthWest')
+    plt.legend(loc='upper left')
 
     ## Compute Error
-    err_pred = x_ekf_pred[:, :-2] - x_tgt_full[:num_dims, 1:]
+    err_pred = x_ekf_pred[:, :-1] - x_tgt_full[:num_dims, 1:]
     err_est = x_ekf_est - x_tgt_full[:num_dims]
 
     rmse_pred = np.sqrt(np.sum(np.fabs(err_pred)**2, axis=0))
@@ -502,7 +525,7 @@ def example2(rng=np.random.default_rng()):
     fig3=plt.figure()
     plt.plot(t_vec,rmse_cov_est,label='RMSE (est. cov.)')
 
-    plt.plot(t_vec[1:], rmse_cov_pred[:-2], label='RMSE (pred. cov)')
+    plt.plot(t_vec[1:], rmse_cov_pred[:-1], label='RMSE (pred. cov)')
     # set(gca,'ColorOrderIndex',1)
     plt.plot(t_vec,rmse_est,'--',label='RMSE (est. act.)')
     plt.plot(t_vec[1:], rmse_pred, '--', label='RMSE (pred. act.)')
