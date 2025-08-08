@@ -163,10 +163,11 @@ class DirectionFinder(PassiveSurveillanceSystem):
         """
         Draw lines of bearing from each sensor corresponding to each measurement
 
-        :param zeta: ndarray; first dimension must match self.num_measurements
+        :param zeta: ndarray; size of the first dimension is the number of measurements, any other dimensions are
+                              interepreted as additional cases to run (num_cases = np.prod(np.shape(zeta)[1:]))
         :param x_sensor: optional ndarray; if empty, then self.pos will be used
         :param kwargs: other named arguments will be passed to triang.model.draw_lob().
-        :return lobs: nested list of tuples; one for each sensor.
+        :return lobs: numpy array with four dimensions: num_dims (2 or 3) x 2 x num_sensors x num_cases.
         """
 
         # Parse the sensors
@@ -176,7 +177,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
             num_measurements = self.num_measurements
         else:
             num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
-            assert num_sensors == self.num_sensors, "Sensor position dimension mismatch."
+            # assert num_sensors == self.num_sensors, "Sensor position dimension mismatch."
             num_measurements = num_sensors * (2 if self.do_2d_aoa else 1)
 
         if num_sensors == 1 & len(x_sensor.shape) == 1:
