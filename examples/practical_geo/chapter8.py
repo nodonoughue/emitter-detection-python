@@ -332,7 +332,7 @@ def example2(rng=np.random.default_rng()):
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     fill_color = colors[5]
     label_fill='DF Error'
-    for idx_overlay in [0,1,2,np.floor(num_time/2),num_time]:
+    for idx_overlay in [0,1,2,np.floor(num_time/2).astype(int),num_time]:
         this_ac_pos = x_aoa_full[:2, idx_overlay]
         this_tgt_pos = x_tgt_full[:2,idx_overlay]
 
