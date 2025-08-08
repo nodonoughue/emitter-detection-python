@@ -315,9 +315,10 @@ def example2(rng=np.random.default_rng()):
     v_tgt_full = np.array([-20, 0, 0])[:, np.newaxis] + np.cumsum(a_tgt_full*t_inc,axis=1)
     x_tgt_full = np.array([50e3, 50e3, 0])[:, np.newaxis] + np.cumsum(v_tgt_full*t_inc, axis=1)
 
+    beam_plot_times = [0,1,2,np.floor(num_time/2).astype(int),num_time-1]
     fig1=plt.figure()
-    plt.plot(x_aoa_full[0], x_aoa_full[1], '-^', markevery=[-1], label='AOA Sensor Trajectory')
-    plt.plot(x_tgt_full[0], x_tgt_full[1], '-<', markevery=[-1], label='Target Trajectory')
+    plt.plot(x_aoa_full[0], x_aoa_full[1], '-^', markevery=beam_plot_times, label='AOA Sensor Trajectory')
+    plt.plot(x_tgt_full[0], x_tgt_full[1], '-<', markevery=beam_plot_times, label='Target Trajectory')
     plt.grid(True)
     plt.legend(loc='upper right')
 
@@ -332,7 +333,7 @@ def example2(rng=np.random.default_rng()):
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     fill_color = colors[5]
     label_fill='DF Error'
-    for idx_overlay in [0,1,2,np.floor(num_time/2).astype(int),num_time]:
+    for idx_overlay in beam_plot_times:
         this_ac_pos = x_aoa_full[:2, idx_overlay]
         this_tgt_pos = x_tgt_full[:2,idx_overlay]
 
