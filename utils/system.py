@@ -124,7 +124,7 @@ class PassiveSurveillanceSystem(ABC):
     def max_likelihood_uncertainty(self, zeta, source_search: SearchSpace,
                                    do_sensor_bias: bool, do_sensor_pos: bool, do_sensor_vel:bool,
                                    bias_search: SearchSpace=None, pos_search: SearchSpace=None,
-                                   vel_search: SearchSpace=None,
+                                   vel_search: SearchSpace=None, print_progress=False,
                                    **kwargs):
         """
         To perform a Max Likelihood Search with extra uncertainty parameters (e.g., sensor bias,
@@ -188,7 +188,7 @@ class PassiveSurveillanceSystem(ABC):
 
             return self.log_likelihood(zeta=zeta, x_source=x_source, v_source=v_source,
                                        x_sensor=x_sensor, v_sensor=v_sensor,
-                                       bias=bias)
+                                       bias=bias, print_progress=print_progress)
 
         th_est, likelihood, th_grid = utils.solvers.ml_solver(ell=ell, search_space=search_space,
                                                               **kwargs)

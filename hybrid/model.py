@@ -1,3 +1,4 @@
+import time
 import numpy as np
 from scipy.linalg import block_diag
 import triang
@@ -168,7 +169,8 @@ def jacobian_uncertainty(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=
 
 def log_likelihood(x_source, zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None,
                    v_fdoa=None, v_source=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None,
-                   do_resample=False, angle_bias=None, range_bias=None, range_rate_bias=None):
+                   do_resample=False, angle_bias=None, range_bias=None, range_rate_bias=None,
+                   print_progress=False):
     """
     Computes the Log Likelihood for Hybrid sensor measurement (AOA, TDOA, and
     FDOA), given the received measurement vector zeta, covariance matrix C,
@@ -215,8 +217,29 @@ def log_likelihood(x_source, zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=Non
         cov = cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
                                   tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
+    if print_progress:
+        t_start = time.perf_counter()
+        max_num_rows = 20
+        desired_iter_per_row = np.ceil(n_source_pos / max_num_rows).astype(int)
+        markers_per_row = 40
+        desired_iter_per_marker = np.ceil(desired_iter_per_row / markers_per_row).astype(int)
+
+        # Make sure we don't exceed the min/max iter per marker
+        min_iter_per_marker = 10
+        max_iter_per_marker = 1e6
+        iter_per_marker = np.maximum(min_iter_per_marker, np.minimum(max_iter_per_marker, desired_iter_per_marker))
+        iter_per_row = iter_per_marker * markers_per_row
+
+        print('Computing Log Likelihood...')
+
     # Loop across source positions
     for idx_source in np.arange(n_source_pos):
+        if print_progress:
+            utils.print_progress(num_total=n_source_pos, curr_idx=idx_source,
+                                 iterations_per_marker=iter_per_marker,
+                                 iterations_per_row=iter_per_row,
+                                 t_start=t_start)
+
         x_i = x_source[:, idx_source]
         if v_source is None:
             v_i = None
@@ -233,6 +256,11 @@ def log_likelihood(x_source, zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=Non
 
         # Compute the scaled log likelihood
         ell[idx_source] = - cov.solve_aca(err)
+
+    if print_progress:
+        print('done')
+        t_elapsed = time.perf_counter() - t_start
+        utils.print_elapsed(t_elapsed)
 
     return ell
 

@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import utils
 from utils.covariance import CovarianceMatrix
@@ -199,7 +200,8 @@ def jacobian_uncertainty(x_sensor, x_source, do_2d_aoa=False, do_bias=False, do_
 
     return j
 
-def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=False, bias=None):
+def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=False, bias=None,
+                   print_progress=True):
     """
     Computes the Log Likelihood for AOA sensor measurement, given the
     received measurement vector psi, covariance matrix cov,
@@ -235,7 +237,28 @@ def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=Fa
     # Initialize Output
     ell = np.zeros(shape=(n_source_pos, ))
 
+    if print_progress:
+        t_start = time.perf_counter()
+        max_num_rows = 20
+        desired_iter_per_row = np.ceil(n_source_pos / max_num_rows).astype(int)
+        markers_per_row = 40
+        desired_iter_per_marker = np.ceil(desired_iter_per_row / markers_per_row).astype(int)
+
+        # Make sure we don't exceed the min/max iter per marker
+        min_iter_per_marker = 10
+        max_iter_per_marker = 1e6
+        iter_per_marker = np.maximum(min_iter_per_marker, np.minimum(max_iter_per_marker, desired_iter_per_marker))
+        iter_per_row = iter_per_marker * markers_per_row
+
+        print('Computing Log Likelihood...')
+
     for idx_source in np.arange(n_source_pos):
+        if print_progress:
+            utils.print_progress(num_total=n_source_pos, curr_idx=idx_source,
+                                 iterations_per_marker=iter_per_marker,
+                                 iterations_per_row=iter_per_row,
+                                 t_start=t_start)
+
         x_i = x_source[:, idx_source]
 
         # Generate the ideal measurement matrix for this position
@@ -246,6 +269,11 @@ def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=Fa
 
         # Compute the scaled log likelihood
         ell[idx_source] = - cov.solve_aca(err)
+
+    if print_progress:
+        print('done')
+        t_elapsed = time.perf_counter() - t_start
+        utils.print_elapsed(t_elapsed)
 
     return ell
 
