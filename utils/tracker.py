@@ -95,22 +95,22 @@ def make_kinematic_model(model_type: str, num_dims: int=3, process_covar: np.nda
         process_covar = process_covar*np.eye(num_dims)
 
     # Initialize Output
-    state_space = {'num_dims',num_dims,
-                   'num_states',None,
-                   'has_pos',True,
-                   'has_vel',None,
-                   'pos_idx',None,
-                   'vel_idx',None}
+    state_space = {'num_dims': num_dims,
+                   'num_states': None,
+                   'has_pos': True,
+                   'has_vel': None,
+                   'pos_slice': None,
+                   'vel_slice': None}
 
     # Define Kinematic Model and Process Noise
     model_type = model_type.lower() # ensure it's lowercase for ease of comparison
     if model_type == 'cv' or model_type == 'constant velocity':
         # Position and Velocity are tracked states
         # Acceleration is assumed zero-mean Gaussian
-        state_space.num_states = 2*num_dims
-        state_space.pos_idx = np.arange(num_dims)
-        state_space.vel_idx = num_dims + np.arange(num_dims)
-        state_space.has_vel = True
+        state_space['num_states'] = 2*num_dims
+        state_space['pos_slice'] = np.s_[:num_dims]
+        state_space['vel_slice'] = np.s_[num_dims:2*num_dims]
+        state_space['has_vel'] = True
 
         def f(t):
             # todo: debug the next line, is it doing what we want?
@@ -129,10 +129,10 @@ def make_kinematic_model(model_type: str, num_dims: int=3, process_covar: np.nda
         #
         # State model is:
         # [px, py, pz, vx, vy, vz, ax, ay, az]'
-        state_space.num_states = 3*num_dims
-        state_space.pos_idx = np.arange(num_dims)
-        state_space.vel_idx = num_dims + np.arange(num_dims)
-        state_space.has_vel = True
+        state_space['num_states'] = 3*num_dims
+        state_space['pos_slice'] = np.s_[:num_dims]
+        state_space['vel_slice'] = np.s_[num_dims:2*num_dims]
+        state_space['has_vel'] = True
 
         def f(t):
             return np.block([[np.eye(num_dims), t*np.eye(num_dims), .5*t**2*np.eye(num_dims)],
@@ -153,10 +153,10 @@ def make_kinematic_model(model_type: str, num_dims: int=3, process_covar: np.nda
         #
         # State model is:
         # [px, py, pz, vx, vy, vz, ax, ay, az, jx, jy, jz]'
-        state_space.num_states = 4*num_dims
-        state_space.pos_idx = np.arange(num_dims)
-        state_space.vel_idx = num_dims + np.arange(num_dims)
-        state_space.has_vel = True
+        state_space['num_states'] = 4*num_dims
+        state_space['pos_slice'] = np.s_[:num_dims]
+        state_space['vel_slice'] = np.s_[num_dims:2*num_dims]
+        state_space['has_vel'] = True
 
         def f(t):
             return np.block([[np.eye(num_dims), t*np.eye(num_dims), .5*t**2*np.eye(num_dims), 1/6*t**3*np.eye(num_dims)],
@@ -191,9 +191,9 @@ def make_measurement_model(pss:PassiveSurveillanceSystem, state_space:dict):
 
     # Define functions to sample the position/velocity components of the target state
     def pos_component(x):
-        return x[state_space['pos_idx']]
+        return x[state_space['pos_slice']]
     def vel_component(x):
-        return x[state_space['vel_idx']] if state_space['has_vel'] else None
+        return x[state_space['vel_slice']] if state_space['has_vel'] else None
 
     # Non-Linear Measurement Function
     def z_fun(x):
@@ -208,10 +208,15 @@ def make_measurement_model(pss:PassiveSurveillanceSystem, state_space:dict):
         # Build the H matrix
         _, num_source_pos = utils.safe_2d_shape(x)
         h = np.zeros((pss.num_measurements, state_space['num_states'], num_source_pos))
-        h[:, state_space['pos_idx'], :] = np.transpose(j[:pss.num_dim, :])
+        h[:, state_space['pos_slice'], :] = np.transpose(j[:pss.num_dim, :])[:, :, np.newaxis]
         if state_space['has_vel'] and j.shape[0] > pss.num_dim:
             # The state space has velocity components, and the pss returned rows for
             # the jacobian w.r.t. velocity.
-            h[: state_space['vel_idx'], :] = np.transpose(j[pss.num_dim:, :])
+            h[: state_space['vel_slice'], :] = np.transpose(j[pss.num_dim:, :])[:, :, np.newaxis]
+
+        if num_source_pos == 1:
+            # Collapse it to 2D, there's no need for the third dimension
+            h = np.reshape(h, (pss.num_measurements, state_space['num_states']))
+        return h
 
     return z_fun, h_fun

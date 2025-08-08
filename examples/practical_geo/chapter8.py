@@ -54,35 +54,35 @@ def example1(rng=np.random.default_rng()):
     # Due East
     # todo: make sure the trajectory components line up right
     t_e_vec = np.arange(start=0, stop=t_e_leg, step=t_inc)
-    x_e_leg = x_tgt_init + np.array([vel, 0, 0])@ t_e_vec[np.newaxis, :]
+    x_e_leg = x_tgt_init[:, np.newaxis] + np.array([vel, 0, 0])[:, np.newaxis] * t_e_vec[np.newaxis, :]
 
     # Turn to South
     t_turn_vec = np.arange(start=t_inc, step=t_inc, stop=t_turn)
     angle_turn = np.pi/2 * t_turn_vec/t_turn
-    x_turn = x_e_leg[:, -1] + turn_rad * np.array([np.sin(angle_turn), np.cos(angle_turn)-1, np.zeros_like(angle_turn)])
+    x_turn = x_e_leg[:, [-1]] + turn_rad * np.array([np.sin(angle_turn), np.cos(angle_turn)-1, np.zeros_like(angle_turn)])
 
     # Due South
     t_s_vec = np.arange(start=t_inc, step=t_inc, stop=t_s_leg)
-    x_s_leg = x_turn[:, -1] + np.array([0, -vel, 0]) @ t_s_vec[np.newaxis, :]
+    x_s_leg = x_turn[:, [-1]] + np.array([0, -vel, 0])[:, np.newaxis] * t_s_vec[np.newaxis, :]
 
     # Combine legs
     x_tgt_full = np.concatenate((x_e_leg, x_turn, x_s_leg), axis=1)
-    t_vec = np.arange(start=0, step=t_inc, stop=t_e_leg+t_turn+t_s_leg)
+    t_vec = np.arange(x_tgt_full.shape[1]) * t_inc
     num_time = len(t_vec)
 
     # plt.plot Geometry
     fig1 = plt.figure()
-    plt.scatter(x_tdoa[0], x_tdoa[1], 'o', label='Sensors')
+    plt.scatter(x_tdoa[0], x_tdoa[1], marker='o', label='Sensors')
     plt.plot(x_tgt_full[0],x_tgt_full[1], marker='v', markevery=[-1], label='Aircraft')
-    plt.legend(loc='SouthWest')
+    plt.legend(loc='lower left')
     plt.grid(True)
 
     # ===  Measurement Statistics
     ref_idx = 1
     sigma_toa = 10e-9
-    cov_toa = sigma_toa^2 * np.eye(n_tdoa)
-    cov_roa = _speed_of_light**2*cov_toa
-    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx)
+    cov_toa = (sigma_toa**2) * np.eye(n_tdoa)
+    cov_roa = CovarianceMatrix(_speed_of_light**2*cov_toa)
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx, variance_is_toa=False)
 
     # ===  Generate Measurements
     z = tdoa.measurement(x_tgt_full)
@@ -96,29 +96,29 @@ def example1(rng=np.random.default_rng()):
     sigma_a = 1
 
     f_fun, q_fun, state_space = tracker.make_kinematic_model('cv',num_dims,sigma_a**2)
-    num_states = state_space.num_states
-    pos_idx = state_space.pos_idx
-    vel_idx = state_space.vel_idx
+    num_states = state_space['num_states']
+    pos_slice = state_space['pos_slice']
+    vel_slice = state_space['vel_slice']
     f = f_fun(t_inc) # generate state transition matrix
     q = q_fun(t_inc) # generate process noise covariance matrix
 
     z_fun, h_fun = tracker.make_measurement_model(pss=tdoa, state_space=state_space)
-     # msmt function and linearized msmt function
+    # msmt function and linearized msmt function
 
     # ===  Initialize Track State
-    x_pred = np.zeros((num_states,1))
+    x_pred = np.zeros((num_states,))
     p_pred = np.zeros((num_states, num_states))
 
     # Initialize position with TDOA estimate from first measurement
     x_init = np.array([0, 50e3, 5e3])
     epsilon = 100
-    x_pred[pos_idx], _, _ = tdoa.gradient_descent(zeta=zeta[:, 0], x_init=x_init, epsilon=epsilon)
-    p_pred[pos_idx, pos_idx] = 10*tdoa.compute_crlb(x_source=x_pred[pos_idx])
+    x_pred[pos_slice], _ = tdoa.gradient_descent(zeta=zeta[:, 0], x_init=x_init, epsilon=epsilon)
+    p_pred[pos_slice, pos_slice] = 10*tdoa.compute_crlb(x_source=x_pred[pos_slice])
 
     # Bound initial velocity uncertainty by assumed max velocity of 340 m/s
     # (Mach 1 at sea level)
     max_vel = 340
-    p_pred[vel_idx, vel_idx] = 10*max_vel**2*np.eye(num_dims)
+    p_pred[vel_slice, vel_slice] = 10*max_vel**2*np.eye(num_dims)
 
     # ===  Step Through Time
     print('Iterating through EKF tracker time steps...')
@@ -129,8 +129,8 @@ def example1(rng=np.random.default_rng()):
 
     x_ekf_est = np.zeros((num_dims,num_time))
     x_ekf_pred = np.zeros((num_dims, num_time))
-    rmse_cov_est = np.zeros((1,num_time))
-    rmse_cov_pred = np.zeros((1, num_time))
+    rmse_cov_est = np.zeros((num_time, ))
+    rmse_cov_pred = np.zeros((num_time, ))
     num_ell_pts = 101 # number of points for ellipse drawing
     x_ell_est = np.zeros((2,num_ell_pts,num_time))
     for idx in np.arange(num_time):
@@ -148,21 +148,24 @@ def example1(rng=np.random.default_rng()):
         x_pred, p_pred = tracker.kf_predict(x_est, p_est, q, f)
 
         # Output the current prediction/estimation state
-        x_ekf_est[:,idx] = x_est[pos_idx]
-        x_ekf_pred[:,idx] = x_pred[pos_idx]
+        x_ekf_est[:,idx] = x_est[pos_slice]
+        x_ekf_pred[:,idx] = x_pred[pos_slice]
 
-        rmse_cov_est[:, idx] = np.sqrt(np.linalg.trace(p_est[pos_idx,pos_idx]))
-        rmse_cov_pred[:, idx] = np.sqrt(np.linalg.trace(p_pred[pos_idx,pos_idx]))
+        rmse_cov_est[idx] = np.sqrt(np.linalg.trace(p_est[pos_slice,pos_slice]))
+        rmse_cov_pred[idx] = np.sqrt(np.linalg.trace(p_pred[pos_slice,pos_slice]))
 
         # Draw an error ellipse
-        x_ell_est[:, :, idx] = utils.errors.draw_error_ellipse(x_est[pos_idx[:2]], p_est[pos_idx[:2], pos_idx[:2]],
-                                                               num_ell_pts)
+        x_est_xyz = x_est[pos_slice]
+        p_est_xyz = p_est[pos_slice, pos_slice]
+        x_est_xy = x_est_xyz[:2]
+        p_est_xy = p_est_xyz[:2, :2]
+        x_ell_est[:, :, idx] = utils.errors.draw_error_ellipse(x_est_xy, p_est_xy, num_ell_pts)
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
     utils.print_elapsed(t_elapsed)
 
-    plt.scatter(x_init[0], x_init[1], '+',label='Initial Position Estimate')
+    plt.scatter(x_init[0], x_init[1], marker='+',label='Initial Position Estimate')
     plt.plot(x_ekf_est[0],x_ekf_est[1],'--',label='EKF (est.)')
     plt.plot(x_ekf_pred[0],x_ekf_pred[1],'--',label='EKF (pred.)')
     plt.grid(True)
@@ -185,9 +188,9 @@ def example1(rng=np.random.default_rng()):
 
     fig2=plt.figure()
     plt.plot(t_vec,rmse_cov_est, label='RMSE (est. cov.)')
-    plt.plot(t_vec[1:], rmse_cov_pred[:-2], label='RMSE (pred. cov)')
+    plt.plot(t_vec[2:], rmse_cov_pred[:-2], label='RMSE (pred. cov)')
     plt.plot(t_vec,rmse_est, '--', label='RMSE (est. act.)')
-    plt.plot(t_vec[1:], rmse_pred, '--',label='RMSE (pred. act.)')
+    plt.plot(t_vec[2:], rmse_pred, '--',label='RMSE (pred. act.)')
     plt.grid(True)
     plt.xlabel('Time [sec]')
     plt.ylabel('Error [m]')
@@ -204,7 +207,7 @@ def example1(rng=np.random.default_rng()):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    
+
     for idx_mc in np.arange(num_mc):
         utils.print_progress(num_mc, idx_mc, iterations_per_marker, iterations_per_row, t_start)
 
@@ -213,18 +216,18 @@ def example1(rng=np.random.default_rng()):
         zeta = z + noise
 
         # Initialize Track State
-        x_pred = np.zeros((num_states,1))
+        x_pred = np.zeros((num_states,))
         p_pred = np.zeros((num_states, num_states))
 
         # Initialize position with TDOA estimate from first measurement
         x_init = np.array([0, 50e3, 5e3])
         epsilon = 100
-        x_pred[pos_idx] = tdoa.gradient_descent(zeta[:, 0], x_init=x_init,epsilon=epsilon)
-        p_pred[pos_idx, pos_idx] = tdoa.compute_crlb(x_source=x_pred[pos_idx])
+        x_pred[pos_slice], _ = tdoa.gradient_descent(zeta[:, 0], x_init=x_init,epsilon=epsilon)
+        p_pred[pos_slice, pos_slice] = tdoa.compute_crlb(x_source=x_pred[pos_slice])
 
         # Bound initial velocity uncertainty by assumed max velocity of 340 m/s
         # (Mach 1 at sea level)
-        p_pred[vel_idx, vel_idx] = max_vel**2*np.eye(num_dims)
+        p_pred[vel_slice, vel_slice] = max_vel**2*np.eye(num_dims)
 
         # Step Through Time
         x_ekf_est = np.zeros((num_dims,num_time))
@@ -242,13 +245,13 @@ def example1(rng=np.random.default_rng()):
             x_pred, p_pred = tracker.kf_predict(x_est, p_est, q, f)
 
             # Output the current prediction/estimation state
-            x_ekf_est[:, idx] = x_est[pos_idx]
-            x_ekf_pred[:, idx] = x_pred[pos_idx]
+            x_ekf_est[:, idx] = x_est[pos_slice]
+            x_ekf_pred[:, idx] = x_pred[pos_slice]
 
-            sse_cov_est[idx_mc, idx] = np.linalg.trace(p_est[pos_idx, pos_idx])
-            sse_cov_pred[idx_mc, idx] = np.linalg.trace(p_pred[pos_idx, pos_idx])
-        
-        err_pred = x_ekf_pred[:, :-2] - x_tgt_full[:, 1:]
+            sse_cov_est[idx_mc, idx] = np.linalg.trace(p_est[pos_slice, pos_slice])
+            sse_cov_pred[idx_mc, idx] = np.linalg.trace(p_pred[pos_slice, pos_slice])
+
+        err_pred = x_ekf_pred[:, :-1] - x_tgt_full[:, 1:]
         err_est = x_ekf_est - x_tgt_full
 
         sse_pred[idx_mc,:] = np.sum(np.fabs(err_pred)**2, axis=0)
@@ -265,8 +268,8 @@ def example1(rng=np.random.default_rng()):
     rmse_cov_pred = np.sqrt(np.mean(sse_cov_pred, axis=0))
 
     fig3=plt.figure()
-    plt.plot(t_vec, rmse_cov_est, label='RMSE (est. cov.)')    
-    plt.plot(t_vec[1:], rmse_cov_pred[:-2], label='RMSE (pred. cov)')
+    plt.plot(t_vec, rmse_cov_est, label='RMSE (est. cov.)')
+    plt.plot(t_vec[1:], rmse_cov_pred[:-1], label='RMSE (pred. cov)')
     plt.plot(t_vec, rmse_est, '--', label='RMSE (est. act.)')
     plt.plot(t_vec[1:], rmse_pred, '--', label='RMSE (pred. act.)')
     plt.grid(True)
@@ -276,7 +279,7 @@ def example1(rng=np.random.default_rng()):
 
     plt.legend(loc='upper right')
 
-    # ===  Return Figure Handles
+    # === Return Figure Handles
     figs = [fig1, fig2, fig3]
 
     return figs
@@ -304,11 +307,11 @@ def example2(rng=np.random.default_rng()):
 
     # Origin is 0,0.  Alt is 10 km. Velocity is +y at 100 m/s.
     # Let's make it a function for simplicity
-    x_aoa_full = np.array([0, 0, 10e3]) + np.array([0, 100, 0])[:, np.newaxis] * t_vec[np.newaxis, :]
+    x_aoa_full = np.array([0, 0, 10e3])[:, np.newaxis] + np.array([0, 100, 0])[:, np.newaxis] * t_vec[np.newaxis, :]
 
     # Origin is 50 km, 50 km. Alt is 0 m.  Velocity is -x at 5 m/s.
     ship_accel_power = .05
-    a_tgt_full = np.concatenate((-ship_accel_power + 2*ship_accel_power*rng.standard_normal((2, num_time)), np.zeros(1, num_time)), axis=0)
+    a_tgt_full = np.concatenate((-ship_accel_power + 2*ship_accel_power*rng.standard_normal((2, num_time)), np.zeros((1, num_time))), axis=0)
     v_tgt_full = np.array([-20, 0, 0])[:, np.newaxis] + np.cumsum(a_tgt_full*t_inc,axis=1)
     x_tgt_full = np.array([50e3, 50e3, 0])[:, np.newaxis] + np.cumsum(v_tgt_full*t_inc, axis=1)
 
@@ -326,14 +329,14 @@ def example2(rng=np.random.default_rng()):
     aoa = DirectionFinder(x_aoa_full, cov=cov_psi, do_2d_aoa=False)
 
     # Add DF overlays
-    colors = plt.get('DefaultAxesColorOrder')
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     fill_color = colors[5]
     label_fill='DF Error'
-    for idx_overlay in [1,2,3,np.floor(num_time/2),num_time]:
+    for idx_overlay in [0,1,2,np.floor(num_time/2),num_time]:
         this_ac_pos = x_aoa_full[:2, idx_overlay]
         this_tgt_pos = x_tgt_full[:2,idx_overlay]
 
-        psi_true = aoa.measurement(this_tgt_pos, x_sensor=this_ac_pos)
+        psi_true = aoa.measurement(x_source=this_tgt_pos, x_sensor=this_ac_pos)
         psi_err_plus = psi_true + sigma_psi
         psi_err_minus = psi_true - sigma_psi
 
@@ -362,9 +365,9 @@ def example2(rng=np.random.default_rng()):
     num_dims = 3 # number of dimensions to use in state
 
     f_fun, q_fun, state_space = tracker.make_kinematic_model('cv',num_dims,sigma_a**2)
-    num_states = state_space.num_states
-    pos_idx = state_space.pos_idx
-    vel_idx = state_space.vel_idx
+    num_states = state_space['num_states']
+    pos_idx = state_space['pos_idx']
+    vel_idx = state_space['vel_idx']
     f = f_fun(t_inc) # generate state transition matrix
     q = q_fun(t_inc) # generate process noise covariance matrix
 

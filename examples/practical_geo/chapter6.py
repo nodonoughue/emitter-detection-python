@@ -359,7 +359,8 @@ def example4(do_iterative=False):
                                                                 bias_search=bias_search,
                                                                 do_sensor_bias=True,
                                                                 do_sensor_pos=False,
-                                                                do_sensor_vel=False)
+                                                                do_sensor_vel=False,
+                                                                print_progress=True)
 
     err_km = np.linalg.norm(x_est_bias-x_tgt)/1000
     print('ML Est. w/Uncertainty: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_bias[0]/1e3,

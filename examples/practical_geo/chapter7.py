@@ -399,7 +399,7 @@ def example4(rng=np.random.default_rng()):
     num_dims, num_sensors = utils.safe_2d_shape(x_aoa)
     sigma_theta = 10
     sigma_psi = sigma_theta*_deg2rad
-    cov_psi = CovarianceMatrix(sigma_psi^2*np.eye(num_sensors))
+    cov_psi = CovarianceMatrix((sigma_psi**2)*np.eye(num_sensors))
 
     # Make PSS Object
     aoa = DirectionFinder(x=x_aoa, cov=cov_psi, do_2d_aoa=False)
@@ -407,11 +407,11 @@ def example4(rng=np.random.default_rng()):
     # Define pulse timing
     pri = 1e-3
     int_time = 30 # observation period
-    num_pulses = np.floor(int_time/pri)+1
+    num_pulses = np.floor(int_time/pri).astype(int)+1
     
     # Define outputs
     x_est = np.zeros((aoa.num_dim, num_pulses))
-    cep = np.zeros((1,num_pulses))
+    cep = np.zeros((num_pulses, ))
     x_init = np.array([1, 1])*1e3
     
     # Step through pulses
@@ -428,11 +428,11 @@ def example4(rng=np.random.default_rng()):
     
         # Generate noisy measurements
         psi = aoa.measurement(x_source=x_tgt)
-        zeta = psi + aoa.cov.lower @ rng.standard_normal(size=(aoa.num_dim, 1))
+        zeta = psi + aoa.cov.lower @ rng.standard_normal(size=(aoa.num_dim, ))
     
-        if idx==1:
+        if idx==0:
             # Initialization
-            this_x = aoa.least_square(zeta=zeta, x_init=x_init)
+            this_x, _ = aoa.least_square(zeta=zeta, x_init=x_init)
             this_p = aoa.compute_crlb(x_source=this_x)
         else:
             # EKF Update
@@ -465,7 +465,7 @@ def example4(rng=np.random.default_rng()):
     plt.ylim(x_tgt[1] + .6*offset*np.array([-1, 1]))
 
     ## Compute Errors
-    err = np.sqrt(np.sum(np.fabs(x_est - x_tgt)**2, axis=0))
+    err = np.sqrt(np.sum(np.fabs(x_est - x_tgt[:, np.newaxis])**2, axis=0))
     time_vec = pri*(1+np.arange(num_pulses))
     
     fig2=plt.figure()
