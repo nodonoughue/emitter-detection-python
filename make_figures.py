@@ -6,6 +6,8 @@ force_recalc = True
 do_book_1 = True
 do_book_2 = True
 
+#todo: make a global Monte Carlo trial size setting and leverage it for all examples, to make an easy place to control accuracy vs. timeliness
+
 if do_book_1:
     print('************************************************************************************************')
     print('Generating all figures from ''Emitter Detection and Geolocation for Electronic Warfare'', 2019.')
