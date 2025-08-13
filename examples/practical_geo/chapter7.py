@@ -94,6 +94,8 @@ def example1(colors=None):
     else:
         print('{:d} samples required to achieve {:.2f} m CEP50.'.format(num_samples[good_index], desired_cep))
 
+    # TODO: Debug -- plots 2a and 2b are showing empty
+
     # Plot for AOR
     x_ctr = np.array([0e3, 3e3])
     offset = np.array([5e3, 2e3])
@@ -150,6 +152,9 @@ def example2(rng=np.random.default_rng()):
     :param rng: random number generator
     :return: figure handle to generated graphic
     """
+
+    # ToDo: Debug -- plot 4a has different curves than MATLAB (LS Soln for sample mean; error ellipses for single vs. mean)
+
     # Define sensor positions
     x_tdoa = np.array([[-10e3, 0, 10e3],
                        [0, 10e3, 0]])
@@ -254,13 +259,14 @@ def example2(rng=np.random.default_rng()):
     # Plot error as a function of time
     err = np.sqrt(np.sum(np.fabs(x_ls-x_tgt[:, np.newaxis])**2, axis=0))
     err_mn = np.sqrt(np.sum(np.fabs(x_ls_mn-x_tgt[:, np.newaxis])**2, axis=0))
-    
+
+    # ToDo: Debug -- error seems to be scaled differently than CRLB; verify
     fig3 = plt.figure()
     time_vec = pri * (1+np.arange(num_pulses))
     plt.semilogy(time_vec, err, label='Error (single sample)')
     plt.semilogy(time_vec, err_mn, label='Error (sample mean)')
-    plt.plot(time_vec, cep_single_sample*np.ones_like(time_vec), label='CRLB (single sample)')
-    plt.plot(time_vec, cep_single_sample/np.sqrt(1+np.arange(num_pulses)), label='CRLB (sample mean)')
+    plt.semilogy(time_vec, cep_single_sample*np.ones_like(time_vec), label='CRLB (single sample)')
+    plt.semilogy(time_vec, cep_single_sample/np.sqrt(1+np.arange(num_pulses)), label='CRLB (sample mean)')
     plt.xlabel('Time [s]')
     plt.ylabel('Error [m]')
     plt.ylim([10, 10e3])

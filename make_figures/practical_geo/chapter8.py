@@ -34,9 +34,9 @@ def make_all_figures(close_figs=False, force_recalc=False):
 
     # Generate all figures
     figs3_4_5 = make_figures_3_4_5(prefix, force_recalc)
-    figs6_7 = make_figures_6_7(prefix, force_recalc)
+    figs7_8 = make_figures_7_8(prefix, force_recalc)
 
-    figs = list(figs3_4_5) +  list(figs6_7)
+    figs = list(figs3_4_5) +  list(figs7_8)
     if close_figs:
         [plt.close(fig) for fig in figs]
         return None
@@ -77,9 +77,9 @@ def make_figures_3_4_5(prefix=None, force_recalc=False):
     return figs
 
 
-def make_figures_6_7(prefix=None, force_recalc=False):
+def make_figures_7_8(prefix=None, force_recalc=False):
     """
-    Figures 8.6 and 8.7 from Example 7.2
+    Figures 8.7 and 8.8 from Example 7.2
 
     :param prefix: output directory to place generated figure
     :param force_recalc: optional flag (default=True), if False then the example does not run
@@ -87,18 +87,18 @@ def make_figures_6_7(prefix=None, force_recalc=False):
     """
 
     if not force_recalc:
-        print('Skipping Figures 8.6 and 8.7 (re-run with force_recalc=True to generate)...')
+        print('Skipping Figures 8.7 and 8.8 (re-run with force_recalc=True to generate)...')
         return None,
 
-    print('Generating Figures 8.6 and 8.7 (Example 8.2)...')
+    print('Generating Figures 8.7 and 8.8 (Example 8.2)...')
 
     figs = chapter8.example2()
 
     # Output to file
     if prefix is not None:
-        labels = ['fig6a', 'fig6b', 'fig7']
+        labels = ['fig7a', 'fig7b', 'fig8']
         if len(labels) != len(figs):
-            print('**Error saving figure 8.6 and 8.7; unexpected number of figures returned from Example 8.2.')
+            print('**Error saving figure 8.7 and 8.8; unexpected number of figures returned from Example 8.2.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')

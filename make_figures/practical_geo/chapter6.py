@@ -38,11 +38,11 @@ def make_all_figures(close_figs=False, force_recalc=False):
     # Generate all figures
     fig1 = make_figure_1(prefix, force_recalc)
     fig2 = make_figure_2(prefix, force_recalc)
-    fig3 = make_figure_3(prefix)
-    fig7_8 = make_figures_7_8(prefix, force_recalc)
-    fig10 = make_figure_10(prefix, force_recalc)
+    fig6 = make_figure_6(prefix)
+    fig8_9 = make_figures_8_9(prefix, force_recalc)
+    fig12 = make_figure_12(prefix, force_recalc)
 
-    figs = list(fig1) + list(fig2) + list(fig3) + list(fig7_8) + list(fig10)
+    figs = list(fig1) + list(fig2) + list(fig6) + list(fig8_9) + list(fig12)
     if close_figs:
         [plt.close(fig) for fig in figs]
         return None
@@ -85,7 +85,7 @@ def make_figure_1(prefix=None, force_recalc=False):
 
 def make_figure_2(prefix=None, force_recalc=False):
     """
-    Figure 6.2 from Example 6.2
+    Figure 6.2 from Example 6.2 and figure 6.5 from Example 6.3
 
     :param prefix: output directory to place generated figure
     :param force_recalc: optional flag (default=True), if False then the example does not run
@@ -93,19 +93,19 @@ def make_figure_2(prefix=None, force_recalc=False):
     """
 
     if not force_recalc:
-        print('Skipping Figure 6.2 from Examples 6.2 and 6.3 (re-run with force_recalc=True to generate)...')
+        print('Skipping Figures 6.2 and 6.5 from Examples 6.2 and 6.3 (re-run with force_recalc=True to generate)...')
         return None,
 
-    print('Generating Figure 6.2 from Examples 6.2 and 6.3...')
+    print('Generating Figures 6.2 and 6.5 from Examples 6.2 and 6.3...')
 
     figs = chapter6.example2()
     figs = figs + list(chapter6.example3())
 
     # Output to file
     if prefix is not None:
-        labels = ['fig2', 'fig2a']
+        labels = ['fig2', 'fig5']
         if len(labels) != len(figs):
-            print('**Error saving figure 6.2; unexpected number of figures returned from Examples 6.2 and 6.3.')
+            print('**Error saving figures 6.2 and 6.5; unexpected number of figures returned from Examples 6.2 and 6.3.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')
@@ -114,15 +114,15 @@ def make_figure_2(prefix=None, force_recalc=False):
     return figs
 
 
-def make_figure_3(prefix=None):
+def make_figure_6(prefix=None):
     """
-    Figure 6.3, Impact of Sensor Position Errors
+    Figure 6.6, Impact of Sensor Position Errors
 
     :param prefix: output directory to place generated figure
     :return: handle
     """
 
-    print('Generating Figures 6.3a and 6.3b...')
+    print('Generating Figures 6.6a and 6.6b...')
 
     # Define Positions
     x_aoa = np.array([[-1., 1.], [0., 0.]])
@@ -187,9 +187,9 @@ def make_figure_3(prefix=None):
 
     # Output to file
     if prefix is not None:
-        labels = ['fig3a', 'fig3b']
+        labels = ['fig6a', 'fig6b']
         if len(labels) != len(figs):
-            print('**Error saving figure 6.3; unexpected number of figures generated.')
+            print('**Error saving figure 6.6; unexpected number of figures generated.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')
@@ -198,9 +198,9 @@ def make_figure_3(prefix=None):
     return figs
 
 
-def make_figures_7_8(prefix=None, force_recalc=True):
+def make_figures_8_9(prefix=None, force_recalc=True):
     """
-    Figures 6.7 and 6.8, from Example 6.4
+    Figures 6.8 and 6.9, from Example 6.4
 
     :param prefix: output directory to place generated figure
     :param force_recalc: optional flag (default=True), if False then the example does not run
@@ -208,18 +208,18 @@ def make_figures_7_8(prefix=None, force_recalc=True):
     """
 
     if not force_recalc:
-        print('Skipping Figures 6.7 and 6.8 from Example 6.4 (re-run with force_recalc=True to generate)...')
+        print('Skipping Figures 6.8 and 6.9 from Example 6.4 (re-run with force_recalc=True to generate)...')
         return None, None
 
-    print('Generating Figures 6.7 and 6.8, from Example 6.4...')
+    print('Generating Figures 6.8 and 6.9, from Example 6.4...')
 
     figs = chapter6.example4()
 
     # Output to file
     if prefix is not None:
-        labels = ['fig7a', 'fig7b', 'fig8a', 'fig8b']
+        labels = ['fig8a', 'fig8b', 'fig9a', 'fig9b']
         if len(labels) != len(figs):
-            print('**Error saving figures 6.7 and 6.8; unexpected number of figures returned from Example 6.4.')
+            print('**Error saving figures 6.8 and 6.8; unexpected number of figures returned from Example 6.4.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')
@@ -228,9 +228,9 @@ def make_figures_7_8(prefix=None, force_recalc=True):
     return figs
 
 
-def make_figure_10(prefix=None, force_recalc=True):
+def make_figure_12(prefix=None, force_recalc=True):
     """
-    Figures 6.10, from Example 6.5
+    Figures 6.12, from Example 6.5
 
     :param prefix: output directory to place generated figure
     :param force_recalc: optional flag (default=True), if False then the example does not run
@@ -238,18 +238,18 @@ def make_figure_10(prefix=None, force_recalc=True):
     """
 
     if not force_recalc:
-        print('Skipping Figure 6.10 from Example 6.5 (re-run with force_recalc=True to generate)...')
+        print('Skipping Figure 6.12 from Example 6.5 (re-run with force_recalc=True to generate)...')
         return None, None
 
-    print('Generating Figure 6.10, from Example 6.5...')
+    print('Generating Figure 6.12, from Example 6.5...')
 
     figs = chapter6.example5()
 
     # Output to file
     if prefix is not None:
-        labels = ['fig10']
+        labels = ['fig12']
         if len(labels) != len(figs):
-            print('**Error saving figures 6.10; unexpected number of figures returned from Example 6.5.')
+            print('**Error saving figures 6.12; unexpected number of figures returned from Example 6.5.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')

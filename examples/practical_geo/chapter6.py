@@ -35,6 +35,8 @@ def example1():
 
     :return: figure handle to generated graphic
     """
+    # TODO: Debug; figure doesn't look right
+
     # Set up sensors
     x_aoa = np.array([[2, 2, 0], [2, -1, 0]])
     _, n_aoa = np.shape(x_aoa)
@@ -226,6 +228,7 @@ def example3():
     plt.grid(True)
 
     # Draw the Isochrones and LOBs -- Truth
+    # ToDo: Debug -- the LOBs aren't drawing correctly
     xy_lobs = aoa.draw_lobs(zeta=zeta_unc_bias[:n_aoa], x_source=x_tgt, scale=1.5)
     # xy_lob_bias = aoa.draw_lobs(x_sensor=x_aoa_true, psi=zeta_unc_bias[:n_aoa], x_source=x_tgt, scale=1.5)
     label = 'LOB (nominal positions w/bias)'
