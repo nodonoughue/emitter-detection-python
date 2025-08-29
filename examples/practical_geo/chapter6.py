@@ -35,7 +35,6 @@ def example1():
 
     :return: figure handle to generated graphic
     """
-    # TODO: Debug; figure doesn't look right
 
     # Set up sensors
     x_aoa = np.array([[2, 2, 0], [2, -1, 0]])
@@ -61,12 +60,16 @@ def example1():
 
     # Draw the LOBs
     xy_lobs = aoa.draw_lobs(zeta=psi, x_source=x_tgt, scale=1.5)
+    # response is (2, 2, 3, 1) for (n_dims, start:end, num_sensors, num_cases)
+    xy_lobs = np.squeeze(xy_lobs).transpose((2, 0, 1)) # reshape to (num_sensors, num_dims, 2)
     label = 'LOB (w/o bias)'
     for xy_lob in xy_lobs:
         plt.plot(xy_lob[0], xy_lob[1], color=hdl_target.get_facecolor(), label=label)
         label = None
 
     xy_lobs = aoa.draw_lobs(zeta=psi_bias, x_source=x_tgt, scale=1.5)
+    # response is (2, 2, 3, 1) for (n_dims, start:end, num_sensors, num_cases)
+    xy_lobs = np.squeeze(xy_lobs).transpose((2, 0, 1)) # reshape to (num_sensors, num_dims, 2)
     label = 'LOB (w/bias)'
     for xy_lob in xy_lobs:
         plt.plot(xy_lob[0], xy_lob[1], '--', color=hdl_sensors.get_facecolor(), label=label)
@@ -228,8 +231,8 @@ def example3():
     plt.grid(True)
 
     # Draw the Isochrones and LOBs -- Truth
-    # ToDo: Debug -- the LOBs aren't drawing correctly
     xy_lobs = aoa.draw_lobs(zeta=zeta_unc_bias[:n_aoa], x_source=x_tgt, scale=1.5)
+    xy_lobs = np.squeeze(xy_lobs).transpose((2, 0, 1))
     # xy_lob_bias = aoa.draw_lobs(x_sensor=x_aoa_true, psi=zeta_unc_bias[:n_aoa], x_source=x_tgt, scale=1.5)
     label = 'LOB (nominal positions w/bias)'
     for xy_lob in xy_lobs:
@@ -241,7 +244,7 @@ def example3():
     xy_isos = tdoa.draw_isochrones(range_diff=zeta_unc_bias[aoa.num_measurements:], num_pts=101, max_ortho=8)
     for xy_iso in xy_isos:
         plt.plot(xy_iso[0], xy_iso[1], color=hdl_nominal_t.get_facecolor(), label=label_nominal)
-        label_nominal = 'None'
+        label_nominal = None
 
     plt.legend(loc='lower right')
     plt.xlim(-1, 8)
