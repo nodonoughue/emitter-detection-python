@@ -38,7 +38,7 @@ def example1(colors=None):
         colors = plt.get_cmap("viridis_r")
 
     # Define sensor positions
-    x_aoa = np.array([[0, 0],[1e3, 0]])
+    x_aoa = np.array([[0, 1e3],[0, 0]])
     x_tgt = np.array([2e3, 4e3])
 
     # Define sensor accuracy
@@ -75,10 +75,10 @@ def example1(colors=None):
 
     fig=plt.figure()
     for this_sigma, this_cep in zip(sigma_theta_vec, cep_vec):
-        plt.loglog(num_samples, this_cep, label='\\sigma_\\theta={:d}^\\circ'.format(this_sigma))
+        plt.loglog(num_samples, this_cep, label='$\sigma_{{\\theta}}={:d}^\circ$'.format(this_sigma))
 
-    plt.plot(num_samples, 100*np.ones_like(num_samples), '--', label='CEP=100 m')
-    plt.plot(est_k_min*np.array([1,1]),[1e1,1e4],'--',label='K={:d}'.format(np.astype(est_k_min, int)))
+    plt.plot(num_samples, 100*np.ones_like(num_samples), 'k--', label='CEP=100 m')
+    plt.plot(est_k_min*np.array([1,1]),[1e1,1e4],'k--',label='K={:d}'.format(np.astype(est_k_min, int)))
     plt.ylim([10, 10e3])
     plt.xlabel('Number of Samples [K]')
     plt.ylabel('$CEP_{50}$ [m]')
@@ -94,8 +94,6 @@ def example1(colors=None):
     else:
         print('{:d} samples required to achieve {:.2f} m CEP50.'.format(num_samples[good_index], desired_cep))
 
-    # TODO: Debug -- plots 2a and 2b are showing empty
-
     # Plot for AOR
     x_ctr = np.array([0e3, 3e3])
     offset = np.array([5e3, 2e3])
@@ -105,7 +103,10 @@ def example1(colors=None):
                                max_offset=offset,
                                epsilon=grid_res)
     x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
-    extent = (x_ctr[0] - offset[0], x_ctr[0] + offset[0], x_ctr[1] - offset[1], x_ctr[1] + offset[1])
+    extent = ((x_ctr[0] - offset[0])/1e3,
+              (x_ctr[0] + offset[0])/1e3,
+              (x_ctr[1] - offset[1])/1e3,
+              (x_ctr[1] + offset[1])/1e3)
 
     # Use a squeeze operation to ensure that the individual dimension indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
@@ -129,12 +130,12 @@ def example1(colors=None):
         plt.colorbar(hdl, format='%d')
 
         # Add contour lines
-        hdl2 = plt.contour(x_grid[0], x_grid[1], cep/1e3, origin='lower', colors='k')
+        hdl2 = plt.contour(x_grid[0]/1e3, x_grid[1]/1e3, cep/1e3, origin='lower', colors='k')
         plt.clabel(hdl2, fontsize=10, colors='w')
         plt.xlabel('x [km]')
         plt.ylabel('y [km]')
 
-        aoa.plot_sensors(marker='^',label='Sensors')
+        aoa.plot_sensors(scale=1e3,marker='^',label='Sensors')
         plt.ylim([-.5, 5.5])
 
     return figs
@@ -152,8 +153,6 @@ def example2(rng=np.random.default_rng()):
     :param rng: random number generator
     :return: figure handle to generated graphic
     """
-
-    # ToDo: Debug -- plot 4a has different curves than MATLAB (LS Soln for sample mean; error ellipses for single vs. mean)
 
     # Define sensor positions
     x_tdoa = np.array([[-10e3, 0, 10e3],
@@ -194,11 +193,11 @@ def example2(rng=np.random.default_rng()):
 
     fig1=plt.figure()
     for this_cep, this_sigma_t in zip(cep_vec, sigma_t_vec):
-        plt.loglog(time_vec, this_cep, label='\\sigma_t={:.1f} \\mu s'.format(this_sigma_t*1e6))
+        plt.loglog(time_vec, this_cep, label='$\sigma_t={:.1f} \mu s$'.format(this_sigma_t*1e6))
 
     plt.plot(time_vec, 10*np.ones_like(time_vec),'k-.', label='10 m')
     plt.xlabel('Time [s]')
-    plt.ylabel('$CEP_{50}$ [m]')
+    plt.ylabel('$CcEP_{50}$ [m]')
     plt.ylim([1, 1000])
     plt.legend(loc='upper right')
     plt.grid(True)
@@ -221,7 +220,10 @@ def example2(rng=np.random.default_rng()):
     crlb_sample_mean = tdoa.compute_crlb(x_source=x_tgt)
     cep_sample_mean = utils.errors.compute_cep50(crlb_sample_mean)
     print('CEP50 for the sample mean: {:.2f} km'.format(cep_sample_mean/1e3))
-    
+
+    # Reset the covariance matrix
+    tdoa.cov = cov_roa
+
     # Demonstrate geolocation
     z = tdoa.measurement(x_source=x_tgt)
     zeta = z[:, np.newaxis] + tdoa.cov.lower @ rng.standard_normal(size=(tdoa.num_measurements, num_pulses))  # noisy measurement
@@ -244,10 +246,9 @@ def example2(rng=np.random.default_rng()):
     fig2 = plt.figure()
     # plt.plot(x_tdoa[0], x_tdoa[1],'o',label='TDOA Sensors')
     plt.plot(x_tgt[0], x_tgt[1], '^', label='Target')
-    plt.plot(x_ls[0],x_ls[1], '--', label='LS Soln (single sample)')
+    # plt.plot(x_ls[0],x_ls[1], '--', label='LS Soln (single sample)')
     plt.plot(x_ls_mn[0],x_ls_mn[1], '-.', label='LS Soln (sample mean)')
     plt.grid(True)
-    plt.legend(loc='upper right')
 
     # Overlay error ellipse
     ell = utils.errors.draw_error_ellipse(x_tgt, crlb_single_sample,num_pts=101)
@@ -255,12 +256,12 @@ def example2(rng=np.random.default_rng()):
     
     plt.plot(ell[0], ell[1], label='Error Ellipse (single sample)')
     plt.plot(ell_full[0], ell_full[1], label='Error Ellipse (sample mean)')
-    
+    plt.legend(loc='upper right')
+
     # Plot error as a function of time
     err = np.sqrt(np.sum(np.fabs(x_ls-x_tgt[:, np.newaxis])**2, axis=0))
     err_mn = np.sqrt(np.sum(np.fabs(x_ls_mn-x_tgt[:, np.newaxis])**2, axis=0))
 
-    # ToDo: Debug -- error seems to be scaled differently than CRLB; verify
     fig3 = plt.figure()
     time_vec = pri * (1+np.arange(num_pulses))
     plt.semilogy(time_vec, err, label='Error (single sample)')
@@ -345,7 +346,6 @@ def example3(rng=np.random.default_rng()):
     plt.plot(x_est[0], x_est[1], '-.', label='Estimated Position')
     plt.scatter(x_tgt[0], x_tgt[1], marker='^', label='Target')
     plt.grid(True)
-    plt.legend(loc='upper right')
 
     # Draw Error Ellipse from single sample
     crlb = aoa.compute_crlb(x_tgt)
@@ -358,6 +358,7 @@ def example3(rng=np.random.default_rng()):
     offset = np.amax(np.amax(ell, axis=1)-np.amin(ell,axis=1), axis=0)
     plt.xlim(x_tgt[0] + .6*offset*np.array([-1, 1]))
     plt.ylim(x_tgt[1] + .6*offset*np.array([-1, 1]))
+    plt.legend(loc='upper right')
 
     # Compute Errors
     err = np.sqrt(np.sum(np.fabs(x_est - x_tgt[:, np.newaxis])**2, axis=0))
@@ -456,7 +457,6 @@ def example4(rng=np.random.default_rng()):
     plt.plot(x_est[0],x_est[1],'-.', label='Estimated Position')
     plt.plot(x_tgt[0],x_tgt[1],'^', label='Target')
     plt.grid(True)
-    plt.legend(loc='upper right')
 
     # Draw Error Ellipse from single sample
     crlb = aoa.compute_crlb(x_tgt)
@@ -469,6 +469,7 @@ def example4(rng=np.random.default_rng()):
     offset = np.amax(np.amax(ell, axis=1)-np.amin(ell,axis=1), axis=None)
     plt.xlim(x_tgt[0] + .6*offset*np.array([-1, 1]))
     plt.ylim(x_tgt[1] + .6*offset*np.array([-1, 1]))
+    plt.legend(loc='upper right')
 
     ## Compute Errors
     err = np.sqrt(np.sum(np.fabs(x_est - x_tgt[:, np.newaxis])**2, axis=0))

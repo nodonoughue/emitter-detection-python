@@ -191,7 +191,7 @@ def make_figure_7(prefix=None):
 
     fig7b=plt.figure()
     plt.plot(t, zeta.T)
-    plt.legend(['TDOA_{1,2}','TDOA_{1,3}'])
+    plt.legend(['$TDOA_{1,2}$','$TDOA_{1,3}$'])
     plt.grid(True)
     plt.xlabel('Time [s]')
     plt.ylabel('Range Difference Measurement [m]')
