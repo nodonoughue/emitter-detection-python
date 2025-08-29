@@ -175,11 +175,14 @@ def make_figure_7(prefix=None):
     fig7a = plt.figure()
     plt.plot(x_tgt[0], x_tgt[1], '^', label='Target')
     tdoa_label='TDOA Sensor'
-    for this_x, this_x_full in zip(x_tdoa, x_tdoa_full):
+    for idx in range(num_sensors):
+        this_x = np.squeeze(x_tdoa[:, idx])
+        this_x_full = np.squeeze(x_tdoa_full[:, idx, :])
         hdl=plt.plot(this_x_full[0], this_x_full[1], label=tdoa_label)
         tdoa_label = None  # clear the label; only the first one gets a legend entry
         plt.scatter(this_x[0], this_x[1], marker='o', color=hdl[0].get_color(), label=None)
     plt.legend(loc='upper left')
+    plt.axis('equal')
 
     # Compute TDOA as a function of time
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, ref_idx=None, cov=CovarianceMatrix(np.eye(num_sensors)))
@@ -282,12 +285,12 @@ def make_figure_10(prefix=None, rng=np.random.default_rng()):
         # Make a triangular patch
         marker_radius = 250
         num_pts = 3
-        vertex_theta = np.pi+np.arange(start=0, step=2*np.pi/num_pts, stop=2*np.pi*(num_pts-1)/num_pts)-this_bng
+        vertex_theta = np.pi+np.arange(start=0, step=2*np.pi/num_pts, stop=2*np.pi)-this_bng
         marker_x = this_x[0] + marker_radius*np.cos(vertex_theta)
         marker_y = this_x[1] + marker_radius*np.sin(vertex_theta)
 
         # Draw Icon
-        plt.scatter(marker_x, marker_y, s=10, marker='^', edgecolor='k', facecolor=color, label=None)
+        plt.fill(marker_x, marker_y, edgecolor='k', facecolor=color, label=None)
 
         # Draw LOB with uncertainty
         aoa.pos = this_x
