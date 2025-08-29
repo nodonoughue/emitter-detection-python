@@ -53,7 +53,7 @@ def example1(rng=np.random.default_rng()):
 
     # Due East
     # todo: make sure the trajectory components line up right
-    t_e_vec = np.arange(start=0, stop=t_e_leg, step=t_inc)
+    t_e_vec = np.arange(start=0, stop=t_e_leg+t_inc, step=t_inc)
     x_e_leg = x_tgt_init[:, np.newaxis] + np.array([vel, 0, 0])[:, np.newaxis] * t_e_vec[np.newaxis, :]
 
     # Turn to South
@@ -62,7 +62,7 @@ def example1(rng=np.random.default_rng()):
     x_turn = x_e_leg[:, [-1]] + turn_rad * np.array([np.sin(angle_turn), np.cos(angle_turn)-1, np.zeros_like(angle_turn)])
 
     # Due South
-    t_s_vec = np.arange(start=t_inc, step=t_inc, stop=t_s_leg)
+    t_s_vec = np.arange(start=t_inc, step=t_inc, stop=t_s_leg+t_inc)
     x_s_leg = x_turn[:, [-1]] + np.array([0, -vel, 0])[:, np.newaxis] * t_s_vec[np.newaxis, :]
 
     # Combine legs
@@ -74,11 +74,10 @@ def example1(rng=np.random.default_rng()):
     fig1 = plt.figure()
     plt.scatter(x_tdoa[0], x_tdoa[1], marker='o', label='Sensors')
     plt.plot(x_tgt_full[0],x_tgt_full[1], marker='v', markevery=[-1], label='Aircraft')
-    plt.legend(loc='lower left')
     plt.grid(True)
 
     # ===  Measurement Statistics
-    ref_idx = 1
+    ref_idx = 0
     sigma_toa = 10e-9
     cov_toa = (sigma_toa**2) * np.eye(n_tdoa)
     cov_roa = CovarianceMatrix(_speed_of_light**2*cov_toa)
@@ -169,6 +168,7 @@ def example1(rng=np.random.default_rng()):
     plt.plot(x_ekf_est[0],x_ekf_est[1],'--',label='EKF (est.)')
     plt.plot(x_ekf_pred[0],x_ekf_pred[1],'--',label='EKF (pred.)')
     plt.grid(True)
+    plt.legend(loc='lower left')
 
     # plt.plot some error ellipses
     #for idx=1:10:num_time
@@ -195,6 +195,7 @@ def example1(rng=np.random.default_rng()):
     plt.xlabel('Time [sec]')
     plt.ylabel('Error [m]')
     plt.yscale('log')
+    plt.legend(loc='upper right')
 
     # ===  Repeat for Statistical Certainty
     num_mc = 1000
@@ -268,10 +269,10 @@ def example1(rng=np.random.default_rng()):
     rmse_cov_pred = np.sqrt(np.mean(sse_cov_pred, axis=0))
 
     fig3=plt.figure()
-    plt.plot(t_vec, rmse_cov_est, label='RMSE (est. cov.)')
-    plt.plot(t_vec[1:], rmse_cov_pred[:-1], label='RMSE (pred. cov)')
-    plt.plot(t_vec, rmse_est, '--', label='RMSE (est. act.)')
-    plt.plot(t_vec[1:], rmse_pred, '--', label='RMSE (pred. act.)')
+    hdl_est = plt.plot(t_vec, rmse_cov_est, label='RMSE (est. cov.)')
+    hdl_pred = plt.plot(t_vec[1:], rmse_cov_pred[:-1], label='RMSE (pred. cov)')
+    plt.plot(t_vec, rmse_est, '--', label='RMSE (est. act.)', color=hdl_est[0].get_color())
+    plt.plot(t_vec[1:], rmse_pred, '--', label='RMSE (pred. act.)', color=hdl_pred[0].get_color())
     plt.grid(True)
     plt.xlabel('Time [sec]')
     plt.ylabel('Error [m]')

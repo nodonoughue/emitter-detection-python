@@ -113,14 +113,12 @@ def make_kinematic_model(model_type: str, num_dims: int=3, process_covar: np.nda
         state_space['has_vel'] = True
 
         def f(t):
-            # todo: debug the next line, is it doing what we want?
             return np.block([[np.eye(num_dims), t*np.eye(num_dims)],
                              [np.zeros((num_dims, num_dims)), np.eye(num_dims)]])
 
         def q(t):
-            # todo: debug
             return np.block([[.25*t**4*process_covar, .5*t**3*process_covar],
-                             [5*t**3*process_covar, t**2*process_covar]])
+                             [.5*t**3*process_covar, t**2*process_covar]])
 
     elif model_type == 'ca' or model_type == 'constant acceleration':
         # Position, Velocity, and Acceleration are tracked states
