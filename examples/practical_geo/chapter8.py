@@ -52,8 +52,7 @@ def example1(rng=np.random.default_rng()):
     t_inc = 10 # 10 seconds between track updates
 
     # Due East
-    # todo: make sure the trajectory components line up right
-    t_e_vec = np.arange(start=0, stop=t_e_leg, step=t_inc)
+    t_e_vec = np.arange(start=0, stop=t_e_leg+t_inc, step=t_inc)
     x_e_leg = x_tgt_init[:, np.newaxis] + np.array([vel, 0, 0])[:, np.newaxis] * t_e_vec[np.newaxis, :]
 
     # Turn to South
@@ -62,7 +61,7 @@ def example1(rng=np.random.default_rng()):
     x_turn = x_e_leg[:, [-1]] + turn_rad * np.array([np.sin(angle_turn), np.cos(angle_turn)-1, np.zeros_like(angle_turn)])
 
     # Due South
-    t_s_vec = np.arange(start=t_inc, step=t_inc, stop=t_s_leg)
+    t_s_vec = np.arange(start=t_inc, step=t_inc, stop=t_s_leg+t_inc)
     x_s_leg = x_turn[:, [-1]] + np.array([0, -vel, 0])[:, np.newaxis] * t_s_vec[np.newaxis, :]
 
     # Combine legs
@@ -74,11 +73,10 @@ def example1(rng=np.random.default_rng()):
     fig1 = plt.figure()
     plt.scatter(x_tdoa[0], x_tdoa[1], marker='o', label='Sensors')
     plt.plot(x_tgt_full[0],x_tgt_full[1], marker='v', markevery=[-1], label='Aircraft')
-    plt.legend(loc='lower left')
     plt.grid(True)
 
     # ===  Measurement Statistics
-    ref_idx = 1
+    ref_idx = 0
     sigma_toa = 10e-9
     cov_toa = (sigma_toa**2) * np.eye(n_tdoa)
     cov_roa = CovarianceMatrix(_speed_of_light**2*cov_toa)
@@ -169,6 +167,7 @@ def example1(rng=np.random.default_rng()):
     plt.plot(x_ekf_est[0],x_ekf_est[1],'--',label='EKF (est.)')
     plt.plot(x_ekf_pred[0],x_ekf_pred[1],'--',label='EKF (pred.)')
     plt.grid(True)
+    plt.legend(loc='lower left')
 
     # plt.plot some error ellipses
     #for idx=1:10:num_time
@@ -195,6 +194,7 @@ def example1(rng=np.random.default_rng()):
     plt.xlabel('Time [sec]')
     plt.ylabel('Error [m]')
     plt.yscale('log')
+    plt.legend(loc='upper right')
 
     # ===  Repeat for Statistical Certainty
     num_mc = 1000
@@ -268,10 +268,10 @@ def example1(rng=np.random.default_rng()):
     rmse_cov_pred = np.sqrt(np.mean(sse_cov_pred, axis=0))
 
     fig3=plt.figure()
-    plt.plot(t_vec, rmse_cov_est, label='RMSE (est. cov.)')
-    plt.plot(t_vec[1:], rmse_cov_pred[:-1], label='RMSE (pred. cov)')
-    plt.plot(t_vec, rmse_est, '--', label='RMSE (est. act.)')
-    plt.plot(t_vec[1:], rmse_pred, '--', label='RMSE (pred. act.)')
+    hdl_est = plt.plot(t_vec, rmse_cov_est, label='RMSE (est. cov.)')
+    hdl_pred = plt.plot(t_vec[1:], rmse_cov_pred[:-1], label='RMSE (pred. cov)')
+    plt.plot(t_vec, rmse_est, '--', label='RMSE (est. act.)', color=hdl_est[0].get_color())
+    plt.plot(t_vec[1:], rmse_pred, '--', label='RMSE (pred. act.)', color=hdl_pred[0].get_color())
     plt.grid(True)
     plt.xlabel('Time [sec]')
     plt.ylabel('Error [m]')
@@ -302,7 +302,7 @@ def example2(rng=np.random.default_rng()):
     # ===  Define ship and sensor positions
     t_inc = 30
     t_max = 15*60
-    t_vec = np.arange(start=0, step=t_inc, stop=t_max)  # seconds
+    t_vec = np.arange(start=0, step=t_inc, stop=t_max+t_inc)  # seconds
     num_time = len(t_vec)
 
     # Origin is 0,0.  Alt is 10 km. Velocity is +y at 100 m/s.
@@ -311,7 +311,7 @@ def example2(rng=np.random.default_rng()):
 
     # Origin is 50 km, 50 km. Alt is 0 m.  Velocity is -x at 5 m/s.
     ship_accel_power = .05
-    a_tgt_full = np.concatenate((-ship_accel_power + 2*ship_accel_power*rng.standard_normal((2, num_time)), np.zeros((1, num_time))), axis=0)
+    a_tgt_full = np.concatenate((-ship_accel_power + 2*ship_accel_power*rng.uniform(low=0, high=1, size=(2, num_time)), np.zeros((1, num_time))), axis=0)
     v_tgt_full = np.array([-20, 0, 0])[:, np.newaxis] + np.cumsum(a_tgt_full*t_inc,axis=1)
     x_tgt_full = np.array([50e3, 50e3, 0])[:, np.newaxis] + np.cumsum(v_tgt_full*t_inc, axis=1)
 
@@ -384,14 +384,14 @@ def example2(rng=np.random.default_rng()):
 
     # Initialize position with AOA estimate from first three measurement
     x_aoa_init = x_aoa_full[:, :3]
-    z_init = np.ravel(z[:,:3].T)
+    zeta_init = np.ravel(zeta[:,:3])
     cov_init = CovarianceMatrix.block_diagonal(*[cov_psi]*3)
 
     aoa_init = DirectionFinder(x=x_aoa_init, cov=cov_init, do_2d_aoa=do2daoa)
     
     x_init_guess = np.array([10e3, 10e3, 0])
     bnd, bnd_grad = utils.constraints.fixed_alt(0, 'flat')
-    x_init, _ = aoa_init.gradient_descent(zeta=z_init, x_init=x_init_guess, eq_constraints=[bnd])
+    x_init, _ = aoa_init.gradient_descent(zeta=zeta_init, x_init=x_init_guess, eq_constraints=[bnd], epsilon=100)
     p_init = aoa_init.compute_crlb(x_source=x_init, eq_constraints_grad=[bnd_grad])
 
     x_pred[pos_slice] = x_init[:num_dims]
@@ -495,6 +495,7 @@ def example2(rng=np.random.default_rng()):
     plt.plot(x_ekf_est[0],x_ekf_est[1],'-',label='EKF (est.)')
     plt.plot(x_ekf_pred[0],x_ekf_pred[1],'-',label='EKF (pred.)')
     plt.grid(True)
+    plt.legend()
 
     # plt.plot some error ellipses
     #for idx=1:10:num_time
@@ -513,7 +514,7 @@ def example2(rng=np.random.default_rng()):
     plt.plot(x_ekf_pred[0],x_ekf_pred[1],'-',label='EKF (pred.)')
     plt.grid(True)
     plt.xlim([30e3,50e3])
-    plt.legend(loc='upper left')
+    plt.legend(loc='lower left')
 
     ## Compute Error
     err_pred = x_ekf_pred[:, :-1] - x_tgt_full[:num_dims, 1:]

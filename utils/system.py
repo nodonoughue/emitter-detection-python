@@ -518,11 +518,11 @@ class PassiveSurveillanceSystem(ABC):
         pass
 
     # ==================== Helper Methods =====================
-    def plot_sensors(self, ax=None, **kwargs):
+    def plot_sensors(self, scale=1, ax=None, **kwargs):
         if ax is not None:
-            ax.scatter(self.pos[0], self.pos[1], **kwargs)
+            ax.scatter(self.pos[0]/scale, self.pos[1]/scale, **kwargs)
         else:
-            plt.scatter(self.pos[0], self.pos[1], **kwargs)
+            plt.scatter(self.pos[0]/scale, self.pos[1]/scale, **kwargs)
         return
 
     def parse_source_pos_vel(self, pos_vel, default_vel):

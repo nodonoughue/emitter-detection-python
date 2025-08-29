@@ -44,11 +44,11 @@ def make_all_figures(close_figs=False, force_recalc=False):
     figs1_2 = make_figures_1_2(prefix, force_recalc)
     figs3_4 = make_figures_3_4(prefix, force_recalc)
     fig5 = make_figure_5(prefix, force_recalc)
-    fig6 = make_figure_6(prefix)
-    fig7 = make_figure_7(prefix, force_recalc)
-    fig8 = make_figure_8(prefix)
+    fig7 = make_figure_7(prefix)
+    fig8 = make_figure_8(prefix, force_recalc)
+    fig10 = make_figure_10(prefix)
 
-    figs = list(figs1_2) +  list(figs3_4) + list(fig5) + list(fig6) + list(fig7) + list(fig8)
+    figs = list(figs1_2) +  list(figs3_4) + list(fig5) + list(fig7) + list(fig8) + list(fig10)
     if close_figs:
         [plt.close(fig) for fig in figs]
         return None
@@ -147,15 +147,15 @@ def make_figure_5(prefix=None, force_recalc=False):
 
     return figs
 
-def make_figure_6(prefix=None):
+def make_figure_7(prefix=None):
     """
-    Figure 7.6
+    Figure 7.7
 
     :param prefix: output directory to place generated figure
     :return: handle
     """
 
-    print('Generating Figures 7.6...')
+    print('Generating Figures 7.7...')
 
     # Illustration of TDOA changes over time
     x_tgt = np.array([0, 0])
@@ -172,14 +172,17 @@ def make_figure_6(prefix=None):
     x_tdoa_full = x_tdoa[:, :, np.newaxis] + v_tdoa[:, :, np.newaxis] * np.reshape(t, shape=(1, 1, num_t))
 
     # Plot Geometry
-    fig6a = plt.figure()
+    fig7a = plt.figure()
     plt.plot(x_tgt[0], x_tgt[1], '^', label='Target')
     tdoa_label='TDOA Sensor'
-    for this_x, this_x_full in zip(x_tdoa, x_tdoa_full):
+    for idx in range(num_sensors):
+        this_x = np.squeeze(x_tdoa[:, idx])
+        this_x_full = np.squeeze(x_tdoa_full[:, idx, :])
         hdl=plt.plot(this_x_full[0], this_x_full[1], label=tdoa_label)
         tdoa_label = None  # clear the label; only the first one gets a legend entry
         plt.scatter(this_x[0], this_x[1], marker='o', color=hdl[0].get_color(), label=None)
     plt.legend(loc='upper left')
+    plt.axis('equal')
 
     # Compute TDOA as a function of time
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, ref_idx=None, cov=CovarianceMatrix(np.eye(num_sensors)))
@@ -189,17 +192,17 @@ def make_figure_6(prefix=None):
         tdoa.pos = this_x
         zeta[:, idx] = tdoa.measurement(x_source=x_tgt)
 
-    fig6b=plt.figure()
+    fig7b=plt.figure()
     plt.plot(t, zeta.T)
-    plt.legend(['TDOA_{1,2}','TDOA_{1,3}'])
+    plt.legend(['$TDOA_{1,2}$','$TDOA_{1,3}$'])
     plt.grid(True)
     plt.xlabel('Time [s]')
     plt.ylabel('Range Difference Measurement [m]')
 
     # Output to file
-    figs = [fig6a, fig6b]
+    figs = [fig7a, fig7b]
     if prefix is not None:
-        labels = ['fig6a', 'fig6b']
+        labels = ['fig7a', 'fig7b']
         for fig, label in zip(figs, labels):
             fig.savefig(prefix + label + '.svg')
             fig.savefig(prefix + label + '.png')
@@ -207,9 +210,9 @@ def make_figure_6(prefix=None):
     return figs
 
 
-def make_figure_7(prefix=None, force_recalc=False):
+def make_figure_8(prefix=None, force_recalc=False):
     """
-    Figure 7.7 from Example 7.4
+    Figure 7.8 from Example 7.4
 
     :param prefix: output directory to place generated figure
     :param force_recalc: optional flag (default=True), if False then the example does not run
@@ -217,16 +220,16 @@ def make_figure_7(prefix=None, force_recalc=False):
     """
 
     if not force_recalc:
-        print('Skipping Figure 7.7 (re-run with force_recalc=True to generate)...')
+        print('Skipping Figure 7.8 (re-run with force_recalc=True to generate)...')
         return None,
 
-    print('Generating Figure 7.7 (Example 7.4)...')
+    print('Generating Figure 7.8 (Example 7.4)...')
 
     figs = chapter7.example4()
 
     # Output to file
     if prefix is not None:
-        labels = ['fig7a', 'fig7b']
+        labels = ['fig8a', 'fig8b']
         if len(labels) != len(figs):
             print('**Error saving figure 7.7; unexpected number of figures returned from Example 7.4.')
         else:
@@ -236,16 +239,16 @@ def make_figure_7(prefix=None, force_recalc=False):
 
     return figs
 
-def make_figure_8(prefix=None, rng=np.random.default_rng()):
+def make_figure_10(prefix=None, rng=np.random.default_rng()):
     """
-    Figure 7.8
+    Figure 7.10
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :return: handle
     """
 
-    print('Generating Figure 7.8...')
+    print('Generating Figure 7.10...')
 
     x_tgt = np.array([0, 10e3])
 
@@ -265,7 +268,7 @@ def make_figure_8(prefix=None, rng=np.random.default_rng()):
     cov_df = CovarianceMatrix([(theta_unc*_deg2rad)**2])
     aoa = DirectionFinder(x=x_aoa, do_2d_aoa=False, cov=cov_df)
 
-    fig8a=plt.figure()
+    fig10a=plt.figure()
     hdl_traj = plt.plot(x_aoa[0], x_aoa[1], label='Sensor Trajectory')
 
     # Draw bearings at time markers
@@ -282,12 +285,12 @@ def make_figure_8(prefix=None, rng=np.random.default_rng()):
         # Make a triangular patch
         marker_radius = 250
         num_pts = 3
-        vertex_theta = np.pi+np.arange(start=0, step=2*np.pi/num_pts, stop=2*np.pi*(num_pts-1)/num_pts)-this_bng
+        vertex_theta = np.pi+np.arange(start=0, step=2*np.pi/num_pts, stop=2*np.pi)-this_bng
         marker_x = this_x[0] + marker_radius*np.cos(vertex_theta)
         marker_y = this_x[1] + marker_radius*np.sin(vertex_theta)
 
         # Draw Icon
-        plt.scatter(marker_x, marker_y, s=10, marker='^', edgecolor='k', facecolor=color, label=None)
+        plt.fill(marker_x, marker_y, edgecolor='k', facecolor=color, label=None)
 
         # Draw LOB with uncertainty
         aoa.pos = this_x
@@ -307,7 +310,7 @@ def make_figure_8(prefix=None, rng=np.random.default_rng()):
         lob_fill = np.concatenate((xy_lob_high,xy_lob_low[:, [-1]]), axis=1)
         fill_patch = plt.Polygon(lob_fill.T, linestyle='--', edgecolor='k', facecolor=color, alpha=.2,
                                  label=label_fill)
-        fig8a.gca().add_patch(fill_patch)
+        fig10a.gca().add_patch(fill_patch)
         plt.plot(xy_lob[0], xy_lob[1], '-.', label=label_lob,color=color)
         label_fill = None
         label_lob = None
@@ -343,17 +346,17 @@ def make_figure_8(prefix=None, rng=np.random.default_rng()):
         x_prev = this_x
         p_prev = this_p
 
-    fig8b=plt.figure()
-    plt.plot(t_vec, cep_vec/1e3)
+    fig10b=plt.figure()
+    plt.semilogy(t_vec, cep_vec)
     plt.xlabel('Time [s]')
-    plt.ylabel('$CEP_{50}$ [km]')
+    plt.ylabel('$CEP_{50}$ [m]')
 
     # Output to file
-    figs = [fig8a, fig8b]
+    figs = [fig10a, fig10b]
     if prefix is not None:
-        labels = ['fig8', 'fig9']
+        labels = ['fig10a', 'fig10b']
         if len(labels) != len(figs):
-            print('**Error saving figure 7.8; unexpected number of figures.')
+            print('**Error saving figure 7.10; unexpected number of figures.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')
