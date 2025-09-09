@@ -48,11 +48,11 @@ class DirectionFinder(PassiveSurveillanceSystem):
     def jacobian_uncertainty(self, x_source, **kwargs):
         return model.jacobian_uncertainty(x_sensor=self.pos, x_source=x_source, do_2d_aoa=self.do_2d_aoa, **kwargs)
 
-    def log_likelihood(self, x_source, zeta, x_sensor=None, bias=None, v_sensor=None, v_source=None):
+    def log_likelihood(self, x_source, zeta, x_sensor=None, bias=None, v_sensor=None, v_source=None, **kwargs):
         if x_sensor is None: x_sensor = self.pos
         if bias is None: bias = self.bias
         return model.log_likelihood(x_sensor=x_sensor, zeta=zeta, x_source=x_source, cov=self.cov,
-                                    do_2d_aoa=self.do_2d_aoa, bias=bias)
+                                    do_2d_aoa=self.do_2d_aoa, bias=bias, **kwargs)
 
     # def log_likelihood_uncertainty(self, zeta, theta, **kwargs):
     #     return model.log_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, theta=theta, cov=self.cov,

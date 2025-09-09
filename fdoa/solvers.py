@@ -34,9 +34,10 @@ def max_likelihood(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, search_space
         cov = cov.resample(ref_idx=ref_idx)
 
     # Set up function handle
-    def ell(x):
+    def ell(x, **kwargs):
         return model.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor, rho_dot=zeta, cov=cov,
-                                    x_source=x, v_source=None, ref_idx=ref_idx, do_resample=False, bias=bias)
+                                    x_source=x, v_source=None, ref_idx=ref_idx, do_resample=False, bias=bias,
+                                    **kwargs)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, search_space=search_space, **kwargs)

@@ -538,7 +538,7 @@ def constrain_likelihood(ell, eq_constraints: list = None, ineq_constraints: lis
     if eq_constraints is not None:
         utils.ensure_iterable(eq_constraints, flatten=True)
 
-    def ell_constrained(x):
+    def ell_constrained(x, **ell_kwargs):
         valid_mask = True
 
         if eq_constraints is not None:
@@ -552,7 +552,7 @@ def constrain_likelihood(ell, eq_constraints: list = None, ineq_constraints: lis
                 valid_mask = valid_mask and eps <= 0.
 
         result = -np.inf * np.ones_like(valid_mask)
-        result[valid_mask] = ell(x[:, valid_mask])
+        result[valid_mask] = ell(x[:, valid_mask], **ell_kwargs)
         return result
 
     return ell_constrained

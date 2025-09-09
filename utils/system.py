@@ -178,7 +178,7 @@ class PassiveSurveillanceSystem(ABC):
         # pos_indices      -- sensor position indices
         # vel_indices      -- sensor velocity indices
 
-        def ell(th):
+        def ell(th, **ell_kwargs):
             # Parse the parameter vector theta
             pos_vel = th[indices['source_indices']]
             x_source, v_source = self.parse_source_pos_vel(pos_vel, default_vel=self.vel)
@@ -188,7 +188,7 @@ class PassiveSurveillanceSystem(ABC):
 
             return self.log_likelihood(zeta=zeta, x_source=x_source, v_source=v_source,
                                        x_sensor=x_sensor, v_sensor=v_sensor,
-                                       bias=bias, print_progress=print_progress)
+                                       bias=bias, print_progress=print_progress, **ell_kwargs)
 
         th_est, likelihood, th_grid = utils.solvers.ml_solver(ell=ell, search_space=search_space,
                                                               **kwargs)
@@ -268,14 +268,14 @@ class PassiveSurveillanceSystem(ABC):
         # ==================== Log-Likelihood Wrapper Function ================
         # Accepts a 1D vector of measurement biases and a 1D vector of sensor positions
 
-        def ell(b, x, v):
+        def ell(b, x, v, **ell_kwargs):
             # Reshape the sensor position and velocity
             this_x_sensor = np.reshape(x, shape=self.pos.shape)
             this_v_sensor = np.reshape(v, shape=self.pos.shape) if v is not None else None
             res = 0
             for this_zeta, this_x, this_v in zip(zeta_cal.T, x_cal.T, v_cal.T):
                 this_ell = self.log_likelihood(x_sensor=this_x_sensor, v_sensor=this_v_sensor, zeta=this_zeta,
-                                               x_source=this_x, v_source=this_v, bias=b)
+                                               x_source=this_x, v_source=this_v, bias=b, **ell_kwargs)
                 res = res + this_ell
             return res
 

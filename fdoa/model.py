@@ -16,7 +16,7 @@ def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, 
     Nicholas O'Donoughue
     21 January 2021
 
-    :param x_sensor: nDim x nSensor array of sensor positions
+    :param x_sensor: nDim x n_sensor array of sensor positions
     :param x_source: nDim x n_source array of source positions
     :param v_sensor: nDim x nSensor array of sensor velocities
     :param v_source: nDim x n_source array of source velocities

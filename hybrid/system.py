@@ -193,7 +193,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         return np.concatenate(to_concat, axis=1)
 
-    def log_likelihood(self, x_source, zeta, x_sensor=None, bias=None, v_sensor=None, v_source=None):
+    def log_likelihood(self, x_source, zeta, x_sensor=None, bias=None, v_sensor=None, v_source=None, **kwargs):
         # Break apart the sensor position, velocity, and bias measurement inputs into their AOA, TDOA, and FDOA
         # components
         x_aoa, x_tdoa, x_fdoa = self.parse_sensor_data(x_sensor)
@@ -208,12 +208,12 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         result = 0
         if self.aoa is not None:
-            result = result + self.aoa.log_likelihood(x_source=x_source, zeta=z_aoa, x_sensor=x_aoa, bias=b_aoa)
+            result = result + self.aoa.log_likelihood(x_source=x_source, zeta=z_aoa, x_sensor=x_aoa, bias=b_aoa, **kwargs)
         if self.tdoa is not None:
-            result = result + self.tdoa.log_likelihood(x_source=x_source, zeta=z_tdoa, x_sensor=x_tdoa, bias=b_tdoa)
+            result = result + self.tdoa.log_likelihood(x_source=x_source, zeta=z_tdoa, x_sensor=x_tdoa, bias=b_tdoa, **kwargs)
         if self.fdoa is not None:
             result = result + self.fdoa.log_likelihood(x_source=x_source, zeta=z_fdoa, x_sensor=x_fdoa,
-                                                       v_sensor=v_fdoa, v_source=v_source, bias=b_fdoa)
+                                                       v_sensor=v_fdoa, v_source=v_source, bias=b_fdoa, **kwargs)
 
         return result
 
@@ -298,11 +298,11 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
             x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
         # Likelihood function for ML Solvers
-        def ell(pos_vel):
+        def ell(pos_vel, **ell_kwargs):
             # Determine if the input is position only, or position & velocity
             this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
             return self.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor,
-                                       zeta=zeta, x_source=this_pos, v_source=this_vel)
+                                       zeta=zeta, x_source=this_pos, v_source=this_vel, **ell_kwargs)
 
         # Call the util function
         x_est, likelihood, x_grid = utils.solvers.ml_solver(ell=ell, search_space=search_space, **kwargs)
