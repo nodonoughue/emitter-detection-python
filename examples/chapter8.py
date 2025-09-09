@@ -269,7 +269,7 @@ def example1(rng=np.random.default_rng()):
     return fig
 
 
-def example2(rng=np.random.default_rng()):
+def example2(rng=np.random.default_rng(), mc_params=None):
     """
     Executes Example 8.2 and generates one figure
 
@@ -279,6 +279,7 @@ def example2(rng=np.random.default_rng()):
     5 May 2021
 
     :param rng: random number generator
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle to generated graphic
     """
     
@@ -330,6 +331,8 @@ def example2(rng=np.random.default_rng()):
     
     # Compute MC Experiment
     num_monte_carlo = 1000
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     sig = np.sqrt(1/2)*(rng.standard_normal(size=(num_samples, num_monte_carlo))
                         + 1j * rng.standard_normal(size=(num_samples, num_monte_carlo)))
     noise = np.sqrt(1/2)*(rng.standard_normal(size=(num_elements, num_samples, num_monte_carlo))

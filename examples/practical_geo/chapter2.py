@@ -403,7 +403,7 @@ def example3(rng=np.random.default_rng(), colors=None):
     return fig_full, fig_zoom
 
 
-def example3_mc(rng=np.random.default_rng(), colors=None):
+def example3_mc(rng=np.random.default_rng(), colors=None, mc_params=None):
     """
     Executes a modified version of Example 2.3 with Monte-Carlo trials, as discussed in the video walkthrough of
     Example 2.3.
@@ -450,10 +450,13 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
                   'plot_progress': False}
 
     # Monte Carlo Iteration
-    num_mc_trials = 100
-    rmse_ml = np.zeros((num_mc_trials, ))
-    rmse_gd = np.zeros((num_mc_trials, gd_ls_args['max_num_iterations']))
-    rmse_ls = np.zeros((num_mc_trials, gd_ls_args['max_num_iterations']))
+    num_monte_carlo = 100
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
+
+    rmse_ml = np.zeros((num_monte_carlo, ))
+    rmse_gd = np.zeros((num_monte_carlo, gd_ls_args['max_num_iterations']))
+    rmse_ls = np.zeros((num_monte_carlo, gd_ls_args['max_num_iterations']))
 
     print('Performing Monte Carlo simulation...')
     t_start = time.perf_counter()
@@ -462,8 +465,8 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     res = {}
-    for idx in np.arange(num_mc_trials):
-        utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
+    for idx in np.arange(num_monte_carlo):
+        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         res = _mc_iteration(z, pss, rng, ml_args, gd_ls_args)
 
@@ -476,9 +479,9 @@ def example3_mc(rng=np.random.default_rng(), colors=None):
     utils.print_elapsed(t_elapsed)
 
     # Compute average error across Monte Carlo Iterations
-    rmse_avg_ml = np.sqrt(np.sum(rmse_ml**2)/num_mc_trials)
-    rmse_avg_gd = np.sqrt(np.sum(rmse_gd**2, axis=0)/num_mc_trials)
-    rmse_avg_ls = np.sqrt(np.sum(rmse_ls**2, axis=0)/num_mc_trials)
+    rmse_avg_ml = np.sqrt(np.sum(rmse_ml**2)/num_monte_carlo)
+    rmse_avg_gd = np.sqrt(np.sum(rmse_gd**2, axis=0)/num_monte_carlo)
+    rmse_avg_ls = np.sqrt(np.sum(rmse_ls**2, axis=0)/num_monte_carlo)
 
     fig_err = plt.figure()
     x_arr = np.arange(gd_ls_args['max_num_iterations'])

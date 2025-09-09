@@ -288,7 +288,7 @@ def example3(colors=None):
     return figs
 
 
-def example4(rng=np.random.default_rng()):
+def example4(rng=np.random.default_rng(), mc_params=None):
     """
     Executes Example 3.4.
 
@@ -298,14 +298,17 @@ def example4(rng=np.random.default_rng()):
     28 January 2025
 
     :param rng: random number generator
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle to generated graphic
     """
 
     # Set up sensor and target coordinates
     x_source_ctr = np.array([3, 4]) * 1e3
-    num_mc = 200
+    num_monte_carlo = 200
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     offset = 1e2   # Maximum distance from center to a single instance of the source position (per dimension)
-    x_source = x_source_ctr[:, np.newaxis] + offset * (-1 + 2 * rng.standard_normal(size=(2, num_mc)))
+    x_source = x_source_ctr[:, np.newaxis] + offset * (-1 + 2 * rng.standard_normal(size=(2, num_monte_carlo)))
 
     x_tdoa = np.array([[1., 3., 4., 5., 2.], [0., .5, 0., .5, -1.]]) * 1e3
     _, num_tdoa = utils.safe_2d_shape(x_tdoa)
@@ -319,11 +322,11 @@ def example4(rng=np.random.default_rng()):
     pss_full = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx='full', variance_is_toa=False)
 
     # TDOA Measurement and Combined Covariance Matrix
-    z_common = pss_common.measurement(x_source=x_source)  # num_tdoa x num_mc
+    z_common = pss_common.measurement(x_source=x_source)  # num_tdoa x num_monte_carlo
     z_full = pss_full.measurement(x_source=x_source)
 
     # Generate random noise
-    noise_sensor = cov_roa.lower @ rng.standard_normal(size=(num_tdoa, num_mc))
+    noise_sensor = cov_roa.lower @ rng.standard_normal(size=(num_tdoa, num_monte_carlo))
     noise_common = utils.resample_noise(noise_sensor, ref_idx=None)
     noise_full = utils.resample_noise(noise_sensor, ref_idx='full')
 
@@ -344,13 +347,13 @@ def example4(rng=np.random.default_rng()):
                       force_full_calc=True,
                       plot_progress=False)
 
-    rmse_ml = np.zeros((num_mc,))
-    rmse_gd = np.zeros((num_mc, gd_ls_args['max_num_iterations']))
-    rmse_ls = np.zeros((num_mc, gd_ls_args['max_num_iterations']))
+    rmse_ml = np.zeros((num_monte_carlo,))
+    rmse_gd = np.zeros((num_monte_carlo, gd_ls_args['max_num_iterations']))
+    rmse_ls = np.zeros((num_monte_carlo, gd_ls_args['max_num_iterations']))
 
-    rmse_ml_full = np.zeros((num_mc,))
-    rmse_gd_full = np.zeros((num_mc, gd_ls_args['max_num_iterations']))
-    rmse_ls_full = np.zeros((num_mc, gd_ls_args['max_num_iterations']))
+    rmse_ml_full = np.zeros((num_monte_carlo,))
+    rmse_gd_full = np.zeros((num_monte_carlo, gd_ls_args['max_num_iterations']))
+    rmse_ls_full = np.zeros((num_monte_carlo, gd_ls_args['max_num_iterations']))
 
     print('Performing Monte Carlo simulation...')
     t_start = time.perf_counter()
@@ -358,8 +361,8 @@ def example4(rng=np.random.default_rng()):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    for idx in np.arange(num_mc):
-        utils.print_progress(num_mc, idx, iterations_per_marker, iterations_per_row, t_start)
+    for idx in np.arange(num_monte_carlo):
+        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         this_source = x_source[:, idx]
         this_zeta_common = zeta_common[:, idx]
@@ -381,12 +384,12 @@ def example4(rng=np.random.default_rng()):
     utils.print_elapsed(t_elapsed)
 
     # Compute average error across Monte Carlo Iterations
-    rmse_avg_ml = np.sqrt(np.sum(rmse_ml ** 2) / num_mc)
-    rmse_avg_gd = np.sqrt(np.sum(rmse_gd ** 2, axis=0) / num_mc)
-    rmse_avg_ls = np.sqrt(np.sum(rmse_ls ** 2, axis=0) / num_mc)
-    rmse_avg_ml_full = np.sqrt(np.sum(rmse_ml_full ** 2) / num_mc)
-    rmse_avg_gd_full = np.sqrt(np.sum(rmse_gd_full ** 2, axis=0) / num_mc)
-    rmse_avg_ls_full = np.sqrt(np.sum(rmse_ls_full ** 2, axis=0) / num_mc)
+    rmse_avg_ml = np.sqrt(np.sum(rmse_ml ** 2) / num_monte_carlo)
+    rmse_avg_gd = np.sqrt(np.sum(rmse_gd ** 2, axis=0) / num_monte_carlo)
+    rmse_avg_ls = np.sqrt(np.sum(rmse_ls ** 2, axis=0) / num_monte_carlo)
+    rmse_avg_ml_full = np.sqrt(np.sum(rmse_ml_full ** 2) / num_monte_carlo)
+    rmse_avg_gd_full = np.sqrt(np.sum(rmse_gd_full ** 2, axis=0) / num_monte_carlo)
+    rmse_avg_ls_full = np.sqrt(np.sum(rmse_ls_full ** 2, axis=0) / num_monte_carlo)
 
     fig_err = plt.figure()
     x_arr = np.arange(gd_ls_args['max_num_iterations'])

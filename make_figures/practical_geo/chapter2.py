@@ -21,12 +21,13 @@ from make_figures import chapter13
 from examples.practical_geo import chapter2
 
 
-def make_all_figures(close_figs=False, force_recalc=False):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -42,9 +43,9 @@ def make_all_figures(close_figs=False, force_recalc=False):
     fig2 = make_figure_2(prefix)
     fig3 = make_figure_3(prefix)
     fig4 = make_figure_4(prefix)
-    fig5, fig6a, fig6b, fig6c, fig6d = make_figures_5_6(prefix, force_recalc)
-    fig8a, fig8b = make_figure_8(prefix, force_recalc)
-    fig10a, fig10b = make_figure_10(prefix, force_recalc)
+    fig5, fig6a, fig6b, fig6c, fig6d = make_figures_5_6(prefix, mc_params)
+    fig8a, fig8b = make_figure_8(prefix, mc_params)
+    fig10a, fig10b = make_figure_10(prefix, mc_params)
 
     figs = [fig1, fig2, fig3, fig4, fig5, fig6a, fig6b, fig6c, fig6d, fig8a, fig8b, fig10a, fig10b]
     if close_figs:
@@ -147,17 +148,17 @@ def make_figure_4(prefix=None):
     return fig4
 
 
-def make_figures_5_6(prefix=None, force_recalc=False):
+def make_figures_5_6(prefix=None, mc_params=None):
     """
     Figures 5 and 6(a, b, c, d)
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figures 2.5, 2.6a, 2.6b, 2.6c, and 2.6d (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 2.5, 2.6a, 2.6b, 2.6c, and 2.6d (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None, None, None, None, None
 
     print('Generating Figures 2.5, 2.6a, 2.6b, 2.6c, and 2.6d (using Example 2.1)...')
@@ -180,17 +181,17 @@ def make_figures_5_6(prefix=None, force_recalc=False):
     return figs
 
 
-def make_figure_8(prefix=None, force_recalc=False):
+def make_figure_8(prefix=None, mc_params=None):
     """
     Figure 8
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figures 2.8a and 2.8b (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 2.8a and 2.8b (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None, None
 
     print('Generating Figure 2.8a and 2.8b...')
@@ -211,17 +212,17 @@ def make_figure_8(prefix=None, force_recalc=False):
     return fig8a, fig8b
 
 
-def make_figure_10(prefix=None, force_recalc=False):
+def make_figure_10(prefix=None, mc_params=None):
     """
     Figure 10
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figures 2.10a and 2.10b (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 2.10a and 2.10b (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None, None
 
     print('Generating Figures 2.10a and 2.10b (using Example 2.3)...')
@@ -243,4 +244,4 @@ def make_figure_10(prefix=None, force_recalc=False):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, force_recalc=True)
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True})

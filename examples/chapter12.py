@@ -22,7 +22,7 @@ def run_all_examples():
     return figs
 
 
-def example1(rng=np.random.default_rng()):
+def example1(rng=np.random.default_rng(), mc_params=None):
     """
     Executes Example 12.1 and generates three figures
 
@@ -34,6 +34,7 @@ def example1(rng=np.random.default_rng()):
     2 Nov 2022
 
     :param rng: random number generator
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig_geo_a: figure handle for geographic layout
     :return fig_geo_b: figure handle for geographic layout -- zoomed in on target
     :return fig_err: figure handle for error as a function of iteration
@@ -72,7 +73,10 @@ def example1(rng=np.random.default_rng()):
     rho_actual = fdoa.measurement(x_source=x_source, v_source=v_source)
 
     # Initialize Solvers
-    num_mc_trials = int(1000)
+    num_monte_carlo = int(1000)
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
+
     x_init = baseline * x_source / np.abs(x_source)
     x_extent = 5 * baseline
     num_iterations = int(1000)
@@ -81,8 +85,8 @@ def example1(rng=np.random.default_rng()):
     epsilon = 100  # [m] desired iterative search stopping condition
     grid_res = int(500)  # [m] desired grid search resolution
 
-    out_shp = (2, num_mc_trials)
-    out_iterative_shp = (2, num_iterations, num_mc_trials)
+    out_shp = (2, num_monte_carlo)
+    out_iterative_shp = (2, num_iterations, num_monte_carlo)
     x_ml = np.zeros(shape=out_shp)
     x_bf = np.zeros(shape=out_shp)
     x_ls_full = np.zeros(shape=out_iterative_shp)
@@ -116,8 +120,8 @@ def example1(rng=np.random.default_rng()):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    for idx in np.arange(num_mc_trials):
-        utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
+    for idx in np.arange(num_monte_carlo):
+        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(fdoa, ml_search, args)
         x_ml[:, idx] = result['ml']

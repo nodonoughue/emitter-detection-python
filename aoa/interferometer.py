@@ -58,7 +58,7 @@ def compute_df(x1, x2, d_lam):
     return np.arcsin(phi_est/(2.*np.pi*d_lam))
 
 
-def run_example():
+def run_example(mc_params=None):
     """
     Example approach to analyze an interferometer
 
@@ -67,6 +67,7 @@ def run_example():
     Nicholas O'Donoughue
     10 January 2021
 
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: None
     """
 
@@ -80,7 +81,9 @@ def run_example():
     # Set up the parameter sweep
     num_samples_vec = np.asarray([1., 10., 100.])  # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-10., step=0.2, stop=20.2)  # signal-to-noise ratio
-    num_mc = 10000  # number of monte carlo trials at each parameter setting
+    num_monte_carlo = 10000  # number of monte carlo trials at each parameter setting
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
     # Set up output variables
     out_shp = (np.size(num_samples_vec), np.size(snr_db_vec))
@@ -88,22 +91,22 @@ def run_example():
     crlb_psi = np.zeros(shape=out_shp)
 
     # Loop over parameters
-    print('Executing Watson Watt Monte Carlo sweep...')
+    print('Executing Interferometer Monte Carlo sweep...')
     for idx_num_samples, this_num_samples in enumerate(num_samples_vec.tolist()):
-        this_num_mc = num_mc / this_num_samples
+        this_num_monte_carlo = num_monte_carlo / this_num_samples
         print('\t {} samples per estimate...'.format(this_num_samples))
 
         # Generate Signals
         iq_amp = np.sqrt(2)/2
         s1 = [np.random.normal(loc=0.0, scale=iq_amp, size=(this_num_samples, 2)).view(np.complex128)
-              for _ in np.arange(this_num_mc)]
+              for _ in np.arange(this_num_monte_carlo)]
         s2 = [alpha*this_s1*np.exp(1j*phi) for this_s1 in s1]
     
         # Generate Noise
         noise_base1 = [np.random.normal(loc=0.0, scale=iq_amp, size=(this_num_samples, 2)).view(np.complex128)
-                       for _ in np.arange(this_num_mc)]
+                       for _ in np.arange(this_num_monte_carlo)]
         noise_base2 = [np.random.normal(loc=0.0, scale=iq_amp, size=(this_num_samples, 2)).view(np.complex128)
-                       for _ in np.arange(this_num_mc)]
+                       for _ in np.arange(this_num_monte_carlo)]
     
         # Loop over SNR levels
         for idx_snr, this_snr_db in enumerate(snr_db_vec.tolist()):

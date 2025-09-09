@@ -22,7 +22,7 @@ def run_all_examples():
     return list(example1()) + list(example2())
 
 
-def example1(rng=np.random.default_rng()):
+def example1(rng=np.random.default_rng(), mc_params=None):
     """
     Executes Example 8.1.
 
@@ -196,20 +196,22 @@ def example1(rng=np.random.default_rng()):
     plt.yscale('log')
     plt.legend(loc='upper right')
 
-    # ===  Repeat for Statistical Certainty
-    num_mc = 1000
-    sse_pred = np.zeros((num_mc, num_time-1))
-    sse_est = np.zeros((num_mc, num_time))
-    sse_cov_pred = np.zeros((num_mc, num_time))
-    sse_cov_est = np.zeros((num_mc, num_time))
-    print('Repeating tracker test for {:d} Monte Carlo trials...'.format(num_mc))
+    # === Repeat for Statistical Certainty
+    num_monte_carlo = 1000
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
+    sse_pred = np.zeros((num_monte_carlo, num_time-1))
+    sse_est = np.zeros((num_monte_carlo, num_time))
+    sse_cov_pred = np.zeros((num_monte_carlo, num_time))
+    sse_cov_est = np.zeros((num_monte_carlo, num_time))
+    print('Repeating tracker test for {:d} Monte Carlo trials...'.format(num_monte_carlo))
     t_start = time.perf_counter()
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
 
-    for idx_mc in np.arange(num_mc):
-        utils.print_progress(num_mc, idx_mc, iterations_per_marker, iterations_per_row, t_start)
+    for idx_mc in np.arange(num_monte_carlo):
+        utils.print_progress(num_monte_carlo, idx_mc, iterations_per_marker, iterations_per_row, t_start)
 
         # Generate Measurements
         noise = tdoa.cov.lower @ rng.standard_normal((tdoa.num_measurements, num_time))

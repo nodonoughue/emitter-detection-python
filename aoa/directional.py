@@ -98,7 +98,7 @@ def compute_df(s, psi_samples, g, psi_res=0.1, min_psi=-np.pi, max_psi=np.pi):
     return psi
 
 
-def run_example():
+def run_example(mc_params=None):
     """
     Example evaluation of an Adcock and Rectangular-aperture DF receiver
 
@@ -107,6 +107,7 @@ def run_example():
     Nicholas O'Donoughue
     14 January 2021
 
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: None
     """
 
@@ -129,8 +130,10 @@ def run_example():
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100])         # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-20, step=2, stop=20+2)  # signal-to-noise ratio
-    num_mc = 1000              # number of monte carlo trials at each parameter setting
-    
+    num_monte_carlo = 1000              # number of monte carlo trials at each parameter setting
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
+
     # Set up output variables
     out_shp = [np.size(num_samples_vec), np.size(snr_db_vec)]
     rmse_psi = np.zeros(shape=out_shp)
@@ -139,11 +142,11 @@ def run_example():
     # Loop over parameters
     print('Executing Adcock Monte Carlo sweep...')
     for idx_num_samples, num_samples in enumerate(num_samples_vec.tolist()):
-        this_num_mc = num_mc / num_samples
+        this_num_monte_carlo = num_monte_carlo / num_samples
         print('\tnum_samples={}'.format(num_samples))
     
         # Generate Monte Carlo Noise with unit power
-        noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in np.arange(this_num_mc)]
+        noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in np.arange(this_num_monte_carlo)]
         
         # Loop over SNR levels
         for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):
@@ -199,7 +202,9 @@ def run_example():
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100])  # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-20, step=2, stop=20 + 2)  # signal-to-noise ratio
-    num_mc = 1000  # number of monte carlo trials at each parameter setting
+    num_monte_carlo = 1000  # number of monte carlo trials at each parameter setting
+    if mc_params is not None:
+        num_monte_carlo = min(np.astype(num_monte_carlo / mc_params['monte_carlo_decimation'], 'int'),mc_params['min_num_monte_carlo'])
 
     # Set up output variables
     out_shp = [np.size(num_samples_vec), np.size(snr_db_vec)]
@@ -209,11 +214,11 @@ def run_example():
     # Loop over parameters
     print('Executing Adcock Monte Carlo sweep...')
     for idx_num_samples, num_samples in enumerate(num_samples_vec.tolist()):
-        this_num_mc = num_mc / num_samples
+        this_num_monte_carlo = num_monte_carlo / num_samples
         print('\tnum_samples={}'.format(num_samples))
 
         # Generate Monte Carlo Noise with unit power
-        noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in np.arange(this_num_mc)]
+        noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in np.arange(this_num_monte_carlo)]
 
         # Loop over SNR levels
         for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):

@@ -132,7 +132,7 @@ def compute_df(r, x, ts, f, radius, fr, psi_res, min_psi, max_psi):
     return psi
 
     
-def run_example():
+def run_example(mc_params=None):
     """
     Example script to demonstrate analysis of a Doppler DF receiver.
 
@@ -141,6 +141,7 @@ def run_example():
     Nicholas O'Donoughue
     14 January 2021
 
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: None
     """
 
@@ -161,7 +162,9 @@ def run_example():
     # Set up the parameter sweep
     num_samples_vec = np.asarray([10, 100, 1000])   # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-10, step=2, stop=22)   # signal-to-noise ratio
-    num_mc = 1.e6                       # number of monte carlo trials at each parameter setting
+    num_monte_carlo = 1.e6                       # number of monte carlo trials at each parameter setting
+    if mc_params is not None:
+        num_monte_carlo = min(np.astype(num_monte_carlo / mc_params['monte_carlo_decimation'], 'int'),mc_params['min_num_monte_carlo'])
 
     # Set up output variables
     out_shp = (np.size(num_samples_vec), np.size(snr_db_vec))
@@ -171,7 +174,7 @@ def run_example():
     # Loop over parameters
     print('Executing Doppler Monte Carlo sweep...')
     for idx_num_samples, this_num_samples in enumerate(num_samples_vec.tolist()):
-        this_num_mc = num_mc / this_num_samples
+        this_num_monte_carlo = num_monte_carlo / this_num_samples
         print('\t M={}'.format(this_num_samples))
 
         # Reference signal
@@ -187,9 +190,9 @@ def run_example():
         # Generate noise signal
         noise_amp = np.sqrt(np.sum(abs(r0)**2)/(this_num_samples*2))
         noise_base_r = [np.random.normal(loc=0.0, scale=noise_amp, size=(this_num_samples, 2)).view(np.complex128)
-                        for _ in np.arange(this_num_mc)]
+                        for _ in np.arange(this_num_monte_carlo)]
         noise_base_x = [np.random.normal(loc=0.0, scale=noise_amp, size=(this_num_samples, 2)).view(np.complex128)
-                        for _ in np.arange(this_num_mc)]
+                        for _ in np.arange(this_num_monte_carlo)]
 
         # Loop over SNR levels
         for snr_db, idx_snr in snr_db_vec:

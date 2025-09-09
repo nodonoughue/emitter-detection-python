@@ -21,12 +21,13 @@ import detector
 from examples import chapter3
 
 
-def make_all_figures(close_figs=False):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
     :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -49,8 +50,8 @@ def make_all_figures(close_figs=False):
     fig4 = make_figure_4(prefix)
     fig7 = make_figure_7(prefix)
     fig8 = make_figure_8(prefix)
-    fig9 = make_figure_9(prefix, rng, colors)
-    fig10 = make_figure_10(prefix, rng, colors)
+    fig9 = make_figure_9(prefix, rng, colors, mc_params)
+    fig10 = make_figure_10(prefix, rng, colors, mc_params)
 
     figs = [fig1, fig2, fig3, fig4, fig7, fig8, fig9, fig10]
 
@@ -387,7 +388,7 @@ def make_figure_8(prefix=None):
     return fig8
 
 
-def make_figure_9(prefix=None, rng=np.random.default_rng(), colors=None):
+def make_figure_9(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
     """
     Figures 9, Example 3.1 Monte Carlo Results
 
@@ -399,12 +400,13 @@ def make_figure_9(prefix=None, rng=np.random.default_rng(), colors=None):
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: set of colors for plotting
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
     print('Generating Figure 3.9 (using Example 3.1)...')
 
-    fig9 = chapter3.example1(rng, colors)
+    fig9 = chapter3.example1(rng, colors, mc_params)
 
     # Save figure
     if prefix is not None:
@@ -414,7 +416,7 @@ def make_figure_9(prefix=None, rng=np.random.default_rng(), colors=None):
     return fig9
 
 
-def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None):
+def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
     """
     Figures 10, Example 3.2 Monte Carlo results
 
@@ -426,12 +428,13 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None):
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: colormap for plotting
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
     print('Generating Figure 3.10 (using Example 3.2)...')
 
-    fig10 = chapter3.example2(rng, colors)
+    fig10 = chapter3.example2(rng, colors, mc_params)
 
     # Save figure
     if prefix is not None:

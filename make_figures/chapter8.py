@@ -18,13 +18,13 @@ import time
 from examples import chapter8
 
 
-def make_all_figures(close_figs=False, force_recalc=True):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter.
 
     :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
-    :force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -44,8 +44,8 @@ def make_all_figures(close_figs=False, force_recalc=True):
     fig7b = make_figure_7b(prefix)
     fig9 = make_figure_9(prefix, rng)
     fig10 = make_figure_10(prefix)
-    fig12 = make_figure_12(prefix, rng, force_recalc)
-    fig13 = make_figure_13(prefix, rng, force_recalc)
+    fig12 = make_figure_12(prefix, rng, mc_params)
+    fig13 = make_figure_13(prefix, rng, mc_params)
 
     figs = [fig3, fig4, fig5, fig6, fig7a, fig7b, fig9, fig10, fig12, fig13]
 
@@ -456,7 +456,7 @@ def make_figure_10(prefix=None):
     return fig10
 
 
-def make_figure_12(prefix=None, rng=np.random.default_rng(), force_recalc=True):
+def make_figure_12(prefix=None, rng=np.random.default_rng(), mc_params=None):
     """
     Figure 12 - CRLB Plot
 
@@ -467,12 +467,12 @@ def make_figure_12(prefix=None, rng=np.random.default_rng(), force_recalc=True):
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 8.12... (re-run with force_recalc=True to generate)')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 8.12... (re-run with mc_params[\'force_recalc\']=True to generate)')
         return None
 
     print('Generating Figure 8.12...')
@@ -496,6 +496,8 @@ def make_figure_12(prefix=None, rng=np.random.default_rng(), force_recalc=True):
     crlb_rmse_deg_stoch = np.sqrt(crlb_psi_stoch)*180/np.pi
 
     num_monte_carlo = 1000
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     s = np.exp(1j*rng.uniform(low=0, high=2*np.pi, size=(1, num_samples, num_monte_carlo)))
     x0 = np.expand_dims(v(psi), axis=2) * s
     n = np.sqrt(1/2)*(rng.standard_normal(size=(num_elements, num_samples, num_monte_carlo))
@@ -566,7 +568,7 @@ def make_figure_12(prefix=None, rng=np.random.default_rng(), force_recalc=True):
     return fig12
 
 
-def make_figure_13(prefix=None, rng=np.random.default_rng(), force_recalc=True):
+def make_figure_13(prefix=None, rng=np.random.default_rng(), mc_params=None):
     """
     Figure 13 - Example 8.2
 
@@ -577,17 +579,17 @@ def make_figure_13(prefix=None, rng=np.random.default_rng(), force_recalc=True):
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 8.13 (re-run with force_recalc=True to generate)')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 8.13 (re-run with mc_params[\'force_recalc\']=True to generate)')
         return None
 
     print('Generating Figure 8.13...')
 
-    fig13 = chapter8.example2(rng)
+    fig13 = chapter8.example2(rng, mc_params)
 
     if prefix is not None:
         fig13.savefig(prefix + 'fig13.png')
@@ -597,4 +599,4 @@ def make_figure_13(prefix=None, rng=np.random.default_rng(), force_recalc=True):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, force_recalc=True)
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True})

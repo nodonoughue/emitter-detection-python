@@ -49,7 +49,7 @@ def compute_df(r, x, y):
     return np.arctan2(np.real(yy), np.real(xx))  # output in radians
 
 
-def run_example():
+def run_example(mc_params=None):
     """
     Test script that demonstrates how to analyze a Watson-Watt DF receiver.
 
@@ -58,7 +58,8 @@ def run_example():
     Nicholas O'Donoughue
     9 January 2021
 
-    :return:
+    :param mc_params: Optional struct to control Monte Carlo trial size
+    :return: None
     """
 
     # Generate the Signals
@@ -70,7 +71,9 @@ def run_example():
     # Set up the parameter sweep
     num_samples_vec = np.asarray([1., 10., 100.])  # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-10., step=0.2, stop=20.2)  # signal-to-noise ratio
-    num_mc = 10000  # number of monte carlo trials at each parameter setting
+    num_monte_carlo = 10000  # number of monte carlo trials at each parameter setting
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
     # Set up output variables
     out_shp = (np.size(num_samples_vec), np.size(snr_db_vec))
@@ -80,7 +83,7 @@ def run_example():
     # Loop over parameters
     print('Executing Watson Watt Monte Carlo sweep...')
     for idx_num_samples, this_num_samples in enumerate(num_samples_vec.tolist()):
-        this_num_mc = num_mc / this_num_samples
+        this_num_monte_carlo = num_monte_carlo / this_num_samples
         print('\t {} samples per estimate...'.format(this_num_samples))
 
         # Generate signal vectors
@@ -92,11 +95,11 @@ def run_example():
         # Generate Monte Carlo Noise with unit power -- generate one for each MC trial
         ref_pwr = np.sqrt(np.mean(r0**2))  # root-mean-square of reference signal
         noise_base_r = [np.random.normal(loc=0., scale=ref_pwr, size=(this_num_samples, 1))
-                        for _ in np.arange(this_num_mc)]
+                        for _ in np.arange(this_num_monte_carlo)]
         noise_base_x = [np.random.normal(loc=0., scale=ref_pwr, size=(this_num_samples, 1))
-                        for _ in np.arange(this_num_mc)]
+                        for _ in np.arange(this_num_monte_carlo)]
         noise_base_y = [np.random.normal(loc=0., scale=ref_pwr, size=(this_num_samples, 1))
-                        for _ in np.arange(this_num_mc)]
+                        for _ in np.arange(this_num_monte_carlo)]
 
         # Loop over SNR levels
         for idx_snr, this_snr_db in enumerate(snr_db_vec.tolist()):
