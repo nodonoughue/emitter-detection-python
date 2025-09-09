@@ -232,9 +232,9 @@ def example2(colors=None):
     f_source_hz = 1e9
 
     # Build grid of positions within 500km of source position (ENU origin)
-    v_source_enu = np.zeros(shape=(3, 1))  # source is stationary
+    v_source_enu = np.zeros(shape=(3, ))  # source is stationary
 
-    x_ctr = np.zeros(shape=(3, 1))
+    x_ctr = np.zeros(shape=(3, ))
     max_offset = 500e3  # +/- distance from the center of each axis to the edges
     search_size = np.array([1., 1., 0.]) * max_offset  # only search East-North dimensions, not Up
     num_points_per_axis = 201  # MATLAB code uses 1,001, but the image appears properly resolved with just 201
