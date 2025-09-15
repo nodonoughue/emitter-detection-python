@@ -17,11 +17,11 @@ def measurement(x_sensor, x_source, do_2d_aoa=False, bias=None):
     Nicholas O'Donoughue
     5 September 2021
 
-    :param x_sensor: nDim x nSensor array of sensor positions
+    :param x_sensor: nDim x n_sensor array of sensor positions
     :param x_source: nDim x n_source array of source positions
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
-    :param bias:  Optional nSensor x 1 vector of AOA biases (nSensor x 2 if do2DAoA is true).  [default = None]
-    :return psi: nSensor -1 x n_source array of AOA measurements
+    :param bias:  Optional n_sensor x 1 vector of AOA biases (nSensor x 2 if do2DAoA is true).  [default = None]
+    :return psi: n_sensor x n_source or 2*n_sensor x n_source array of AOA measurements
     """
 
     # Parse inputs
@@ -35,42 +35,45 @@ def measurement(x_sensor, x_source, do_2d_aoa=False, bias=None):
     if n_dim1 != n_dim2:
         raise TypeError('First dimension of all inputs must match')
 
-    # Check angle bias dimensions and parse
+    # Make sure that x_source and x_sensor are 2D
+    # We could use np.atleast_2d, but that will add the new dimension at the start, not the end
+    if len(x_source.shape) == 1:
+        x_source = x_source[:, np.newaxis]
+    if len(x_sensor.shape) == 1:
+        x_sensor = x_sensor[:, np.newaxis]
+
+    # Prepare bias arrays
     angle_bias_az = 0.
     angle_bias_el = 0.
     if bias is not None:
-        n_dim_bias, n_bias = utils.safe_2d_shape(bias)
-        # Check for vector input
-        if len(np.shape(bias)):
-            n_bias = n_dim_bias
-            n_dim_bias = 1
-        if (do_2d_aoa and n_dim_bias != 2) or (not do_2d_aoa and n_dim_bias != 1) or n_bias != n_sensor:
-            raise TypeError('Angle bias dimensions must match number of sensor measurements to make.')
-
+        bias = np.asarray(bias)
         if do_2d_aoa:
-            angle_bias_az = np.reshape(bias[0], (1, n_sensor, n_source))
-            angle_bias_el = np.reshape(bias[1], (1, n_sensor, n_source))
+            if bias.shape[0] != 2 or bias.shape[1] != n_sensor:
+                raise TypeError('For 2D AOA, bias must be shape (2, n_sensor)')
+            angle_bias_az = bias[0][:, np.newaxis]  # (n_sensor, 1)
+            angle_bias_el = bias[1][:, np.newaxis]  # (n_sensor, 1)
         else:
-            angle_bias_az = np.reshape(bias, (1, n_sensor, n_source))
+            if bias.shape[0] != n_sensor:
+                raise TypeError('For 1D AOA, bias must be shape (n_sensor,) or (n_sensor, 1)')
+            angle_bias_az = bias[:, np.newaxis]
 
     # Compute cartesian offset from each source position to each sensor
-    dx = np.reshape(x_source, (n_dim1, 1, n_source)) - np.reshape(x_sensor, (n_dim1, n_sensor, 1))
+    dx = x_source[:, np.newaxis, :] - x_sensor[:, :, np.newaxis]  # (n_dim, n_sensor, n_source)
 
     # Compute angle in radians
-    az = np.reshape(np.arctan2(dx[1, :, :], dx[0, :, :]) + angle_bias_az, shape=out_dims)
+    az = np.arctan2(dx[1], dx[0]) + angle_bias_az  # shape (n_sensor, n_source)
 
     # Elevation angle, if desired
     if do_2d_aoa and n_dim1 == 3:
-        ground_rng = np.expand_dims(np.sqrt(np.sum(dx[0:2, :, :]**2, axis=0)), axis=0)
-        el = np.reshape(np.arctan2(dx[2, :, :], ground_rng) + angle_bias_el, shape=out_dims)
-
-        # Stack az/el along the first dimension
-        psi = np.concatenate((az, el), axis=0)
+        # Compute elevation (radians): shape (n_sensor, n_source)
+        ground_rng = np.sqrt(dx[0]**2 + dx[1]**2)
+        el = np.arctan2(dx[2], ground_rng) + angle_bias_el
+        psi = np.concatenate((az, el), axis=0) # shape (2*n_sensor, n_source)
     else:
-        # Just return az
-        psi = az
+        psi = az  # shape (n_sensor, n_source)
 
-    return psi
+    # Ensure it's at least 1D and return
+    return np.atleast_1d(psi.squeeze() if n_source == 1 else psi)
 
 
 def jacobian(x_sensor, x_source, do_2d_aoa=False):

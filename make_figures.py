@@ -7,7 +7,7 @@ do_book_2 = True
 
 # Parameters used to control execution
 mc_params = {'force_recalc': True,
-             'monte_carlo_decimation': 10000,
+             'monte_carlo_decimation': 1,
              'min_num_monte_carlo': int(10)}
 
 if do_book_1:

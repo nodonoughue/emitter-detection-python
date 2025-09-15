@@ -115,7 +115,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         # components
         x_aoa, x_tdoa, x_fdoa = self.parse_sensor_data(x_sensor)
         _, _, v_fdoa = self.parse_sensor_data(v_sensor, vel_input=True)
-        b_aoa, b_tdoa, b_fdoa = self.parse_measurement_data(bias)
+        b_aoa, b_tdoa, b_fdoa = self.parse_sensor_data(bias)
 
         # Parse source position and velocity
         if v_source is None:
@@ -124,19 +124,19 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
                                                            default_vel=np.zeros_like(x_source))
 
         # Call component models
-        to_concat = []
-        if self.aoa is not None:
-            to_concat.append(self.aoa.measurement(x_source, x_sensor=x_aoa, bias=b_aoa))
+        measurements = [
+            model.measurement(x_source, x_sensor=sensor, bias=bias,
+                              v_sensor=v_fdoa if model is self.fdoa else None,
+                              v_source=v_source if model is self.fdoa else None)
+            for model, sensor, bias in[
+                (self.aoa, x_aoa, b_aoa),
+                (self.tdoa, x_tdoa, b_tdoa),
+                (self.fdoa, x_fdoa, b_fdoa)
+            ]
+            if model is not None
+        ]
 
-        if self.tdoa is not None:
-            to_concat.append(self.tdoa.measurement(x_source, x_sensor=x_tdoa, bias=b_aoa))
-
-        if self.fdoa is not None:
-            to_concat.append(self.fdoa.measurement(x_source, x_sensor=x_fdoa, v_sensor=v_fdoa, v_source=v_source,
-                                                   bias=b_aoa))
-
-        z = np.concatenate(to_concat, axis=0)
-        return z
+        return np.concatenate(measurements, axis=0)
 
     def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
         # Parse sensor pos/vel overrides

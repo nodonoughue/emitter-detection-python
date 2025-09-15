@@ -85,49 +85,47 @@ def compute_df(r, x, ts, f, radius, fr, psi_res, min_psi, max_psi):
     :return psi: Estimated angle of arrival [radians]
     """
 
-    # Speed of light
+    # Constants and preprocessing
     c = constants.speed_of_light
-
-    # Filter the reference signal out of the test signal
-    y = x * np.conjugate(r)
-
-    # Compute (and unwrap) the complex phase angle
-    phi = np.unwrap(np.arctan2(np.imag(y), np.real(y)))
+    y = x * np.conjugate(r)  # filter reference data to find signal
+    phi = np.unwrap(np.angle(y))
 
     # Generate test phase signal
     num_samples = np.size(phi)
     sample_vec = np.arange(num_samples)
-    t_vec = np.expand_dims(ts*sample_vec, axis=1)
+    t_vec = ts*sample_vec
 
     def phi_0(psi_local):
+        # psi_local: shape (N,)
+        # returns: shape (num_samples, N)
+
         # Converts from angle of arrival (psi_local) to complex phase (phi_0) over sample interval (t_vec)
-        return 2. * np.pi * f * radius / c * np.cos(2 * np.pi * fr * t_vec - psi_local.T)
+        return 2. * np.pi * f * radius / c * np.cos(2 * np.pi * fr * t_vec[:, np.newaxis] - psi_local[np.newaxis, :])
 
-    # Initialize DF search loop
-    this_psi_res = 1  # Start at 1 radian resolution
-    psi_vec = np.expand_dims(np.arange(start=min_psi, stop=max_psi+this_psi_res, step=this_psi_res), axis=1)
-    psi = 0.          # Initialize output
+    # Initial search resolution
+    this_psi_res = 1.0
+    psi = 0.0
 
-    # Make sure the loop happens at least once
-    if psi_res > this_psi_res:
-        psi_res = this_psi_res
+    # Ensure at least one loop
+    psi_res = min(psi_res, this_psi_res)
 
     # Loop until desired DF resolution achieved
     while this_psi_res >= psi_res:
-        # Compute error at each test point in search vector
-        err = np.sum((np.expand_dims(phi, axis=1)-phi_0(psi_vec))**2, axis=0)
+        # search vector
+        psi_vec = np.arange(min_psi, max_psi + this_psi_res, this_psi_res)
+        phi0_mat = phi_0(psi_vec)  # shape: (num_samples, len(psi_vec))
 
-        # Find point with minimal error, use as center point for next
-        # iteration of search
+        # Compute error at each test point in search vector and find minimum
+        err = np.sum((phi[:, np.newaxis] - phi0_mat)**2, axis=0)
         idx_opt = np.argmin(err)
         psi = psi_vec[idx_opt]
 
-        # Increase resolution (decrease search vector step size)
-        # and interval create search vector for next iteration
-        this_psi_res = this_psi_res/10
-        min_psi = psi_vec[np.maximum(0, idx_opt-2)]
-        max_psi = psi_vec[np.minimum(np.size(psi_vec)-1, idx_opt+2)]
-        psi_vec = np.arange(start=min_psi, stop=max_psi+this_psi_res, step=this_psi_res)
+        # Refine search bounds for next iteration
+        this_psi_res /= 10
+        idx_min = max(0, idx_opt - 2)
+        idx_max = min(len(psi_vec) - 1, idx_opt + 2)
+        min_psi = psi_vec[idx_min]
+        max_psi = psi_vec[idx_max]
 
     return psi
 

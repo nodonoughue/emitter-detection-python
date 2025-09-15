@@ -188,10 +188,9 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         def this_jacobian(pos_vel):
             this_pos, this_vel = self.parse_source_pos_vel(pos_vel, default_vel=v_source)
             n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
-            j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=self.pos, v_sensor=self.vel)
             # Jacobian returns 2*self.n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
             # excise just the position portion
-            return j[:n_dim]
+            return self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=self.pos, v_sensor=self.vel)[:n_dim]
 
         return utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov,
                                                 **kwargs)

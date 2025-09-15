@@ -29,35 +29,28 @@ def measurement(x_sensor, x_source, ref_idx=None, bias=None):
     if n_dim1 != n_dim2:
         raise TypeError('First dimension of all inputs must match')
 
+    # Make sure that x_source is 2D
+    # We could use np.atleast_2d, but that will add the new dimension at the start, not the end
+    if len(x_source.shape) == 1:
+        x_source = x_source[:, np.newaxis]
+
     # Parse sensor pairs
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
 
-    # Parse TDOA bias
-    rdoa_bias = 0
-    if bias is not None:
-        rdoa_bias = bias[test_idx_vec] - bias[ref_idx_vec]
-
     # Compute range from each source to each sensor
-    # dx = np.reshape(x_source, (n_dim1, 1, n_source)) - x_sensor
-    # r = np.reshape(np.sqrt(np.sum(np.fabs(dx)**2, axis=0)), (n_sensor, n_source))  # n_sensor x n_source
-    r = utils.geo.calc_range(x_sensor, x_source)
+    r = utils.geo.calc_range(x_sensor, x_source)  # (n_sensor, n_source)
+
+    # Add bias
+    if bias is not None:
+        if len(r.shape) > 1:
+            r = r + bias[:, np.newaxis]
+        else:
+            r = r + bias
 
     # Compute range difference for each pair of sensors
-    if n_source > 1:
-        # There are multiple sources; they must traverse the second dimension
-        out_dims = (np.size(test_idx_vec), n_source)
-        bias_dims = (out_dims[0], 1)
-    else:
-        # Single source, make it an array
-        out_dims = (np.size(test_idx_vec), )
-        bias_dims = out_dims
+    rdoa = r[test_idx_vec] - r[ref_idx_vec]  # (n_pair, n_source)
 
-    rdoa = np.reshape(r[test_idx_vec] - r[ref_idx_vec], out_dims)
-
-    if bias is not None:
-        rdoa = rdoa + np.reshape(rdoa_bias, bias_dims)
-
-    return rdoa
+    return np.atleast_1d(rdoa.squeeze() if n_source == 1 else rdoa)
 
 
 def jacobian(x_sensor, x_source, ref_idx=None):

@@ -1,6 +1,6 @@
 import numpy as np
 import scipy
-
+from utils.covariance import CovarianceMatrix
 
 def beamscan(x, v, psi_max=np.pi/2, num_points=101):
     """
@@ -33,7 +33,7 @@ def beamscan(x, v, psi_max=np.pi/2, num_points=101):
     # Steer each of the num_samples data samples
     # - take the magnitude squared
     # - compute the mean across M snapshots
-    p = np.ravel(np.sum(np.abs(np.conjugate(x).T.dot(steering_vectors))**2, axis=0)/num_array_elements)
+    p = np.ravel(np.sum(np.abs(np.conjugate(x).T.dot(steering_vectors))**2, axis=0)/num_samples)
 
     return p, psi_vec
 
@@ -61,18 +61,16 @@ def beamscan_mvdr(x, v, psi_max=np.pi/2, num_points=101):
     psi_vec = np.linspace(start=-1, stop=1, num=num_points) * psi_max
 
     # Compute the sample covariance matrix
-    n, m = np.shape(x)
-    covariance = np.cov(x)
-
-    # Pre-compute covariance matrix inverses
-    c_pinv = np.real(scipy.linalg.pinvh(covariance))
+    num_array_elements, num_samples = np.shape(x)
+    covariance = CovarianceMatrix(np.cov(x), do_inverse=True)
 
     # Steer each of the M data samples
     p = np.zeros(shape=(num_points, ))
     for idx_psi in np.arange(num_points):
-        this_v = v(psi_vec[idx_psi])/np.sqrt(n)  # N x 1
+        this_v = v(psi_vec[idx_psi])/np.sqrt(num_array_elements)  # N x 1
 
-        p[idx_psi] = 1/np.abs(np.conjugate(this_v).T.dot(c_pinv).dot(this_v))
+        # p[idx_psi] = 1/np.abs(np.conj(this_v).T @ covariance.inv @ this_v)
+        p[idx_psi] = 1/np.abs(covariance.solve_aca(np.conj(this_v).T)[0])
 
     return p, psi_vec
 

@@ -16,10 +16,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
         if cov is None:
             # Make a dummy; unit variance
             num_dim, num_sensors = utils.safe_2d_shape(x)
-            if do_2d_aoa:
-                num_measurements = 2*num_sensors
-            else:
-                num_measurements = num_sensors
+            num_measurements = num_sensors * (2 if do_2d_aoa else 1)
             cov = CovarianceMatrix(np.eye(num_measurements))
 
         super().__init__(x, cov, **kwargs)

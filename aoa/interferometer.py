@@ -49,10 +49,10 @@ def compute_df(x1, x2, d_lam):
 
     # The inner product of the two signals is a sufficient statistic for the
     # phase between them, in the presence of a single signal and Gaussian noise
-    y = np.inner(np.conjugate(x1), x2)
+    y = np.vdot(x1, x2)
 
     # Use atan2 to solve for the complex phase angle
-    phi_est = np.arctan2(np.imag(y), np.real(y))
+    phi_est = np.angle(y)
 
     # Convert from phase angle to angle of arrival
     return np.arcsin(phi_est/(2.*np.pi*d_lam))

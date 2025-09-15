@@ -42,11 +42,11 @@ def compute_df(r, x, y):
     """
 
     # Remove reference signal from test data, achieved via a conjugate inner transpose
-    xx = np.inner(np.conjugate(r), x)
-    yy = np.inner(np.conjugate(r), y)
+    xx = np.vdot(r, x)
+    yy = np.vdot(r, y)
 
     # Results should be V * cos(th) and V * sin(th), use atan2 to solve for th
-    return np.arctan2(np.real(yy), np.real(xx))  # output in radians
+    return np.arctan2(yy.real, xx.real)  # output in radians
 
 
 def run_example(mc_params=None):

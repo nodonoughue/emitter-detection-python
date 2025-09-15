@@ -62,38 +62,36 @@ def compute_df(s, psi_samples, g, psi_res=0.1, min_psi=-np.pi, max_psi=np.pi):
     :return: Estimated angle of arrival [radians]
     """
 
-    # Determine how many samples exist
-    num_steering, num_samples = np.shape(s)
-    
     # Initialize the outer loop to .1 radians
     this_psi_res = .1
-    psi_vec = np.arange(start=min_psi, stop=max_psi + this_psi_res, step=this_psi_res)  # Set up search vector
     psi = 0.  # Initialize output
 
-    # Iteratively search for the optimal index, until the sample spacing is less than the desired resolution
-    if psi_res > this_psi_res:
-        psi_res = this_psi_res
+    # Ensure at least one loop
+    psi_res = min(psi_res, this_psi_res)
 
     while this_psi_res >= psi_res:
+        psi_vec = np.arange(start=min_psi, stop=max_psi + this_psi_res, step=this_psi_res)  # Set up search vector
+
         # Find the difference between each possible AoA (psi_vec) and the measurement steering angles
-        psi_diff = np.expand_dims(psi_samples, axis=1) - np.expand_dims(psi_vec, axis=0)
+        psi_diff = psi_samples[:, np.newaxis] - psi_vec[np.newaxis, :]
 
         # Compute the expected gain pattern for each candidate AoA value
+        # ToDo: Vectorize g, or wrap it with np.vectorize
         g_vec = np.reshape(np.asarray([g(psi) for psi in psi_diff]), shape=psi_diff.shape)
     
         # Find the candidate AoA value that minimizes the MSE between the
         # expected and received gain patterns.
 
-        sse = np.sum(np.sum((np.reshape(s, [num_steering, 1, num_samples])-np.expand_dims(g_vec, axis=2))**2,
-                            axis=2), axis=0)
+        sse = np.sum((s[:, :, np.newaxis]-g_vec[:, np.newaxis, :])**2, axis=(0, 1))
         idx_opt = np.argmin(sse)
         psi = psi_vec[idx_opt]
         
         # Set up the bounds and resolution for the next iteration
-        this_psi_res = this_psi_res / 10
-        min_psi = psi_vec[np.maximum(0, idx_opt - 2)]
-        max_psi = psi_vec[np.minimum(np.size(psi_vec)-1, idx_opt + 2)]
-        psi_vec = np.arange(start=min_psi, stop=max_psi + this_psi_res, step=this_psi_res)
+        this_psi_res /= 10
+        idx_min = max(0, idx_opt-2)
+        idx_max = min(len(psi_vec)-1, idx_opt+2)
+        min_psi = psi_vec[idx_min]
+        max_psi = psi_vec[idx_max]
 
     return psi
 
