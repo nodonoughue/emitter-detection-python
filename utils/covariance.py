@@ -158,7 +158,7 @@ class CovarianceMatrix:
             self._lower = None
 
         if self._do_inverse:
-            self._inv = np.real(pinvh(self._cov))
+            self._inv = pinvh(self._cov)
         else:
             self._inv = None
 
@@ -182,18 +182,18 @@ class CovarianceMatrix:
         # Check for the matrix inverse
         if self._do_inverse:
             if np.isscalar(self._inv) or np.size(self._inv) == 1:
-                val = self._inv * a @ a.T
+                val = self._inv * a @ np.conj(a.T)
             else:
-                val = a @ self._inv @ a.T
+                val = a @ self._inv @ np.conj(a.T)
 
         # Check for Cholesky decomposition
         elif self._do_cholesky:
             c = solve_triangular(self._lower, a.T, lower=True)
             if c.ndim == 1:
                 # It's a 1D vector, just take the sum of the square of each element
-                val = np.sum(c**2)
+                val = np.sum(np.abs(c)**2)
             else:
-                val = c.T @ c
+                val = np.conj(c.T) @ c
 
         else:
             # If we've gotten here, something is wrong

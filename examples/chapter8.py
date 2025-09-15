@@ -187,8 +187,8 @@ def generate_ex1_data(rng=np.random.default_rng()):
     rx_noise_dbw = lin_to_db(constants.kT*rx_bw_hz)+noise_figure
     # snr_db = rx_pwr_dbw - rx_noise_dbw --- not used
     # snr_lin = lin_to_db(snr_db)  # num_sources x 1 --- not used
-    rx_pwr_w = lin_to_db(rx_pwr_dbw)
-    rx_noise_w = lin_to_db(rx_noise_dbw)
+    rx_pwr_w = db_to_lin(rx_pwr_dbw)
+    rx_noise_w = db_to_lin(rx_noise_dbw)
 
     # Set up received data vector
     v_steer_mtx = v(psi)  # num_elements x num_sources
@@ -234,12 +234,15 @@ def example1(rng=np.random.default_rng()):
     #   num_elements     number of array elements
     #   num_samples      number of time snapshots
     #   d_lam            array spacing
+    num_elements = data['num_elements']
+    d_lam = data['d_lam']
+    x = data['x']
 
     # Construct array steering vector
-    v, _ = array_df.model.make_steering_vector(data['d_lam'], data['num_elements'])
+    v, _ = array_df.model.make_steering_vector(d_lam, num_elements)
 
     # Call Beamformer
-    pwr_vec, psi_vec = array_df.solvers.beamscan(data['x'], v, np.pi/2, 1001)
+    pwr_vec, psi_vec = array_df.solvers.beamscan(x, v, np.pi/2, 1001)
     peaks, _ = find_peaks(pwr_vec, prominence=.1*np.max(pwr_vec))
     # print(peaks)
     psi_peaks = psi_vec[peaks]
@@ -247,9 +250,8 @@ def example1(rng=np.random.default_rng()):
     th_peaks = 180*psi_peaks/np.pi
 
     # Call MVDR Beamformer
-    # ToDo: Doesn't look right; diagnose and fix.
-    pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(data['x'], v, np.pi/2, 1001)
-    peaks_mvdr, _ = find_peaks(pwr_vec_mvdr, prominence=.1*np.max(pwr_vec_mvdr))
+    pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(x, v, np.pi/2, 1001)
+    peaks_mvdr, _ = find_peaks(pwr_vec_mvdr, prominence=.2*np.max(pwr_vec_mvdr))
     psi_peaks_mvdr = psi_vec[peaks_mvdr]
     peak_vals_mvdr = pwr_vec_mvdr[peaks_mvdr]
     th_peaks_mvdr = 180*psi_peaks_mvdr/np.pi
