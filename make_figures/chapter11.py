@@ -488,6 +488,8 @@ def make_figure_6(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 11.6a...')
+
     # Define Sensor Positions
     baseline = 10e3
     num_sensors = 3
@@ -510,7 +512,8 @@ def make_figure_6(prefix=None):
     x_source = np.array([np.ravel(x_full), np.ravel(y_full)])  # shape=(2 x num_grid_points**2)
 
     # Compute CRLB
-    crlb = tdoa.perf.compute_crlb(x_sensor, x_source, cov_roa, variance_is_toa=False, do_resample=True)
+    crlb = tdoa.perf.compute_crlb(x_sensor, x_source, cov_roa, variance_is_toa=False, do_resample=True,
+                                  print_progress=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), (num_grid_points, num_grid_points))
 
     # Set up contours
@@ -521,7 +524,6 @@ def make_figure_6(prefix=None):
         fmt[level] = label
 
     # Draw Figure
-    print('Generating Figure 11.6a...')
     fig6a, ax = plt.subplots()
 
     plt.plot(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, 'ro', label='Sensors')
@@ -534,6 +536,7 @@ def make_figure_6(prefix=None):
     plt.ylabel('Down-range [km]')
 
     # Figure 6b, Impact of fourth sensor on CRLB
+    print('Generating Figure 11.6b...')
 
     # Add a sensor at the origin
     x_sensor1 = np.concatenate((x_sensor, np.zeros(shape=(2, 1))), axis=1)
@@ -547,11 +550,11 @@ def make_figure_6(prefix=None):
     # automatically resample the covariance matrix.
     # cov_tdoa = timing_error**2 * (1 + np.eye(num_sensors-1))
 
-    crlb2 = tdoa.perf.compute_crlb(x_sensor1, x_source, cov_roa, variance_is_toa=False, do_resample=True)
+    crlb2 = tdoa.perf.compute_crlb(x_sensor1, x_source, cov_roa, variance_is_toa=False, do_resample=True,
+                                   print_progress=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb2), [num_grid_points, num_grid_points])
 
     # Draw the figure
-    print('Generating Figure 11.6b...')
     fig6b, ax = plt.subplots()
 
     plt.plot(x_sensor1[0, :]/1e3, x_sensor1[1, :]/1e3, 'ro', label='Sensors')

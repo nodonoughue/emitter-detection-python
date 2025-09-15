@@ -130,7 +130,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     for idx in np.arange(num_monte_carlo):
         utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        # TODO: Debug -- ML solution is wrong; seems fixed at [0, 0]
         result = _mc_iteration(pss=hybrid, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
         x_bf[:, idx] = result['bf']
@@ -380,7 +379,6 @@ def _plot_mc_iteration_result(pss: HybridPassiveSurveillanceSystem, args, result
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
     plt.legend()
-    plt.show()
 
     # Compute Error Statistics
     err_ml = args['x_source'][:, np.newaxis] - results['ml']

@@ -117,6 +117,8 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     print('Performing Monte Carlo simulation for FDOA performance...')
     t_start = time.perf_counter()
 
+    # TODO: Debug; GD solver doesn't show up in fig 7c
+    # TODO: Debug, ML and BF solvers appear stuck at origin
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
