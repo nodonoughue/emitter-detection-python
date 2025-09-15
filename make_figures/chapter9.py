@@ -197,4 +197,4 @@ def make_figure_4(prefix=None):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, mc_params={'force_recalc': True})
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})
