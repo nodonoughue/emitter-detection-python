@@ -206,7 +206,7 @@ def example3():
     # Generate Measurements
     x_tgt = np.array([6, 3])
     alpha_aoa = np.array([5, 10, -5])*_deg2rad  # AOA bias
-    bias = np.concatenate((alpha_aoa, np.zeros((tdoa.num_measurements, ))), axis=0)
+    bias = np.concatenate((alpha_aoa, np.zeros((tdoa.num_sensors, ))), axis=0)
 
     zeta = hybrid.measurement(x_source=x_tgt)
     zeta_unc = hybrid.measurement(x_source=x_tgt, x_sensor=x_sensor_true)
@@ -347,8 +347,8 @@ def example4(do_iterative=False):
     ml_search = SearchSpace(x_ctr=x_ctr,
                             max_offset=search_size,
                             epsilon=grid_res)
-    x_est_true, _, _ = tdoa.max_likelihood(zeta=zeta_true, search_space=ml_search)
-    x_est, _, _ = tdoa.max_likelihood(zeta=zeta, search_space=ml_search)
+    x_est_true, _, _ = tdoa.max_likelihood(zeta=zeta_true, search_space=ml_search, print_progress=True)
+    x_est, _, _ = tdoa.max_likelihood(zeta=zeta, search_space=ml_search, print_progress=True)
 
     print('True ML Est.: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_true[0]/1e3, x_est_true[1]/1e3,
                                                                       np.linalg.norm(x_est_true-x_tgt)/1000.))
