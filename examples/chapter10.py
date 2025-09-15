@@ -164,7 +164,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     plt.xlim([-50, 50])
     plt.ylim([-10, 70])
     plt.legend(loc='upper left')
-    plt.show()
 
     # Compute Error Statistics
     err_ml = x_source[:, np.newaxis] - x_ml

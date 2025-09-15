@@ -164,7 +164,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     plt.xlim([-wd, wd])
     plt.ylim(np.array([-1, 1])*ht+x_source[1]/1e3/2)
     plt.legend(loc='upper left')
-    plt.show()
 
     # Plot zoomed geometry
     num_iter_to_plot = 1000

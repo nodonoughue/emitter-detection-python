@@ -166,7 +166,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
     plt.legend()
-    plt.show()
 
     # Plot zoomed geometry
     num_iter_to_plot = 100
