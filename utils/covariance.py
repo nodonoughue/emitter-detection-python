@@ -411,13 +411,13 @@ class CovarianceMatrix:
             x = np.random.randn(1, num_samples) * np.sqrt(self._cov)
         elif self.do_cholesky:
             # We already did Cholesky decomposition; use it directly to generate colored noise
-            x = np.squeeze(self._lower @ np.random.randn(num_measurements, num_samples)) # shape (num_measurements, num_samples)
+            x = self._lower @ np.random.randn(num_measurements, num_samples) # shape (num_measurements, num_samples)
         else:
             # Use the builtin multivariate_normal generator with self._cov
             # This one will return the result with shape (num_samples, num_measurements), so we need to transpose
-            x = np.squeeze(np.transpose(np.random.multivariate_normal(mean=np.zeros(num_measurements),
-                                                                      cov=self._cov,
-                                                                      size=num_samples))) # shape (num_measurements, num_samples)
+            x = np.transpose(np.random.multivariate_normal(mean=np.zeros(num_measurements),
+                                                           cov=self._cov,
+                                                           size=num_samples)) # shape (num_measurements, num_samples)
 
         if mean_vec is not None:
             # Make sure that mean_vec is a 1d array
