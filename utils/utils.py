@@ -552,18 +552,32 @@ class SearchSpace:
     points_per_dim: np.ndarray[np.int_]
     max_offset: np.ndarray
 
-    def __init__(self, x_ctr, epsilon, points_per_dim=None, max_offset=None):
+    def __init__(self,
+                 x_ctr:npt.ArrayLike,
+                 epsilon:npt.ArrayLike=None,
+                 points_per_dim:npt.ArrayLike=None,
+                 max_offset:npt.ArrayLike=None):
         self.x_ctr = x_ctr
-        self.epsilon = epsilon
 
         if points_per_dim is None:
-            # infer from max_offset
+            # infer from max_offset and epsilon
+            assert epsilon is not None and max_offset is not None, 'Not enough inputs.'
             self.max_offset = max_offset
+            self.epsilon = epsilon
             self.points_per_dim = np.floor(1 + 2 * self.max_offset / self.epsilon).astype(int)
         elif max_offset is None:
-            # infer from search_size
-            self.points_per_dim = np.array(points_per_dim, dtype=int)
+            # infer from points_per_dim and epsilon
+            assert epsilon is not None and points_per_dim is not None, 'Not enough inputs.'
+            self.epsilon = epsilon
+            self.points_per_dim = points_per_dim
             self.max_offset = self.epsilon * (self.points_per_dim - 1) / 2
+        elif epsilon is None:
+            # infer from points_per_dim and max_offset
+            assert max_offset is not None and points_per_dim is not None, 'Not enough inputs.'
+            self.points_per_dim = points_per_dim
+            self.max_offset = max_offset
+            out_shape = np.amax(np.shape(points_per_dim), np.shape(max_offset))
+            self.epsilon = np.divide(max_offset, points_per_dim - 1, out=np.ones(out_shape), where=points_per_dim>1)
         else:
             # make sure they align
             assert np.all(np.equal(max_offset, (points_per_dim - 1)/2 * epsilon)), 'Bad inputs to search space.'
@@ -601,17 +615,12 @@ def make_nd_grid(search_space: SearchSpace):
     else:
         max_offset = search_space.max_offset.ravel()
 
-    if np.size(search_space.epsilon) == 1:
-        grid_spacing = search_space.epsilon * np.ones((n_dim, ))
-    else:
-        grid_spacing = search_space.epsilon.ravel()
-
     if np.size(search_space.points_per_dim) == 1:
         points_per_dim = search_space.points_per_dim * np.ones((n_dim, ))
     else:
         points_per_dim = search_space.points_per_dim.ravel()
 
-    assert n_dim == np.size(max_offset) and n_dim == np.size(grid_spacing), \
+    assert n_dim == np.size(max_offset) and n_dim == np.size(points_per_dim), \
            'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
 
 
