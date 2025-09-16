@@ -40,7 +40,7 @@ def crlb_det(covariance, noise_power, psi_vec, num_snapshots, v, v_dot):
     else:
         c = 1/np.real(xi*h)
 
-    return c / (2 * num_snapshots)
+    return np.squeeze(c) / (2 * num_snapshots)
 
 
 def crlb_stochastic(covariance, noise_power, psi_vec, num_snapshots, v, v_dot):
@@ -82,4 +82,4 @@ def crlb_stochastic(covariance, noise_power, psi_vec, num_snapshots, v, v_dot):
         b = covariance * a / (1+a)
 
     # CRLB, ex 8.75
-    return (noise_power / (2 * num_snapshots)) * np.linalg.pinv(np.real(b*h.T))        # D x D
+    return np.squeeze((noise_power / (2 * num_snapshots)) * np.linalg.pinv(np.real(b*h.T)))        # D x D

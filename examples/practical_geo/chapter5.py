@@ -277,7 +277,7 @@ def example3():
     # Initialize grid
     max_offset = int(10e3)
     num_pts = np.array([201, 201, 1])
-    grid_res = 2*max_offset / (num_pts-1)
+    grid_res = 2*max_offset / max(num_pts-1,1)  # Use the max function to avoid a divide by zero error
     search_space = SearchSpace(x_ctr=x_tgt,
                                max_offset=max_offset,
                                epsilon=grid_res)

@@ -42,7 +42,7 @@ def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, 
 
     # Compute range rate from range and velocity
     dv = v_sensor[:, :, np.newaxis] - v_source[:, np.newaxis, :] # (n_dim, n_sensor, n_source)
-    rr = np.sum(dv*dx, axis=0) / r  # (n_sensor, n_source)
+    rr = np.divide(np.sum(dv*dx, axis=0), r, out=np.zeros((n_sensor, n_source)), where=r!=0)  # (n_sensor, n_source)
 
     # Add bias, if provided
     if bias is not None:
@@ -85,14 +85,14 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     # Compute the Offset Vectors
     dx = x_sensor[:, :, np.newaxis] - np.reshape(x_source, (n_dim, 1, n_source))  # n_dim x n_sensor x n_source
     rn = np.reshape(np.sqrt(np.sum(dx**2, axis=0)), (1, n_sensor, n_source))  # Euclidean norm for each offset vector
-    dx_norm = dx / rn  # n_dim x n_sensor x n_source
+    dx_norm = np.divide(dx, rn, out=np.zeros((n_dim, n_sensor, n_source)), where=rn!=0)  # n_dim x n_sensor x n_source
     px = np.reshape(dx_norm, (n_dim, 1, n_sensor, n_source)) * np.reshape(dx_norm, (1, n_dim, n_sensor, n_source))
     # n_dim x n_dim x n_sensor x n_source
     
     # Compute the gradient of R_n
     dv = (np.reshape(v_sensor, (n_dim, n_sensor, 1))
           - np.reshape(v_source, (n_dim, 1, n_source)))  # n_dim x n_sensor x n_source
-    dv_norm = dv/rn  # n_dim x n_sensor x n_source
+    dv_norm = np.divide(dv, rn, out=np.zeros((n_dim, n_sensor, n_source)), where=rn!=0)  # n_dim x n_sensor x n_source
     # Iterate the matmul over the number of sensors and sources
     nabla_rn = np.asarray([[np.dot(np.eye(n_dim) - px[:, :, idx_sen, idx_src],
                                    dv_norm[:, idx_sen, idx_src])

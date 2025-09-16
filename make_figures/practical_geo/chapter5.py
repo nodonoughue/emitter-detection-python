@@ -207,7 +207,7 @@ def make_figure_14(prefix=None):
 
     # Logarithmic Barrier
     t_vec = np.array([.5, 1, 2])  # different log parameters
-    log_kernel = np.log(np.fabs(u_vec))
+    log_kernel = np.log(np.fabs(u_vec), out=np.zeros_like(u_vec), where=u_vec < 0)
     log_kernel[u_vec >=0] = np.inf
     logarithmic = [-(1/this_t) * log_kernel for this_t in t_vec]
 

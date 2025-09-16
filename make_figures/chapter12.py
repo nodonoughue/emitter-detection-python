@@ -16,7 +16,7 @@ import numpy as np
 import fdoa
 from examples import chapter12
 from utils import SearchSpace
-
+from utils.unit_conversions import lin_to_db
 
 def make_all_figures(close_figs=False, mc_params=None):
     """
@@ -311,7 +311,7 @@ def _make_figure3_subfigure(eps, x_vec, y_vec, x_sensor, v_sensor, x_source, sen
     fig, ax = plt.subplots()
 
     # Make the background image using the difference between each pixel's FDOA and the true source's FDOA
-    ax.imshow(10 * np.log10(np.flipud(eps)), extent=(x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]), aspect='auto')
+    ax.imshow(lin_to_db(np.flipud(eps)), extent=(x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]), aspect='auto')
 
     # Add the sensors and source markers
     handle_sensors = plt.scatter(x_sensor[sensors_to_plot, 0], x_sensor[sensors_to_plot, 1],
