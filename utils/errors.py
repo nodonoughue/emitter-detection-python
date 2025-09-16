@@ -77,6 +77,7 @@ def compute_cep50(covariance):
         if lam_min > .25*lam_max:
             cep[idx_matrix] = .59*(np.sqrt(lam_min)+np.sqrt(lam_max))
         else:
+            # ToDo: suppress runtime warning (invalid value encountered in scalar divide....inf? nan?) while generating Fig 13.8a
             cep[idx_matrix] = np.sqrt(lam_max)*(.67+.8*lam_min/lam_max)
 
     if num_matrices == 1:

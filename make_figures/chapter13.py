@@ -35,17 +35,14 @@ def make_all_figures(close_figs=False, mc_params=None):
     prefix = utils.init_output_dir('chapter13')
     utils.init_plot_style()
 
-    # Random Number Generator
-    rng = np.random.default_rng(0)
-
     # Initializes colorSet - Mx3 RGB vector for successive plot lines
     colors = plt.get_cmap("tab10")
 
     # Generate all figures
     fig1 = make_figure_1(prefix, colors)
     fig2a, fig2b, fig2c, fig2d = make_figure_2(prefix)
-    fig3, fig4 = make_figures_3_4(prefix, rng, mc_params)
-    fig5, fig6 = make_figures_5_6(prefix, rng, mc_params)
+    fig3, fig4 = make_figures_3_4(prefix, mc_params)
+    fig5, fig6 = make_figures_5_6(prefix, mc_params)
     fig7a, fig7b = make_figure_7(prefix)
     fig8a, fig8b = make_figure_8(prefix)
     fig9 = make_figure_9(prefix)

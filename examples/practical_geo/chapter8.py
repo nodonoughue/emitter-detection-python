@@ -206,7 +206,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     sse_cov_est = np.zeros((num_monte_carlo, num_time))
     print('Repeating tracker test for {:d} Monte Carlo trials...'.format(num_monte_carlo))
     t_start = time.perf_counter()
-    iterations_per_marker = 1
+    iterations_per_marker = 10
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
 
@@ -410,7 +410,7 @@ def example2(rng=np.random.default_rng()):
     # ===  Step Through Time
     print('Iterating through EKF tracker time steps...')
     markers_per_row = 40
-    iter_per_marker = 20
+    iter_per_marker = 1
     iter_per_row = markers_per_row * iter_per_marker
 
     # at least 1 iteration per marker, no more than 100 iterations per marker
