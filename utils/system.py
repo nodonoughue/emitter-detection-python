@@ -51,15 +51,34 @@ class PassiveSurveillanceSystem(ABC):
     def measurement(self, x_source, x_sensor=None, bias=None, v_sensor=None, v_source=None):
         pass
 
-    def noisy_measurement(self, x_source, x_sensor=None, bias=None, v_sensor=None, v_source=None, num_samples=1):
-        noise = self.cov.sample(num_samples=num_samples)
-        # ToDo: handle case where x_source is 2D (num_measurement, num_source)
-        if num_samples <= 1:
-            # Only take the first dimension of the noise
-            return self.measurement(x_source, x_sensor, bias, v_sensor, v_source) + noise[:, 0]
-        else:
-            # Add a second dimension to the measurements and combine
-            return self.measurement(x_source, x_sensor, bias, v_sensor, v_source)[:, np.newaxis] + noise
+    def noisy_measurement(self, x_source, num_samples:int = 1, **kwargs):
+        """
+        Generate a set of noisy measurements. Will return a 3D matrix of shape (num_measurements, num_sources, num_samples),
+        except that the latter two dimensions will be removed is their size is equal to 1.
+
+        :param x_source: 1D or 2D array of source positions
+        :param num_samples: Optional integer specifying the number of samples to generate
+        All other parameters are passed directly to self.measurement() as keyword arguments
+        :return: 1D or 2D array of noisy measurements, depending on the shape of x_source and num_samples.
+        """
+
+        # Generate noise-free measurement
+        _, num_sources = utils.safe_2d_shape(x_source)
+        z = np.reshape(self.measurement(x_source, **kwargs), (self.num_measurements, num_sources))
+
+        # Generate noise
+        noise = np.reshape(self.cov.sample(num_samples=num_samples*num_sources),
+                           (self.num_measurements, num_sources, num_samples))
+
+        # Add the noise
+        zeta = z[:, :, np.newaxis] + noise
+
+        # Squeeze singleton-dimensions and return
+        if num_samples == 1:
+            zeta = zeta[:, :, 0]
+        if num_sources == 1:
+            zeta = zeta[:, 0]
+        return zeta
 
     @abstractmethod
     def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
