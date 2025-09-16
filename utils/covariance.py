@@ -435,6 +435,10 @@ class CovarianceMatrix:
                 # Add a new axis to the end of mean_vec, to ensure proper broadcasting to y
                 x = x + mean_vec[:, np.newaxis] # shape (num_measurements, num_samples) -- or -- (num_samples, )
 
+        if do_squeeze:
+            # The user didn't specify a num_samples variable, so let's remove the second dimension
+            x = x[:, 0]
+
         return x
 
     @classmethod
