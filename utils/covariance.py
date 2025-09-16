@@ -390,7 +390,7 @@ class CovarianceMatrix:
         if self._inv is not None:
             self._inv = self._inv / val
 
-    def sample(self, num_samples: int = 1, mean_vec:npt.ArrayLike = None) -> npt.ArrayLike:
+    def sample(self, num_samples: int = None, mean_vec:npt.ArrayLike = None) -> npt.ArrayLike:
         """
         Generate a random sample from the covariance matrix.
 
@@ -400,11 +400,17 @@ class CovarianceMatrix:
         :param num_samples: The number of independent samples to generate (default=1)
         :param mean_vec: A numpy array of shape (num_measurements, ) containing the mean vector to apply
         :return: A numpy array of shape (num_measurements, num_samples) containing independent samples of the
-                 (num_measurements, ) random vector defined by this covariance matrix
+                 (num_measurements, ) random vector defined by this covariance matrix. If num_samples is not provided,
+                 then the response is a 1D vector with shape (num_measurements, )
         """
 
         self._parse()  # Make sure the matrix has been parsed
         num_measurements = self._cov.shape[0]
+        if num_samples is None:
+            num_samples = 1
+            do_squeeze = True
+        else:
+            do_squeeze = False
 
         if self._cov.size == 1:
             # The covariance matrix is scalar; let's do it manually
