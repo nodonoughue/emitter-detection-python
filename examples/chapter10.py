@@ -15,17 +15,14 @@ def run_all_examples():
     :return figs: list of figure handles
     """
 
-    # Random Number Generator
-    rng = np.random.default_rng(0)
-
-    fig1 = example1(rng)
+    fig1 = example1()
     fig2 = example2()
     fig3 = example3()
 
     return [fig1, fig2, fig3]
 
 
-def example1(rng=np.random.default_rng(), mc_params=None):
+def example1(mc_params=None):
     """
     Executes Example 10.1 and generates two figures
 
@@ -36,7 +33,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     Nicholas O'Donoughue
     18 May 2021
 
-    :param rng: random number generator
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig_geo: figure handle to generated graphic with geographic layout
     :return fig_err: figure handle to generated graphic with error as a function of iteration
@@ -119,8 +115,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     args = {'psi_act': psi_act,
             'gd_ls_args': {'x_init': x_init,
                            'max_num_iterations': num_iterations,
-                           'force_full_calc': True},
-            'rng': rng}
+                           'force_full_calc': True}}
     ml_search = SearchSpace(x_ctr=x_init, max_offset=max_offset, epsilon=epsilon)
 
     iterations_per_marker = 1
@@ -259,8 +254,7 @@ def _mc_iteration(pss: DirectionFinder, ml_search: SearchSpace, args: dict):
     """
 
     # Generate a random measurement
-    rng = args['rng']
-    psi = args['psi_act'] + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
+    psi = args['psi_act'] + pss.cov.sample()
 
     # Generate solutions
     res_ml, _, _ = pss.max_likelihood(zeta=psi, search_space=ml_search, print_progress=False)

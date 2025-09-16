@@ -326,7 +326,7 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     z_full = pss_full.measurement(x_source=x_source)
 
     # Generate random noise
-    noise_sensor = cov_roa.lower @ rng.standard_normal(size=(num_tdoa, num_monte_carlo))
+    noise_sensor = cov_roa.sample(num_samples=num_monte_carlo)
     noise_common = utils.resample_noise(noise_sensor, ref_idx=None)
     noise_full = utils.resample_noise(noise_sensor, ref_idx='full')
 

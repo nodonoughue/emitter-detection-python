@@ -17,17 +17,14 @@ def run_all_examples():
     :return figs: list of figure handles
     """
 
-    # Random Number Generator
-    rng = np.random.default_rng(0)
-
-    fig1a, fig1b = example1(rng)
-    fig2a, fig2b = example2(rng)
+    fig1a, fig1b = example1()
+    fig2a, fig2b = example2()
 
     figs = [fig1a, fig1b, fig2a, fig2b]
     return figs
 
 
-def example1(rng=np.random.default_rng(), mc_params=None):
+def example1(mc_params=None):
     """
     Executes Example 13.1 and generates two figures
 
@@ -36,7 +33,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     Nicholas O'Donoughue
     17 Nov 2022
 
-    :param rng: random number generator
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig_geo: figure handle for geographic layout
     :return fig_err: figure handle for error as a function of iteration
@@ -116,7 +112,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
                }
 
     args = {'rho_act': rho_actual,
-            'rng': rng,
             'gd_args': gd_args,
             'ls_args': ls_args,
             }
@@ -157,7 +152,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     return fig_geo, fig_err
 
 
-def example2(rng=np.random.default_rng(), mc_params=None):
+def example2(mc_params=None):
     """
     Executes Example 13.2 and generates two figures
 
@@ -166,7 +161,6 @@ def example2(rng=np.random.default_rng(), mc_params=None):
     Nicholas O'Donoughue
     19 Nov 2022
 
-    :param rng: random number generator
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig_geo: figure handle for geographic layout
     :return fig_err: figure handle for error as a function of iteration
@@ -252,7 +246,6 @@ def example2(rng=np.random.default_rng(), mc_params=None):
     args = {'ls_args': ls_args,  # arguments to pass on to LS solver
             'gd_args': gd_args,  # arguments to pass on to GD solver
             'rho_act': rho_actual,
-            'rng': rng
             }
 
     print('Performing Monte Carlo simulation for FDOA performance...')
@@ -295,7 +288,6 @@ def _mc_iteration(pss:HybridPassiveSurveillanceSystem, ml_search: SearchSpace, a
     Executes a single iteration of the Monte Carlo simulation in Example 11.1.
 
     :param args: Dictionary of arguments for monte carlo simulation in Example 11.1. Fields are:
-                rng: random number generator
                 rho_act: true range difference of arrival (meters)
                 covar_rho: measurement error covariance matrix
                 covar_lower: lower triangular Cholesky decomposition of the measurement error covariance matrix
@@ -319,9 +311,8 @@ def _mc_iteration(pss:HybridPassiveSurveillanceSystem, ml_search: SearchSpace, a
     # TODO: Check for divergent case and set a flag to ignore this iteration
 
     # Generate a random measurement
-    rng = args['rng']
     zeta_act = args['rho_act']
-    zeta = zeta_act + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
+    zeta = zeta_act + pss.cov.sample()
 
     gd_args = args['gd_args']
     ls_args = args['ls_args']

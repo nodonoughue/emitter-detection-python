@@ -225,9 +225,8 @@ def example2(rng=np.random.default_rng()):
     tdoa.cov = cov_roa
 
     # Demonstrate geolocation
-    z = tdoa.measurement(x_source=x_tgt)
-    zeta = z[:, np.newaxis] + tdoa.cov.lower @ rng.standard_normal(size=(tdoa.num_measurements, num_pulses))  # noisy measurement
-    
+    zeta = tdoa.noisy_measurement(x_source=x_tgt, num_samples=num_pulses)
+
     # Sample Mean
     zeta_mn = np.cumsum(zeta,axis=1)/(1+np.arange(num_pulses))
     
@@ -306,8 +305,7 @@ def example3(rng=np.random.default_rng()):
     num_pulses = np.floor(int_time/pri).astype(int)+1
 
     # Generate noisy measurements
-    psi = aoa.measurement(x_tgt)
-    zeta = psi[:, np.newaxis] + aoa.cov.lower @ rng.standard_normal(size=(aoa.num_measurements, num_pulses))
+    zeta = aoa.noisy_measurement(x_source=x_tgt, num_samples=num_pulses)
 
     # Define measurement and Jacobian functions
     z_fun = aoa.measurement
@@ -434,8 +432,7 @@ def example4(rng=np.random.default_rng()):
         h_fun = lambda x: aoa.jacobian(x).T
     
         # Generate noisy measurements
-        psi = aoa.measurement(x_source=x_tgt)
-        zeta = psi + aoa.cov.lower @ rng.standard_normal(size=(aoa.num_dim, ))
+        zeta = aoa.noisy_measurement(x_source=x_tgt)
     
         if idx==0:
             # Initialization

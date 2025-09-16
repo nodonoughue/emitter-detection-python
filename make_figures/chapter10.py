@@ -31,9 +31,6 @@ def make_all_figures(close_figs=False, mc_params=None):
     prefix = utils.init_output_dir('chapter10')
     utils.init_plot_style()
 
-    # Random Number Generator
-    rng = np.random.default_rng(0)
-
     # Colormap
     cmap = plt.get_cmap("tab10")
 
@@ -42,7 +39,7 @@ def make_all_figures(close_figs=False, mc_params=None):
     fig2 = make_figure_2(prefix, cmap)
     fig3 = make_figure_3(prefix)
     fig4 = make_figure_4(prefix)
-    fig5a, fig5b = make_figure_5(prefix, rng, mc_params)
+    fig5a, fig5b = make_figure_5(prefix, mc_params)
     fig6 = make_figure_6(prefix)
     fig7 = make_figure_7(prefix)
 
@@ -380,7 +377,7 @@ def make_figure_4(prefix=None):
     return fig4
 
 
-def make_figure_5(prefix=None, rng=np.random.default_rng(), mc_params=None):
+def make_figure_5(prefix=None, mc_params=None):
     """
     Figure 5 - Example Solution
 
@@ -390,8 +387,6 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), mc_params=None):
     19 May 2021
 
     :param prefix: output directory to place generated figure
-    :param rng: random number generator
-    :param force_recalc: optional flag (default=True), if False then the example does not run
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig5a: figure handle for first subfigure
     :return fig5b: figure handle for second subfigure
@@ -399,7 +394,7 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), mc_params=None):
 
     print('Generating Figure 10.5 (a and b)...')
 
-    fig5a, fig5b = chapter10.example1(rng, mc_params)
+    fig5a, fig5b = chapter10.example1(mc_params)
 
     if prefix is not None:
         plt.figure(fig5a)

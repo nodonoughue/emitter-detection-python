@@ -284,7 +284,7 @@ def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho: CovarianceM
     return fig
 
 
-def make_figures_3_4(prefix=None, rng=np.random.default_rng(), mc_params=None):
+def make_figures_3_4(prefix=None, mc_params=None):
     """
     Figures 3 and 4, Example 13.1: Homogeneous (3-mode) Sensors
 
@@ -294,7 +294,6 @@ def make_figures_3_4(prefix=None, rng=np.random.default_rng(), mc_params=None):
     4 December 2022
 
     :param prefix: output directory to place generated figure
-    :param rng: (Optional) random number generator
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig3: figure handle for figure 13.3
     :return fig4: figure handle for figure 13.4
@@ -306,7 +305,7 @@ def make_figures_3_4(prefix=None, rng=np.random.default_rng(), mc_params=None):
         return None, None
 
     print('Generating Figures 13.3 and 13.4 (using Example 13.1)...')
-    fig3, fig4 = chapter13.example1(rng, mc_params=mc_params)
+    fig3, fig4 = chapter13.example1(mc_params=mc_params)
 
     if prefix is not None:
         fig3.savefig(prefix + 'fig3.png')
@@ -318,7 +317,7 @@ def make_figures_3_4(prefix=None, rng=np.random.default_rng(), mc_params=None):
     return fig3, fig4
 
 
-def make_figures_5_6(prefix=None, rng=np.random.default_rng(), mc_params=None):
+def make_figures_5_6(prefix=None, mc_params=None):
     """
     Figures 3 and 4, Example 13.2: Heterogeneous Sensors
 
@@ -328,7 +327,6 @@ def make_figures_5_6(prefix=None, rng=np.random.default_rng(), mc_params=None):
     4 December 2022
 
     :param prefix: output directory to place generated figure
-    :param rng: (Optional) random number generator
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
@@ -338,7 +336,7 @@ def make_figures_5_6(prefix=None, rng=np.random.default_rng(), mc_params=None):
         return None, None
 
     print('Generating Figures 13.5 and 13.6 (using Example 13.2)...')
-    fig5, fig6 = chapter13.example2(rng, mc_params=mc_params)
+    fig5, fig6 = chapter13.example2(mc_params=mc_params)
 
     if prefix is not None:
         fig5.savefig(prefix + 'fig5.png')

@@ -109,7 +109,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
 
     args = {'rho_act': rho_actual,
             'num_measurements': num_sensors - 1,
-            'rng': rng,
             'ls_args': ls_args,
             'gd_args': gd_args,
             'covar_sensor': covar_sensor}
@@ -247,7 +246,6 @@ def _mc_iteration(pss: FDOAPassiveSurveillanceSystem, ml_search: SearchSpace, ar
     Executes a single iteration of the Monte Carlo simulation in Example 11.1.
 
     :param args: Dictionary of arguments for monte carlo simulation in Example 11.1. Fields are:
-                rng: random number generator
                 rho_act: true range difference of arrival (meters)
                 covar_rho: measurement error covariance matrix
                 covar_lower: lower triangular Cholesky decomposition of the measurement error covariance matrix
@@ -269,8 +267,7 @@ def _mc_iteration(pss: FDOAPassiveSurveillanceSystem, ml_search: SearchSpace, ar
     """
 
     # Generate a random measurement
-    rng = args['rng']
-    rho = args['rho_act'] + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
+    rho = args['rho_act'] + pss.cov.sample()
 
     gd_args = args['gd_args']
     ls_args = args['ls_args']

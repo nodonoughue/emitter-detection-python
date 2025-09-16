@@ -88,18 +88,13 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor_enu, vel=v_sensor_enu, cov=CovarianceMatrix(cov_rr), ref_idx=ref_fdoa)
     hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=fdoa)
 
-    # Generate Noise
+    # Generate Noisy data
+    zeta = hybrid.noisy_measurement(x_source=x_source_enu, v_source=v_source_enu, num_samples=num_monte_carlo)
+
+    # Monte Carlo parameters
     num_monte_carlo = 1000
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
-    noise_white = rng.standard_normal(size=(hybrid.num_measurements, num_monte_carlo))
-
-    # Generate correlated noise to account for reference sensors used in TDOA and FDOA
-    noise_measurement = hybrid.cov.lower @ noise_white
-
-    # Generate Data
-    z = hybrid.measurement(x_source=x_source_enu, v_source=v_source_enu)
-    zeta = z[:, np.newaxis] + noise_measurement
 
     # GD and LS Search Parameters
     x_init_enu = np.array([1, 1, 0]) * 1e3

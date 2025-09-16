@@ -84,7 +84,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
 
     # ===  Generate Measurements
     z = tdoa.measurement(x_tgt_full)
-    noise = tdoa.cov.lower @ rng.standard_normal((tdoa.num_measurements, num_time))
+    noise = tdoa.cov.sample(num_samples=num_time)
     zeta = z + noise
 
     # crlb = tdoa.computeCRLB(x_tdoa, x_tgt_full, C_roa, ref_idx, false, true)
@@ -214,7 +214,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
         utils.print_progress(num_monte_carlo, idx_mc, iterations_per_marker, iterations_per_row, t_start)
 
         # Generate Measurements
-        noise = tdoa.cov.lower @ rng.standard_normal((tdoa.num_measurements, num_time))
+        noise = tdoa.cov.sample(num_samples=num_time)
         zeta = z + noise
 
         # Initialize Track State
@@ -410,7 +410,7 @@ def example2(rng=np.random.default_rng()):
     # ===  Step Through Time
     print('Iterating through EKF tracker time steps...')
     markers_per_row = 40
-    iter_per_marker = 10
+    iter_per_marker = 20
     iter_per_row = markers_per_row * iter_per_marker
 
     # at least 1 iteration per marker, no more than 100 iterations per marker

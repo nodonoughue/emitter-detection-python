@@ -113,7 +113,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
 
     mc_args = {'rho_act': rho_actual,
                'num_measurements': num_sensors-1,
-               'rng': rng
                }
 
     iterations_per_marker = 1
@@ -264,8 +263,7 @@ def _mc_iteration(pss: TDOAPassiveSurveillanceSystem, ml_search: SearchSpace, ls
     """
 
     # Generate a random measurement
-    rng = mc_args['rng']
-    rho = mc_args['rho_act'] + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
+    rho = mc_args['rho_act'] + pss.cov.sample()
 
     # Generate solutions
     res_ml, _, _ = pss.max_likelihood(zeta=rho, search_space=ml_search)

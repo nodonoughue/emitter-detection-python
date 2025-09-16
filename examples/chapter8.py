@@ -230,7 +230,7 @@ def example1(rng=np.random.default_rng()):
     # Load sample data
     data = loadmat(data_fnm)
     #   x                noisy data vector (M x N)
-    #   num_source       number of sources
+    #   num_sources      number of sources
     #   num_elements     number of array elements
     #   num_samples      number of time snapshots
     #   d_lam            array spacing

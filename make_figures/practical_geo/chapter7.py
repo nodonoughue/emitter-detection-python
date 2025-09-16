@@ -337,8 +337,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng()):
         z_fun = aoa.measurement
         h_fun = lambda x: aoa.jacobian(x).T
 
-        # ToDo: Make a noisy_measurement function for PSS classes and use it
-        this_psi = aoa.measurement(x_tgt) + lower @ rng.standard_normal(1)
+        this_psi = aoa.noisy_measurement(x_tgt)
 
         this_x, this_p = tracker.ekf_update(x_prev, p_prev, this_psi, aoa.cov.cov, z_fun, h_fun)
         cep_vec[idx] = utils.errors.compute_cep50(this_p)

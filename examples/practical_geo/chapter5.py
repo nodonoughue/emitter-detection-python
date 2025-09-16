@@ -139,9 +139,7 @@ def example2():
 
         # Make PSS Object
         tdoa = TDOAPassiveSurveillanceSystem(x=this_x_tdoa, cov=cov, variance_is_toa=False, ref_idx=None)
-        z = tdoa.measurement(x_source=x_tgt)
-        noise_z = tdoa.cov.lower @ np.random.randn(tdoa.num_measurements)
-        zeta = z + noise_z
+        zeta = tdoa.noisy_measurement(x_source=x_tgt)
 
         # Solve for Target Position
         gd_args = {'zeta': zeta, 'x_init': this_x_init}
@@ -370,9 +368,7 @@ def example4():
     aoa = DirectionFinder(x=x_aoa_ecef, cov=cov_aoa, do_2d_aoa=True)
 
     # Noisy Measurement
-    z = aoa.measurement(x_source=x_tgt_ecef)
-    n = aoa.cov.lower @ np.random.randn(aoa.num_measurements)
-    zeta = z + n
+    zeta = aoa.noisy_measurement(x_source=x_tgt_ecef)
 
     # Solvers
     init_alt = 500e3
@@ -474,9 +470,7 @@ def example5():
         return np.array([scipy.stats.multivariate_normal.pdf(this_x, mean=x_prior, cov=cov_prior) for this_x in x.T])
 
     # Measurement
-    z = tdoa.measurement(x_source=x_tgt)
-    noise = tdoa.cov.lower @ np.random.randn(num_tdoa-1)
-    zeta = z + noise
+    zeta = tdoa.noisy_measurement(x_source=x_tgt)
 
     # Solution
     x_center = x_tgt

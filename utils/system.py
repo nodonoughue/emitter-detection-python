@@ -51,6 +51,16 @@ class PassiveSurveillanceSystem(ABC):
     def measurement(self, x_source, x_sensor=None, bias=None, v_sensor=None, v_source=None):
         pass
 
+    def noisy_measurement(self, x_source, x_sensor=None, bias=None, v_sensor=None, v_source=None, num_samples=1):
+        noise = self.cov.sample(num_samples=num_samples)
+        # ToDo: handle case where x_source is 2D (num_measurement, num_source)
+        if num_samples <= 1:
+            # Only take the first dimension of the noise
+            return self.measurement(x_source, x_sensor, bias, v_sensor, v_source) + noise[:, 0]
+        else:
+            # Add a second dimension to the measurements and combine
+            return self.measurement(x_source, x_sensor, bias, v_sensor, v_source)[:, np.newaxis] + noise
+
     @abstractmethod
     def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
         pass

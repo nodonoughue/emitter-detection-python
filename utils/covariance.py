@@ -390,6 +390,47 @@ class CovarianceMatrix:
         if self._inv is not None:
             self._inv = self._inv / val
 
+    def sample(self, num_samples: int = 1, mean_vec:npt.ArrayLike = None) -> npt.ArrayLike:
+        """
+        Generate a random sample from the covariance matrix.
+
+        Nicholas O'Donoughue
+        16 September 2025
+
+        :param num_samples: The number of independent samples to generate (default=1)
+        :param mean_vec: A numpy array of shape (num_measurements, ) containing the mean vector to apply
+        :return: A numpy array of shape (num_measurements, num_samples) containing independent samples of the
+                 (num_measurements, ) random vector defined by this covariance matrix
+        """
+
+        self._parse()  # Make sure the matrix has been parsed
+        num_measurements = self._cov.shape[0]
+
+        if self._cov.size == 1:
+            # The covariance matrix is scalar; let's do it manually
+            x = np.random.randn(1, num_samples) * np.sqrt(self._cov)
+        elif self.do_cholesky:
+            # We already did Cholesky decomposition; use it directly to generate colored noise
+            x = np.squeeze(self._lower @ np.random.randn(num_measurements, num_samples)) # shape (num_measurements, num_samples)
+        else:
+            # Use the builtin multivariate_normal generator with self._cov
+            # This one will return the result with shape (num_samples, num_measurements), so we need to transpose
+            x = np.squeeze(np.transpose(np.random.multivariate_normal(mean=np.zeros(num_measurements),
+                                                                      cov=self._cov,
+                                                                      size=num_samples))) # shape (num_measurements, num_samples)
+
+        if mean_vec is not None:
+            # Make sure that mean_vec is a 1d array
+            if len(mean_vec.shape) > 1 and np.prod(mean_vec.shape[1:]) > 1:
+                warnings.warn("Input mean_vec is not a 1D array; it will be ignored.")
+            elif num_measurements != mean_vec.shape[0]:
+                warnings.warn("Input mean_vec size does not match the covariance matrix; it will be ignored.")
+            else:
+                # Add a new axis to the end of mean_vec, to ensure proper broadcasting to y
+                x = x + mean_vec[:, np.newaxis] # shape (num_measurements, num_samples) -- or -- (num_samples, )
+
+        return x
+
     @classmethod
     def block_diagonal(cls, *args: 'CovarianceMatrix') -> 'CovarianceMatrix':
         c = block_diag(*[x.cov for x in args])

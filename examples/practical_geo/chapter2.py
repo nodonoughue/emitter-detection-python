@@ -269,16 +269,8 @@ def example2(colors=None):
     pss = _make_pss_systems(err_aoa=err_aoa, err_time=err_time, err_freq=err_freq, f0=f0,
                             tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
-    # Take Hybrid measurement and Define combined covariance matrix
-    z = pss.measurement(x_source=x_source)
-
-    # Generate Random Noise
-    cov_lower = pss.cov.lower
-    num_measurements = pss.num_measurements
-    noise = cov_lower @ np.random.randn(num_measurements, )
-
-    # Combine Noise with Perfect Measurement
-    zeta = z + noise
+    # Take Hybrid measurement, with noise
+    zeta = pss.noisy_measurement(x_source=x_source)
 
     # ---- Set Up Solution Parameters ----
     # ML Search Parameters
@@ -318,7 +310,7 @@ def example2(colors=None):
     return fig_full, fig_zoom
 
 
-def example3(rng=np.random.default_rng(), colors=None):
+def example3(colors=None):
     """
     Executes Example 2.3.
 
@@ -327,7 +319,6 @@ def example3(rng=np.random.default_rng(), colors=None):
     Nicholas O'Donoughue
     16 January 2025
 
-    :param rng: random number generator
     :param colors:
     :return: figure handle to generated graphic
     """
@@ -364,7 +355,7 @@ def example3(rng=np.random.default_rng(), colors=None):
                   'plot_progress': False}
 
     # Perform a single Monte-Carlo iteration (executing all solvers)
-    res = _mc_iteration(z, pss, rng, ml_args, gd_ls_args)
+    res = _mc_iteration(z, pss, ml_args, gd_ls_args)
 
     # ---- Estimate Error Bounds ----
     # CRLB
@@ -403,7 +394,7 @@ def example3(rng=np.random.default_rng(), colors=None):
     return fig_full, fig_zoom
 
 
-def example3_mc(rng=np.random.default_rng(), colors=None, mc_params=None):
+def example3_mc(colors=None, mc_params=None):
     """
     Executes a modified version of Example 2.3 with Monte-Carlo trials, as discussed in the video walkthrough of
     Example 2.3.
@@ -413,7 +404,6 @@ def example3_mc(rng=np.random.default_rng(), colors=None, mc_params=None):
     Nicholas O'Donoughue
     16 January 2025
 
-    :param rng: random number generator
     :param colors:
     :return: figure handle to generated graphic
     """
@@ -468,7 +458,7 @@ def example3_mc(rng=np.random.default_rng(), colors=None, mc_params=None):
     for idx in np.arange(num_monte_carlo):
         utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        res = _mc_iteration(z, pss, rng, ml_args, gd_ls_args)
+        res = _mc_iteration(z, pss, ml_args, gd_ls_args)
 
         rmse_ml[idx] = np.linalg.norm(res['ml']-x_source)
         rmse_gd[idx, :] = np.linalg.norm(res['gd']-x_source[:, np.newaxis], axis=0)
@@ -522,7 +512,7 @@ def example3_mc(rng=np.random.default_rng(), colors=None, mc_params=None):
     return fig_err, fig_full
 
 
-def _mc_iteration(z, pss: HybridPassiveSurveillanceSystem, rng, ml_search:SearchSpace, gd_ls_args):
+def _mc_iteration(z, pss: HybridPassiveSurveillanceSystem, ml_search:SearchSpace, gd_ls_args):
     """
     Executes a single iteration of the Monte Carlo simulation in Example 2.3.
 
@@ -536,7 +526,7 @@ def _mc_iteration(z, pss: HybridPassiveSurveillanceSystem, rng, ml_search:Search
     """
 
     # Generate a random measurement
-    zeta = z + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
+    zeta = z + pss.cov.sample()
 
     # ---- Apply Various Solvers ----
     # ML Solution
