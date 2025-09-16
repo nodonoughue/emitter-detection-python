@@ -93,7 +93,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    savemat('./ex8_1.mat',
+    savemat('ex8_1.mat',
             {'x': noisy_signal,
              'num_sources': num_sources,
              'num_elements': num_elements,
@@ -147,7 +147,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    savemat('./problem8_5.mat',
+    savemat('problem8_5.mat',
             {'x': noisy_signal,
              'num_sources': num_sources,
              'num_elements': num_elements,
@@ -201,7 +201,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    savemat('./problem8_6.mat',
+    savemat('problem8_6.mat',
             {'x': noisy_signal,
              'num_sources': num_sources,
              'num_elements': num_elements,
@@ -223,7 +223,7 @@ def example1(rng=np.random.default_rng()):
     """
 
     # If the data is missing, make it
-    data_fnm = './ex8_1.mat'
+    data_fnm = 'ex8_1.mat'
     if not os.path.exists(data_fnm):
         generate_ex1_data(rng)
 
