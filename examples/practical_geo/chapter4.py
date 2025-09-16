@@ -25,7 +25,7 @@ def run_all_examples():
     return list(example1()) + list(example2())
 
 
-def example1(rng=np.random.default_rng(), mc_params=None):
+def example1(mc_params=None):
     """
     Executes Example 4.1.
 
@@ -88,13 +88,13 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor_enu, vel=v_sensor_enu, cov=CovarianceMatrix(cov_rr), ref_idx=ref_fdoa)
     hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=fdoa)
 
-    # Generate Noisy data
-    zeta = hybrid.noisy_measurement(x_source=x_source_enu, v_source=v_source_enu, num_samples=num_monte_carlo)
-
     # Monte Carlo parameters
     num_monte_carlo = 1000
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
+
+    # Generate Noisy data
+    zeta = hybrid.noisy_measurement(x_source=x_source_enu, v_source=v_source_enu, num_samples=num_monte_carlo)
 
     # GD and LS Search Parameters
     x_init_enu = np.array([1, 1, 0]) * 1e3
@@ -121,8 +121,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     for idx in np.arange(num_monte_carlo):
         utils.print_progress(num_total=num_monte_carlo, curr_idx=idx, iterations_per_marker=iterations_per_marker,
                              iterations_per_row=iterations_per_row, t_start=t_start)
-
-        # TDOA, AOA, and FDOA Error
 
         # LS Solution
         _, x_ls_iters = hybrid.least_square(zeta=zeta[:, idx], **ls_args)
