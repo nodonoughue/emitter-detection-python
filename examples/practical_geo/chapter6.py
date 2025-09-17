@@ -459,7 +459,7 @@ def example5(do_vel_only_cal=False):
     z_cal = hybrid.measurement(x_source=x_cal, v_sensor=v_fdoa_actual)
 
     # Generate Noise
-    noise = cov_tf.sample(num_samples=1)
+    noise = cov_tf.sample(num_samples=None)  # providing 'None' ensured a 1d vector response
     noise_cal = cov_tf.sample(num_samples=num_cal)
     zeta = z + noise
     zeta_cal = z_cal + noise_cal
