@@ -89,41 +89,9 @@ def make_steering_vector(d_lam, num_elements):
     element_idx_vec = np.expand_dims(np.arange(num_elements), axis=1)  # Make it 2D, elements along first dim
 
     def steer(psi):
-        return np.exp(1j * 2 * np.pi * d_lam * element_idx_vec * np.expand_dims(np.sin(psi), axis=0))
+        return np.exp(1j * 2 * np.pi * d_lam * element_idx_vec * np.sin(np.atleast_1d(psi)[np.newaxis, :]))
 
     def steer_grad(psi):
-        return (-1j * 2 * np.pi * d_lam * element_idx_vec * np.expand_dims(np.cos(psi), axis=0)) * steer(psi)
-
-    return steer, steer_grad
-
-
-def make_arbitrary_steering_vector(d_lam_vec):
-    """
-    # Returns an array manifold for an arbitrary linear array with
-    # inter-element spacing defined by the vector d_lam_vec.
-
-    Ported from MATLAB code.
-
-    Nicholas O'Donoughue
-    18 January 2021
-
-    :param d_lam_vec: Inter-element spacing, in units of wavelengths, as a vector of length N-1 for an N element array.
-    :return v: Function handle that accepts an angle (in radians) and returns an N-element vector of complex phase
-               shifts for each element.  If multiple angles are supplied, the output is a matrix of size numel(th) x N.
-    :return v_dot: Function handle to gradient vector dv(psi) / dpsi
-    """
-
-    # Ensure that the input is a row vector
-    d_lam_vec = d_lam_vec.flatten()
-
-    # Accumulate the inter-element spacings, to compute the distance from each
-    # element to the reference element (first)
-    cum_spacing = np.cumsum(d_lam_vec)
-
-    def steer(psi):
-        return np.exp(1j*2*np.pi*cum_spacing*np.sin(psi.T)).T
-
-    def steer_grad(psi):
-        return (1j*2*np.pi*cum_spacing*np.cos(psi.T)).T*steer(psi)
+        return (-1j * 2 * np.pi * d_lam * element_idx_vec * np.cos(np.atleast_1d(psi)[np.newaxis, :])) * steer(psi)
 
     return steer, steer_grad

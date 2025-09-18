@@ -35,9 +35,9 @@ def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, search_space:SearchSpa
     cov = preprocess_cov(cov=cov, do_resample=do_resample, variance_is_toa=variance_is_toa, ref_idx=ref_idx)
 
     # Set up function handle
-    def ell(x):
+    def ell(x, **ell_kwargs):
         return model.log_likelihood(x_sensor, zeta, cov, x, ref_idx, do_resample=False, variance_is_toa=False,
-                                    bias=bias)
+                                    bias=bias, **ell_kwargs)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, search_space=search_space,

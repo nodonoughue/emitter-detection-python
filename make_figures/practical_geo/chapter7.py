@@ -23,13 +23,13 @@ _rad2deg = utils.unit_conversions.convert(1, "rad", "deg")
 _deg2rad = utils.unit_conversions.convert(1, "deg", "rad")
 
 
-def make_all_figures(close_figs=False, force_recalc=False):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                        Default=False
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -41,11 +41,11 @@ def make_all_figures(close_figs=False, force_recalc=False):
     utils.init_plot_style()
 
     # Generate all figures
-    figs1_2 = make_figures_1_2(prefix, force_recalc)
-    figs3_4 = make_figures_3_4(prefix, force_recalc)
-    fig5 = make_figure_5(prefix, force_recalc)
+    figs1_2 = make_figures_1_2(prefix, mc_params)
+    figs3_4 = make_figures_3_4(prefix, mc_params)
+    fig5 = make_figure_5(prefix, mc_params)
     fig7 = make_figure_7(prefix)
-    fig8 = make_figure_8(prefix, force_recalc)
+    fig8 = make_figure_8(prefix, mc_params)
     fig10 = make_figure_10(prefix)
 
     figs = list(figs1_2) +  list(figs3_4) + list(fig5) + list(fig7) + list(fig8) + list(fig10)
@@ -59,17 +59,17 @@ def make_all_figures(close_figs=False, force_recalc=False):
     return figs
 
 
-def make_figures_1_2(prefix=None, force_recalc=False):
+def make_figures_1_2(prefix=None, mc_params=None):
     """
     Figures 7.1 and 7.2 from Example 7.1
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: handle
     """
 
-    if not force_recalc:
-        print('Skipping Figures 7.1 and 7.2 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 7.1 and 7.2 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None,
 
     print('Generating Figures 7.1 and 7.2 (Example 7.1)...')
@@ -88,17 +88,17 @@ def make_figures_1_2(prefix=None, force_recalc=False):
 
     return figs
 
-def make_figures_3_4(prefix=None, force_recalc=False):
+def make_figures_3_4(prefix=None, mc_params=None):
     """
     Figures 7.3 and 7.4 from Example 7.2
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: handle
     """
 
-    if not force_recalc:
-        print('Skipping Figures 7.3 and 7.4 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 7.3 and 7.4 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None,
 
     print('Generating Figures 7.3 and 7.4 (Example 7.2)...')
@@ -118,17 +118,17 @@ def make_figures_3_4(prefix=None, force_recalc=False):
     return figs
 
 
-def make_figure_5(prefix=None, force_recalc=False):
+def make_figure_5(prefix=None, mc_params=None):
     """
     Figure 7.5 from Example 7.3
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 7.5 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 7.5 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None,
 
     print('Generating Figures 7.5 (Example 7.3)...')
@@ -210,17 +210,17 @@ def make_figure_7(prefix=None):
     return figs
 
 
-def make_figure_8(prefix=None, force_recalc=False):
+def make_figure_8(prefix=None, mc_params=None):
     """
     Figure 7.8 from Example 7.4
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 7.8 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 7.8 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None,
 
     print('Generating Figure 7.8 (Example 7.4)...')
@@ -337,8 +337,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng()):
         z_fun = aoa.measurement
         h_fun = lambda x: aoa.jacobian(x).T
 
-        # ToDo: Make a noisy_measurement function for PSS classes and use it
-        this_psi = aoa.measurement(x_tgt) + lower @ rng.standard_normal(1)
+        this_psi = aoa.noisy_measurement(x_tgt)
 
         this_x, this_p = tracker.ekf_update(x_prev, p_prev, this_psi, aoa.cov.cov, z_fun, h_fun)
         cep_vec[idx] = utils.errors.compute_cep50(this_p)
@@ -366,4 +365,4 @@ def make_figure_10(prefix=None, rng=np.random.default_rng()):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, force_recalc=True)
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})

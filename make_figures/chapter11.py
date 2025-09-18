@@ -18,13 +18,14 @@ from examples import chapter11
 from utils.covariance import CovarianceMatrix
 
 
-def make_all_figures(close_figs=False, force_recalc=False):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
     :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -45,7 +46,7 @@ def make_all_figures(close_figs=False, force_recalc=False):
     fig4 = make_figure_4(prefix)
     fig5 = make_figure_5(prefix)
     fig6a, fig6b = make_figure_6(prefix)
-    fig7a, fig7b, fig8 = make_figure_7_8(prefix, rng, force_recalc)
+    fig7a, fig7b, fig8 = make_figure_7_8(prefix, rng, mc_params)
     fig9 = make_figure_9(prefix)
     fig10 = make_figure_10(prefix)
 
@@ -487,6 +488,8 @@ def make_figure_6(prefix=None):
     :return: figure handle
     """
 
+    print('Generating Figure 11.6a...')
+
     # Define Sensor Positions
     baseline = 10e3
     num_sensors = 3
@@ -509,7 +512,8 @@ def make_figure_6(prefix=None):
     x_source = np.array([np.ravel(x_full), np.ravel(y_full)])  # shape=(2 x num_grid_points**2)
 
     # Compute CRLB
-    crlb = tdoa.perf.compute_crlb(x_sensor, x_source, cov_roa, variance_is_toa=False, do_resample=True)
+    crlb = tdoa.perf.compute_crlb(x_sensor, x_source, cov_roa, variance_is_toa=False, do_resample=True,
+                                  print_progress=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), (num_grid_points, num_grid_points))
 
     # Set up contours
@@ -520,7 +524,6 @@ def make_figure_6(prefix=None):
         fmt[level] = label
 
     # Draw Figure
-    print('Generating Figure 11.6a...')
     fig6a, ax = plt.subplots()
 
     plt.plot(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, 'ro', label='Sensors')
@@ -533,6 +536,7 @@ def make_figure_6(prefix=None):
     plt.ylabel('Down-range [km]')
 
     # Figure 6b, Impact of fourth sensor on CRLB
+    print('Generating Figure 11.6b...')
 
     # Add a sensor at the origin
     x_sensor1 = np.concatenate((x_sensor, np.zeros(shape=(2, 1))), axis=1)
@@ -546,11 +550,11 @@ def make_figure_6(prefix=None):
     # automatically resample the covariance matrix.
     # cov_tdoa = timing_error**2 * (1 + np.eye(num_sensors-1))
 
-    crlb2 = tdoa.perf.compute_crlb(x_sensor1, x_source, cov_roa, variance_is_toa=False, do_resample=True)
+    crlb2 = tdoa.perf.compute_crlb(x_sensor1, x_source, cov_roa, variance_is_toa=False, do_resample=True,
+                                   print_progress=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb2), [num_grid_points, num_grid_points])
 
     # Draw the figure
-    print('Generating Figure 11.6b...')
     fig6b, ax = plt.subplots()
 
     plt.plot(x_sensor1[0, :]/1e3, x_sensor1[1, :]/1e3, 'ro', label='Sensors')
@@ -572,7 +576,7 @@ def make_figure_6(prefix=None):
     return fig6a, fig6b
 
 
-def make_figure_7_8(prefix=None, rng=np.random.default_rng(), force_recalc=False):
+def make_figure_7_8(prefix=None, rng=np.random.default_rng(), mc_params=None):
     """
     Figures 7 and 8 - Example TDOA Calculation
 
@@ -585,16 +589,17 @@ def make_figure_7_8(prefix=None, rng=np.random.default_rng(), force_recalc=False
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :param force_recalc: optional flag (default=True), if False then the example does not run
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figures 11.7 and 11.8 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 11.7 and 11.8 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None, None, None
 
     print('Generating Figures 11.7 and 11.8 (using Example 11.1)...')
-    fig7a, fig7b, fig8 = chapter11.example1(rng)
+    fig7a, fig7b, fig8 = chapter11.example1(rng, mc_params=mc_params)
 
     if prefix is not None:
         fig7a.savefig(prefix + 'fig7a.svg')
@@ -780,4 +785,4 @@ def make_figure_10(prefix=None):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, force_recalc=True)
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})

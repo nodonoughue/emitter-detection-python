@@ -15,20 +15,14 @@ def run_all_examples():
     :return figs: list of figure handles
     """
 
-    # Random Number Generator
-    rng = np.random.default_rng(0)
-
-    # Colormap
-    cmap = plt.get_cmap("tab10")
-
-    fig1 = example1(rng, cmap)
+    fig1 = example1()
     fig2 = example2()
     fig3 = example3()
 
     return [fig1, fig2, fig3]
 
 
-def example1(rng=np.random.default_rng(), cmap=None):
+def example1(mc_params=None):
     """
     Executes Example 10.1 and generates two figures
 
@@ -39,14 +33,10 @@ def example1(rng=np.random.default_rng(), cmap=None):
     Nicholas O'Donoughue
     18 May 2021
 
-    :param rng: random number generator
-    :param cmap: colormap
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig_geo: figure handle to generated graphic with geographic layout
     :return fig_err: figure handle to generated graphic with error as a function of iteration
     """
-
-    if cmap is None:
-        cmap = plt.get_cmap("tab10")
 
     # Define sensor positions and PSS object
     x_sensor = 30.0*np.array([[-1., 0., 1.], [0.,  0., 0.]])
@@ -75,8 +65,6 @@ def example1(rng=np.random.default_rng(), cmap=None):
         this_range = range_act[idx_sensor]
         this_err = angle_error[idx_sensor]
 
-        this_color = cmap(idx_sensor)
-
         # Vector from sensor to source
         # dx = x_source - this_x
 
@@ -88,7 +76,7 @@ def example1(rng=np.random.default_rng(), cmap=None):
                                             axis=1)
 
         # Plot the Uncertainty Interval
-        plt.fill(lob_fill1[0, :], lob_fill1[1, :], linestyle='--', alpha=.1, edgecolor='k', facecolor=this_color,
+        plt.fill(lob_fill1[0, :], lob_fill1[1, :], linestyle='--', alpha=.1, edgecolor='k',
                  label=None)
 
     # Position Markers
@@ -104,11 +92,13 @@ def example1(rng=np.random.default_rng(), cmap=None):
 
     # Iterative Methods
     epsilon = .5  # km
-    num_mc_trials = 1000
+    num_monte_carlo = 1000
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     num_iterations = 50
 
-    out_shp = (2, num_mc_trials)
-    out_iterative_shp = (2, num_iterations, num_mc_trials)
+    out_shp = (2, num_monte_carlo)
+    out_iterative_shp = (2, num_iterations, num_monte_carlo)
     x_ml = np.zeros(shape=out_shp)
     x_bf = np.zeros(shape=out_shp)
     x_centroid = np.zeros(shape=out_shp)
@@ -125,15 +115,14 @@ def example1(rng=np.random.default_rng(), cmap=None):
     args = {'psi_act': psi_act,
             'gd_ls_args': {'x_init': x_init,
                            'max_num_iterations': num_iterations,
-                           'force_full_calc': True},
-            'rng': rng}
+                           'force_full_calc': True}}
     ml_search = SearchSpace(x_ctr=x_init, max_offset=max_offset, epsilon=epsilon)
 
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    for idx in np.arange(num_mc_trials):
-        utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
+    for idx in np.arange(num_monte_carlo):
+        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(pss=triang, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
@@ -170,7 +159,6 @@ def example1(rng=np.random.default_rng(), cmap=None):
     plt.xlim([-50, 50])
     plt.ylim([-10, 70])
     plt.legend(loc='upper left')
-    plt.show()
 
     # Compute Error Statistics
     err_ml = x_source[:, np.newaxis] - x_ml
@@ -266,11 +254,10 @@ def _mc_iteration(pss: DirectionFinder, ml_search: SearchSpace, args: dict):
     """
 
     # Generate a random measurement
-    rng = args['rng']
-    psi = args['psi_act'] + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
+    psi = args['psi_act'] + pss.cov.sample()
 
     # Generate solutions
-    res_ml, _, _ = pss.max_likelihood(zeta=psi, search_space=ml_search)
+    res_ml, _, _ = pss.max_likelihood(zeta=psi, search_space=ml_search, print_progress=False)
     res_bf, _, _ = pss.bestfix(zeta=psi, search_space=ml_search)
     res_centroid = pss.centroid(zeta=psi)
     res_incenter = pss.angle_bisector(zeta=psi)
@@ -318,7 +305,7 @@ def example2():
           .format(max_cross_range/1e3))
 
     x_max = 100
-    grid_res = 0.25
+    grid_res = 0.5
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=x_max,
                                epsilon=grid_res)
@@ -327,7 +314,7 @@ def example2():
     grid_shape_2d = [i for i in grid_shape if i > 1]
 
     # Compute CRLB
-    crlb = triang.compute_crlb(x_source=x_source*1e3)
+    crlb = triang.compute_crlb(x_source=x_source*1e3, print_progress=True)
     cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape_2d)
 
     # Blank out y=0
@@ -370,9 +357,14 @@ def example3():
     num_dims, num_sensors = np.shape(x_sensor)
 
     x_max = 100
-    x_vec = np.arange(start=-x_max, step=.25, stop=x_max)
-    x_mesh, y_mesh = np.meshgrid(x_vec, x_vec)
-    x0 = np.stack((x_mesh.flatten(), y_mesh.flatten()), axis=1).T
+    grid_res = 0.5
+    search_space = SearchSpace(x_ctr=np.array([0., 0.]),
+                               max_offset=x_max,
+                               epsilon=grid_res)
+    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
+    grid_shape_2d = [i for i in grid_shape if i > 1]
+
     
     # Define measurement accuracy
     sigma_psi = 2.5*np.pi/180
@@ -381,11 +373,11 @@ def example3():
     triang = DirectionFinder(x=x_sensor*1e3, cov=covar_psi, do_2d_aoa=False)
 
     # Compute CRLB
-    crlb = triang.compute_crlb(x0*1e3)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=np.shape(x_mesh))  # m
+    crlb = triang.compute_crlb(x_source*1e3, print_progress=True)
+    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape_2d)  # m
     
     good_point = cep50 <= 25e3
-    rng_val = np.sqrt(np.sum(np.abs(x0)**2, axis=0))  # km
+    rng_val = np.sqrt(np.sum(np.abs(x_source)**2, axis=0))  # km
     max_range = np.max(rng_val[np.reshape(good_point, shape=np.shape(rng_val))])  # km
     print('Maximum range that satisfies CEP < 25 km is {:.2f} km'.format(max_range))
 
@@ -393,7 +385,7 @@ def example3():
     fig = plt.figure()
     plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='AOA Sensors')
     contour_levels = [.1, .5, 1, 5, 10, 25, 50]
-    contour_set = plt.contour(x_mesh, y_mesh, cep50/1e3, contour_levels)
+    contour_set = plt.contour(x_grid[0], x_grid[1], cep50/1e3, contour_levels)
     plt.clabel(contour_set, contour_levels)
     plt.xlabel('x [km]')
     plt.ylabel('y [km]')

@@ -16,15 +16,16 @@ import numpy as np
 import fdoa
 from examples import chapter12
 from utils import SearchSpace
+from utils.unit_conversions import lin_to_db
 
-
-def make_all_figures(close_figs=False, force_recalc=False):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
     :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -45,7 +46,7 @@ def make_all_figures(close_figs=False, force_recalc=False):
     fig4 = make_figure_4(prefix)
     fig5 = make_figure_5(prefix)
     fig6a, fig6b, fig6c, fig6d = make_figure_6(prefix)
-    fig7a, fig7b, fig8 = make_figures_7_8(prefix, force_recalc)
+    fig7a, fig7b, fig8 = make_figures_7_8(prefix, mc_params)
 
     figs = [fig1, fig2a, fig2b, fig3a, fig3b, fig3c, fig3d, fig4, fig5, fig6a, fig6b, fig6c, fig6d, fig7a, fig7b, fig8]
     if close_figs:
@@ -310,7 +311,7 @@ def _make_figure3_subfigure(eps, x_vec, y_vec, x_sensor, v_sensor, x_source, sen
     fig, ax = plt.subplots()
 
     # Make the background image using the difference between each pixel's FDOA and the true source's FDOA
-    ax.imshow(10 * np.log10(np.flipud(eps)), extent=(x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]), aspect='auto')
+    ax.imshow(lin_to_db(np.flipud(eps)), extent=(x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]), aspect='auto')
 
     # Add the sensors and source markers
     handle_sensors = plt.scatter(x_sensor[sensors_to_plot, 0], x_sensor[sensors_to_plot, 1],
@@ -460,7 +461,7 @@ def make_figure_5(prefix):
 
 def make_figure_6(prefix):
     """
-    Figure 1, System Drawing
+    Figure 6
 
     Ported from MATLAB Code
 
@@ -611,17 +612,28 @@ def make_figure_6(prefix):
     return fig6a, fig6b, fig6c, fig6d
 
 
-def make_figures_7_8(prefix, force_recalc=False):
+def make_figures_7_8(prefix, mc_params=None):
+    """
+    Figures 7 and 8, Example 12.1
 
-    if not force_recalc:
-        print('Skipping Figures 12.7 and 12.8... (re-run with force_recalc=True to generate)')
+    Ported from MATLAB Code
+
+    Nicholas O'Donoughue
+    28 October 2022
+
+    :param prefix: output directory
+    :param mc_params: Optional struct to control Monte Carlo trial size
+    :return: figure handle
+    """
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 12.7 and 12.8... (re-run with mc_params[\'force_recalc\']=True to generate)')
         return None, None, None
 
     # Figures 7-8, Example FDOA Calculation
     # Figure 7 is geometry
     print('Generating Figures 12.7 and 12.8...')
 
-    fig7a, fig7b, fig8 = chapter12.example1()
+    fig7a, fig7b, fig8 = chapter12.example1(mc_params=mc_params)
 
     if prefix is not None:
         fig7a.savefig(prefix + 'fig7a.png')
@@ -637,4 +649,4 @@ def make_figures_7_8(prefix, force_recalc=False):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, force_recalc=True)
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})

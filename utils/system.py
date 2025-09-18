@@ -51,6 +51,35 @@ class PassiveSurveillanceSystem(ABC):
     def measurement(self, x_source, x_sensor=None, bias=None, v_sensor=None, v_source=None):
         pass
 
+    def noisy_measurement(self, x_source, num_samples:int = 1, **kwargs):
+        """
+        Generate a set of noisy measurements. Will return a 3D matrix of shape (num_measurements, num_sources, num_samples),
+        except that the latter two dimensions will be removed is their size is equal to 1.
+
+        :param x_source: 1D or 2D array of source positions
+        :param num_samples: Optional integer specifying the number of samples to generate
+        All other parameters are passed directly to self.measurement() as keyword arguments
+        :return: 1D or 2D array of noisy measurements, depending on the shape of x_source and num_samples.
+        """
+
+        # Generate noise-free measurement
+        _, num_sources = utils.safe_2d_shape(x_source)
+        z = np.reshape(self.measurement(x_source, **kwargs), (self.num_measurements, num_sources))
+
+        # Generate noise
+        noise = np.reshape(self.cov.sample(num_samples=num_samples*num_sources),
+                           (self.num_measurements, num_sources, num_samples))
+
+        # Add the noise
+        zeta = z[:, :, np.newaxis] + noise
+
+        # Squeeze singleton-dimensions and return
+        if num_samples == 1:
+            zeta = zeta[:, :, 0]
+        if num_sources == 1:
+            zeta = zeta[:, 0]
+        return zeta
+
     @abstractmethod
     def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
         pass
@@ -178,7 +207,7 @@ class PassiveSurveillanceSystem(ABC):
         # pos_indices      -- sensor position indices
         # vel_indices      -- sensor velocity indices
 
-        def ell(th):
+        def ell(th, **ell_kwargs):
             # Parse the parameter vector theta
             pos_vel = th[indices['source_indices']]
             x_source, v_source = self.parse_source_pos_vel(pos_vel, default_vel=self.vel)
@@ -188,7 +217,7 @@ class PassiveSurveillanceSystem(ABC):
 
             return self.log_likelihood(zeta=zeta, x_source=x_source, v_source=v_source,
                                        x_sensor=x_sensor, v_sensor=v_sensor,
-                                       bias=bias, print_progress=print_progress)
+                                       bias=bias, **ell_kwargs)
 
         th_est, likelihood, th_grid = utils.solvers.ml_solver(ell=ell, search_space=search_space,
                                                               **kwargs)
@@ -268,14 +297,14 @@ class PassiveSurveillanceSystem(ABC):
         # ==================== Log-Likelihood Wrapper Function ================
         # Accepts a 1D vector of measurement biases and a 1D vector of sensor positions
 
-        def ell(b, x, v):
+        def ell(b, x, v, **ell_kwargs):
             # Reshape the sensor position and velocity
             this_x_sensor = np.reshape(x, shape=self.pos.shape)
             this_v_sensor = np.reshape(v, shape=self.pos.shape) if v is not None else None
             res = 0
             for this_zeta, this_x, this_v in zip(zeta_cal.T, x_cal.T, v_cal.T):
                 this_ell = self.log_likelihood(x_sensor=this_x_sensor, v_sensor=this_v_sensor, zeta=this_zeta,
-                                               x_source=this_x, v_source=this_v, bias=b)
+                                               x_source=this_x, v_source=this_v, bias=b, **ell_kwargs)
                 res = res + this_ell
             return res
 

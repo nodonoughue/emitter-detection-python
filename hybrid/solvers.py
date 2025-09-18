@@ -36,13 +36,14 @@ def max_likelihood(zeta, cov: CovarianceMatrix, search_space: SearchSpace,
                                   tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Set up function handle
-    def ell(x):
+    def ell(x, **kwargs):
         return model.log_likelihood(x_aoa=x_aoa, x_tdoa=x_tdoa,
                                     x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                     zeta=zeta, x_source=x, v_source=v_source,
                                     cov=cov, do_2d_aoa=do_2d_aoa,
                                     tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx, do_resample=False,
-                                    angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
+                                    angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias,
+                                    **kwargs)
 
     # Call the util function
     x_est, likelihood, x_grid = solvers.ml_solver(ell=ell, search_space=search_space,

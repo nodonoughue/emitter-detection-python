@@ -93,7 +93,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    savemat('./ex8_1.mat',
+    savemat('ex8_1.mat',
             {'x': noisy_signal,
              'num_sources': num_sources,
              'num_elements': num_elements,
@@ -147,7 +147,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    savemat('./problem8_5.mat',
+    savemat('problem8_5.mat',
             {'x': noisy_signal,
              'num_sources': num_sources,
              'num_elements': num_elements,
@@ -187,8 +187,8 @@ def generate_ex1_data(rng=np.random.default_rng()):
     rx_noise_dbw = lin_to_db(constants.kT*rx_bw_hz)+noise_figure
     # snr_db = rx_pwr_dbw - rx_noise_dbw --- not used
     # snr_lin = lin_to_db(snr_db)  # num_sources x 1 --- not used
-    rx_pwr_w = lin_to_db(rx_pwr_dbw)
-    rx_noise_w = lin_to_db(rx_noise_dbw)
+    rx_pwr_w = db_to_lin(rx_pwr_dbw)
+    rx_noise_w = db_to_lin(rx_noise_dbw)
 
     # Set up received data vector
     v_steer_mtx = v(psi)  # num_elements x num_sources
@@ -201,7 +201,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    savemat('./problem8_6.mat',
+    savemat('problem8_6.mat',
             {'x': noisy_signal,
              'num_sources': num_sources,
              'num_elements': num_elements,
@@ -223,23 +223,26 @@ def example1(rng=np.random.default_rng()):
     """
 
     # If the data is missing, make it
-    data_fnm = './ex8_1.mat'
+    data_fnm = 'ex8_1.mat'
     if not os.path.exists(data_fnm):
         generate_ex1_data(rng)
 
     # Load sample data
     data = loadmat(data_fnm)
     #   x                noisy data vector (M x N)
-    #   num_source       number of sources
+    #   num_sources      number of sources
     #   num_elements     number of array elements
     #   num_samples      number of time snapshots
     #   d_lam            array spacing
+    num_elements = data['num_elements']
+    d_lam = data['d_lam']
+    x = data['x']
 
     # Construct array steering vector
-    v, _ = array_df.model.make_steering_vector(data['d_lam'], data['num_elements'])
+    v, _ = array_df.model.make_steering_vector(d_lam, num_elements)
 
     # Call Beamformer
-    pwr_vec, psi_vec = array_df.solvers.beamscan(data['x'], v, np.pi/2, 1001)
+    pwr_vec, psi_vec = array_df.solvers.beamscan(x, v, np.pi/2, 1001)
     peaks, _ = find_peaks(pwr_vec, prominence=.1*np.max(pwr_vec))
     # print(peaks)
     psi_peaks = psi_vec[peaks]
@@ -247,9 +250,8 @@ def example1(rng=np.random.default_rng()):
     th_peaks = 180*psi_peaks/np.pi
 
     # Call MVDR Beamformer
-    # ToDo: Doesn't look right; diagnose and fix.
-    pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(data['x'], v, np.pi/2, 1001)
-    peaks_mvdr, _ = find_peaks(pwr_vec_mvdr, prominence=.1*np.max(pwr_vec_mvdr))
+    pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(x, v, np.pi/2, 1001)
+    peaks_mvdr, _ = find_peaks(pwr_vec_mvdr, prominence=.2*np.max(pwr_vec_mvdr))
     psi_peaks_mvdr = psi_vec[peaks_mvdr]
     peak_vals_mvdr = pwr_vec_mvdr[peaks_mvdr]
     th_peaks_mvdr = 180*psi_peaks_mvdr/np.pi
@@ -269,7 +271,7 @@ def example1(rng=np.random.default_rng()):
     return fig
 
 
-def example2(rng=np.random.default_rng()):
+def example2(rng=np.random.default_rng(), mc_params=None):
     """
     Executes Example 8.2 and generates one figure
 
@@ -279,6 +281,7 @@ def example2(rng=np.random.default_rng()):
     5 May 2021
 
     :param rng: random number generator
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle to generated graphic
     """
     
@@ -330,6 +333,8 @@ def example2(rng=np.random.default_rng()):
     
     # Compute MC Experiment
     num_monte_carlo = 1000
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     sig = np.sqrt(1/2)*(rng.standard_normal(size=(num_samples, num_monte_carlo))
                         + 1j * rng.standard_normal(size=(num_samples, num_monte_carlo)))
     noise = np.sqrt(1/2)*(rng.standard_normal(size=(num_elements, num_samples, num_monte_carlo))
@@ -363,7 +368,6 @@ def example2(rng=np.random.default_rng()):
             this_err_beamscan[idx_mc] = np.abs(psi_vec[idx_pk]-psi)
     
             # Compute beamscan MVDR image
-            # ToDo: plot doesn't look right; diagnose and fix.
             pwr_vec_mvdr, psi_vec = array_df.solvers.beamscan_mvdr(this_rx_signal[:, :, idx_mc], v, np.pi/2, 2001)
             idx_pk = np.argmax(np.abs(pwr_vec_mvdr))
             this_err_mvdr[idx_mc] = np.abs(psi_vec[idx_pk]-psi)

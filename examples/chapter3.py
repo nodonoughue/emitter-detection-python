@@ -21,7 +21,7 @@ def run_all_examples(rng=np.random.default_rng(), colors=None):
     return [example1(rng, colors), example2(rng, colors)]
 
 
-def example1(rng=np.random.default_rng(), colors=None):
+def example1(rng=np.random.default_rng(), colors=None, mc_params=None):
     """
     Executes Example 3.1.
 
@@ -32,6 +32,7 @@ def example1(rng=np.random.default_rng(), colors=None):
     
     :param rng: random number generator
     :param colors: colormap
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle to generated graphic
     """
 
@@ -79,7 +80,9 @@ def example1(rng=np.random.default_rng(), colors=None):
     
     # Monte Carlo Trial
     num_monte_carlo = int(1e4)
-    
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
+
     # Convert noise and signal power to linear units
     noise_pwr_lin = db_to_lin(noise_pwr)
     signal_pwr_vec_coarse_lin = db_to_lin(signal_pwr_vec_coarse)
@@ -125,7 +128,7 @@ def example1(rng=np.random.default_rng(), colors=None):
     return fig
 
     
-def example2(rng=np.random.default_rng(), colors=None):
+def example2(rng=np.random.default_rng(), colors=None, mc_params=None):
     """
     Executes Example 3.2.
     
@@ -136,6 +139,7 @@ def example2(rng=np.random.default_rng(), colors=None):
 
     :param rng: random number generator
     :param colors: colormap
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle to generated graphic
     """
 
@@ -199,6 +203,8 @@ def example2(rng=np.random.default_rng(), colors=None):
 
     # Monte Carlo Trial
     num_monte_carlo = int(1e4)
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
     # Convert noise and signal power to linear units
     noise_pwr_lin = db_to_lin(noise_power)

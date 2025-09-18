@@ -21,13 +21,13 @@ from utils.covariance import CovarianceMatrix
 from utils import SearchSpace
 
 
-def make_all_figures(close_figs=False, force_recalc=False):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
-    :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -35,17 +35,14 @@ def make_all_figures(close_figs=False, force_recalc=False):
     prefix = utils.init_output_dir('chapter13')
     utils.init_plot_style()
 
-    # Random Number Generator
-    rng = np.random.default_rng(0)
-
     # Initializes colorSet - Mx3 RGB vector for successive plot lines
     colors = plt.get_cmap("tab10")
 
     # Generate all figures
     fig1 = make_figure_1(prefix, colors)
     fig2a, fig2b, fig2c, fig2d = make_figure_2(prefix)
-    fig3, fig4 = make_figures_3_4(prefix, rng, force_recalc)
-    fig5, fig6 = make_figures_5_6(prefix, rng, force_recalc)
+    fig3, fig4 = make_figures_3_4(prefix, mc_params)
+    fig5, fig6 = make_figures_5_6(prefix, mc_params)
     fig7a, fig7b = make_figure_7(prefix)
     fig8a, fig8b = make_figure_8(prefix)
     fig9 = make_figure_9(prefix)
@@ -284,7 +281,7 @@ def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho: CovarianceM
     return fig
 
 
-def make_figures_3_4(prefix=None, rng=np.random.default_rng(), force_recalc=False):
+def make_figures_3_4(prefix=None, mc_params=None):
     """
     Figures 3 and 4, Example 13.1: Homogeneous (3-mode) Sensors
 
@@ -294,19 +291,18 @@ def make_figures_3_4(prefix=None, rng=np.random.default_rng(), force_recalc=Fals
     4 December 2022
 
     :param prefix: output directory to place generated figure
-    :param rng: (Optional) random number generator
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig3: figure handle for figure 13.3
     :return fig4: figure handle for figure 13.4
 
     """
 
-    if not force_recalc:
-        print('Skipping Figures 13.3 and 13.4... (re-run with force_recalc=True to generate)')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 13.3 and 13.4... (re-run with mc_params[\'force_recalc\']=True to generate)')
         return None, None
 
     print('Generating Figures 13.3 and 13.4 (using Example 13.1)...')
-    fig3, fig4 = chapter13.example1(rng)
+    fig3, fig4 = chapter13.example1(mc_params=mc_params)
 
     if prefix is not None:
         fig3.savefig(prefix + 'fig3.png')
@@ -318,7 +314,7 @@ def make_figures_3_4(prefix=None, rng=np.random.default_rng(), force_recalc=Fals
     return fig3, fig4
 
 
-def make_figures_5_6(prefix=None, rng=np.random.default_rng(), force_recalc=False):
+def make_figures_5_6(prefix=None, mc_params=None):
     """
     Figures 3 and 4, Example 13.2: Heterogeneous Sensors
 
@@ -328,17 +324,16 @@ def make_figures_5_6(prefix=None, rng=np.random.default_rng(), force_recalc=Fals
     4 December 2022
 
     :param prefix: output directory to place generated figure
-    :param rng: (Optional) random number generator
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figures 13.5 and 13.6... (re-run with force_recalc=True to generate)')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 13.5 and 13.6... (re-run with mc_params[\'force_recalc\']=True to generate)')
         return None, None
 
     print('Generating Figures 13.5 and 13.6 (using Example 13.2)...')
-    fig5, fig6 = chapter13.example2(rng)
+    fig5, fig6 = chapter13.example2(mc_params=mc_params)
 
     if prefix is not None:
         fig5.savefig(prefix + 'fig5.png')
@@ -675,4 +670,4 @@ def make_figure_9(prefix):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, force_recalc=True)
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})

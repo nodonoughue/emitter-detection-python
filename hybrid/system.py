@@ -35,20 +35,24 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     def __init__(self, cov=None, aoa=None, tdoa=None, fdoa=None, ref_idx=None, **kwargs):
         # Parse the provided sensor types
         x_arr = []
+        v_arr = []
         if aoa is not None:
             x_arr.append(aoa.pos)
+            v_arr.append(np.zeros_like(aoa.pos))
             self.aoa = aoa
             self.num_aoa_sensors = self.aoa.num_sensors
             self.num_aoa_measurements = self.aoa.num_measurements
 
         if tdoa is not None:
             x_arr.append(tdoa.pos)
+            v_arr.append(np.zeros_like(tdoa.pos))
             self.tdoa = tdoa
             self.num_tdoa_sensors = self.tdoa.num_sensors
             self.num_tdoa_measurements = self.tdoa.num_measurements
 
         if fdoa is not None:
             x_arr.append(fdoa.pos)
+            v_arr.append(fdoa.vel)
             self.fdoa = fdoa
             self.num_fdoa_sensors = self.fdoa.num_sensors
             self.num_fdoa_measurements = self.fdoa.num_measurements
@@ -56,6 +60,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         assert len(x_arr)>0, 'Error initializing HybridPSS system; at least one type of subordinate PSS system must be supplied.'
 
         x = np.concatenate(x_arr, axis=1)
+        v = np.concatenate(v_arr, axis=1) if v_arr else None
 
         if ref_idx is None:
             ref_idx = self.parse_reference_indices()
@@ -64,7 +69,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
             cov = self.parse_covariance_matrix()
 
         # Initiate the superclass
-        super().__init__(x, cov, ref_idx, **kwargs)
+        super().__init__(x, cov, ref_idx, vel=v, **kwargs)
 
         # Overwrite the numbers of sensors/measurements and generate indices for referencing
         # from combined position, measurement, and covariance matrices.
@@ -115,7 +120,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         # components
         x_aoa, x_tdoa, x_fdoa = self.parse_sensor_data(x_sensor)
         _, _, v_fdoa = self.parse_sensor_data(v_sensor, vel_input=True)
-        b_aoa, b_tdoa, b_fdoa = self.parse_measurement_data(bias)
+        b_aoa, b_tdoa, b_fdoa = self.parse_sensor_data(bias)
 
         # Parse source position and velocity
         if v_source is None:
@@ -124,19 +129,19 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
                                                            default_vel=np.zeros_like(x_source))
 
         # Call component models
-        to_concat = []
-        if self.aoa is not None:
-            to_concat.append(self.aoa.measurement(x_source, x_sensor=x_aoa, bias=b_aoa))
+        measurements = [
+            model.measurement(x_source, x_sensor=sensor, bias=bias,
+                              v_sensor=v_fdoa if model is self.fdoa else None,
+                              v_source=v_source if model is self.fdoa else None)
+            for model, sensor, bias in[
+                (self.aoa, x_aoa, b_aoa),
+                (self.tdoa, x_tdoa, b_tdoa),
+                (self.fdoa, x_fdoa, b_fdoa)
+            ]
+            if model is not None
+        ]
 
-        if self.tdoa is not None:
-            to_concat.append(self.tdoa.measurement(x_source, x_sensor=x_tdoa, bias=b_aoa))
-
-        if self.fdoa is not None:
-            to_concat.append(self.fdoa.measurement(x_source, x_sensor=x_fdoa, v_sensor=v_fdoa, v_source=v_source,
-                                                   bias=b_aoa))
-
-        z = np.concatenate(to_concat, axis=0)
-        return z
+        return np.concatenate(measurements, axis=0)
 
     def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
         # Parse sensor pos/vel overrides
@@ -193,7 +198,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         return np.concatenate(to_concat, axis=1)
 
-    def log_likelihood(self, x_source, zeta, x_sensor=None, bias=None, v_sensor=None, v_source=None):
+    def log_likelihood(self, x_source, zeta, x_sensor=None, bias=None, v_sensor=None, v_source=None, **kwargs):
         # Break apart the sensor position, velocity, and bias measurement inputs into their AOA, TDOA, and FDOA
         # components
         x_aoa, x_tdoa, x_fdoa = self.parse_sensor_data(x_sensor)
@@ -208,12 +213,12 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         result = 0
         if self.aoa is not None:
-            result = result + self.aoa.log_likelihood(x_source=x_source, zeta=z_aoa, x_sensor=x_aoa, bias=b_aoa)
+            result = result + self.aoa.log_likelihood(x_source=x_source, zeta=z_aoa, x_sensor=x_aoa, bias=b_aoa, **kwargs)
         if self.tdoa is not None:
-            result = result + self.tdoa.log_likelihood(x_source=x_source, zeta=z_tdoa, x_sensor=x_tdoa, bias=b_tdoa)
+            result = result + self.tdoa.log_likelihood(x_source=x_source, zeta=z_tdoa, x_sensor=x_tdoa, bias=b_tdoa, **kwargs)
         if self.fdoa is not None:
             result = result + self.fdoa.log_likelihood(x_source=x_source, zeta=z_fdoa, x_sensor=x_fdoa,
-                                                       v_sensor=v_fdoa, v_source=v_source, bias=b_fdoa)
+                                                       v_sensor=v_fdoa, v_source=v_source, bias=b_fdoa, **kwargs)
 
         return result
 
@@ -295,14 +300,14 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
-            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
+            x_sensor, v_sensor, bias = self.pos, self.fdoa.vel if self.fdoa is not None else self.vel, self.bias
 
         # Likelihood function for ML Solvers
-        def ell(pos_vel):
+        def ell(pos_vel, **ell_kwargs):
             # Determine if the input is position only, or position & velocity
             this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
             return self.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor,
-                                       zeta=zeta, x_source=this_pos, v_source=this_vel)
+                                       zeta=zeta, x_source=this_pos, v_source=this_vel, **ell_kwargs)
 
         # Call the util function
         x_est, likelihood, x_grid = utils.solvers.ml_solver(ell=ell, search_space=search_space, **kwargs)
@@ -336,7 +341,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
-            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
+            x_sensor, v_sensor, bias = self.pos, self.fdoa.vel if self.fdoa is not None else self.vel, self.bias
 
         # Initialize measurement error and jacobian functions
         def y(pos_vel):
@@ -363,7 +368,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
-            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
+            x_sensor, v_sensor, bias = self.pos, self.fdoa.vel if self.fdoa is not None else self.vel, self.bias
 
         # Initialize measurement error and jacobian functions
         def y(pos_vel):
@@ -390,7 +395,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         if cal_data is not None:
             x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
-            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
+            x_sensor, v_sensor, bias = self.pos, self.fdoa.vel if self.fdoa is not None else self.vel, self.bias
 
         # Generate the PDF
         def measurement(pos_vel):
@@ -545,7 +550,6 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     def parse_covariance_matrix(self):
         # Pull the covariance matrix from the components; we need the unresampled version because
         # when we set it we will resample it.
-        # ToDo: if self.cov is not None, raise a warning that this will overwrite the current covariance matrix
 
         to_concat = []
         if self.aoa is not None:

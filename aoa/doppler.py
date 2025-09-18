@@ -85,54 +85,52 @@ def compute_df(r, x, ts, f, radius, fr, psi_res, min_psi, max_psi):
     :return psi: Estimated angle of arrival [radians]
     """
 
-    # Speed of light
+    # Constants and preprocessing
     c = constants.speed_of_light
-
-    # Filter the reference signal out of the test signal
-    y = x * np.conjugate(r)
-
-    # Compute (and unwrap) the complex phase angle
-    phi = np.unwrap(np.arctan2(np.imag(y), np.real(y)))
+    y = x * np.conjugate(r)  # filter reference data to find signal
+    phi = np.unwrap(np.angle(y))
 
     # Generate test phase signal
     num_samples = np.size(phi)
     sample_vec = np.arange(num_samples)
-    t_vec = np.expand_dims(ts*sample_vec, axis=1)
+    t_vec = ts*sample_vec
 
     def phi_0(psi_local):
+        # psi_local: shape (N,)
+        # returns: shape (num_samples, N)
+
         # Converts from angle of arrival (psi_local) to complex phase (phi_0) over sample interval (t_vec)
-        return 2. * np.pi * f * radius / c * np.cos(2 * np.pi * fr * t_vec - psi_local.T)
+        return 2. * np.pi * f * radius / c * np.cos(2 * np.pi * fr * t_vec[:, np.newaxis] - psi_local[np.newaxis, :])
 
-    # Initialize DF search loop
-    this_psi_res = 1  # Start at 1 radian resolution
-    psi_vec = np.expand_dims(np.arange(start=min_psi, stop=max_psi+this_psi_res, step=this_psi_res), axis=1)
-    psi = 0.          # Initialize output
+    # Initial search resolution
+    this_psi_res = 1.0
+    psi = 0.0
 
-    # Make sure the loop happens at least once
-    if psi_res > this_psi_res:
-        psi_res = this_psi_res
+    # Ensure at least one loop
+    psi_res = min(psi_res, this_psi_res)
 
     # Loop until desired DF resolution achieved
     while this_psi_res >= psi_res:
-        # Compute error at each test point in search vector
-        err = np.sum((np.expand_dims(phi, axis=1)-phi_0(psi_vec))**2, axis=0)
+        # search vector
+        psi_vec = np.arange(min_psi, max_psi + this_psi_res, this_psi_res)
+        phi0_mat = phi_0(psi_vec)  # shape: (num_samples, len(psi_vec))
 
-        # Find point with minimal error, use as center point for next
-        # iteration of search
+        # Compute error at each test point in search vector and find minimum
+        err = np.sum((phi[:, np.newaxis] - phi0_mat)**2, axis=0)
         idx_opt = np.argmin(err)
         psi = psi_vec[idx_opt]
 
-        # Increase resolution (decrease search vector step size)
-        # and interval create search vector for next iteration
-        this_psi_res = this_psi_res/10
-        min_psi = psi_vec[np.maximum(0, idx_opt-2)]
-        max_psi = psi_vec[np.minimum(np.size(psi_vec)-1, idx_opt+2)]
-        psi_vec = np.arange(start=min_psi, stop=max_psi+this_psi_res, step=this_psi_res)
+        # Refine search bounds for next iteration
+        this_psi_res /= 10
+        idx_min = max(0, idx_opt - 2)
+        idx_max = min(len(psi_vec) - 1, idx_opt + 2)
+        min_psi = psi_vec[idx_min]
+        max_psi = psi_vec[idx_max]
 
     return psi
 
     
-def run_example():
+def run_example(mc_params=None):
     """
     Example script to demonstrate analysis of a Doppler DF receiver.
 
@@ -141,6 +139,7 @@ def run_example():
     Nicholas O'Donoughue
     14 January 2021
 
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: None
     """
 
@@ -161,7 +160,9 @@ def run_example():
     # Set up the parameter sweep
     num_samples_vec = np.asarray([10, 100, 1000])   # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-10, step=2, stop=22)   # signal-to-noise ratio
-    num_mc = 1.e6                       # number of monte carlo trials at each parameter setting
+    num_monte_carlo = 1.e6                       # number of monte carlo trials at each parameter setting
+    if mc_params is not None:
+        num_monte_carlo = min(np.astype(num_monte_carlo / mc_params['monte_carlo_decimation'], 'int'),mc_params['min_num_monte_carlo'])
 
     # Set up output variables
     out_shp = (np.size(num_samples_vec), np.size(snr_db_vec))
@@ -171,7 +172,7 @@ def run_example():
     # Loop over parameters
     print('Executing Doppler Monte Carlo sweep...')
     for idx_num_samples, this_num_samples in enumerate(num_samples_vec.tolist()):
-        this_num_mc = num_mc / this_num_samples
+        this_num_monte_carlo = num_monte_carlo / this_num_samples
         print('\t M={}'.format(this_num_samples))
 
         # Reference signal
@@ -187,9 +188,9 @@ def run_example():
         # Generate noise signal
         noise_amp = np.sqrt(np.sum(abs(r0)**2)/(this_num_samples*2))
         noise_base_r = [np.random.normal(loc=0.0, scale=noise_amp, size=(this_num_samples, 2)).view(np.complex128)
-                        for _ in np.arange(this_num_mc)]
+                        for _ in np.arange(this_num_monte_carlo)]
         noise_base_x = [np.random.normal(loc=0.0, scale=noise_amp, size=(this_num_samples, 2)).view(np.complex128)
-                        for _ in np.arange(this_num_mc)]
+                        for _ in np.arange(this_num_monte_carlo)]
 
         # Loop over SNR levels
         for snr_db, idx_snr in snr_db_vec:

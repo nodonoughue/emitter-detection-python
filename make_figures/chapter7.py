@@ -18,13 +18,14 @@ import aoa
 from examples import chapter7
 
 
-def make_all_figures(close_figs=False, force_recalc=True):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
     :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
     :force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -40,12 +41,12 @@ def make_all_figures(close_figs=False, force_recalc=True):
 
     # Generate all figures
     fig1 = make_figure_1(prefix)
-    fig3 = make_figure_3(prefix, rng, colors, force_recalc)
-    fig5 = make_figure_5(prefix, rng, colors, force_recalc)
+    fig3 = make_figure_3(prefix, rng, colors, mc_params)
+    fig5 = make_figure_5(prefix, rng, colors, mc_params)
     fig6b = make_figure_6b(prefix)
-    fig7 = make_figure_7(prefix, rng, colors, force_recalc)
+    fig7 = make_figure_7(prefix, rng, colors, mc_params)
     fig8 = make_figure_8(prefix)
-    fig10 = make_figure_10(prefix, rng, colors, force_recalc)
+    fig10 = make_figure_10(prefix, rng, colors, mc_params)
     fig12 = make_figure_12(prefix)
     fig14 = make_figure_14(prefix)
     fig15b = make_figure_15b(prefix)
@@ -108,7 +109,7 @@ def make_figure_1(prefix=None):
     return fig1
 
 
-def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, force_recalc=True):
+def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
     """
     Figure 3, Adcock CRLB
 
@@ -120,12 +121,12 @@ def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, force_r
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: colormap
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 7.3... (re-run with force_recalc=True to generate)')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 7.3... (re-run with mc_params[\'force_recalc\']=True to generate)')
         return None
 
     print('Generating Figure 7.3...')
@@ -153,8 +154,10 @@ def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, force_r
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100])  # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-20, step=2, stop=20)  # signal-to-noise ratio
-    num_mc = 10000  # number of monte carlo trials at each parameter setting
-    
+    num_monte_carlo = 10000  # number of monte carlo trials at each parameter setting
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
+
     # Set up output scripts
     out_shp = (np.size(num_samples_vec), np.size(snr_db_vec))
     rmse_psi = np.zeros(shape=out_shp, dtype=float)
@@ -165,14 +168,14 @@ def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, force_r
     iterations_per_marker = 1000
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    total_iterations = num_mc*len(snr_db_vec)*len(num_samples_vec)
+    total_iterations = num_monte_carlo*len(snr_db_vec)*len(num_samples_vec)
     t_start = time.perf_counter()
     for idx_samples, num_samples in enumerate(num_samples_vec):
         # Generate Monte Carlo Noise with unit power
         # -- for simplicity, we only generate the real component, since this
         #    receiver is only working on the real portion of the received
         #    signal
-        noise_base = (1/np.sqrt(2))*rng.standard_normal(size=(num_angular_samples, num_samples, num_mc))
+        noise_base = (1/np.sqrt(2))*rng.standard_normal(size=(num_angular_samples, num_samples, num_monte_carlo))
 
         for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):
             # Compute noise power, scale base noise
@@ -183,16 +186,16 @@ def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, force_r
             rx_signal = true_signal+noise
             
             # Estimate
-            psi_est = np.zeros(shape=(num_mc, 1), dtype=float)
+            psi_est = np.zeros(shape=(num_monte_carlo, 1), dtype=float)
 
-            for idx_mc in range(num_mc):
-                curr_idx = idx_mc + idx_snr * num_mc + idx_samples * len(snr_db_vec) * num_mc
+            for idx_mc in range(num_monte_carlo):
+                curr_idx = idx_mc + idx_snr * num_monte_carlo + idx_samples * len(snr_db_vec) * num_monte_carlo
                 utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
 
                 psi_est[idx_mc] = aoa.directional.compute_df(rx_signal[:, :, idx_mc], psi, g, psi_res,
                                                              min_psi, max_psi)
             
-            rmse_psi[idx_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2, axis=None)/num_mc)
+            rmse_psi[idx_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2, axis=None)/num_monte_carlo)
             
             # CRLB
             crlb_psi[idx_samples, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot, psi,
@@ -232,7 +235,7 @@ def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, force_r
     return fig3
 
 
-def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, force_recalc=True):
+def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
     """
     Figure 5, Rectangular Aperture CRLB
 
@@ -244,12 +247,12 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, force_r
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: colormap
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 7.5... (re-run with force_recalc=True to generate)')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 7.5... (re-run with mc_params[\'force_recalc\']=True to generate)')
         return None
 
     print('Generating Figure 7.5...')
@@ -274,7 +277,9 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, force_r
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100], dtype=int)  # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-10, stop=20.1, step=1)  # signal-to-noise ratio
-    num_mc = 10000  # number of monte carlo trials at each parameter setting
+    num_monte_carlo = 10000  # number of monte carlo trials at each parameter setting
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
     # Set up output scripts
     out_shp = (np.size(num_samples_vec), np.size(snr_db_vec))
@@ -286,12 +291,12 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, force_r
     iterations_per_marker = 1000
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    total_iterations = num_mc * len(snr_db_vec) * len(num_samples_vec)
+    total_iterations = num_monte_carlo * len(snr_db_vec) * len(num_samples_vec)
     t_start = time.perf_counter()
     for idx_num_samples, num_samples in enumerate(num_samples_vec):
         # Generate Monte Carlo Noise with unit power
-        noise_base = 1/np.sqrt(2)*(rng.standard_normal(size=(num_angular_samples, num_samples, num_mc))
-                                   + 1j*rng.standard_normal(size=(num_angular_samples, num_samples, num_mc)))
+        noise_base = 1/np.sqrt(2)*(rng.standard_normal(size=(num_angular_samples, num_samples, num_monte_carlo))
+                                   + 1j*rng.standard_normal(size=(num_angular_samples, num_samples, num_monte_carlo)))
 
         for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):
             # Compute noise power, scale base noise
@@ -302,16 +307,16 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, force_r
             signal_rx = signal_true+noise
 
             # Estimate
-            psi_est = np.zeros(shape=(num_mc, ))
+            psi_est = np.zeros(shape=(num_monte_carlo, ))
 
-            for idx_mc in range(num_mc):
-                curr_idx = idx_mc + idx_snr * num_mc + idx_num_samples * len(snr_db_vec) * num_mc
+            for idx_mc in range(num_monte_carlo):
+                curr_idx = idx_mc + idx_snr * num_monte_carlo + idx_num_samples * len(snr_db_vec) * num_monte_carlo
                 utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
 
                 psi_est[idx_mc] = aoa.directional.compute_df(signal_rx[:, :, idx_mc], psi, g, psi_res,
                                                              -np.pi, np.pi)
 
-            rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2)/num_mc)
+            rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2)/num_monte_carlo)
 
             # CRLB
             crlb_psi[idx_num_samples, idx_snr] = np.absolute(aoa.directional.crlb(snr_db, num_samples, g, g_dot, psi,
@@ -391,7 +396,7 @@ def make_figure_6b(prefix=None):
     return fig6b
 
 
-def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, force_recalc=True):
+def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
     """
     Figure 7, Watson-Watt Performance
 
@@ -403,12 +408,12 @@ def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, force_r
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: colormap
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 7.7... (re-run with force_recalc=True to generate)')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 7.7... (re-run with mc_params[\'force_recalc\']=True to generate)')
         return None
 
     print('Generating Figure 7.7...')
@@ -425,7 +430,9 @@ def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, force_r
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100], dtype=int)  # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-10, step=.2, stop=20)  # signal-to-noise ratio
-    num_mc = 10000  # number of monte carlo trials at each parameter setting
+    num_monte_carlo = 10000  # number of monte carlo trials at each parameter setting
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
     # Set up output scripts
     out_shp = np.broadcast(np.expand_dims(num_samples_vec, axis=0), np.expand_dims(snr_db_vec, axis=1))
@@ -433,11 +440,13 @@ def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, force_r
     crlb_psi = np.zeros(shape=out_shp.shape)
 
     # Loop over parameters
-    print('Executing Watson-Watt Monte Carlo sweep...')
-    iterations_per_marker = 1000
+    print('Executing Watson Watt Monte Carlo sweep...')
+    total_iterations = num_monte_carlo * len(snr_db_vec) * len(num_samples_vec)
+    max_num_rows = 20
     markers_per_row = 40
+    iterations_per_marker = int(max(1e5, total_iterations/markers_per_row/max_num_rows))
     iterations_per_row = markers_per_row * iterations_per_marker
-    total_iterations = num_mc * len(snr_db_vec) * len(num_samples_vec)
+
     t_start = time.perf_counter()
     for idx_num_samples, this_num_samples in enumerate(num_samples_vec.tolist()):
         # Generate signal vectors
@@ -448,9 +457,9 @@ def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, force_r
 
         # Generate Monte Carlo Noise with unit power
         sample_power = np.linalg.norm(r0)/np.sqrt(this_num_samples)  # average sample power
-        noise_base_r = sample_power*rng.standard_normal(size=(this_num_samples, num_mc))
-        noise_base_x = sample_power*rng.standard_normal(size=(this_num_samples, num_mc))
-        noise_base_y = sample_power*rng.standard_normal(size=(this_num_samples, num_mc))
+        noise_base_r = sample_power*rng.standard_normal(size=(this_num_samples, num_monte_carlo))
+        noise_base_x = sample_power*rng.standard_normal(size=(this_num_samples, num_monte_carlo))
+        noise_base_y = sample_power*rng.standard_normal(size=(this_num_samples, num_monte_carlo))
 
         # Loop over SNR vector
         for idx_snr, snr_db in enumerate(snr_db_vec):
@@ -464,10 +473,10 @@ def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, force_r
             x = x0 + noise_base_x/np.sqrt(snr_lin)
 
             # Compute the estimate
-            psi_est = np.zeros(shape=(num_mc, ))
+            psi_est = np.zeros(shape=(num_monte_carlo, ))
 
-            for idx_mc in np.arange(num_mc):
-                curr_idx = idx_mc + idx_snr * num_mc + idx_num_samples * len(snr_db_vec) * num_mc
+            for idx_mc in np.arange(num_monte_carlo):
+                curr_idx = idx_mc + idx_snr * num_monte_carlo + idx_num_samples * len(snr_db_vec) * num_monte_carlo
                 utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
 
                 psi_est[idx_mc] = aoa.watson_watt.compute_df(r[:, idx_mc], x[:, idx_mc], y[:, idx_mc])
@@ -553,7 +562,7 @@ def make_figure_8(prefix=None):
     return fig8b
 
 
-def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, force_recalc=True):
+def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
     """
     Figure 10, Doppler CRLB
 
@@ -565,12 +574,12 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, force_
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: colormap
-    :param force_recalc: if False, this routine will return an empty figure, to avoid time-consuming recalculation
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 7.10... (re-run with force_recalc=True to generate)')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 7.10... (re-run with mc_params[\'force_recalc\']=True to generate)')
         return None
 
     print('Generating Figure 7.10...')
@@ -595,7 +604,9 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, force_
     # Set up the parameter sweep
     num_samples_vec = np.array([10, 100, 1000], dtype=int)  # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-10, step=2, stop=30.1)  # signal-to-noise ratio
-    num_mc = 10000  # number of monte carlo trials at each parameter setting
+    num_monte_carlo = 10000  # number of monte carlo trials at each parameter setting
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
     # Set up output scripts
     out_shp = np.broadcast(np.expand_dims(num_samples_vec, axis=1), np.expand_dims(snr_db_vec, axis=0))
@@ -607,7 +618,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, force_
     iterations_per_marker = 1000
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    total_iterations = num_mc * len(snr_db_vec) * len(num_samples_vec)
+    total_iterations = num_monte_carlo * len(snr_db_vec) * len(num_samples_vec)
     t_start = time.perf_counter()
     for idx_num_samples, num_samples in enumerate(num_samples_vec.tolist()):
         # Reference signal
@@ -621,7 +632,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, force_
 
         # Generate noise signal
         sample_power = np.sqrt(signal_amp/2)
-        noise_shp = (num_samples, num_mc)
+        noise_shp = (num_samples, num_monte_carlo)
         noise_base_r = sample_power*(rng.standard_normal(size=noise_shp) + 1j*rng.standard_normal(size=noise_shp))
         noise_base_x = sample_power*(rng.standard_normal(size=noise_shp) + 1j*rng.standard_normal(size=noise_shp))
 
@@ -634,16 +645,16 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, force_
             x = np.expand_dims(x0, axis=1) + noise_base_x*np.sqrt(noise_pwr)
 
             # Compute the estimate
-            psi_est = np.zeros(shape=(num_mc, ))
-            for idx_mc in range(num_mc):
-                curr_idx = idx_mc + idx_snr * num_mc + idx_num_samples * len(snr_db_vec) * num_mc
+            psi_est = np.zeros(shape=(num_monte_carlo, ))
+            for idx_mc in range(num_monte_carlo):
+                curr_idx = idx_mc + idx_snr * num_monte_carlo + idx_num_samples * len(snr_db_vec) * num_monte_carlo
                 utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
 
                 psi_est[idx_mc] = aoa.doppler.compute_df(r[:, idx_mc], x[:, idx_mc], ts, f, ant_radius, fr, psi_res,
                                                          -np.pi, np.pi)
             
             rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2, axis=None)
-                                                         / num_mc)
+                                                         / num_monte_carlo)
 
             # CRLB
             crlb_psi[idx_num_samples, idx_snr] = aoa.doppler.crlb(snr_db, num_samples, signal_amp, ts, f, ant_radius,
@@ -834,4 +845,4 @@ def make_figure_16(prefix=None):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, force_recalc=True)
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})

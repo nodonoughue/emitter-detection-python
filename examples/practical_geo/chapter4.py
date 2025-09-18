@@ -25,7 +25,7 @@ def run_all_examples():
     return list(example1()) + list(example2())
 
 
-def example1(rng=np.random.default_rng()):
+def example1(mc_params=None):
     """
     Executes Example 4.1.
 
@@ -88,16 +88,13 @@ def example1(rng=np.random.default_rng()):
     fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor_enu, vel=v_sensor_enu, cov=CovarianceMatrix(cov_rr), ref_idx=ref_fdoa)
     hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=fdoa)
 
-    # Generate Noise
-    num_mc = 1000
-    noise_white = rng.standard_normal(size=(hybrid.num_measurements, num_mc))
+    # Monte Carlo parameters
+    num_monte_carlo = 1000
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
-    # Generate correlated noise to account for reference sensors used in TDOA and FDOA
-    noise_measurement = hybrid.cov.lower @ noise_white
-
-    # Generate Data
-    z = hybrid.measurement(x_source=x_source_enu, v_source=v_source_enu)
-    zeta = z[:, np.newaxis] + noise_measurement
+    # Generate Noisy data
+    zeta = hybrid.noisy_measurement(x_source=x_source_enu, v_source=v_source_enu, num_samples=num_monte_carlo)
 
     # GD and LS Search Parameters
     x_init_enu = np.array([1, 1, 0]) * 1e3
@@ -112,7 +109,7 @@ def example1(rng=np.random.default_rng()):
                'force_full_calc': True,
                'plot_progress': False}
 
-    error = np.zeros((num_mc, ls_args['max_num_iterations']))
+    error = np.zeros((num_monte_carlo, ls_args['max_num_iterations']))
     x_ls_iters = np.zeros((num_dims, max_num_iterations))  # pre-initialize iterative LS solution
     print('Performing Monte Carlo simulation...')
     t_start = time.perf_counter()
@@ -121,11 +118,9 @@ def example1(rng=np.random.default_rng()):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
 
-    for idx in np.arange(num_mc):
-        utils.print_progress(num_total=num_mc, curr_idx=idx, iterations_per_marker=iterations_per_marker,
+    for idx in np.arange(num_monte_carlo):
+        utils.print_progress(num_total=num_monte_carlo, curr_idx=idx, iterations_per_marker=iterations_per_marker,
                              iterations_per_row=iterations_per_row, t_start=t_start)
-
-        # TDOA, AOA, and FDOA Error
 
         # LS Solution
         _, x_ls_iters = hybrid.least_square(zeta=zeta[:, idx], **ls_args)
@@ -138,10 +133,10 @@ def example1(rng=np.random.default_rng()):
 
     # Remove outliers
     error = utils.remove_outliers(error)
-    num_mc_actual, _ = utils.safe_2d_shape(error)
+    num_monte_carlo_actual, _ = utils.safe_2d_shape(error)
 
     # Plot RMSE and CRLB
-    rmse_ls = np.sqrt(np.sum(error**2, 0)/num_mc_actual)
+    rmse_ls = np.sqrt(np.sum(error**2, 0)/num_monte_carlo_actual)
 
     fig2 = plt.figure()
     plt.plot(np.arange(max_num_iterations), rmse_ls, label='Least Squares')
@@ -230,9 +225,9 @@ def example2(colors=None):
     f_source_hz = 1e9
 
     # Build grid of positions within 500km of source position (ENU origin)
-    v_source_enu = np.zeros(shape=(3, 1))  # source is stationary
+    v_source_enu = np.zeros(shape=(3, ))  # source is stationary
 
-    x_ctr = np.zeros(shape=(3, 1))
+    x_ctr = np.zeros(shape=(3, ))
     max_offset = 500e3  # +/- distance from the center of each axis to the edges
     search_size = np.array([1., 1., 0.]) * max_offset  # only search East-North dimensions, not Up
     num_points_per_axis = 201  # MATLAB code uses 1,001, but the image appears properly resolved with just 201

@@ -107,7 +107,7 @@ def calc_doppler(x1, v1, x2, v2, f):
     # that dist has the same shape as dx, to avoid the broadcasting bug.
     dx = x2-x1
     dist = np.linalg.norm(dx, axis=2)
-    u12 = dx / dist[:, :, np.newaxis]
+    u12 = np.divide(dx, dist[:, :, np.newaxis], out=np.zeros_like(dx), where=dist[:, :, np.newaxis]!=0)
     u21 = -u12
 
     # x1 velocity towards x2

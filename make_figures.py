@@ -1,46 +1,50 @@
 import make_figures
 
 close_figs = True
-force_recalc = True
 
 do_book_1 = True
 do_book_2 = True
 
-#todo: make a global Monte Carlo trial size setting and leverage it for all examples, to make an easy place to control accuracy vs. timeliness
+# Parameters used to control execution
+mc_params = {'force_recalc': True,
+             'monte_carlo_decimation': 1,
+             'min_num_monte_carlo': int(10)}
 
 if do_book_1:
     print('************************************************************************************************')
     print('Generating all figures from ''Emitter Detection and Geolocation for Electronic Warfare'', 2019.')
     print('************************************************************************************************')
     print('close_figs = {}'.format(close_figs))
-    print('force_recalc = {}'.format(force_recalc))
+    print('force_recalc = {}'.format(mc_params['force_recalc']))
+    print('min_num_monte_carlo = {}'.format(mc_params['min_num_monte_carlo']))
+    print('monte_carlo_decimation = {}'.format(mc_params['monte_carlo_decimation']))
 
     print('*** Chapter 1 ***')
     make_figures.chapter1.make_all_figures(close_figs=close_figs)
     print('*** Chapter 2 ***')
     make_figures.chapter2.make_all_figures(close_figs=close_figs)
     print('*** Chapter 3 ***')
-    make_figures.chapter3.make_all_figures(close_figs=close_figs)
+    make_figures.chapter3.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 4 ***')
-    make_figures.chapter4.make_all_figures(close_figs=close_figs)
+    make_figures.chapter4.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 5 ***')
     make_figures.chapter5.make_all_figures(close_figs=close_figs)
     print('*** Chapter 6 ***')
     make_figures.chapter6.make_all_figures(close_figs=close_figs)
     print('*** Chapter 7 ***')
-    make_figures.chapter7.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.chapter7.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 8 ***')
-    make_figures.chapter8.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.chapter8.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 9 ***')
     make_figures.chapter9.make_all_figures(close_figs=close_figs)
     print('*** Chapter 10 ***')
-    make_figures.chapter10.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.chapter10.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 11 ***')
-    make_figures.chapter11.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.chapter11.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 12 ***')
-    make_figures.chapter12.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.chapter12.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 13 ***')
-    make_figures.chapter13.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.chapter13.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Appendix B ***')
     make_figures.appendixB.make_all_figures(close_figs=close_figs)
     print('*** Appendix C ***')
@@ -59,24 +63,26 @@ if do_book_2:
     print('Generating all figures from ''Practical Geolocation for Electronic Warfare using MATLAB'', 2022.')
     print('************************************************************************************************')
     print('close_figs = {}'.format(close_figs))
-    print('force_recalc = {}'.format(force_recalc))
+    print('force_recalc = {}'.format(mc_params['force_recalc']))
+    print('min_num_monte_carlo = {}'.format(mc_params['min_num_monte_carlo']))
+    print('monte_carlo_decimation = {}'.format(mc_params['monte_carlo_decimation']))
 
     print('*** Chapter 1 ***')
     make_figures.practical_geo.chapter1.make_all_figures(close_figs=close_figs)
     print('*** Chapter 2 ***')
-    make_figures.practical_geo.chapter2.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.practical_geo.chapter2.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 3 ***')
-    make_figures.practical_geo.chapter3.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.practical_geo.chapter3.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 4 ***')
-    make_figures.practical_geo.chapter4.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.practical_geo.chapter4.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 5 ***')
-    make_figures.practical_geo.chapter5.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.practical_geo.chapter5.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 6 ***')
-    make_figures.practical_geo.chapter6.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.practical_geo.chapter6.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 7 ***')
-    make_figures.practical_geo.chapter7.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.practical_geo.chapter7.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('*** Chapter 8 ***')
-    make_figures.practical_geo.chapter8.make_all_figures(close_figs=close_figs, force_recalc=force_recalc)
+    make_figures.practical_geo.chapter8.make_all_figures(close_figs=close_figs, mc_params=mc_params)
     print('Figure generation complete.')
 else:
     print('************************************************************************************************')

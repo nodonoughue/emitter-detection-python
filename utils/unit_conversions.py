@@ -37,9 +37,8 @@ def lin_to_db(lin_value, eps=1e-99):
 
     # Use the optional eps argument as a minimum allowable precision, to prevent divide by zero errors if we take the
     # logarithm of 0.
-    lin_value = np.where(lin_value >= eps, lin_value, eps)
-
-    return 10. * np.log10(lin_value)
+    # ToDo: suppress runtime warning (divide by zero) while generating Fig 8.7b, 12.3a
+    return np.where(lin_value>=eps, 10 * np.log10(lin_value), -np.inf)
 
 
 def db_to_lin(db_value, inf_val=3000):
@@ -57,9 +56,7 @@ def db_to_lin(db_value, inf_val=3000):
 
     # Use the optional inf_val argument as a maximum dB value, above which we convert the output to np.inf to prevent
     # overflow errors
-    db_value = np.where(db_value <= inf_val, db_value, np.inf)
-
-    return np.power(10., db_value/10.)
+    return np.where(db_value>inf_val, np.inf, np.power(10, db_value/10))
 
 
 def convert(value, from_unit, to_unit):

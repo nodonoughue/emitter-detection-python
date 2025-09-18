@@ -119,7 +119,7 @@ def make_taper(taper_len: int, taper_type: str):
     return w, snr_loss
 
 
-def parse_reference_sensor(ref_idx, num_sensors=0):
+def parse_reference_sensor(ref_idx, num_sensors:int=0):
     """
     Accepts a reference index setting (either None, a scalar integer, or a 2 x N array of sensor pairs),
     and returns matching vectors for test and reference indices.
@@ -141,26 +141,25 @@ def parse_reference_sensor(ref_idx, num_sensors=0):
     if ref_idx is None:
         # Default behavior is to use the last sensor as a common reference
         test_idx_vec = np.arange(num_sensors-1)
-        ref_idx_vec = (num_sensors - 1) * np.ones_like(test_idx_vec)
+        ref_idx_vec = np.full(num_sensors - 1, num_sensors-1)
 
     elif isinstance(ref_idx, str) and ref_idx.lower() == 'full':
         # Generate all possible sensor pairs
-        perm = list(combinations(np.arange(num_sensors), 2))
-        test_idx_vec = np.asarray([x[0] for x in perm])
-        ref_idx_vec = np.asarray([x[1] for x in perm])
+        pairs = np.array(list(combinations(np.arange(num_sensors), 2)))
+        test_idx_vec, ref_idx_vec = pairs[:, 0], pairs[:, 1]
 
     elif np.isscalar(ref_idx):
         # Check for error condition
-        assert ref_idx < num_sensors, 'Bad reference index; unable to parse.'
+        if not (0 <= ref_idx < num_sensors):
+            raise ValueError('Bad reference index; unable to parse.')
 
         # Scalar reference index, use all other sensors as test sensors
-        test_idx_vec = np.asarray([i for i in np.arange(num_sensors) if i != ref_idx])
-        ref_idx_vec = ref_idx * np.ones_like(test_idx_vec)
+        test_idx_vec = np.delete(np.arange(num_sensors), ref_idx)
+        ref_idx_vec = np.full(num_sensors - 1, ref_idx)
 
     else:
         # Pair of vectors; first row is test sensors, second is reference
-        test_idx_vec = ref_idx[0, :]
-        ref_idx_vec = ref_idx[1, :]
+        test_idx_vec, ref_idx_vec = np.asarray(ref_idx)
 
     return test_idx_vec, ref_idx_vec
 
@@ -327,7 +326,7 @@ def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx
         else:
             b_i_wt = 1.
 
-        noise_ai = np.zeros((len(a_i), utils.safe_2d_shape(noise)[1]))
+        noise_ai = np.zeros((len(a_i), safe_2d_shape(noise)[1]))
         noise_bi = np.zeros_like(noise_ai)
 
         mask_ai = ~np.isnan(a_i)
@@ -351,7 +350,7 @@ def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx
     return noise_out
 
 
-def ensure_invertible(covariance, epsilon=1e-10):
+def ensure_invertible(covariance, epsilon=1e-20):
     """
     Check the input matrix by finding the eigenvalues and checking that they are all >= a small value
     (epsilon), to ensure that it can be inverted.
@@ -540,16 +539,10 @@ def safe_2d_shape(x: np.array) -> np.array:
         
     # Wrap x in an array, in case it's a scalar or list
     x = np.asarray(x)
+    shape = x.shape
 
-    # Initialize output dimensions
-    dims_out = [1, 1]  # The default, for empty dimensions, is 1
-
-    # Attempt to overwrite default with the actual size, for defined dimensions
-    dims = np.shape(x)
-    for idx_dim in np.arange(np.amin([2, len(dims)])):
-        dims_out[idx_dim] = dims[idx_dim]
-
-    return dims_out
+    # Pad with (1, 1), if needed, then return just the first two dimensions
+    return (shape + (1, 1))[:2]
 
 
 class SearchSpace:
@@ -559,18 +552,32 @@ class SearchSpace:
     points_per_dim: np.ndarray[np.int_]
     max_offset: np.ndarray
 
-    def __init__(self, x_ctr, epsilon, points_per_dim=None, max_offset=None):
+    def __init__(self,
+                 x_ctr:npt.ArrayLike,
+                 epsilon:npt.ArrayLike=None,
+                 points_per_dim:npt.ArrayLike=None,
+                 max_offset:npt.ArrayLike=None):
         self.x_ctr = x_ctr
-        self.epsilon = epsilon
 
         if points_per_dim is None:
-            # infer from max_offset
+            # infer from max_offset and epsilon
+            assert epsilon is not None and max_offset is not None, 'Not enough inputs.'
             self.max_offset = max_offset
+            self.epsilon = epsilon
             self.points_per_dim = np.floor(1 + 2 * self.max_offset / self.epsilon).astype(int)
         elif max_offset is None:
-            # infer from search_size
-            self.points_per_dim = np.array(points_per_dim, dtype=int)
+            # infer from points_per_dim and epsilon
+            assert epsilon is not None and points_per_dim is not None, 'Not enough inputs.'
+            self.epsilon = epsilon
+            self.points_per_dim = points_per_dim
             self.max_offset = self.epsilon * (self.points_per_dim - 1) / 2
+        elif epsilon is None:
+            # infer from points_per_dim and max_offset
+            assert max_offset is not None and points_per_dim is not None, 'Not enough inputs.'
+            self.points_per_dim = points_per_dim
+            self.max_offset = max_offset
+            out_shape = np.amax(np.shape(points_per_dim), np.shape(max_offset))
+            self.epsilon = np.divide(max_offset, points_per_dim - 1, out=np.ones(out_shape), where=points_per_dim>1)
         else:
             # make sure they align
             assert np.all(np.equal(max_offset, (points_per_dim - 1)/2 * epsilon)), 'Bad inputs to search space.'
@@ -608,17 +615,12 @@ def make_nd_grid(search_space: SearchSpace):
     else:
         max_offset = search_space.max_offset.ravel()
 
-    if np.size(search_space.epsilon) == 1:
-        grid_spacing = search_space.epsilon * np.ones((n_dim, ))
-    else:
-        grid_spacing = search_space.epsilon.ravel()
-
     if np.size(search_space.points_per_dim) == 1:
         points_per_dim = search_space.points_per_dim * np.ones((n_dim, ))
     else:
         points_per_dim = search_space.points_per_dim.ravel()
 
-    assert n_dim == np.size(max_offset) and n_dim == np.size(grid_spacing), \
+    assert n_dim == np.size(max_offset) and n_dim == np.size(points_per_dim), \
            'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
 
 

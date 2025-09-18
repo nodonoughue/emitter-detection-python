@@ -15,13 +15,13 @@ import matplotlib.pyplot as plt
 from examples.practical_geo import chapter4
 
 
-def make_all_figures(close_figs=False, force_recalc=False):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                        Default=False
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -33,8 +33,8 @@ def make_all_figures(close_figs=False, force_recalc=False):
     utils.init_plot_style()
 
     # Generate all figures
-    figs_10_11 = make_figures_10_11(prefix, force_recalc)
-    fig12 = make_figure_12(prefix, force_recalc)
+    figs_10_11 = make_figures_10_11(prefix, mc_params)
+    fig12 = make_figure_12(prefix, mc_params)
 
     figs = list(figs_10_11) + list(fig12)
     if close_figs:
@@ -48,22 +48,22 @@ def make_all_figures(close_figs=False, force_recalc=False):
     return figs
 
 
-def make_figures_10_11(prefix=None, force_recalc=False):
+def make_figures_10_11(prefix=None, mc_params=None):
     """
     Figure 4.10 and 4.11 from Example 4.1
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: handle
     """
 
-    if not force_recalc:
-        print('Skipping Figures 4.10, and 4.11 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 4.10, and 4.11 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None, None
 
     print('Generating Figures 4.10, 4.11 (from Example 4.1)...')
 
-    figs = chapter4.example1()
+    figs = chapter4.example1(mc_params=mc_params)
 
     # Display the plot
     plt.draw()
@@ -81,17 +81,17 @@ def make_figures_10_11(prefix=None, force_recalc=False):
     return figs
 
 
-def make_figure_12(prefix=None, force_recalc=False):
+def make_figure_12(prefix=None, mc_params=None):
     """
     Figure 4.12 from Example 4.2
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 4.12 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 4.12 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None, None
 
     print('Generating Figure 4.12 (from Example 4.2)...')
@@ -115,4 +115,4 @@ def make_figure_12(prefix=None, force_recalc=False):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, force_recalc=True)
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})

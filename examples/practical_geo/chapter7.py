@@ -75,7 +75,7 @@ def example1(colors=None):
 
     fig=plt.figure()
     for this_sigma, this_cep in zip(sigma_theta_vec, cep_vec):
-        plt.loglog(num_samples, this_cep, label='$\sigma_{{\\theta}}={:d}^\circ$'.format(this_sigma))
+        plt.loglog(num_samples, this_cep, label='$\\sigma_{{\\theta}}={:d}^\\circ$'.format(this_sigma))
 
     plt.plot(num_samples, 100*np.ones_like(num_samples), 'k--', label='CEP=100 m')
     plt.plot(est_k_min*np.array([1,1]),[1e1,1e4],'k--',label='K={:d}'.format(np.astype(est_k_min, int)))
@@ -193,7 +193,7 @@ def example2(rng=np.random.default_rng()):
 
     fig1=plt.figure()
     for this_cep, this_sigma_t in zip(cep_vec, sigma_t_vec):
-        plt.loglog(time_vec, this_cep, label='$\sigma_t={:.1f} \mu s$'.format(this_sigma_t*1e6))
+        plt.loglog(time_vec, this_cep, label='$\\sigma_t={:.1f} \\mu s$'.format(this_sigma_t*1e6))
 
     plt.plot(time_vec, 10*np.ones_like(time_vec),'k-.', label='10 m')
     plt.xlabel('Time [s]')
@@ -225,9 +225,8 @@ def example2(rng=np.random.default_rng()):
     tdoa.cov = cov_roa
 
     # Demonstrate geolocation
-    z = tdoa.measurement(x_source=x_tgt)
-    zeta = z[:, np.newaxis] + tdoa.cov.lower @ rng.standard_normal(size=(tdoa.num_measurements, num_pulses))  # noisy measurement
-    
+    zeta = tdoa.noisy_measurement(x_source=x_tgt, num_samples=num_pulses)
+
     # Sample Mean
     zeta_mn = np.cumsum(zeta,axis=1)/(1+np.arange(num_pulses))
     
@@ -306,8 +305,7 @@ def example3(rng=np.random.default_rng()):
     num_pulses = np.floor(int_time/pri).astype(int)+1
 
     # Generate noisy measurements
-    psi = aoa.measurement(x_tgt)
-    zeta = psi[:, np.newaxis] + aoa.cov.lower @ rng.standard_normal(size=(aoa.num_measurements, num_pulses))
+    zeta = aoa.noisy_measurement(x_source=x_tgt, num_samples=num_pulses)
 
     # Define measurement and Jacobian functions
     z_fun = aoa.measurement
@@ -366,7 +364,7 @@ def example3(rng=np.random.default_rng()):
 
     fig2=plt.figure()
     plt.semilogy(time_vec, err, label='Measured')
-    plt.plot(time_vec, cep, label='Predicted (CEP_{50})')
+    plt.plot(time_vec, cep, label='$Predicted (CEP_{50})$')
     plt.plot(time_vec, 100*np.ones_like(time_vec), 'k-.', label='100 m')
     plt.xlabel('Time [s]')
     plt.ylabel('Error [m]')
@@ -434,8 +432,7 @@ def example4(rng=np.random.default_rng()):
         h_fun = lambda x: aoa.jacobian(x).T
     
         # Generate noisy measurements
-        psi = aoa.measurement(x_source=x_tgt)
-        zeta = psi + aoa.cov.lower @ rng.standard_normal(size=(aoa.num_dim, ))
+        zeta = aoa.noisy_measurement(x_source=x_tgt)
     
         if idx==0:
             # Initialization

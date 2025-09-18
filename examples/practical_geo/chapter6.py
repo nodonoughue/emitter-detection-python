@@ -98,11 +98,10 @@ def example2():
     x_tdoa = np.array([[0, 2, 0],[2, -2, 0]])  # avg position(reported)
     _, n_tdoa = utils.safe_2d_shape(x_tdoa)
 
-    cov_pos_full = .1 * np.eye(2 * n_tdoa)  # position covar; all are IID
-    cov_pos_lower = np.linalg.cholesky(cov_pos_full, upper=False)
+    cov_pos_full = CovarianceMatrix(.1 * np.eye(2 * n_tdoa))  # position covar; all are IID
 
     # Generate a random set of TDOA positions
-    x_tdoa_actual = x_tdoa + np.reshape(cov_pos_lower @ np.random.randn(2 * n_tdoa, ), shape=(2, n_tdoa))
+    x_tdoa_actual = x_tdoa + np.reshape(cov_pos_full.sample(), shape=(2, n_tdoa))
 
     # Generate PSS System
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=None, ref_idx=None)
@@ -181,13 +180,12 @@ def example3():
     # number of spatial dimensions in the problem.
     cov_pos_single = .1*np.eye(num_dims)  # covariance across dimensions, for a single sensor
     cov_pos = np.kron(cov_pos_1d, cov_pos_single) # combined covariance of all sensor coordinates
+    cov_obj = CovarianceMatrix(cov_pos)
 
     # Generate a random set of AOA and TDOA positions
     # L=chol(C_beta,'lower'); -- This will fail, because C_beta is not positive
     # definite (it has some eigenvalues that are zero)
-    singular_vectors, singular_values, _ = np.linalg.svd(cov_pos)
-    cov_lower = singular_vectors @ np.diag(np.sqrt(singular_values))
-    epsilon = np.reshape(cov_lower @ np.random.randn(num_dims*(n_aoa+n_tdoa), 1), shape=(n_aoa+n_tdoa, num_dims)).T
+    epsilon = np.reshape(cov_obj.sample(), shape=(n_aoa+n_tdoa, num_dims)).T
 
     # Grab the position offsets and add to the reported TDOA and AOA positions
     x_aoa_true = x_aoa + epsilon[:, :n_aoa]  # first n_dim x n_aoa errors belong to the AOA sensors
@@ -206,7 +204,7 @@ def example3():
     # Generate Measurements
     x_tgt = np.array([6, 3])
     alpha_aoa = np.array([5, 10, -5])*_deg2rad  # AOA bias
-    bias = np.concatenate((alpha_aoa, np.zeros((tdoa.num_measurements, ))), axis=0)
+    bias = np.concatenate((alpha_aoa, np.zeros((tdoa.num_sensors, ))), axis=0)
 
     zeta = hybrid.measurement(x_source=x_tgt)
     zeta_unc = hybrid.measurement(x_source=x_tgt, x_sensor=x_sensor_true)
@@ -284,7 +282,7 @@ def example4(do_iterative=False):
 
     z = tdoa.measurement(x_source=x_tgt, bias=tdoa_bias)  # free of pos unc, w/bias
     z_true = tdoa.measurement(x_source=x_tgt)  # free of pos unc, w/o bias
-    noise = tdoa.cov.lower @ np.random.randn(tdoa.num_measurements, )
+    noise = tdoa.cov.sample()
     zeta = z + noise
     zeta_true = z_true + noise
 
@@ -347,8 +345,8 @@ def example4(do_iterative=False):
     ml_search = SearchSpace(x_ctr=x_ctr,
                             max_offset=search_size,
                             epsilon=grid_res)
-    x_est_true, _, _ = tdoa.max_likelihood(zeta=zeta_true, search_space=ml_search)
-    x_est, _, _ = tdoa.max_likelihood(zeta=zeta, search_space=ml_search)
+    x_est_true, _, _ = tdoa.max_likelihood(zeta=zeta_true, search_space=ml_search, print_progress=True)
+    x_est, _, _ = tdoa.max_likelihood(zeta=zeta, search_space=ml_search, print_progress=True)
 
     print('True ML Est.: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_true[0]/1e3, x_est_true[1]/1e3,
                                                                       np.linalg.norm(x_est_true-x_tgt)/1000.))
@@ -429,7 +427,7 @@ def example5(do_vel_only_cal=False):
 
     # Generate Random Velocity Errors
     cov_vel = CovarianceMatrix(100**2 * np.eye(n_dim * n_fdoa))
-    vel_err = np.reshape(cov_vel.lower @ np.random.randn(n_dim*n_fdoa, 1), (n_dim, n_fdoa))
+    vel_err = np.reshape(cov_vel.sample(), (n_dim, n_fdoa))
     v_fdoa_actual = v_fdoa + vel_err
 
     # Build sensor-level covariance matrix
@@ -461,9 +459,10 @@ def example5(do_vel_only_cal=False):
     z_cal = hybrid.measurement(x_source=x_cal, v_sensor=v_fdoa_actual)
 
     # Generate Noise
-    noise = cov_tf.lower @ np.random.randn(n_tdoa+n_fdoa-2, num_cal + 1) # one column for target; num_cal for cal data
-    zeta = z + noise[:, 0]
-    zeta_cal = z_cal + noise[:, 1:]
+    noise = cov_tf.sample(num_samples=None)  # providing 'None' ensured a 1d vector response
+    noise_cal = cov_tf.sample(num_samples=num_cal)
+    zeta = z + noise
+    zeta_cal = z_cal + noise_cal
 
     # Estimate Position
     x_init = np.array([0, 5])*1e3

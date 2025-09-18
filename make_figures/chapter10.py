@@ -16,22 +16,20 @@ import triang
 from examples import chapter10
 
 
-def make_all_figures(close_figs=False, force_recalc=False):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
-    :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
+    :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
-    :force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
     # Find the output directory
     prefix = utils.init_output_dir('chapter10')
     utils.init_plot_style()
-
-    # Random Number Generator
-    rng = np.random.default_rng(0)
 
     # Colormap
     cmap = plt.get_cmap("tab10")
@@ -41,7 +39,7 @@ def make_all_figures(close_figs=False, force_recalc=False):
     fig2 = make_figure_2(prefix, cmap)
     fig3 = make_figure_3(prefix)
     fig4 = make_figure_4(prefix)
-    fig5a, fig5b = make_figure_5(prefix, rng, force_recalc)
+    fig5a, fig5b = make_figure_5(prefix, mc_params)
     fig6 = make_figure_6(prefix)
     fig7 = make_figure_7(prefix)
 
@@ -379,7 +377,7 @@ def make_figure_4(prefix=None):
     return fig4
 
 
-def make_figure_5(prefix=None, rng=np.random.default_rng(), force_recalc=True):
+def make_figure_5(prefix=None, mc_params=None):
     """
     Figure 5 - Example Solution
 
@@ -389,19 +387,14 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), force_recalc=True):
     19 May 2021
 
     :param prefix: output directory to place generated figure
-    :param rng: random number generator
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig5a: figure handle for first subfigure
     :return fig5b: figure handle for second subfigure
     """
 
-    if not force_recalc:
-        print('Skipping Figure 10.5... (re-run with force_recalc=True to generate)')
-        return None, None
-
     print('Generating Figure 10.5 (a and b)...')
 
-    fig5a, fig5b = chapter10.example1(rng)
+    fig5a, fig5b = chapter10.example1(mc_params)
 
     if prefix is not None:
         plt.figure(fig5a)
@@ -464,4 +457,4 @@ def make_figure_7(prefix=None):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, force_recalc=True)
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})

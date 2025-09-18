@@ -20,12 +20,13 @@ import detector
 from examples import chapter4
 
 
-def make_all_figures(close_figs=False):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
     :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -41,12 +42,12 @@ def make_all_figures(close_figs=False):
 
     # Generate all figures
     fig1a = make_figure_1a(prefix)
-    fig1b = make_figure_1b(prefix, rng)
+    fig1b = make_figure_1b(prefix, rng, mc_params)
     fig2a = make_figure_2a(prefix, rng)
-    fig2b = make_figure_2b(prefix, rng)
+    fig2b = make_figure_2b(prefix, rng, mc_params)
     fig3 = make_figure_3(prefix)
     fig5 = make_figure_5(prefix, colors)
-    fig6 = make_figure_6(prefix, rng, colors)
+    fig6 = make_figure_6(prefix, rng, colors, mc_params)
     fig7 = make_figure_7(prefix)
     fig8 = make_figure_8(prefix, colors)
 
@@ -115,7 +116,7 @@ def make_figure_1a(prefix=None):
     return fig1a
 
 
-def make_figure_1b(prefix=None, rng=np.random.default_rng()):
+def make_figure_1b(prefix=None, rng=np.random.default_rng(), mc_params=None):
     """
     Figure 1b - Figure 1b, Bandwidth
 
@@ -126,6 +127,7 @@ def make_figure_1b(prefix=None, rng=np.random.default_rng()):
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
@@ -138,7 +140,9 @@ def make_figure_1b(prefix=None, rng=np.random.default_rng()):
     num_code_samples = num_code_bits*num_samples
     lo = np.exp(1j*2*np.pi*np.arange(num_code_samples)*4/num_samples)  # 4 samples/cycle
 
-    num_monte_carlo = 100
+    num_monte_carlo = 1000
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     spectral_average = np.zeros_like(lo)
     for ii in range(num_monte_carlo):
         # Generate a random code
@@ -271,7 +275,7 @@ def make_figure_2a(prefix=None, rng=np.random.default_rng()):
     return fig2a
 
 
-def make_figure_2b(prefix=None, rng=np.random.default_rng()):
+def make_figure_2b(prefix=None, rng=np.random.default_rng(), mc_params=None):
     """
     Figure 2b - Spectrum
 
@@ -282,12 +286,15 @@ def make_figure_2b(prefix=None, rng=np.random.default_rng()):
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
     print('Generating Figure 4.2b...')
 
     num_monte_carlo = 1000
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
     num_bits_code1 = 16
     num_bits_code2 = 64
@@ -448,7 +455,7 @@ def make_figure_5(prefix=None, colors=None):
     return fig5
 
 
-def make_figure_6(prefix=None, rng=np.random.default_rng(), colors=None):
+def make_figure_6(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
     """
     Figures 6, Comparison of Performance
 
@@ -460,6 +467,7 @@ def make_figure_6(prefix=None, rng=np.random.default_rng(), colors=None):
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param colors: colormap for plotting
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle
     """
 
@@ -490,6 +498,8 @@ def make_figure_6(prefix=None, rng=np.random.default_rng(), colors=None):
     input_snr_vec_coarse_lin = db_to_lin(input_snr_vec_coarse_db)
 
     num_monte_carlo = int(1e4)
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     num_tbwp = int(tbwp_vec_lin.size)
     num_snr = int(input_snr_vec_coarse_lin.size)
 

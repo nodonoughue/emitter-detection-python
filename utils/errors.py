@@ -73,13 +73,11 @@ def compute_cep50(covariance):
         # Check the eigenvalues; they should not be complex or negative
         assert not (np.iscomplex(lam_max) or np.iscomplex(lam_min)), 'Complex eigenvalue encountered; check for errors.'
 
-        # Ratio of dominant to secondary eigenvalues
-        ratio = np.sqrt(lam_min/lam_max)
-
         # Depending on the eigenvalue ratio, use the appropriate approximation
-        if ratio > .5:
+        if lam_min > .25*lam_max:
             cep[idx_matrix] = .59*(np.sqrt(lam_min)+np.sqrt(lam_max))
         else:
+            # ToDo: suppress runtime warning (invalid value encountered in scalar divide....inf? nan?) while generating Fig 13.8a
             cep[idx_matrix] = np.sqrt(lam_max)*(.67+.8*lam_min/lam_max)
 
     if num_matrices == 1:

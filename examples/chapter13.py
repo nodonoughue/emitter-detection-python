@@ -17,17 +17,14 @@ def run_all_examples():
     :return figs: list of figure handles
     """
 
-    # Random Number Generator
-    rng = np.random.default_rng(0)
-
-    fig1a, fig1b = example1(rng)
-    fig2a, fig2b = example2(rng)
+    fig1a, fig1b = example1()
+    fig2a, fig2b = example2()
 
     figs = [fig1a, fig1b, fig2a, fig2b]
     return figs
 
 
-def example1(rng=np.random.default_rng()):
+def example1(mc_params=None):
     """
     Executes Example 13.1 and generates two figures
 
@@ -36,7 +33,7 @@ def example1(rng=np.random.default_rng()):
     Nicholas O'Donoughue
     17 Nov 2022
 
-    :param rng: random number generator
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig_geo: figure handle for geographic layout
     :return fig_err: figure handle for error as a function of iteration
     """
@@ -81,7 +78,9 @@ def example1(rng=np.random.default_rng()):
     rho_actual = hybrid.measurement(x_source=x_source)
 
     # Initialize Solvers
-    num_mc_trials = int(1000)
+    num_monte_carlo = int(1000)
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     x_extent = 5 * baseline
     num_iterations = int(1000)
     alpha = .3
@@ -89,8 +88,8 @@ def example1(rng=np.random.default_rng()):
     epsilon = 100  # [m] desired iterative search stopping condition
     grid_res = int(500)  # [m] desired grid search resolution
 
-    out_shp = (2, num_mc_trials)
-    out_iterative_shp = (2, num_iterations, num_mc_trials)
+    out_shp = (2, num_monte_carlo)
+    out_iterative_shp = (2, num_iterations, num_monte_carlo)
     x_ml = np.zeros(shape=out_shp)
     x_bf = np.zeros(shape=out_shp)
     x_ls_full = np.zeros(shape=out_iterative_shp)
@@ -113,7 +112,6 @@ def example1(rng=np.random.default_rng()):
                }
 
     args = {'rho_act': rho_actual,
-            'rng': rng,
             'gd_args': gd_args,
             'ls_args': ls_args,
             }
@@ -124,10 +122,9 @@ def example1(rng=np.random.default_rng()):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    for idx in np.arange(num_mc_trials):
-        utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
+    for idx in np.arange(num_monte_carlo):
+        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
-        # TODO: Debug -- ML solution is wrong; seems fixed at [0, 0]
         result = _mc_iteration(pss=hybrid, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
         x_bf[:, idx] = result['bf']
@@ -155,7 +152,7 @@ def example1(rng=np.random.default_rng()):
     return fig_geo, fig_err
 
 
-def example2(rng=np.random.default_rng()):
+def example2(mc_params=None):
     """
     Executes Example 13.2 and generates two figures
 
@@ -164,7 +161,7 @@ def example2(rng=np.random.default_rng()):
     Nicholas O'Donoughue
     19 Nov 2022
 
-    :param rng: random number generator
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return fig_geo: figure handle for geographic layout
     :return fig_err: figure handle for error as a function of iteration
     """
@@ -211,7 +208,9 @@ def example2(rng=np.random.default_rng()):
     rho_actual = hybrid.measurement(x_source=x_source)
 
     # Initialize Solvers
-    num_mc_trials = int(1000)
+    num_monte_carlo = int(1000)
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     x_extent = 5 * baseline
     num_iterations = int(1000)
     alpha = .3
@@ -219,8 +218,8 @@ def example2(rng=np.random.default_rng()):
     epsilon = 100  # [m] desired iterative search stopping condition
     grid_res = int(500)  # [m] desired grid search resolution
 
-    out_shp = (2, num_mc_trials)
-    out_iterative_shp = (2, num_iterations, num_mc_trials)
+    out_shp = (2, num_monte_carlo)
+    out_iterative_shp = (2, num_iterations, num_monte_carlo)
     x_ml = np.zeros(shape=out_shp)
     x_bf = np.zeros(shape=out_shp)
     x_ls_full = np.zeros(shape=out_iterative_shp)
@@ -247,7 +246,6 @@ def example2(rng=np.random.default_rng()):
     args = {'ls_args': ls_args,  # arguments to pass on to LS solver
             'gd_args': gd_args,  # arguments to pass on to GD solver
             'rho_act': rho_actual,
-            'rng': rng
             }
 
     print('Performing Monte Carlo simulation for FDOA performance...')
@@ -256,8 +254,8 @@ def example2(rng=np.random.default_rng()):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    for idx in np.arange(num_mc_trials):
-        utils.print_progress(num_mc_trials, idx, iterations_per_marker, iterations_per_row, t_start)
+    for idx in np.arange(num_monte_carlo):
+        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(pss=hybrid, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
@@ -290,7 +288,6 @@ def _mc_iteration(pss:HybridPassiveSurveillanceSystem, ml_search: SearchSpace, a
     Executes a single iteration of the Monte Carlo simulation in Example 11.1.
 
     :param args: Dictionary of arguments for monte carlo simulation in Example 11.1. Fields are:
-                rng: random number generator
                 rho_act: true range difference of arrival (meters)
                 covar_rho: measurement error covariance matrix
                 covar_lower: lower triangular Cholesky decomposition of the measurement error covariance matrix
@@ -314,9 +311,8 @@ def _mc_iteration(pss:HybridPassiveSurveillanceSystem, ml_search: SearchSpace, a
     # TODO: Check for divergent case and set a flag to ignore this iteration
 
     # Generate a random measurement
-    rng = args['rng']
     zeta_act = args['rho_act']
-    zeta = zeta_act + pss.cov.lower @ rng.standard_normal(size=(pss.num_measurements, ))
+    zeta = zeta_act + pss.cov.sample()
 
     gd_args = args['gd_args']
     ls_args = args['ls_args']
@@ -374,7 +370,6 @@ def _plot_mc_iteration_result(pss: HybridPassiveSurveillanceSystem, args, result
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
     plt.legend()
-    plt.show()
 
     # Compute Error Statistics
     err_ml = args['x_source'][:, np.newaxis] - results['ml']

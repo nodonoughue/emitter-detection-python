@@ -311,7 +311,7 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
 
 
 def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
-              prior=None, prior_wt: float = 0.):
+              prior=None, prior_wt: float = 0., print_progress=False):
     """
     Execute ML estimation through brute force computational methods.
 
@@ -345,7 +345,7 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
                                                      ineq_constraints=ineq_constraints, tol=constraint_tolerance)
 
     # Evaluate the likelihood function at each coordinate in the search space
-    likelihood = ell(x_set)
+    likelihood = ell(x_set, print_progress=print_progress)
 
     if prior is not None and prior_wt > 0:
         pdf_prior = np.reshape(prior(x_set), shape=likelihood.shape)
@@ -436,9 +436,9 @@ def sensor_calibration(ell,
         if bias_search is not None and np.any(bias_search.points_per_dim > 1):
             x_sensor_vec = pos_search.x_ctr
             v_sensor_vec = vel_search.x_ctr
-            def ell_bias(bias):
+            def ell_bias(bias, **ell_kwargs):
                 # Input is num_parameters x num_test_points; iterate over test points
-                return [ell(this_bias, x_sensor_vec, v_sensor_vec) for this_bias in bias.T]
+                return [ell(this_bias, x_sensor_vec, v_sensor_vec, **ell_kwargs) for this_bias in bias.T]
 
             result = utils.solvers.ml_solver(ell=ell_bias, search_space=bias_search)
             bias_est = result[0]
@@ -447,9 +447,9 @@ def sensor_calibration(ell,
         # =================== Estimate Sensor Position =========================
         if pos_search is not None and np.any(pos_search.points_per_dim > 1):
             v_sensor_vec = vel_search.x_ctr
-            def ell_pos(x):
+            def ell_pos(x, **ell_kwargs):
                 # Input is num_parameters x num_test_points; iterate over test points
-                return [ell(bias_est, this_x, v_sensor_vec) for this_x in x.T]
+                return [ell(bias_est, this_x, v_sensor_vec, **ell_kwargs) for this_x in x.T]
 
             # Do them one at a time; set the points_per_dim to 1 on the others
             points_per_dim = pos_search.points_per_dim
@@ -467,9 +467,9 @@ def sensor_calibration(ell,
 
         # =================== Estimate Sensor Velocity =========================
         if vel_search is not None and np.any(vel_search.points_per_dim > 1):
-            def ell_vel(v):
+            def ell_vel(v, **ell_kwargs):
                 # Input is num_parameters x num_test_points; iterate over test points
-                return [ell(bias_est, x_sensor_est, this_v) for this_v in v.T]
+                return [ell(bias_est, x_sensor_est, this_v, **ell_kwargs) for this_v in v.T]
 
             # Do them one at a time; set the points_per_dim to 1 on the others
             points_per_dim = vel_search.points_per_dim

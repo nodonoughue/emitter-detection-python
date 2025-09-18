@@ -52,13 +52,13 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         return model.jacobian_uncertainty(x_sensor=self.pos, x_source=x_source, v_sensor=self.vel,
                                           ref_idx=self.ref_idx, **kwargs)
 
-    def log_likelihood(self, zeta, x_source, x_sensor=None, v_sensor=None, v_source=None, bias=None):
+    def log_likelihood(self, zeta, x_source, x_sensor=None, v_sensor=None, v_source=None, bias=None, **kwargs):
         if x_sensor is None: x_sensor = self.pos
         if v_sensor is None: v_sensor = self.vel
         if bias is None: bias = self.bias
         return model.log_likelihood(x_sensor=x_sensor, rho_dot=zeta, x_source=x_source, cov=self.cov,
                                     v_sensor=v_sensor, v_source=v_source, ref_idx=self.ref_idx,
-                                    do_resample=False, bias=bias)
+                                    do_resample=False, bias=bias, **kwargs)
 
     # def log_likelihood_uncertainty(self, zeta, theta, **kwargs):
     #     return model.log_likelihood_uncertainty(x_sensor=self.pos, rho_dot=zeta, theta=theta, cov=self.cov,
@@ -87,11 +87,11 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
             x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
 
         # Likelihood function for ML Solvers
-        def ell(pos_vel):
+        def ell(pos_vel, **ell_kwargs):
             # Determine if the input is position only, or position & velocity
             this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
             return self.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor,
-                                       zeta=zeta, x_source=this_pos, v_source=this_vel)
+                                       zeta=zeta, x_source=this_pos, v_source=this_vel, **ell_kwargs)
 
         # Call the util function
         x_est, likelihood, x_grid = utils.solvers.ml_solver(ell=ell, search_space=search_space, **kwargs)
@@ -188,10 +188,9 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         def this_jacobian(pos_vel):
             this_pos, this_vel = self.parse_source_pos_vel(pos_vel, default_vel=v_source)
             n_dim, _ = utils.safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
-            j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=self.pos, v_sensor=self.vel)
             # Jacobian returns 2*self.n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
             # excise just the position portion
-            return j[:n_dim]
+            return self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=self.pos, v_sensor=self.vel)[:n_dim]
 
         return utils.perf.compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov,
                                                 **kwargs)

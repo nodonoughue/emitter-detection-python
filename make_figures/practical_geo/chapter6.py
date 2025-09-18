@@ -18,13 +18,13 @@ import triang
 from examples.practical_geo import chapter6
 
 
-def make_all_figures(close_figs=False, force_recalc=False):
+def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                        Default=False
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -36,11 +36,11 @@ def make_all_figures(close_figs=False, force_recalc=False):
     utils.init_plot_style()
 
     # Generate all figures
-    fig1 = make_figure_1(prefix, force_recalc)
-    fig2 = make_figure_2(prefix, force_recalc)
+    fig1 = make_figure_1(prefix, mc_params)
+    fig2 = make_figure_2(prefix, mc_params)
     fig6 = make_figure_6(prefix)
-    fig8_9 = make_figures_8_9(prefix, force_recalc)
-    fig12 = make_figure_12(prefix, force_recalc)
+    fig8_9 = make_figures_8_9(prefix, mc_params)
+    fig12 = make_figure_12(prefix, mc_params)
 
     figs = list(fig1) + list(fig2) + list(fig6) + list(fig8_9) + list(fig12)
     if close_figs:
@@ -53,17 +53,17 @@ def make_all_figures(close_figs=False, force_recalc=False):
     return figs
 
 
-def make_figure_1(prefix=None, force_recalc=False):
+def make_figure_1(prefix=None, mc_params=None):
     """
     Figure 6.1 from Example 6.1
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 6.1 from Example 6.1 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 6.1 from Example 6.1 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None, None
 
     print('Generating Figure 6.1 (Example 6.1)...')
@@ -83,17 +83,17 @@ def make_figure_1(prefix=None, force_recalc=False):
     return figs
 
 
-def make_figure_2(prefix=None, force_recalc=False):
+def make_figure_2(prefix=None, mc_params=None):
     """
     Figure 6.2 from Example 6.2 and figure 6.5 from Example 6.3
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: handle
     """
 
-    if not force_recalc:
-        print('Skipping Figures 6.2 and 6.5 from Examples 6.2 and 6.3 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 6.2 and 6.5 from Examples 6.2 and 6.3 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None,
 
     print('Generating Figures 6.2 and 6.5 from Examples 6.2 and 6.3...')
@@ -198,17 +198,17 @@ def make_figure_6(prefix=None):
     return figs
 
 
-def make_figures_8_9(prefix=None, force_recalc=True):
+def make_figures_8_9(prefix=None, mc_params=None):
     """
     Figures 6.8 and 6.9, from Example 6.4
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: handle
     """
 
-    if not force_recalc:
-        print('Skipping Figures 6.8 and 6.9 from Example 6.4 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figures 6.8 and 6.9 from Example 6.4 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None, None
 
     print('Generating Figures 6.8 and 6.9, from Example 6.4...')
@@ -228,17 +228,17 @@ def make_figures_8_9(prefix=None, force_recalc=True):
     return figs
 
 
-def make_figure_12(prefix=None, force_recalc=True):
+def make_figure_12(prefix=None, mc_params=None):
     """
     Figures 6.12, from Example 6.5
 
     :param prefix: output directory to place generated figure
-    :param force_recalc: optional flag (default=True), if False then the example does not run
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: handle
     """
 
-    if not force_recalc:
-        print('Skipping Figure 6.12 from Example 6.5 (re-run with force_recalc=True to generate)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 6.12 from Example 6.5 (re-run with mc_params[\'force_recalc\']=True to generate)...')
         return None, None
 
     print('Generating Figure 6.12, from Example 6.5...')
@@ -259,4 +259,4 @@ def make_figure_12(prefix=None, force_recalc=True):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, force_recalc=True)
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})

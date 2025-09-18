@@ -16,7 +16,7 @@ def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, 
     Nicholas O'Donoughue
     21 January 2021
 
-    :param x_sensor: nDim x nSensor array of sensor positions
+    :param x_sensor: nDim x n_sensor array of sensor positions
     :param x_source: nDim x n_source array of source positions
     :param v_sensor: nDim x nSensor array of sensor velocities
     :param v_source: nDim x n_source array of source velocities
@@ -29,36 +29,33 @@ def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, 
     n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
     test_idx_vec, ref_idx_vec = utils.parse_reference_sensor(ref_idx, n_sensor)
 
-    # Parse FDOA bias
-    rrdoa_bias = 0
-    if bias is not None:
-        rrdoa_bias = bias[test_idx_vec] - bias[ref_idx_vec]
+    # Make sure that x_source is 2D
+    # We could use np.atleast_2d, but that will add the new dimension at the start, not the end
+    if len(x_source.shape) == 1:
+        x_source = x_source[:, np.newaxis]
+    if len(v_source.shape) == 1:
+        v_source = v_source[:, np.newaxis]
 
     # Compute distance from each source position to each sensor
-    dx = np.reshape(x_source, (n_dim, 1, n_source)) - np.reshape(x_sensor, (n_dim, n_sensor, 1))
-    r = np.sqrt(np.sum(dx**2, axis=0, keepdims=True))  # 1 x nSensor1 x n_source1
-    
+    dx = x_source[:, np.newaxis, :] - x_sensor[:, :, np.newaxis]  # (n_dim, n_sensor, n_source)
+    r = np.linalg.norm(dx, axis=0)  # (n_sensor, n_source)
+
     # Compute range rate from range and velocity
-    dv = np.reshape(v_sensor, (n_dim, n_sensor, 1)) - np.reshape(v_source, (n_dim, 1, n_source))
-    rr = np.reshape(np.sum(dv*dx/r, axis=0), (n_sensor, n_source)) + rrdoa_bias  # nSensor x n_source
-    
+    dv = v_sensor[:, :, np.newaxis] - v_source[:, np.newaxis, :] # (n_dim, n_sensor, n_source)
+    rr = np.divide(np.sum(dv*dx, axis=0), r, out=np.zeros((n_sensor, n_source)), where=r!=0)  # (n_sensor, n_source)
+
+    # Add bias, if provided
+    if bias is not None:
+        if len(rr.shape)>1:
+            rr = rr + bias[:, np.newaxis]  # (n_sensor, n_source)
+        else:
+            rr = rr + bias
+
     # Apply reference sensors to compute range rate difference for each sensor
     # pair
-    if n_source > 1:
-        # There are multiple sources; they must traverse the second dimension
-        out_dims = (np.size(test_idx_vec), n_source)
-        bias_dims = (out_dims[0], 1)
-    else:
-        # Single source, make it an array
-        out_dims = (np.size(test_idx_vec), )
-        bias_dims = out_dims
+    rrdoa = rr[test_idx_vec, :] - rr[ref_idx_vec, :]  # (nPair, n_source)
 
-    rrdoa = np.reshape(rr[test_idx_vec] - rr[ref_idx_vec], out_dims)
-
-    if bias is not None:
-        rrdoa = rrdoa + np.reshape(rrdoa_bias, bias_dims)
-
-    return rrdoa
+    return np.atleast_1d(rrdoa.squeeze() if n_source == 1 else rrdoa)
 
 
 def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
@@ -88,14 +85,14 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     # Compute the Offset Vectors
     dx = x_sensor[:, :, np.newaxis] - np.reshape(x_source, (n_dim, 1, n_source))  # n_dim x n_sensor x n_source
     rn = np.reshape(np.sqrt(np.sum(dx**2, axis=0)), (1, n_sensor, n_source))  # Euclidean norm for each offset vector
-    dx_norm = dx / rn  # n_dim x n_sensor x n_source
+    dx_norm = np.divide(dx, rn, out=np.zeros((n_dim, n_sensor, n_source)), where=rn!=0)  # n_dim x n_sensor x n_source
     px = np.reshape(dx_norm, (n_dim, 1, n_sensor, n_source)) * np.reshape(dx_norm, (1, n_dim, n_sensor, n_source))
     # n_dim x n_dim x n_sensor x n_source
     
     # Compute the gradient of R_n
     dv = (np.reshape(v_sensor, (n_dim, n_sensor, 1))
           - np.reshape(v_source, (n_dim, 1, n_source)))  # n_dim x n_sensor x n_source
-    dv_norm = dv/rn  # n_dim x n_sensor x n_source
+    dv_norm = np.divide(dv, rn, out=np.zeros((n_dim, n_sensor, n_source)), where=rn!=0)  # n_dim x n_sensor x n_source
     # Iterate the matmul over the number of sensors and sources
     nabla_rn = np.asarray([[np.dot(np.eye(n_dim) - px[:, :, idx_sen, idx_src],
                                    dv_norm[:, idx_sen, idx_src])
@@ -290,7 +287,7 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts,
     # use the final sensor as the reference for all difference measurements.
     rr = measurement(x_sensor=x_sensor, x_source=x_source,
                      v_sensor=v_sensor, v_source=v_source,
-                     ref_idx=ref_idx)
+                     ref_idx=ref_idx)  # shape: (n_pair, 1)
 
     if do_resample:
         cov = cov.resample(ref_idx=ref_idx)
