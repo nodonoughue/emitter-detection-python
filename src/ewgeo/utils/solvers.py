@@ -441,7 +441,7 @@ def sensor_calibration(ell,
                 # Input is num_parameters x num_test_points; iterate over test points
                 return [ell(this_bias, x_sensor_vec, v_sensor_vec, **ell_kwargs) for this_bias in bias.T]
 
-            result = solvers.ml_solver(ell=ell_bias, search_space=bias_search)
+            result = ml_solver(ell=ell_bias, search_space=bias_search)
             bias_est = result[0]
             bias_search.x_ctr = bias_est # store result as center for next iteration
 
@@ -461,7 +461,7 @@ def sensor_calibration(ell,
                 this_ppd = np.ones_like(points_per_dim)
                 this_ppd[:,idx] = points_per_dim[:, idx]
                 pos_search.points_per_dim = this_ppd
-                result = solvers.ml_solver(ell=ell_pos, search_space=pos_search)
+                result = ml_solver(ell=ell_pos, search_space=pos_search)
                 x_sensor_est = result[0]
                 # store result as center for next iteration
                 pos_search.x_ctr = np.reshape(x_sensor_est, shape=np.shape(points_per_dim))
