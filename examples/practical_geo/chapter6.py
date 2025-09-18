@@ -416,6 +416,7 @@ def example5(do_vel_only_cal=False):
 
     :return: figure handle to generated graphic
     """
+    # TODO: Debug; the plots don't appear to function properly
 
     # Set up sensors
     x_tdoa = np.array([[-1, 0, 1],
@@ -497,7 +498,7 @@ def example5(do_vel_only_cal=False):
         plt.plot(x_est_fdoa_cal[0], x_est_fdoa_cal[1], linestyle='-.', marker='s', markevery=[-1],
                  label='Solution (w/velocity cal)')
 
-    plt.label(loc='lower left')
+    plt.legend(loc='lower left')
     return fig,
 
 
