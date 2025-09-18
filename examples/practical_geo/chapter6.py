@@ -497,6 +497,7 @@ def example5(do_vel_only_cal=False):
         plt.plot(x_est_fdoa_cal[0], x_est_fdoa_cal[1], linestyle='-.', marker='s', markevery=[-1],
                  label='Solution (w/velocity cal)')
 
+    plt.label(loc='lower left')
     return fig,
 
 
