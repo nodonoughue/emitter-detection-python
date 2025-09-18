@@ -1,12 +1,13 @@
-import numpy as np
 import matplotlib.pyplot as plt
-
-import utils
-from utils import SearchSpace
-from utils.covariance import CovarianceMatrix
-from triang import DirectionFinder
+import numpy as np
 import time
 
+from ewgeo.triang import DirectionFinder
+from ewgeo.utils import print_elapsed, print_progress, make_nd_grid, safe_2d_shape, SearchSpace
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
+from ewgeo.utils.geo import calc_range
 
 def run_all_examples():
     """
@@ -40,7 +41,7 @@ def example1(mc_params=None):
 
     # Define sensor positions and PSS object
     x_sensor = 30.0*np.array([[-1., 0., 1.], [0.,  0., 0.]])
-    num_dims, num_sensors = utils.safe_2d_shape(x_sensor)
+    num_dims, num_sensors = safe_2d_shape(x_sensor)
     covar_psi = CovarianceMatrix((2*np.pi/180)**2 * np.eye(num_sensors))
     triang = DirectionFinder(x=x_sensor, cov=covar_psi, do_2d_aoa=False)
 
@@ -51,7 +52,7 @@ def example1(mc_params=None):
     psi_act = triang.measurement(x_source)
 
     # Compute Ranges
-    range_act = utils.geo.calc_range(x_sensor, x_source)
+    range_act = calc_range(x_sensor, x_source)
 
     # Error Values
     angle_error = 3*np.sqrt(np.diag(covar_psi.cov))
@@ -122,7 +123,7 @@ def example1(mc_params=None):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     for idx in np.arange(num_monte_carlo):
-        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
+        print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(pss=triang, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
@@ -134,7 +135,7 @@ def example1(mc_params=None):
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     # Plot Closed-Form Solutions
     plt.scatter(x_centroid[0, 0], x_centroid[1, 0], marker='*', label='Centroid')
@@ -153,8 +154,8 @@ def example1(mc_params=None):
 
     # Compute and Plot CRLB and Error Ellipse Expectations
     err_crlb = triang.compute_crlb(x_source)
-    crlb_cep50 = utils.errors.compute_cep50(err_crlb)  # [km]
-    crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
+    crlb_cep50 = compute_cep50(err_crlb)  # [km]
+    crlb_ellipse = draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linewidth=.5, label='90% Error Ellipse')
     plt.xlim([-50, 50])
     plt.ylim([-10, 70])
@@ -176,10 +177,10 @@ def example1(mc_params=None):
     cov_bf = np.cov(err_bf) + bias_bf.dot(bias_bf.T)
     cov_cnt = np.cov(err_cnt) + bias_cnt.dot(bias_cnt.T)
     cov_inc = np.cov(err_inc) + bias_inc.dot(bias_inc.T)
-    cep50_ml = utils.errors.compute_cep50(cov_ml)
-    cep50_bf = utils.errors.compute_cep50(cov_bf)
-    cep50_cnt = utils.errors.compute_cep50(cov_cnt)
-    cep50_inc = utils.errors.compute_cep50(cov_inc)
+    cep50_ml = compute_cep50(cov_ml)
+    cep50_bf = compute_cep50(cov_bf)
+    cep50_cnt = compute_cep50(cov_cnt)
+    cep50_inc = compute_cep50(cov_inc)
 
     out_shp = (2, num_iterations)
     out_cov_shp = (2, 2, num_iterations)
@@ -197,8 +198,8 @@ def example1(mc_params=None):
         cov_ls[:, :, ii] = np.cov(np.squeeze(err_ls[:, ii, :])) + bias_ls[:, ii].dot(bias_ls[:, ii].T)
         cov_grad[:, :, ii] = np.cov(np.squeeze(err_grad[:, ii, :])) + bias_grad[:, ii].dot(bias_grad[:, ii].T)
 
-        cep50_ls[ii] = utils.errors.compute_cep50(cov_ls[:, :, ii])  # [km]
-        cep50_grad[ii] = utils.errors.compute_cep50(cov_grad[:, :, ii])  # [km]
+        cep50_ls[ii] = compute_cep50(cov_ls[:, :, ii])  # [km]
+        cep50_grad[ii] = compute_cep50(cov_grad[:, :, ii])  # [km]
 
     # Second subfigure
     iter_ax = np.arange(num_iterations)
@@ -297,7 +298,7 @@ def example2():
     down_range_vec = 100 * np.ones(shape=np.shape(cross_range_vec))
     x_source = np.concatenate((cross_range_vec[np.newaxis, :], down_range_vec[np.newaxis, :]), axis=0)
     crlb = triang.compute_crlb(x_source*1e3)
-    cep50 = utils.errors.compute_cep50(crlb)
+    cep50 = compute_cep50(crlb)
     
     good_points = np.argwhere(cep50 <= 25e3)
     max_cross_range = np.amax(np.abs(x_source[0, good_points]))*1e3
@@ -309,13 +310,13 @@ def example2():
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=x_max,
                                epsilon=grid_res)
-    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    x_source, x_grid, grid_shape = make_nd_grid(search_space)
     # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
     grid_shape_2d = [i for i in grid_shape if i > 1]
 
     # Compute CRLB
     crlb = triang.compute_crlb(x_source=x_source*1e3, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape_2d)
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape_2d)
 
     # Blank out y=0
     nan_mask = np.abs(x_grid[1]) < 1e-6  # x_grid is a list of meshgrid outputs; search the y-dimension
@@ -361,7 +362,7 @@ def example3():
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=x_max,
                                epsilon=grid_res)
-    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    x_source, x_grid, grid_shape = make_nd_grid(search_space)
     # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
     grid_shape_2d = [i for i in grid_shape if i > 1]
 
@@ -374,7 +375,7 @@ def example3():
 
     # Compute CRLB
     crlb = triang.compute_crlb(x_source*1e3, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape_2d)  # m
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape_2d)  # m
     
     good_point = cep50 <= 25e3
     rng_val = np.sqrt(np.sum(np.abs(x_source)**2, axis=0))  # km

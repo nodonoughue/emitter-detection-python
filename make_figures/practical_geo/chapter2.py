@@ -9,16 +9,15 @@ Nicholas O'Donoughue
 9 January 2025
 """
 
-import utils
 import matplotlib.pyplot as plt
-# import numpy as np
 
+from ewgeo.utils import init_output_dir, init_plot_style
+
+from examples.practical_geo import chapter2
 from make_figures import chapter10
 from make_figures import chapter11
 from make_figures import chapter12
 from make_figures import chapter13
-
-from examples.practical_geo import chapter2
 
 
 def make_all_figures(close_figs=False, mc_params=None):
@@ -35,8 +34,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     # rng = np.random.default_rng()
 
     # Find the output directory
-    prefix = utils.init_output_dir('practical_geo/chapter2')
-    utils.init_plot_style()
+    prefix = init_output_dir('practical_geo/chapter2')
+    init_plot_style()
 
     # Generate all figures
     fig1 = make_figure_1(prefix)

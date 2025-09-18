@@ -9,10 +9,12 @@ Nicholas O'Donoughue
 21 March 2021
 """
 
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
+
+from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils.geo import calc_range
+from ewgeo.utils.unit_conversions import lin_to_db, db_to_lin
 
 
 def make_all_figures(close_figs=False):
@@ -28,8 +30,8 @@ def make_all_figures(close_figs=False):
     rng = np.random.default_rng()
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter1')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter1')
+    init_plot_style()
 
     # Generate all figures
     fig1 = make_figure_1(prefix, rng)
@@ -137,7 +139,7 @@ def make_figure_2(prefix=None):
     xs = np.array([.1, .9])
 
     # Compute Ranges
-    r1 = utils.geo.calc_range(x1, xs)
+    r1 = calc_range(x1, xs)
 
     # Error Values
     angle_error = 5*np.pi/180
@@ -203,8 +205,8 @@ def make_figure_3(prefix=None):
     xs = np.array([.1, .9])
     
     # Compute Ranges
-    r1 = utils.geo.calc_range(x1, xs)
-    r2 = utils.geo.calc_range(x2, xs)
+    r1 = calc_range(x1, xs)
+    r2 = calc_range(x2, xs)
     
     # Error Values
     angle_error = 5*np.pi/180

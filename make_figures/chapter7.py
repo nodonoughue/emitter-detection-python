@@ -8,13 +8,16 @@ Ported from MATLAB Code
 Nicholas O'Donoughue
 26 March 2021
 """
-import time
 
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
-import aoa
+import time
+
+import ewgeo.aoa as aoa
+from ewgeo.utils import init_output_dir, init_plot_style, print_progress, print_elapsed
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.unit_conversions import lin_to_db, db_to_lin
+
 from examples import chapter7
 
 
@@ -30,8 +33,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter7')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter7')
+    init_plot_style()
 
     # Random Number Generator
     rng = np.random.default_rng(0)
@@ -190,7 +193,7 @@ def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
 
             for idx_mc in range(num_monte_carlo):
                 curr_idx = idx_mc + idx_snr * num_monte_carlo + idx_samples * len(snr_db_vec) * num_monte_carlo
-                utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+                print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
 
                 psi_est[idx_mc] = aoa.directional.compute_df(rx_signal[:, :, idx_mc], psi, g, psi_res,
                                                              min_psi, max_psi)
@@ -203,7 +206,7 @@ def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
         
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
     
     # Generate plot
     fig3 = plt.figure()
@@ -311,7 +314,7 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
 
             for idx_mc in range(num_monte_carlo):
                 curr_idx = idx_mc + idx_snr * num_monte_carlo + idx_num_samples * len(snr_db_vec) * num_monte_carlo
-                utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+                print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
 
                 psi_est[idx_mc] = aoa.directional.compute_df(signal_rx[:, :, idx_mc], psi, g, psi_res,
                                                              -np.pi, np.pi)
@@ -324,7 +327,7 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     # Generate figure
     fig5 = plt.figure()
@@ -477,7 +480,7 @@ def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
 
             for idx_mc in np.arange(num_monte_carlo):
                 curr_idx = idx_mc + idx_snr * num_monte_carlo + idx_num_samples * len(snr_db_vec) * num_monte_carlo
-                utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+                print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
 
                 psi_est[idx_mc] = aoa.watson_watt.compute_df(r[:, idx_mc], x[:, idx_mc], y[:, idx_mc])
 
@@ -488,7 +491,7 @@ def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     fig7 = plt.figure()
     crlb_label = 'CRLB'
@@ -596,7 +599,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_par
     ts = 1/(5*f)
 
     # Doppler antenna parameters
-    c = utils.constants.speed_of_light
+    c = speed_of_light
     lam = c/f
     ant_radius = lam/2
     psi_res = .0001  # desired doppler resolution
@@ -648,7 +651,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_par
             psi_est = np.zeros(shape=(num_monte_carlo, ))
             for idx_mc in range(num_monte_carlo):
                 curr_idx = idx_mc + idx_snr * num_monte_carlo + idx_num_samples * len(snr_db_vec) * num_monte_carlo
-                utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+                print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
 
                 psi_est[idx_mc] = aoa.doppler.compute_df(r[:, idx_mc], x[:, idx_mc], ts, f, ant_radius, fr, psi_res,
                                                          -np.pi, np.pi)
@@ -662,7 +665,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_par
         
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     fig10 = plt.figure()
     crlb_label = 'CRLB'

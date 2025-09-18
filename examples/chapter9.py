@@ -1,6 +1,7 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from utils import errors
+import numpy as np
+
+from ewgeo.utils.errors import compute_cep50, draw_cep50, draw_error_ellipse
 
 
 def run_all_examples():
@@ -86,11 +87,11 @@ def example2():
     # Set up error covariance matrix
     covariance = np.array([[10.0, -3.0], [-3.0, 5.0]])
     
-    cep50 = errors.compute_cep50(covariance)
+    cep50 = compute_cep50(covariance)
     print('CEP50: {:0.2f}'.format(cep50))
     
-    x_ell, y_ell = errors.draw_error_ellipse(np.array([0, 0]), covariance, num_pts=101, conf_interval=50)
-    x_cep, y_cep = errors.draw_cep50(np.array([0, 0]), covariance, num_pts=101)
+    x_ell, y_ell = draw_error_ellipse(np.array([0, 0]), covariance, num_pts=101, conf_interval=50)
+    x_cep, y_cep = draw_cep50(np.array([0, 0]), covariance, num_pts=101)
 
     # Draw the Ellipse and CEP
     fig = plt.figure()

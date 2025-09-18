@@ -9,8 +9,9 @@ Nicholas O'Donoughue
 25 March 2021
 """
 
-import utils
 import matplotlib.pyplot as plt
+
+from ewgeo.utils import init_output_dir, init_plot_style
 from examples import chapter5
 
 
@@ -24,8 +25,8 @@ def make_all_figures(close_figs=False):
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter5')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter5')
+    init_plot_style()
 
     # Generate all figures
     fig4 = make_figure_4(prefix)

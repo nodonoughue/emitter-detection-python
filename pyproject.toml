@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ewgeo"
+version = "0.0.0"
+authors = [
+  { name="Nicholas O'Donoughue", email="nodonoug@rand.org" },
+]
+description = "Python code companion to Emitter Detection and Geolocation for Electronic Warfare (Artech House, 2019)"
+readme = "README.md"
+requires-python = ">= 3.12"
+dependencies = [
+  "matplotlib",
+  "numpy",
+  "scipy",
+  "seaborn",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

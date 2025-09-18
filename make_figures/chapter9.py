@@ -9,9 +9,12 @@ Nicholas O'Donoughue
 17 May 2021
 """
 
-import utils
 import matplotlib.pyplot as plt
 import numpy as np
+
+from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils.errors import draw_cep50, draw_error_ellipse
+
 from examples import chapter9
 
 
@@ -25,8 +28,8 @@ def make_all_figures(close_figs=False):
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter9')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter9')
+    init_plot_style()
 
     # Generate all figures
     fig1 = make_figure_1(prefix)
@@ -74,8 +77,8 @@ def make_figure_1(prefix=None):
     cov_mtx = np.array([[sx2, sxy], [sxy, sy2]])
     
     # Compute Ellipses
-    x_ell1, y_ell1 = utils.errors.draw_error_ellipse(x2, cov_mtx, num_pts=361, conf_interval=1)    # 1 sigma
-    x_ell2, y_ell2 = utils.errors.draw_error_ellipse(x2, cov_mtx, num_pts=361, conf_interval=95)   # 95% conf interval
+    x_ell1, y_ell1 = draw_error_ellipse(x2, cov_mtx, num_pts=361, conf_interval=1)    # 1 sigma
+    x_ell2, y_ell2 = draw_error_ellipse(x2, cov_mtx, num_pts=361, conf_interval=95)   # 95% conf interval
     
     # Draw figure
     fig1 = plt.figure()
@@ -149,8 +152,8 @@ def make_figure_3(prefix=None):
     cov_mtx = np.array([[sx2, sxy], [sxy, sy2]])
     
     # Compute Error Ellipses
-    x_ellipse, y_ellipse = utils.errors.draw_error_ellipse(x2, cov_mtx, num_pts=361, conf_interval=50)
-    x_cep, y_cep = utils.errors.draw_cep50(x2, cov_mtx, num_pts=361)
+    x_ellipse, y_ellipse = draw_error_ellipse(x2, cov_mtx, num_pts=361, conf_interval=50)
+    x_cep, y_cep = draw_cep50(x2, cov_mtx, num_pts=361)
     
     # Draw Figure
     fig3 = plt.figure()
@@ -197,4 +200,4 @@ def make_figure_4(prefix=None):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})
+    make_all_figures(close_figs=False)

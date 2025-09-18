@@ -9,10 +9,11 @@ Nicholas O'Donoughue
 8 December 2022
 """
 
-import utils
 import matplotlib.pyplot as plt
 import numpy as np
-import atm
+
+import ewgeo.atm as atm
+from ewgeo.utils import init_output_dir, init_plot_style
 
 
 def make_all_figures(close_figs=False):
@@ -25,8 +26,8 @@ def make_all_figures(close_figs=False):
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('appendixC')
-    utils.init_plot_style()
+    prefix = init_output_dir('appendixC')
+    init_plot_style()
 
     # Random Number Generator
     # rng = np.random.default_rng(0)

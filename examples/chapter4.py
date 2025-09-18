@@ -1,9 +1,11 @@
-import numpy as np
 import matplotlib.pyplot as plt
-import prop
-import detector
-import utils
-from utils.unit_conversions import lin_to_db
+import numpy as np
+
+
+from ewgeo import detector
+from ewgeo import prop
+from ewgeo.utils.constants import kT
+from ewgeo.utils.unit_conversions import lin_to_db
 
 
 def run_all_examples(colors=None):
@@ -46,7 +48,7 @@ def example1():
     corr_time = 1e-4
         
     # Compute xi0
-    noise_pwr = noise_figure + lin_to_db(utils.constants.kT*bw_noise)
+    noise_pwr = noise_figure + lin_to_db(kT*bw_noise)
     xi0 = erp + rx_gain - tx_loss - rx_loss - noise_pwr
     
     # Compute Prop Loss
@@ -138,7 +140,7 @@ def example2(colors=None):
     corr_time = 1e-4                 # s
         
     # Compute xi0
-    noise_pwr = noise_figure + lin_to_db(utils.constants.kT*bw_noise)
+    noise_pwr = noise_figure + lin_to_db(kT*bw_noise)
     xi0 = tx_pwr + tx_gain + rx_gain - tx_loss - rx_loss - noise_pwr
     
     # Adjust xi0 to account for partial pulse

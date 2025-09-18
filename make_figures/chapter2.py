@@ -10,12 +10,14 @@ Nicholas O'Donoughue
 22 March 2021
 """
 
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import erf, erfinv
 from scipy.linalg import toeplitz
+
+from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils.unit_conversions import lin_to_db, db_to_lin
+
 from examples import chapter2
 
 
@@ -35,8 +37,8 @@ def make_all_figures(close_figs=False):
     rng = np.random.default_rng()
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter2')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter2')
+    init_plot_style()
 
     # Generate all figures
     fig1 = make_figure_1(prefix)

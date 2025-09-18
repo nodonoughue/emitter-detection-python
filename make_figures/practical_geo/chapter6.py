@@ -9,11 +9,12 @@ Nicholas O'Donoughue
 7 April 2025
 """
 
-import utils
 import matplotlib.pyplot as plt
 import numpy as np
 
-import triang
+import ewgeo.triang as triang
+from ewgeo.utils import init_output_dir, init_plot_style, safe_2d_shape
+from ewgeo.utils.geo import calc_range, find_intersect
 
 from examples.practical_geo import chapter6
 
@@ -32,8 +33,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     # rng = np.random.default_rng()
 
     # Find the output directory
-    prefix = utils.init_output_dir('practical_geo/chapter6')
-    utils.init_plot_style()
+    prefix = init_output_dir('practical_geo/chapter6')
+    init_plot_style()
 
     # Generate all figures
     fig1 = make_figure_1(prefix, mc_params)
@@ -128,7 +129,7 @@ def make_figure_6(prefix=None):
     x_aoa = np.array([[-1., 1.], [0., 0.]])
     x_target = np.array([0., 5.])
     x_err = np.array([1., 0.])
-    _, num_sensor = utils.safe_2d_shape(x_aoa)
+    _, num_sensor = safe_2d_shape(x_aoa)
 
     x_aoa_un = x_aoa + x_err[:, np.newaxis]
     x_aoa_nonun = x_aoa + x_err[:, np.newaxis] @ np.array([[-1, 1]])
@@ -136,11 +137,11 @@ def make_figure_6(prefix=None):
     # Solve True LOBs and AOAs
     # lob = x_target[:, np.newaxis] - x_aoa
     psi = triang.model.measurement(x_sensor=x_aoa, x_source=x_target)
-    r = utils.geo.calc_range(x1=x_aoa, x2=x_target)
+    r = calc_range(x1=x_aoa, x2=x_target)
 
     # Solve Erroneous AOAs
-    x_tgt_un = utils.geo.find_intersect(x0=x_aoa_un[:, 0], psi0=psi[0], x1=x_aoa_un[:, 1], psi1=psi[1])
-    x_tgt_nonun = utils.geo.find_intersect(x0=x_aoa_nonun[:, 0], psi0=psi[0], x1=x_aoa_nonun[:, 1], psi1=psi[1])
+    x_tgt_un = find_intersect(x0=x_aoa_un[:, 0], psi0=psi[0], x1=x_aoa_un[:, 1], psi1=psi[1])
+    x_tgt_nonun = find_intersect(x0=x_aoa_nonun[:, 0], psi0=psi[0], x1=x_aoa_nonun[:, 1], psi1=psi[1])
 
     # Generate the lobs, dimensions are num_dim x num_tx x 2 (datapoints)
     # num_dim x num_sensor x 2

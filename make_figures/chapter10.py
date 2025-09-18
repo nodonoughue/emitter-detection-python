@@ -9,10 +9,13 @@ Nicholas O'Donoughue
 19 May 2021
 """
 
-import utils
 import matplotlib.pyplot as plt
 import numpy as np
-import triang
+
+import ewgeo.triang as triang
+from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils.geo import calc_range
+
 from examples import chapter10
 
 
@@ -22,14 +25,13 @@ def make_all_figures(close_figs=False, mc_params=None):
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
-    :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter10')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter10')
+    init_plot_style()
 
     # Colormap
     cmap = plt.get_cmap("tab10")
@@ -85,7 +87,7 @@ def make_figure_1(prefix=None, cmap=None):
     ang_err = 5*np.pi/180
 
     # Compute Ranges and Angles
-    range_act = utils.geo.calc_range(x_sensor, x_source)
+    range_act = calc_range(x_sensor, x_source)
     psi_act = triang.model.measurement(x_sensor, x_source)
 
     # Start first figure; geometry
@@ -168,7 +170,7 @@ def make_figure_2(prefix=None, cmap=None):
     ang_err = 5*np.pi/180
 
     # Compute Ranges and Angles
-    range_act = utils.geo.calc_range(x_sensor, x_source)
+    range_act = calc_range(x_sensor, x_source)
     psi_act = triang.model.measurement(x_sensor, x_source)
 
     # Start first figure; geometry

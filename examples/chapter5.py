@@ -1,7 +1,8 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from utils.unit_conversions import db_to_lin
+import numpy as np
 from scipy import stats
+
+from ewgeo.utils.unit_conversions import db_to_lin
 
 
 def run_all_examples():

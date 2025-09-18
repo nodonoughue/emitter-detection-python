@@ -1,16 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-import utils
-from utils.covariance import CovarianceMatrix
-from utils import tracker
-from triang import DirectionFinder
-from tdoa import TDOAPassiveSurveillanceSystem
 
-_ft2m = utils.unit_conversions.convert(1, from_unit="ft", to_unit="m")
-_rad2deg = utils.unit_conversions.convert(1, from_unit="rad", to_unit="deg")
-_deg2rad = utils.unit_conversions.convert(1, from_unit="deg", to_unit="rad")
-_speed_of_light = utils.constants.speed_of_light
+from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.triang import DirectionFinder
+from ewgeo.utils import print_progress, print_elapsed, safe_2d_shape
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.constraints import fixed_alt
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import draw_error_ellipse
+from ewgeo.utils import tracker
+from ewgeo.utils.unit_conversions import convert
+
+_ft2m = convert(1, from_unit="ft", to_unit="m")
+_rad2deg = convert(1, from_unit="rad", to_unit="deg")
+_deg2rad = convert(1, from_unit="deg", to_unit="rad")
 
 def run_all_examples():
     """
@@ -22,7 +26,7 @@ def run_all_examples():
     return list(example1()) + list(example2())
 
 
-def example1(rng=np.random.default_rng(), mc_params=None):
+def example1(mc_params=None):
     """
     Executes Example 8.1.
 
@@ -38,7 +42,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     x_tdoa = np.array([[5e3,   0,  0, -5e3],
                        [  0, 5e3,  0,    0],
                        [30,  60, 30,   60]])
-    num_dims, n_tdoa = utils.safe_2d_shape(x_tdoa)
+    num_dims, n_tdoa = safe_2d_shape(x_tdoa)
 
     # ===  Define target trajectory
     x_tgt_init = np.array([-50e3, 100e3, 20e3*_ft2m])
@@ -79,7 +83,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     ref_idx = 0
     sigma_toa = 10e-9
     cov_toa = (sigma_toa**2) * np.eye(n_tdoa)
-    cov_roa = CovarianceMatrix(_speed_of_light**2*cov_toa)
+    cov_roa = CovarianceMatrix(speed_of_light ** 2 * cov_toa)
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx, variance_is_toa=False)
 
     # ===  Generate Measurements
@@ -132,7 +136,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     num_ell_pts = 101 # number of points for ellipse drawing
     x_ell_est = np.zeros((2,num_ell_pts,num_time))
     for idx in np.arange(num_time):
-        utils.print_progress(num_time, idx, iterations_per_marker, iterations_per_row, t_start)
+        print_progress(num_time, idx, iterations_per_marker, iterations_per_row, t_start)
 
         # Grab Current Measurement
         this_zeta = zeta[:, idx]
@@ -157,26 +161,17 @@ def example1(rng=np.random.default_rng(), mc_params=None):
         p_est_xyz = p_est[pos_slice, pos_slice]
         x_est_xy = x_est_xyz[:2]
         p_est_xy = p_est_xyz[:2, :2]
-        x_ell_est[:, :, idx] = utils.errors.draw_error_ellipse(x_est_xy, p_est_xy, num_ell_pts)
+        x_ell_est[:, :, idx] = draw_error_ellipse(x_est_xy, p_est_xy, num_ell_pts)
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     plt.scatter(x_init[0], x_init[1], marker='+',label='Initial Position Estimate')
     plt.plot(x_ekf_est[0],x_ekf_est[1],'--',label='EKF (est.)')
     plt.plot(x_ekf_pred[0],x_ekf_pred[1],'--',label='EKF (pred.)')
     plt.grid(True)
     plt.legend(loc='lower left')
-
-    # plt.plot some error ellipses
-    #for idx=1:10:num_time
-    #    this_ell = squeeze(x_ell_est(:,:,idx))
-    #    hdl = patch(this_ell[0], this_ell[1],hdl_est.Color,'FaceAlpha',.2,label='1$\sigma$ Error (est.)')
-    #    if idx~=1
-    #        utils.excludeFromLegend(hdl)
-    #    end
-    #end
 
     # ===  Compute Error
     err_pred = x_ekf_pred[:, :-2] - x_tgt_full[:, 1:-1]
@@ -211,7 +206,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     iterations_per_row = markers_per_row * iterations_per_marker
 
     for idx_mc in np.arange(num_monte_carlo):
-        utils.print_progress(num_monte_carlo, idx_mc, iterations_per_marker, iterations_per_row, t_start)
+        print_progress(num_monte_carlo, idx_mc, iterations_per_marker, iterations_per_row, t_start)
 
         # Generate Measurements
         noise = tdoa.cov.sample(num_samples=num_time)
@@ -261,7 +256,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     rmse_pred = np.sqrt(np.mean(sse_pred, axis=0))
     rmse_est = np.sqrt(np.mean(sse_est, axis=0))
@@ -392,7 +387,7 @@ def example2(rng=np.random.default_rng()):
     aoa_init = DirectionFinder(x=x_aoa_init, cov=cov_init, do_2d_aoa=do2daoa)
     
     x_init_guess = np.array([10e3, 10e3, 0])
-    bnd, bnd_grad = utils.constraints.fixed_alt(0, 'flat')
+    bnd, bnd_grad = fixed_alt(0, 'flat')
     x_init, _ = aoa_init.gradient_descent(zeta=zeta_init, x_init=x_init_guess, eq_constraints=[bnd], epsilon=100)
     p_init = aoa_init.compute_crlb(x_source=x_init, eq_constraints_grad=[bnd_grad])
 
@@ -423,8 +418,8 @@ def example2(rng=np.random.default_rng()):
     num_ell_pts = 101 # number of points for ellipse drawing
     x_ell_est = np.zeros((2,num_ell_pts,num_time))
     for idx in np.arange(num_time):
-        utils.print_progress(num_total=num_time, curr_idx=idx, iterations_per_marker=iter_per_marker,
-                             iterations_per_row=iter_per_row, t_start=t_start)
+        print_progress(num_total=num_time, curr_idx=idx, iterations_per_marker=iter_per_marker,
+                       iterations_per_row=iter_per_row, t_start=t_start)
 
         # Grab Current Measurement
         this_zeta = zeta[:, idx]
@@ -485,28 +480,19 @@ def example2(rng=np.random.default_rng()):
         rmse_cov_pred[idx]= np.sqrt(np.linalg.trace(p_pred[pos_slice, pos_slice]))
 
         # Draw an error ellipse
-        x_ell_est[:, :, idx] = utils.errors.draw_error_ellipse(x=pos_est[:2],
-                                                               covariance=p_pos_est[:2, :2],
-                                                               num_pts=num_ell_pts)
+        x_ell_est[:, :, idx] = draw_error_ellipse(x=pos_est[:2],
+                                                  covariance=p_pos_est[:2, :2],
+                                                  num_pts=num_ell_pts)
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
         
     plt.plot(x_init[0], x_init[1], '+',label='Initial Position Estimate')
     plt.plot(x_ekf_est[0],x_ekf_est[1],'-',label='EKF (est.)')
     plt.plot(x_ekf_pred[0],x_ekf_pred[1],'-',label='EKF (pred.)')
     plt.grid(True)
     plt.legend()
-
-    # plt.plot some error ellipses
-    #for idx=1:10:num_time
-    #    this_ell = squeeze(x_ell_est(:,:,idx))
-    #    hdl = patch(this_ell[0], this_ell[1],hdl_est.Color,'FaceAlpha',.2,label='1$\sigma$ Error (est.)')
-    #    if idx~=1
-    #        utils.excludeFromLegend(hdl)
-    #    end
-    #end
 
     # ===  Zoomed plt.plot on Target
     fig2=plt.figure()
