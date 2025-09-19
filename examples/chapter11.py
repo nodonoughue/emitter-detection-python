@@ -82,7 +82,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     num_iterations = int(1000)
     alpha = .3
     beta = .8
-    epsilon = 100  # [m] desired iterative search stopping condition
+    epsilon = 10  # [m] desired iterative search stopping condition
     grid_res = int(500)  # [m] desired grid search resolution
     x_init = 2 * baseline * np.array([np.cos(th + np.pi / 6), np.sin(th + np.pi / 6)])  # km
     x_extent = 5 * baseline
@@ -105,7 +105,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
                'epsilon': epsilon
                }
 
-    # TODO: Debug; something isn't right with GD in this example; failing to converge.
     gd_args = {'x_init': x_init,
                'max_num_iterations': num_iterations,
                'epsilon': epsilon,
