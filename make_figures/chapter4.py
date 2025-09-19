@@ -9,14 +9,16 @@ Nicholas O'Donoughue
 24 March 2021
 """
 
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import numpy as np
 from scipy.fft import fft, fftshift
 from scipy import stats
-import detector
+
+import ewgeo.detector as detector
+from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils.unit_conversions import lin_to_db, db_to_lin
+
 from examples import chapter4
 
 
@@ -24,8 +26,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
-    :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
-                 Default=False
+    :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
+                       Default=False
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
@@ -37,8 +39,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     rng = np.random.default_rng(0)
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter4')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter4')
+    init_plot_style()
 
     # Generate all figures
     fig1a = make_figure_1a(prefix)

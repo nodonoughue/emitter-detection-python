@@ -1,16 +1,17 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
-import utils
-from utils import SearchSpace
-from utils.covariance import CovarianceMatrix
-from utils import tracker
-from triang import DirectionFinder
-from tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.triang import DirectionFinder
+from ewgeo.utils import make_nd_grid, safe_2d_shape, SearchSpace, tracker
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
+from ewgeo.utils.unit_conversions import convert
 
-_rad2deg = utils.unit_conversions.convert(1, "rad", "deg")
-_deg2rad = utils.unit_conversions.convert(1, "deg", "rad")
-_speed_of_light = utils.constants.speed_of_light
+_rad2deg = convert(1, "rad", "deg")
+_deg2rad = convert(1, "deg", "rad")
+
 
 def run_all_examples():
     """
@@ -42,7 +43,7 @@ def example1(colors=None):
     x_tgt = np.array([2e3, 4e3])
 
     # Define sensor accuracy
-    _, n_sensors = utils.safe_2d_shape(x_aoa)
+    _, n_sensors = safe_2d_shape(x_aoa)
     sigma_theta = 5
     sigma_psi = sigma_theta * _deg2rad
     cov_psi = CovarianceMatrix(sigma_psi**2 * np.eye(n_sensors))
@@ -52,7 +53,7 @@ def example1(colors=None):
 
     # Compute CRLB
     crlb = aoa.compute_crlb(x_source=x_tgt)
-    cep50=utils.errors.compute_cep50(crlb)
+    cep50= compute_cep50(crlb)
     print('CEP50: {:.2f} km'.format(cep50/1e3))
 
     cep50_desired = 100
@@ -71,7 +72,7 @@ def example1(colors=None):
 
             aoa.cov = this_cov
             this_crlb = aoa.compute_crlb(x_source=x_tgt)
-            cep_vec[idx_s, idx_n] = utils.errors.compute_cep50(this_crlb)
+            cep_vec[idx_s, idx_n] = compute_cep50(this_crlb)
 
     fig=plt.figure()
     for this_sigma, this_cep in zip(sigma_theta_vec, cep_vec):
@@ -102,7 +103,7 @@ def example1(colors=None):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=offset,
                                epsilon=grid_res)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    x_set, x_grid, grid_shape = make_nd_grid(search_space)
     extent = ((x_ctr[0] - offset[0])/1e3,
               (x_ctr[0] + offset[0])/1e3,
               (x_ctr[1] - offset[1])/1e3,
@@ -121,7 +122,7 @@ def example1(colors=None):
     for this_k in k_vec:
         aoa.cov = cov_psi.multiply(1/this_k, overwrite=False)
         this_crlb = aoa.compute_crlb(x_source=x_set)
-        cep = np.reshape(utils.errors.compute_cep50(this_crlb), shape=grid_shape_2d)
+        cep = np.reshape(compute_cep50(this_crlb), shape=grid_shape_2d)
 
         # Start with the image plot
         this_fig = plt.figure()
@@ -141,7 +142,7 @@ def example1(colors=None):
     return figs
 
 
-def example2(rng=np.random.default_rng()):
+def example2():
     """
     Executes Example 7.2.
 
@@ -150,7 +151,6 @@ def example2(rng=np.random.default_rng()):
     Nicholas O'Donoughue
     28 June 2025
 
-    :param rng: random number generator
     :return: figure handle to generated graphic
     """
 
@@ -160,10 +160,10 @@ def example2(rng=np.random.default_rng()):
     x_tgt = np.array([5e3, -15e3])
     
     # Define sensor accuracy
-    _, n_sensors = utils.safe_2d_shape(x_tdoa)
+    _, n_sensors = safe_2d_shape(x_tdoa)
     sigma_t = 1e-6
     cov_toa = CovarianceMatrix(sigma_t**2*np.eye(n_sensors))
-    cov_roa = cov_toa.multiply(_speed_of_light**2, overwrite=False)
+    cov_roa = cov_toa.multiply(speed_of_light ** 2, overwrite=False)
     ref_idx = None  # use default reference sensor
 
     # Initialize PSS Object
@@ -174,7 +174,7 @@ def example2(rng=np.random.default_rng()):
     
     # Compute CRLB
     crlb_single_sample = tdoa.compute_crlb(x_source=x_tgt)
-    cep_single_sample = utils.errors.compute_cep50(crlb_single_sample)
+    cep_single_sample = compute_cep50(crlb_single_sample)
     print('CEP50 for a single sample: {:.2f} km'.format(cep_single_sample/1e3))
     
     # Iterate over observation interval
@@ -186,10 +186,10 @@ def example2(rng=np.random.default_rng()):
         for idx_t, this_time in enumerate(time_vec):
             this_num_samples = 1 + np.floor(this_time/pri)
 
-            this_cov_roa = (this_sigma_t**2 * _speed_of_light**2 / this_num_samples) * np.eye(n_sensors)
+            this_cov_roa = (this_sigma_t ** 2 * speed_of_light ** 2 / this_num_samples) * np.eye(n_sensors)
             tdoa.cov = CovarianceMatrix(this_cov_roa)
             this_crlb = tdoa.compute_crlb(x_source=x_tgt)
-            cep_vec[idx_s, idx_t] = utils.errors.compute_cep50(this_crlb)
+            cep_vec[idx_s, idx_t] = compute_cep50(this_crlb)
 
     fig1=plt.figure()
     for this_cep, this_sigma_t in zip(cep_vec, sigma_t_vec):
@@ -218,7 +218,7 @@ def example2(rng=np.random.default_rng()):
     cov = cov_roa.multiply(1/num_pulses, overwrite=False)
     tdoa.cov = cov
     crlb_sample_mean = tdoa.compute_crlb(x_source=x_tgt)
-    cep_sample_mean = utils.errors.compute_cep50(crlb_sample_mean)
+    cep_sample_mean = compute_cep50(crlb_sample_mean)
     print('CEP50 for the sample mean: {:.2f} km'.format(cep_sample_mean/1e3))
 
     # Reset the covariance matrix
@@ -250,8 +250,8 @@ def example2(rng=np.random.default_rng()):
     plt.grid(True)
 
     # Overlay error ellipse
-    ell = utils.errors.draw_error_ellipse(x_tgt, crlb_single_sample,num_pts=101)
-    ell_full = utils.errors.draw_error_ellipse(x_tgt, crlb_sample_mean,num_pts=101)
+    ell = draw_error_ellipse(x_tgt, crlb_single_sample,num_pts=101)
+    ell_full = draw_error_ellipse(x_tgt, crlb_sample_mean,num_pts=101)
     
     plt.plot(ell[0], ell[1], label='Error Ellipse (single sample)')
     plt.plot(ell_full[0], ell_full[1], label='Error Ellipse (sample mean)')
@@ -276,7 +276,7 @@ def example2(rng=np.random.default_rng()):
     return fig1, fig2, fig3
 
 
-def example3(rng=np.random.default_rng()):
+def example3():
     """
     Executes Example 7.3.
 
@@ -292,7 +292,7 @@ def example3(rng=np.random.default_rng()):
     x_tgt = np.array([ 3e3, 25e3])
 
     # Define sensor accuracy
-    _, n_sensors = utils.safe_2d_shape(x_aoa)
+    _, n_sensors = safe_2d_shape(x_aoa)
     sigma_theta = 10
     sigma_psi = sigma_theta*_deg2rad
     cov_psi = CovarianceMatrix(sigma_psi**2*np.eye(n_sensors))
@@ -335,7 +335,7 @@ def example3(rng=np.random.default_rng()):
 
         # Store the results and update the variables
         x_est[:, idx] = this_x
-        cep[idx] = utils.errors.compute_cep50(this_p)
+        cep[idx] = compute_cep50(this_p)
 
         prev_x = this_x
         prev_p = this_p
@@ -347,10 +347,10 @@ def example3(rng=np.random.default_rng()):
 
     # Draw Error Ellipse from single sample
     crlb = aoa.compute_crlb(x_tgt)
-    ell = utils.errors.draw_error_ellipse(x_tgt, crlb, num_pts=101)
+    ell = draw_error_ellipse(x_tgt, crlb, num_pts=101)
     plt.plot(ell[0], ell[1],'-.', label='Error Ellipse (single msmt.)')
 
-    ell_1s = utils.errors.draw_error_ellipse(x_tgt, crlb/np.sqrt(num_pulses), num_pts=101)
+    ell_1s = draw_error_ellipse(x_tgt, crlb/np.sqrt(num_pulses), num_pts=101)
     plt.plot(ell_1s[0], ell_1s[1],'-.', label='Error Ellipse (full observation)')
 
     offset = np.amax(np.amax(ell, axis=1)-np.amin(ell,axis=1), axis=0)
@@ -384,7 +384,7 @@ def example3(rng=np.random.default_rng()):
     return figs
 
 
-def example4(rng=np.random.default_rng()):
+def example4():
     """
     Executes Example 7.4.
 
@@ -401,7 +401,7 @@ def example4(rng=np.random.default_rng()):
     x_tgt = np.array([3e3, 25e3])
     
     # Define sensor accuracy
-    num_dims, num_sensors = utils.safe_2d_shape(x_aoa)
+    num_dims, num_sensors = safe_2d_shape(x_aoa)
     sigma_theta = 10
     sigma_psi = sigma_theta*_deg2rad
     cov_psi = CovarianceMatrix((sigma_psi**2)*np.eye(num_sensors))
@@ -445,7 +445,7 @@ def example4(rng=np.random.default_rng()):
 
         # Store the results and update the variables
         x_est[:, idx] = this_x
-        cep[idx] = utils.errors.compute_cep50(this_p)
+        cep[idx] = compute_cep50(this_p)
     
         prev_x = this_x
         prev_p = this_p
@@ -457,10 +457,10 @@ def example4(rng=np.random.default_rng()):
 
     # Draw Error Ellipse from single sample
     crlb = aoa.compute_crlb(x_tgt)
-    ell = utils.errors.draw_error_ellipse(x=x_tgt, covariance=crlb, num_pts=101)
+    ell = draw_error_ellipse(x=x_tgt, covariance=crlb, num_pts=101)
     plt.plot(ell[0], ell[1],'-.',label='Error Ellipse (single msmt.)')
     
-    ell_end = utils.errors.draw_error_ellipse(x=x_tgt, covariance=this_p, num_pts=101)
+    ell_end = draw_error_ellipse(x=x_tgt, covariance=this_p, num_pts=101)
     plt.plot(ell_end[0], ell_end[1],'-.',label='Error Ellipse (Final EKF Update)')
     
     offset = np.amax(np.amax(ell, axis=1)-np.amin(ell,axis=1), axis=None)

@@ -1,9 +1,10 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from utils import constants
-from utils.unit_conversions import lin_to_db
-import prop
-import aoa
+import numpy as np
+
+from ewgeo import aoa
+from ewgeo.prop.model import get_path_loss
+from ewgeo.utils.constants import kT, speed_of_light
+from ewgeo.utils.unit_conversions import lin_to_db
 
 
 def run_all_examples():
@@ -39,16 +40,16 @@ def initialize_parameters():
                   'aoa_true_deg': 10, 'range_m': np.logspace(start=3, stop=5, num=20)}
 
     # Compute dependent parameters
-    parameters['wavelength'] = constants.speed_of_light / parameters['freq_hz']  # m
+    parameters['wavelength'] = speed_of_light / parameters['freq_hz']  # m
     parameters['aoa_true_rad'] = np.deg2rad(parameters['aoa_true_deg'])
 
-    path_loss = prop.model.get_path_loss(range_m=parameters['range_m'], freq_hz=parameters['freq_hz'],
-                                         tx_ht_m=parameters['tx_ht_m'], rx_ht_m=parameters['rx_ht_m'],
-                                         include_atm_loss=False)
+    path_loss = get_path_loss(range_m=parameters['range_m'], freq_hz=parameters['freq_hz'],
+                              tx_ht_m=parameters['tx_ht_m'], rx_ht_m=parameters['rx_ht_m'],
+                              include_atm_loss=False)
 
     parameters['eirp'] = lin_to_db(parameters['tx_pwr']) + parameters['tx_gain'] - parameters['tx_loss']
     parameters['sig_pwr'] = parameters['eirp'] - path_loss - parameters['rx_loss']
-    parameters['noise_pwr'] = lin_to_db(constants.kT * parameters['bw_noise']) + parameters['noise_figure']
+    parameters['noise_pwr'] = lin_to_db(kT * parameters['bw_noise']) + parameters['noise_figure']
     parameters['snr_db'] = parameters['sig_pwr'] - parameters['noise_pwr']
 
     # Compute the number of time samples available
@@ -201,9 +202,9 @@ def example4(fig=None):
 
     # Loss as a function of range
     range_m_vec = np.arange(start=1e3, step=10, stop=100e3)  # 10 m spacing from 1 km to 100 km
-    path_loss_vec = prop.model.get_path_loss(range_m=range_m_vec, freq_hz=params['freq_hz'], tx_ht_m=params['tx_ht_m'],
-                                             rx_ht_m=params['rx_ht_m'], include_atm_loss=False)
-    noise_pwr = lin_to_db(constants.kT * params['bw_noise']) + params['noise_figure']
+    path_loss_vec = get_path_loss(range_m=range_m_vec, freq_hz=params['freq_hz'], tx_ht_m=params['tx_ht_m'],
+                                  rx_ht_m=params['rx_ht_m'], include_atm_loss=False)
+    noise_pwr = lin_to_db(kT * params['bw_noise']) + params['noise_figure']
     snr0 = lin_to_db(params['tx_pwr']) + params['tx_gain'] - params['tx_loss'] - params['rx_loss'] - noise_pwr
     snr_vec = snr0 - path_loss_vec
 

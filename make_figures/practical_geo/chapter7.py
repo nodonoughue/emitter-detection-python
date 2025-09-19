@@ -8,19 +8,20 @@ Ported from MATLAB Code
 Nicholas O'Donoughue
 28 June 2025
 """
-
-from triang import DirectionFinder
-from tdoa import TDOAPassiveSurveillanceSystem
-import utils
-from utils.covariance import CovarianceMatrix
-from utils import tracker
 import matplotlib.pyplot as plt
 import numpy as np
 
+from ewgeo.triang import DirectionFinder
+from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.utils import init_output_dir, init_plot_style, safe_2d_shape, tracker
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50
+from ewgeo.utils.unit_conversions import convert
+
 from examples.practical_geo import chapter7
 
-_rad2deg = utils.unit_conversions.convert(1, "rad", "deg")
-_deg2rad = utils.unit_conversions.convert(1, "deg", "rad")
+_rad2deg = convert(1, "rad", "deg")
+_deg2rad = convert(1, "deg", "rad")
 
 
 def make_all_figures(close_figs=False, mc_params=None):
@@ -37,8 +38,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     # rng = np.random.default_rng()
 
     # Find the output directory
-    prefix = utils.init_output_dir('practical_geo/chapter7')
-    utils.init_plot_style()
+    prefix = init_output_dir('practical_geo/chapter7')
+    init_plot_style()
 
     # Generate all figures
     figs1_2 = make_figures_1_2(prefix, mc_params)
@@ -166,7 +167,7 @@ def make_figure_7(prefix=None):
 
     t = np.arange(1000)/10  # 0 to 100 in increments of .1
 
-    _, num_sensors = utils.safe_2d_shape(x_tdoa)
+    _, num_sensors = safe_2d_shape(x_tdoa)
     num_t = len(t)
 
     x_tdoa_full = x_tdoa[:, :, np.newaxis] + v_tdoa[:, :, np.newaxis] * np.reshape(t, shape=(1, 1, num_t))
@@ -239,12 +240,11 @@ def make_figure_8(prefix=None, mc_params=None):
 
     return figs
 
-def make_figure_10(prefix=None, rng=np.random.default_rng()):
+def make_figure_10(prefix=None):
     """
     Figure 7.10
 
     :param prefix: output directory to place generated figure
-    :param rng: random number generator
     :return: handle
     """
 
@@ -327,8 +327,6 @@ def make_figure_10(prefix=None, rng=np.random.default_rng()):
     x_prev = np.array([0, 1e3])
     p_prev = np.diag([1e3, 10e3])**2
 
-    lower = np.sqrt(aoa.cov.cov)  # the covariance matrix is a scalar; so just take the square root
-
     cep_vec = np.zeros_like(t_vec)
     for idx in np.arange(t_vec.size):
         this_x_aoa = x_aoa[:,idx]
@@ -340,7 +338,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng()):
         this_psi = aoa.noisy_measurement(x_tgt)
 
         this_x, this_p = tracker.ekf_update(x_prev, p_prev, this_psi, aoa.cov.cov, z_fun, h_fun)
-        cep_vec[idx] = utils.errors.compute_cep50(this_p)
+        cep_vec[idx] = compute_cep50(this_p)
 
         x_prev = this_x
         p_prev = this_p

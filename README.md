@@ -10,7 +10,17 @@ The textbooks can be purchased from Artech House directly at the following links
 
 ## Installation
 
-coming soon...
+Clone the repository, then
+```
+cd passive-geolocation-python
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -e .
+```
+
+This repository has been tested with Python 3.12 and 3.13. We recommend using a 
+virtual environment for package/dependency handling (the virtual environment 
+does not need to be named `.venv`, however).
 
 ### Dependencies
 
@@ -48,4 +58,4 @@ A number of utilities are provided in this repository, under the following names
 + **utils/** Generic utilities, including numerical solvers used in geolocation algorithms.
 
 ## Feedback
-Please submit any suggestions, bugs, or comments to nicholas [dot] odonoughue [at] ieee [dot] org.
+Please submit any suggestions, bugs, or comments as issues in this git repository.

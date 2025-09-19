@@ -1,18 +1,21 @@
-import numpy as np
 import matplotlib.pyplot as plt
-
-import utils
+import numpy as np
 import time
-from utils import SearchSpace
-from utils.covariance import CovarianceMatrix
-from triang import DirectionFinder
-from tdoa import TDOAPassiveSurveillanceSystem
-from fdoa import FDOAPassiveSurveillanceSystem
-from hybrid import HybridPassiveSurveillanceSystem
 
-_rad2deg = utils.unit_conversions.convert(1, "rad", "deg")
-_deg2rad = utils.unit_conversions.convert(1, "deg", "rad")
-_kph2mps = utils.unit_conversions.kph_to_mps(1)
+from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
+from ewgeo.hybrid import HybridPassiveSurveillanceSystem
+from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.triang import DirectionFinder
+from ewgeo.utils import print_elapsed, print_progress, make_nd_grid, safe_2d_shape, SearchSpace, remove_outliers
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.coordinates import lla_to_enu
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
+from ewgeo.utils.unit_conversions import convert, kph_to_mps
+
+_rad2deg = convert(1, "rad", "deg")
+_deg2rad = convert(1, "deg", "rad")
+_kph2mps = kph_to_mps(1)
 
 
 def run_all_examples():
@@ -62,13 +65,13 @@ def example1(mc_params=None):
     f_source_hz = 1e9
 
     # Convert positions and velocity to ENU
-    [e_source, n_source, u_source] = utils.coordinates.lla_to_enu(x_source_lla[0], x_source_lla[1], x_source_lla[2],
-                                                                  ref_lat, ref_lon, ref_alt,
-                                                                  angle_units='deg', dist_units='m')
+    [e_source, n_source, u_source] = lla_to_enu(x_source_lla[0], x_source_lla[1], x_source_lla[2],
+                                                ref_lat, ref_lon, ref_alt,
+                                                angle_units='deg', dist_units='m')
     x_source_enu = np.array([e_source, n_source, u_source])
 
     # Sensor Selection
-    num_dims, num_tdoa = utils.safe_2d_shape(x_sensor_enu)
+    num_dims, num_tdoa = safe_2d_shape(x_sensor_enu)
     num_aoa = num_tdoa
     num_fdoa = num_aoa
     ref_tdoa = num_tdoa - 1
@@ -79,8 +82,8 @@ def example1(mc_params=None):
         num_aoa = 2 * num_aoa  # double the number of aoa "sensors" to account for the second measurement from each
 
     cov_psi = (err_aoa_deg*_deg2rad)**2 * np.eye(num_aoa)  # rad^2
-    cov_r = (err_tdoa_s*utils.constants.speed_of_light)**2 * np.eye(num_tdoa)  # m^2
-    cov_rr = (err_fdoa_hz*utils.constants.speed_of_light/f_source_hz)**2 * np.eye(num_fdoa)  # m^2/s^2
+    cov_r = (err_tdoa_s*speed_of_light)**2 * np.eye(num_tdoa)  # m^2
+    cov_rr = (err_fdoa_hz*speed_of_light/f_source_hz)**2 * np.eye(num_fdoa)  # m^2/s^2
 
     # Make the PSS Objects
     aoa = DirectionFinder(x=x_sensor_enu, do_2d_aoa=do_2d_aoa, cov=CovarianceMatrix(cov_psi))
@@ -98,7 +101,7 @@ def example1(mc_params=None):
 
     # GD and LS Search Parameters
     x_init_enu = np.array([1, 1, 0]) * 1e3
-    # [xx, yy, zz] = utils.enu2ecef(x_init_enu(1), x_init_enu(2), x_init_enu(3), ref_lat, ref_lon, ref_alt)
+    # [xx, yy, zz] = enu2ecef(x_init_enu(1), x_init_enu(2), x_init_enu(3), ref_lat, ref_lon, ref_alt)
     # x_init_ecef = [xx,yy,zz] # reassemble ecef coordinates into a single variable
 
     # LS Search Parameters
@@ -119,7 +122,7 @@ def example1(mc_params=None):
     iterations_per_row = markers_per_row * iterations_per_marker
 
     for idx in np.arange(num_monte_carlo):
-        utils.print_progress(num_total=num_monte_carlo, curr_idx=idx, iterations_per_marker=iterations_per_marker,
+        print_progress(num_total=num_monte_carlo, curr_idx=idx, iterations_per_marker=iterations_per_marker,
                              iterations_per_row=iterations_per_row, t_start=t_start)
 
         # LS Solution
@@ -129,11 +132,11 @@ def example1(mc_params=None):
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     # Remove outliers
-    error = utils.remove_outliers(error)
-    num_monte_carlo_actual, _ = utils.safe_2d_shape(error)
+    error = remove_outliers(error)
+    num_monte_carlo_actual, _ = safe_2d_shape(error)
 
     # Plot RMSE and CRLB
     rmse_ls = np.sqrt(np.sum(error**2, 0)/num_monte_carlo_actual)
@@ -156,11 +159,11 @@ def example1(mc_params=None):
     plt.legend(loc='upper right')
 
     # Compute and display the CEP50
-    cep50 = utils.errors.compute_cep50(crlb)
+    cep50 = compute_cep50(crlb)
     print('CEP50: {:.2f} km'.format(cep50/1e3))
 
     # Generate the 90% error ellipse from the CRLB
-    crlb_ellipse = utils.errors.draw_error_ellipse(x_source_enu[0:2], crlb, 101, 50)
+    crlb_ellipse = draw_error_ellipse(x_source_enu[0:2], crlb, 101, 50)
 
     # Plot Result
     fig1 = plt.figure()
@@ -212,9 +215,9 @@ def example2(colors=None):
     ref_lon = -71  # deg Lon (E)
     ref_alt = 0  # alt (m)
 
-    [e_sensor, n_sensor, u_sensor] = utils.coordinates.lla_to_enu(x_sensor_lla[0], x_sensor_lla[1], x_sensor_lla[2],
-                                                                  ref_lat, ref_lon, ref_alt,
-                                                                  angle_units="deg", dist_units="m")
+    [e_sensor, n_sensor, u_sensor] = lla_to_enu(x_sensor_lla[0], x_sensor_lla[1], x_sensor_lla[2],
+                                                ref_lat, ref_lon, ref_alt,
+                                                angle_units="deg", dist_units="m")
     x_sensor_enu = np.concatenate((e_sensor[np.newaxis, :],
                                    n_sensor[np.newaxis, :],
                                    u_sensor[np.newaxis, :]), axis=0)
@@ -224,7 +227,7 @@ def example2(colors=None):
     err_fdoa_hz = 100
     f_source_hz = 1e9
 
-    # Build grid of positions within 500km of source position (ENU origin)
+    # Build grid of positions within 500 km of source position (ENU origin)
     v_source_enu = np.zeros(shape=(3, ))  # source is stationary
 
     x_ctr = np.zeros(shape=(3, ))
@@ -235,7 +238,7 @@ def example2(colors=None):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=search_size,
                                epsilon=grid_res)
-    x_source_enu, x_grid, grid_shape = utils.make_nd_grid(search_space)  # make the grid
+    x_source_enu, x_grid, grid_shape = make_nd_grid(search_space)  # make the grid
     extent = tuple(np.array([x_ctr[0] - max_offset, x_ctr[0] + max_offset,
                              x_ctr[1] - max_offset, x_ctr[1] + max_offset])/1e3)
 
@@ -247,7 +250,7 @@ def example2(colors=None):
     grid_shape_2d = [i for i in grid_shape if i > 1]
 
     # Sensor Selection
-    _, n_tdoa = utils.safe_2d_shape(x_sensor_lla)
+    _, n_tdoa = safe_2d_shape(x_sensor_lla)
     n_aoa = n_tdoa
     n_fdoa = n_aoa
     ref_tdoa = n_tdoa - 1
@@ -255,8 +258,8 @@ def example2(colors=None):
 
     # Error Covariance Matrix
     cov_psi = CovarianceMatrix((err_aoa_deg * _deg2rad)**2 * np.eye(2*n_aoa))  # rad^2
-    cov_r = CovarianceMatrix((err_tdoa_s*utils.constants.speed_of_light)**2 * np.eye(n_tdoa))  # m^2
-    cov_rr = CovarianceMatrix((err_fdoa_hz*utils.constants.speed_of_light/f_source_hz)**2 * np.eye(n_fdoa))  # m^2/s^2
+    cov_r = CovarianceMatrix((err_tdoa_s*speed_of_light)**2 * np.eye(n_tdoa))  # m^2
+    cov_rr = CovarianceMatrix((err_fdoa_hz*speed_of_light/f_source_hz)**2 * np.eye(n_fdoa))  # m^2/s^2
     # cov_x = CovarianceMatrix.block_diagonal(cov_psi, cov_r, cov_rr)
 
     # Make the PSS objects

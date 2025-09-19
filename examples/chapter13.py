@@ -1,14 +1,15 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import time
-import utils
-from hybrid import HybridPassiveSurveillanceSystem
-from fdoa import FDOAPassiveSurveillanceSystem
-from tdoa import TDOAPassiveSurveillanceSystem
-from triang import DirectionFinder
-from utils.covariance import CovarianceMatrix
-from utils import SearchSpace
 
+from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
+from ewgeo.hybrid import HybridPassiveSurveillanceSystem
+from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.triang import DirectionFinder
+from ewgeo.utils import print_elapsed, print_progress, safe_2d_shape, SearchSpace
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
 
 def run_all_examples():
     """
@@ -50,8 +51,8 @@ def example1(mc_params=None):
     ang_err = 0.2                   # rad (az/el)
     time_err = 100e-9               # sec
     freq_err = 3                    # Hz resolution
-    rng_err = utils.constants.speed_of_light * time_err  # m
-    rng_rate_err = utils.constants.speed_of_light * freq_err / transmit_freq  # m/s
+    rng_err = speed_of_light * time_err  # m
+    rng_rate_err = speed_of_light * freq_err / transmit_freq  # m/s
 
     # Measurement Error Covariance
     tdoa_ref_idx = num_sensors - 1
@@ -123,7 +124,7 @@ def example1(mc_params=None):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     for idx in np.arange(num_monte_carlo):
-        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
+        print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(pss=hybrid, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
@@ -133,7 +134,7 @@ def example1(mc_params=None):
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     # Wrap the results in a dictionary for easier passing
     results = {'ml': x_ml,
@@ -172,16 +173,16 @@ def example2(mc_params=None):
     x_aoa = baseline * np.array([-1., 1.])
     x_time_freq = baseline * np.array([[-1., 1.], [0., 0.]])
     v_time_freq = std_velocity*np.array([np.zeros((2,)), np.ones((2,))])
-    _, num_aoa = utils.safe_2d_shape(x_aoa)
-    _, num_time_freq = utils.safe_2d_shape(x_time_freq)
+    _, num_aoa = safe_2d_shape(x_aoa)
+    _, num_time_freq = safe_2d_shape(x_time_freq)
 
     # Define Sensor Performance
     transmit_freq = 1e9             # Hz
     ang_err = 0.6                   # rad (az/el)
     time_err = 100e-9               # sec
     freq_err = 3                    # Hz resolution
-    rng_err = utils.constants.speed_of_light * time_err  # m
-    rng_rate_err = utils.constants.speed_of_light * freq_err / transmit_freq  # m/s
+    rng_err = speed_of_light * time_err  # m
+    rng_rate_err = speed_of_light * freq_err / transmit_freq  # m/s
 
     # Measurement Error Covariance
     tdoa_ref_idx = num_time_freq - 1
@@ -255,7 +256,7 @@ def example2(mc_params=None):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     for idx in np.arange(num_monte_carlo):
-        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
+        print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(pss=hybrid, ml_search=ml_search, args=args)
         x_ml[:, idx] = result['ml']
@@ -265,7 +266,7 @@ def example2(mc_params=None):
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     # Wrap the results in a dictionary for easier passing
     results = {'ml': x_ml,
@@ -362,9 +363,9 @@ def _plot_mc_iteration_result(pss: HybridPassiveSurveillanceSystem, args, result
 
     # Compute and Plot CRLB and Error Ellipse Expectations
     err_crlb = pss.compute_crlb(x_source=args['x_source'])
-    crlb_cep50 = utils.errors.compute_cep50(err_crlb)/1e3  # [m]
-    crlb_ellipse = utils.errors.draw_error_ellipse(x=args['x_source'], covariance=err_crlb,
-                                                   num_pts=100, conf_interval=90)
+    crlb_cep50 = compute_cep50(err_crlb)/1e3  # [m]
+    crlb_ellipse = draw_error_ellipse(x=args['x_source'], covariance=err_crlb,
+                                      num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :] / 1e3, crlb_ellipse[1, :] / 1e3, linewidth=.5, label='90% Error Ellipse')
 
     plt.xlabel('Cross-range [km]')
@@ -381,8 +382,8 @@ def _plot_mc_iteration_result(pss: HybridPassiveSurveillanceSystem, args, result
     bias_bf = np.mean(err_bf, axis=1)
     cov_ml = np.cov(err_ml) + bias_ml.dot(bias_ml.T)
     cov_bf = np.cov(err_bf) + bias_bf.dot(bias_bf.T)
-    cep50_ml = utils.errors.compute_cep50(cov_ml) / 1e3
-    cep50_bf = utils.errors.compute_cep50(cov_bf) / 1e3
+    cep50_ml = compute_cep50(cov_ml) / 1e3
+    cep50_bf = compute_cep50(cov_bf) / 1e3
 
     out_shp = (2, args['num_iterations'])
     out_cov_shp = (2, 2, args['num_iterations'])
@@ -400,8 +401,8 @@ def _plot_mc_iteration_result(pss: HybridPassiveSurveillanceSystem, args, result
         cov_ls[:, :, ii] = np.cov(np.squeeze(err_ls[:, ii, :])) + bias_ls[:, ii].dot(bias_ls[:, ii].T)
         cov_grad[:, :, ii] = np.cov(np.squeeze(err_grad[:, ii, :])) + bias_grad[:, ii].dot(bias_grad[:, ii].T)
 
-        cep50_ls[ii] = utils.errors.compute_cep50(cov_ls[:, :, ii]) / 1e3  # [km]
-        cep50_grad[ii] = utils.errors.compute_cep50(cov_grad[:, :, ii]) / 1e3  # [km]
+        cep50_ls[ii] = compute_cep50(cov_ls[:, :, ii]) / 1e3  # [km]
+        cep50_grad[ii] = compute_cep50(cov_grad[:, :, ii]) / 1e3  # [km]
 
     # Error plot
     iter_ax = np.arange(args['num_iterations'])

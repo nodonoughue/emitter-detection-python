@@ -1,12 +1,11 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
-import matplotlib.pyplot as plt
-import prop
-import detector
-import utils
-# from utils.unit_conversions import lin_to_db, db_to_lin
-lin_to_db = utils.unit_conversions.lin_to_db
-db_to_lin = utils.unit_conversions.db_to_lin
+
+from ewgeo import detector
+from ewgeo import prop
+from ewgeo.utils.constants import kT
+from ewgeo.utils.unit_conversions import lin_to_db, db_to_lin
 
 
 def run_all_examples(rng=np.random.default_rng(), colors=None):
@@ -57,7 +56,7 @@ def example1(rng=np.random.default_rng(), colors=None, mc_params=None):
     # Noise Power
     bandwidth = 2e5         # channel bandwidth [Hz]
     noise_figure = 5        # noise figure [dB]
-    noise_pwr = lin_to_db(utils.constants.kT*bandwidth)+noise_figure
+    noise_pwr = lin_to_db(kT*bandwidth)+noise_figure
     
     # Signal Power
     eirp = 47    # dBW
@@ -163,7 +162,7 @@ def example2(rng=np.random.default_rng(), colors=None, mc_params=None):
     rx_height_m = 500
 
     # Compute Noise Level and MDS
-    noise_power = noise_figure + lin_to_db(utils.constants.kT * bandwidth)
+    noise_power = noise_figure + lin_to_db(kT * bandwidth)
 
     # SNR with no propagation loss
     snr0 = tx_pwr + tx_gain - tx_loss + rx_gain - rx_loss - noise_power

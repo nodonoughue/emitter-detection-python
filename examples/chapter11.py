@@ -1,10 +1,12 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import time
-import utils
-from tdoa import TDOAPassiveSurveillanceSystem
-from utils.covariance import CovarianceMatrix
-from utils import SearchSpace
+
+from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.utils import print_elapsed, print_progress, SearchSpace
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
 
 
 def run_all_examples():
@@ -55,7 +57,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
 
     # Define Sensor Performance
     time_measurement_standard_deviation = 1e-7
-    rng_measurement_standard_deviation = time_measurement_standard_deviation * utils.constants.speed_of_light
+    rng_measurement_standard_deviation = time_measurement_standard_deviation * speed_of_light
     covar_roa = CovarianceMatrix(rng_measurement_standard_deviation**2 * np.eye(num_sensors))
     # covar_rho = CovarianceMatrix(rng_measurement_standard_deviation**2 * (1 + np.eye(num_sensors-1)))
 
@@ -119,7 +121,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     for idx in np.arange(num_monte_carlo):
-        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
+        print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(pss=tdoa, ml_search=search_space, ls_args=ls_args, gd_args=gd_args, mc_args=mc_args)
         x_ml[:, idx] = result['ml']
@@ -130,7 +132,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     fig_geo_a, ax = plt.subplots()
     plt.scatter(x_sensor[0, :]/1e3, x_sensor[1, :]/1e3, marker='o', label='Sensors', linewidth=1)
@@ -152,8 +154,8 @@ def example1(rng=np.random.default_rng(), mc_params=None):
 
     # Compute and Plot CRLB and Error Ellipse Expectations
     err_crlb = tdoa.compute_crlb(x_source)
-    crlb_cep50 = utils.errors.compute_cep50(err_crlb)/1e3  # [km]
-    crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
+    crlb_cep50 = compute_cep50(err_crlb)/1e3  # [km]
+    crlb_ellipse = draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
     plt.plot(crlb_ellipse[0, :]/1e3, crlb_ellipse[1, :]/1e3, linewidth=.5, label='90% Error Ellipse')
 
     plt.xlabel('Cross-range [km]')
@@ -201,9 +203,9 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     cov_ml = np.cov(err_ml) + bias_ml.dot(bias_ml.T)
     cov_bf = np.cov(err_bf) + bias_bf.dot(bias_bf.T)
     cov_chan_ho = np.cov(err_chan_ho) + bias_chan_ho.dot(bias_chan_ho.T)
-    cep50_ml = utils.errors.compute_cep50(cov_ml)/1e3
-    cep50_bf = utils.errors.compute_cep50(cov_bf)/1e3
-    cep50_chan_ho = utils.errors.compute_cep50(cov_chan_ho)/1e3
+    cep50_ml = compute_cep50(cov_ml)/1e3
+    cep50_bf = compute_cep50(cov_bf)/1e3
+    cep50_chan_ho = compute_cep50(cov_chan_ho)/1e3
 
     out_shp = (2, num_iterations)
     out_cov_shp = (2, 2, num_iterations)
@@ -221,8 +223,8 @@ def example1(rng=np.random.default_rng(), mc_params=None):
         cov_ls[:, :, ii] = np.cov(np.squeeze(err_ls[:, ii, :])) + bias_ls[:, ii].dot(bias_ls[:, ii].T)
         cov_grad[:, :, ii] = np.cov(np.squeeze(err_grad[:, ii, :])) + bias_grad[:, ii].dot(bias_grad[:, ii].T)
 
-        cep50_ls[ii] = utils.errors.compute_cep50(cov_ls[:, :, ii])/1e3  # [km]
-        cep50_grad[ii] = utils.errors.compute_cep50(cov_grad[:, :, ii])/1e3  # [km]
+        cep50_ls[ii] = compute_cep50(cov_ls[:, :, ii])/1e3  # [km]
+        cep50_grad[ii] = compute_cep50(cov_grad[:, :, ii])/1e3  # [km]
 
     # Error plot
     iter_ax = np.arange(num_iterations)

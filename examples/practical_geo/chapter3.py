@@ -1,15 +1,15 @@
-import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-
-import utils
-from tdoa import TDOAPassiveSurveillanceSystem
-from fdoa import FDOAPassiveSurveillanceSystem
-from hybrid import HybridPassiveSurveillanceSystem
-from utils.covariance import CovarianceMatrix
+import numpy as np
 import time
-from utils import SearchSpace
 
+from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
+from ewgeo.hybrid import HybridPassiveSurveillanceSystem
+from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
+from ewgeo.utils import make_nd_grid, print_elapsed, print_progress, resample_noise, safe_2d_shape, SearchSpace
 
 _rad2deg = 180.0/np.pi
 _deg2rad = np.pi/180.0
@@ -126,7 +126,7 @@ def example2(colors=None, do_video_example=False):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=search_size,
                                epsilon=grid_res)
-    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    x_source, x_grid, grid_shape = make_nd_grid(search_space)
     extent = (x_ctr[0] - max_offset, x_ctr[0] + max_offset, x_ctr[1] - max_offset, x_ctr[1] + max_offset)
 
     # Use a squeeze operation to ensure that the individual dimension indices in x_grid are 2D
@@ -147,7 +147,7 @@ def example2(colors=None, do_video_example=False):
         # Response should be N x N x 3, where grid_shape = N x N x 1
 
         # Compute CEP50
-        this_cep = utils.errors.compute_cep50(this_crlb)
+        this_cep = compute_cep50(this_crlb)
         # To compute the RMSE instead of CEP50 uncomment the following
         # this_cep = np.sqrt(np.trace(this_crlb, axis0=0, axis1=1))  # Compute the trace along the spatial axes
 
@@ -172,7 +172,7 @@ def example2(colors=None, do_video_example=False):
             this_crlb = tdoa.compute_crlb(x_source=x_source, print_progress=True)
 
             # Compute CEP50
-            this_cep = utils.errors.compute_cep50(this_crlb)
+            this_cep = compute_cep50(this_crlb)
 
             # Plot this Result
             this_fig = _plot_contourf(x_grid, extent, grid_shape_2d, this_cep/1e3, x_sensors, None, levels, colors)
@@ -211,14 +211,14 @@ def example3(colors=None):
     # alt = 10e3
     # zz_sensors = alt*np.ones((num_sensors, ))
     # x_sensors = np.concatenate((x_sensors, zz_sensors), axis=0)
-    num_dims, num_sensors = utils.safe_2d_shape(x_sensors)
+    num_dims, num_sensors = safe_2d_shape(x_sensors)
 
     # Define Covariance Matrix
     freq_hz = 1e9
-    lam = utils.constants.speed_of_light / freq_hz
+    lam = speed_of_light / freq_hz
     time_err = 100e-9  # 100 ns
     freq_err = 100     # 10 Hz
-    rng_err = utils.constants.speed_of_light * time_err  # meters (ROA)
+    rng_err = speed_of_light * time_err  # meters (ROA)
     rng_rate_err = lam * freq_err                        # meters/second (RROA)
     cov_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
     cov_rroa = CovarianceMatrix(rng_rate_err ** 2 * np.eye(num_sensors))
@@ -256,7 +256,7 @@ def example3(colors=None):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=search_size,
                                epsilon=grid_res)
-    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    x_source, x_grid, grid_shape = make_nd_grid(search_space)
     extent = (x_ctr[0] - max_offset, x_ctr[0] + max_offset, x_ctr[1] - max_offset, x_ctr[1] + max_offset)
 
     # Use a squeeze operation to ensure that the individual dimension
@@ -311,12 +311,12 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     x_source = x_source_ctr[:, np.newaxis] + offset * (-1 + 2 * rng.standard_normal(size=(2, num_monte_carlo)))
 
     x_tdoa = np.array([[1., 3., 4., 5., 2.], [0., .5, 0., .5, -1.]]) * 1e3
-    _, num_tdoa = utils.safe_2d_shape(x_tdoa)
+    _, num_tdoa = safe_2d_shape(x_tdoa)
 
     # Initialize error covariance matrix
     time_err = 1e-7         # 100 ns time of arrival error per sensor
     cov_toa = CovarianceMatrix((time_err**2) * np.eye(num_tdoa))
-    cov_roa = cov_toa.multiply(utils.constants.speed_of_light**2, overwrite=False)
+    cov_roa = cov_toa.multiply(speed_of_light**2, overwrite=False)
 
     pss_common = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=None, variance_is_toa=False)
     pss_full = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx='full', variance_is_toa=False)
@@ -327,8 +327,8 @@ def example4(rng=np.random.default_rng(), mc_params=None):
 
     # Generate random noise
     noise_sensor = cov_roa.sample(num_samples=num_monte_carlo)
-    noise_common = utils.resample_noise(noise_sensor, ref_idx=None)
-    noise_full = utils.resample_noise(noise_sensor, ref_idx='full')
+    noise_common = resample_noise(noise_sensor, ref_idx=None)
+    noise_full = resample_noise(noise_sensor, ref_idx='full')
 
     # Noisy Measurements
     zeta_common = z_common + noise_common
@@ -362,7 +362,7 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     for idx in np.arange(num_monte_carlo):
-        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
+        print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         this_source = x_source[:, idx]
         this_zeta_common = zeta_common[:, idx]
@@ -381,7 +381,7 @@ def example4(rng=np.random.default_rng(), mc_params=None):
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     # Compute average error across Monte Carlo Iterations
     rmse_avg_ml = np.sqrt(np.sum(rmse_ml ** 2) / num_monte_carlo)
@@ -428,15 +428,15 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     plt.legend(loc='upper right')
 
     # CEP50
-    cep50_crlb = utils.errors.compute_cep50(crlb_common)
-    cep50_crlb_full = utils.errors.compute_cep50(crlb_full)
+    cep50_crlb = compute_cep50(crlb_common)
+    cep50_crlb_full = compute_cep50(crlb_full)
     print('CEP50: {:.2f} km ({:.2f} km using full set)'.format(cep50_crlb / 1e3, cep50_crlb_full / 1e3))
 
     # 90% Error Ellipse
     conf_interval = 90
-    crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source[:, -1], covariance=crlb_common, num_pts=101,
+    crlb_ellipse = draw_error_ellipse(x=x_source[:, -1], covariance=crlb_common, num_pts=101,
                                                    conf_interval=conf_interval)
-    # crlb_ellipse_full = utils.errors.draw_error_ellipse(x=x_source[:, -1], covariance=crlb_full, num_pts=101,
+    # crlb_ellipse_full = draw_error_ellipse(x=x_source[:, -1], covariance=crlb_full, num_pts=101,
     #                                                     conf_interval=conf_interval)
 
     # ---- Plot Results from the final Monte Carlo iteration----

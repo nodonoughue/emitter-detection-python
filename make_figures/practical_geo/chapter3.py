@@ -9,11 +9,13 @@ Nicholas O'Donoughue
 17 January 2025
 """
 
-import utils
 import matplotlib.pyplot as plt
 import numpy as np
 
-import tdoa
+import ewgeo.tdoa as tdoa
+from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils.geo import calc_range_diff
+
 from examples.practical_geo import chapter3
 
 
@@ -31,8 +33,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     # rng = np.random.default_rng()
 
     # Find the output directory
-    prefix = utils.init_output_dir('practical_geo/chapter3')
-    utils.init_plot_style()
+    prefix = init_output_dir('practical_geo/chapter3')
+    init_plot_style()
 
     # Generate all figures
     fig1 = make_figure_1(prefix)
@@ -83,7 +85,7 @@ def make_figure_1(prefix=None):
 
         # TODO: Make sure test/ref indices are used consistently. Should be test-ref for TDOA and FDOA
 
-        rdiff = utils.geo.calc_range_diff(x_source, x_ref, x_test)
+        rdiff = calc_range_diff(x_source, x_ref, x_test)
         xy_iso = tdoa.model.draw_isochrone(x_test, x_ref, rdiff, 10000, 5)
 
         plt.plot(xy_iso[0], xy_iso[1], '--', label=isochrone_label)
@@ -127,7 +129,7 @@ def make_figure_2(prefix=None):
         for test_idx in np.arange(start=ref_idx+1, stop=4):
             x_test = x_sensor[:, test_idx]
 
-            rdiff = utils.geo.calc_range_diff(x_source, x_ref, x_test)
+            rdiff = calc_range_diff(x_source, x_ref, x_test)
             xy_iso = tdoa.model.draw_isochrone(x_test, x_ref, rdiff, 10000, 5)
 
             plt.plot(xy_iso[0], xy_iso[1], '--', label=isochrone_label)

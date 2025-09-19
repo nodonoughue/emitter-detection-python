@@ -9,13 +9,19 @@ Nicholas O'Donoughue
 8 March 2022
 """
 
-import utils
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-import tdoa
+
+import ewgeo.tdoa as tdoa
+from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50
+from ewgeo.utils.geo import calc_range
+
 from examples import chapter11
-from utils.covariance import CovarianceMatrix
+
 
 
 def make_all_figures(close_figs=False, mc_params=None):
@@ -24,14 +30,13 @@ def make_all_figures(close_figs=False, mc_params=None):
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
-    :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter11')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter11')
+    init_plot_style()
 
     # Random Number Generator
     rng = np.random.default_rng(0)
@@ -90,9 +95,9 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     x_source = np.array([.5, .5])
     
     # Compute Range Vectors
-    r1 = utils.geo.calc_range(x_sensor1, x_source)
-    r2 = utils.geo.calc_range(x_sensor2, x_source)
-    r3 = utils.geo.calc_range(x_sensor3, x_source)
+    r1 = calc_range(x_sensor1, x_source)
+    r2 = calc_range(x_sensor2, x_source)
+    r3 = calc_range(x_sensor3, x_source)
     
     # Generate a unit circle
     th = np.linspace(start=0, stop=2*np.pi, num=1001)
@@ -163,8 +168,8 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     for i, (x_test, x_ref) in enumerate(zip((x_sensor1, x_sensor2), (x_sensor2, x_sensor3))):
         this_color = cmap.colors[i]
 
-        r_test = utils.geo.calc_range(x_test, x_source)
-        r_ref = utils.geo.calc_range(x_ref, x_source)
+        r_test = calc_range(x_test, x_source)
+        r_ref = calc_range(x_ref, x_source)
         r_diff = r_ref - r_test
 
         # True isochrone
@@ -498,7 +503,7 @@ def make_figure_6(prefix=None):
 
     # Define Sensor Performance
     timing_error = 1e-7
-    range_error = utils.constants.speed_of_light * timing_error
+    range_error = speed_of_light * timing_error
     cov_roa = CovarianceMatrix(range_error**2 * np.eye(num_sensors))
     # In the book, we manually resampled.  But we now have a utility that will
     # automatically resample the covariance matrix.
@@ -514,7 +519,7 @@ def make_figure_6(prefix=None):
     # Compute CRLB
     crlb = tdoa.perf.compute_crlb(x_sensor, x_source, cov_roa, variance_is_toa=False, do_resample=True,
                                   print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), (num_grid_points, num_grid_points))
+    cep50 = np.reshape(compute_cep50(crlb), (num_grid_points, num_grid_points))
 
     # Set up contours
     contour_levels = [.1, 1, 5, 10, 50, 100, 1000]
@@ -544,7 +549,7 @@ def make_figure_6(prefix=None):
 
     # Adjust Sensor Performance Vector
     timing_error = 1e-7
-    range_error = utils.constants.speed_of_light * timing_error
+    range_error = speed_of_light * timing_error
     cov_roa = CovarianceMatrix(range_error**2 * np.eye(num_sensors))
     # In the book, we manually resampled.  But we now have a utility that will
     # automatically resample the covariance matrix.
@@ -552,7 +557,7 @@ def make_figure_6(prefix=None):
 
     crlb2 = tdoa.perf.compute_crlb(x_sensor1, x_source, cov_roa, variance_is_toa=False, do_resample=True,
                                    print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb2), [num_grid_points, num_grid_points])
+    cep50 = np.reshape(compute_cep50(crlb2), [num_grid_points, num_grid_points])
 
     # Draw the figure
     fig6b, ax = plt.subplots()
@@ -634,10 +639,10 @@ def make_figure_9(prefix=None):
     x_source2 = np.array([1, 2])
 
     # Ranges
-    r11 = utils.geo.calc_range(x_source1, x_sensor1)
-    r12 = utils.geo.calc_range(x_source1, x_sensor2)
-    r21 = utils.geo.calc_range(x_source2, x_sensor1)
-    r22 = utils.geo.calc_range(x_source2, x_sensor2)
+    r11 = calc_range(x_source1, x_sensor1)
+    r12 = calc_range(x_source1, x_sensor2)
+    r21 = calc_range(x_source2, x_sensor1)
+    r22 = calc_range(x_source2, x_sensor2)
 
     # Compute Isochrones
     num_points = 1000
@@ -714,10 +719,10 @@ def make_figure_10(prefix=None):
     x_source2 = np.array([-.5, 1.5])
 
     # Ranges
-    r11 = utils.geo.calc_range(x_source1, x_sensor1)
-    r12 = utils.geo.calc_range(x_source1, x_sensor2)
-    r22 = utils.geo.calc_range(x_source2, x_sensor2)
-    r23 = utils.geo.calc_range(x_source2, x_sensor3)
+    r11 = calc_range(x_source1, x_sensor1)
+    r12 = calc_range(x_source1, x_sensor2)
+    r22 = calc_range(x_source2, x_sensor2)
+    r23 = calc_range(x_source2, x_sensor3)
 
     # False Isochrones
     num_points = 1000

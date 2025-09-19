@@ -1,18 +1,20 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import scipy
 
-import utils
-from triang import DirectionFinder
-from tdoa import TDOAPassiveSurveillanceSystem
-from hybrid import HybridPassiveSurveillanceSystem
-from utils import SearchSpace
-from utils.covariance import CovarianceMatrix
-from utils.coordinates import ecef_to_enu, ecef_to_lla, enu_to_ecef, lla_to_ecef
-import triang
+from ewgeo.hybrid import HybridPassiveSurveillanceSystem
+from ewgeo.triang import DirectionFinder
+from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.utils import make_nd_grid, safe_2d_shape, SearchSpace
+from ewgeo.utils.coordinates import correct_enu, ecef_to_enu, ecef_to_lla, enu_to_ecef, lla_to_ecef
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.constraints import bounded_alt, fixed_alt, fixed_cartesian
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import draw_error_ellipse
+from ewgeo.utils.unit_conversions import convert
 
-_rad2deg = utils.unit_conversions.convert(1, "rad", "deg")
-_deg2rad = utils.unit_conversions.convert(1, "deg", "rad")
+_rad2deg = convert(1, "rad", "deg")
+_deg2rad = convert(1, "deg", "rad")
 
 
 def run_all_examples():
@@ -41,7 +43,7 @@ def example1(do_mod_cov=False):
     # Set up sensors
     x_aoa = np.array([[-2, 2],
                       [0, 0]])
-    _, num_aoa = utils.safe_2d_shape(x_aoa)
+    _, num_aoa = safe_2d_shape(x_aoa)
 
     # Define received signals and covariance matrix
     psi = np.array([80, 87]) * _deg2rad
@@ -61,10 +63,10 @@ def example1(do_mod_cov=False):
         plt.grid(True)
 
         # LOBs
-        xy_lob = triang.model.draw_lob(x_aoa[:, 0], psi[0], scale=35)
-        plt.plot(xy_lob[0], xy_lob[1], color=hdl0.get_edgecolor())
-        xy_lob = triang.model.draw_lob(x_aoa[:, 1], psi[1], scale=35)
-        plt.plot(xy_lob[0], xy_lob[1], color=hdl1.get_edgecolor())
+        xy_lobs = aoa.draw_lobs(zeta=psi, scale=35)  # shape (num_dim, 2, aoa.num_sensors, num_cases)
+        # when we loop over, rotate the dimensions and squeeze it to remove the fourth dimension
+        for xy_lob, hdl in zip(np.transpose(xy_lobs.squeeze(), (2, 0, 1)), [hdl0, hdl1]):
+            plt.plot(xy_lob[0], xy_lob[1], color=hdl.get_edgecolor())
 
         return this_fig
 
@@ -79,7 +81,7 @@ def example1(do_mod_cov=False):
 
     # Gradient Descent Solution; Constrained
     y_soln = 25.
-    a, _ = utils.constraints.fixed_cartesian('y', y_soln)
+    a, _ = fixed_cartesian('y', y_soln)
     constraint_arg = {'eq_constraints': [a]}
     x_gd_const, x_gd_full_const = aoa.gradient_descent(**gd_args, **constraint_arg)
 
@@ -126,7 +128,7 @@ def example2():
 
     def _ex2_inner(this_x_tdoa, this_x_init, title=None):
         # Kernel of example 2; called multiple times with different sensor positions
-        _, num_tdoa = utils.safe_2d_shape(this_x_tdoa)
+        _, num_tdoa = safe_2d_shape(this_x_tdoa)
 
         # Define target position
         tgt_alt = 100.
@@ -134,7 +136,7 @@ def example2():
 
         # Sensor Accuracy
         time_err = 1e-7
-        roa_var = (utils.constants.speed_of_light*time_err)**2
+        roa_var = (speed_of_light*time_err)**2
         cov = CovarianceMatrix(np.eye(num_tdoa)*roa_var)
 
         # Make PSS Object
@@ -145,7 +147,7 @@ def example2():
         gd_args = {'zeta': zeta, 'x_init': this_x_init}
         x_gd, x_gd_full = tdoa.gradient_descent(**gd_args)
 
-        a, _ = utils.constraints.fixed_alt(alt_val=tgt_alt, geo_type='flat')
+        a, _ = fixed_alt(alt_val=tgt_alt, geo_type='flat')
         x_gd_alt, x_gd_full_alt = tdoa.gradient_descent(**gd_args, eq_constraints=[a])
         if title is not None:
             print(title)
@@ -234,7 +236,7 @@ def example3():
     x_tdoa = np.array([[20e3, 25e3],
                        np.zeros((2,)),
                        np.zeros((2,))])   # meters, ENU
-    _, num_tdoa = utils.safe_2d_shape(x_tdoa)
+    _, num_tdoa = safe_2d_shape(x_tdoa)
     ref_idx = num_tdoa - 1  # index of TDOA reference sensor
 
     tgt_az = 30.    # degrees E of N
@@ -248,7 +250,7 @@ def example3():
     # Errors
     err_aoa = 3 * _deg2rad
     err_toa = 1e-6
-    err_roa = utils.constants.speed_of_light * err_toa
+    err_roa = speed_of_light * err_toa
 
     cov_aoa = CovarianceMatrix(err_aoa**2 * np.eye(2))  # 2D AOA measurement covariance
     cov_roa = CovarianceMatrix(err_roa**2 * np.eye(num_tdoa))  # ROA measurement covariance
@@ -263,7 +265,7 @@ def example3():
     # CRLB Computation
     crlb_raw = hybrid.compute_crlb(x_source=x_tgt)
 
-    _, a_grad = utils.constraints.fixed_alt(tgt_alt, geo_type='flat')
+    _, a_grad = fixed_alt(tgt_alt, geo_type='flat')
     crlb_fix = hybrid.compute_crlb(x_source=x_tgt, eq_constraints_grad=[a_grad])
 
     print('CRLB (unconstrained):')
@@ -280,7 +282,7 @@ def example3():
     search_space = SearchSpace(x_ctr=x_tgt,
                                max_offset=max_offset,
                                points_per_dim=num_pts)
-    x_set, x_grid, out_shape = utils.make_nd_grid(search_space)
+    x_set, x_grid, out_shape = make_nd_grid(search_space)
 
     # Compute CRLB across grid
     crlb_raw_grid = hybrid.compute_crlb(x_source=x_set, print_progress=True)
@@ -343,7 +345,7 @@ def example4():
     x_aoa_ecef = np.array(enu_to_ecef(east=x_aoa_enu[0], north=x_aoa_enu[1], up=x_aoa_enu[2],
                                       lat_ref=ref_lla[0], lon_ref=ref_lla[1], alt_ref=ref_lla[2],
                                       dist_units='m', angle_units='deg'))  # convert tuple output to an array
-    _, num_aoa = utils.safe_2d_shape(x_aoa_ecef)
+    _, num_aoa = safe_2d_shape(x_aoa_ecef)
 
     sat_lla = np.array([27, -13, 575e3])  # deg lat, deg lon, m alt
     x_tgt_ecef = np.array(lla_to_ecef(lat=sat_lla[0], lon=sat_lla[1], alt=sat_lla[2],
@@ -357,7 +359,7 @@ def example4():
     # when passing to gradient_descent
     alt_low = 500e3
     alt_high = 600e3
-    b = utils.constraints.bounded_alt(alt_min=alt_low, alt_max=alt_high, geo_type='ellipse')
+    b = bounded_alt(alt_min=alt_low, alt_max=alt_high, geo_type='ellipse')
 
     # Measurement Errors
     err_aoa = 3 * _deg2rad
@@ -446,7 +448,7 @@ def example5():
 
     # Errors
     err_time = 3e-7
-    err_range = utils.constants.speed_of_light * err_time
+    err_range = speed_of_light * err_time
     cov_roa = CovarianceMatrix(err_range**2 * np.eye(num_tdoa))
     ref_idx = None
     # cov_rdoa = cov_roa.resample(ref_idx=ref_idx)
@@ -456,11 +458,11 @@ def example5():
 
     # Target Coordinates
     tgt_range = 100e3
-    tgt_alt = utils.unit_conversions.convert(40e3, from_unit='ft', to_unit='m')
-    x_tgt = np.array(utils.coordinates.correct_enu(e_ground=tgt_range, n_ground=0., u_ground=tgt_alt))
+    tgt_alt = convert(40e3, from_unit='ft', to_unit='m')
+    x_tgt = np.array(correct_enu(e_ground=tgt_range, n_ground=0., u_ground=tgt_alt))
 
     # External Prior
-    x_prior = np.array(utils.coordinates.correct_enu(e_ground=95e3, n_ground=10e3, u_ground=10e3))
+    x_prior = np.array(correct_enu(e_ground=95e3, n_ground=10e3, u_ground=10e3))
     cov_prior = np.array([[5., 1., 0.], [1., 50., 0.], [0., 0., 10.]])*1e6
 
     def prior(x):
@@ -500,7 +502,7 @@ def example5():
         plt.scatter(x_ml[0]/1e3, x_ml[1]/1e3, marker='s', label='Estimate')
 
         if do_prior:
-            ell_prior = utils.errors.draw_error_ellipse(x_prior[:2], cov_prior[:2, :2], num_pts=100, conf_interval=90)
+            ell_prior = draw_error_ellipse(x_prior[:2], cov_prior[:2, :2], num_pts=100, conf_interval=90)
             plt.scatter(x_prior[0]/1e3, x_prior[1]/1e3, marker='v', label='Prior')
             plt.plot(ell_prior[0]/1e3, ell_prior[1]/1e3, 'w-.', label='Prior Confidence (90%)')
             plt.scatter(x_ml_prior[0]/1e3, x_ml_prior[1]/1e3, marker='d', label='Estimate (w/prior)')

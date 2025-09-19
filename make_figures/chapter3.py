@@ -9,15 +9,17 @@ Nicholas O'Donoughue
 23 March 2021
 """
 
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin, kft_to_km
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
-import seaborn as sns
-import atm
-import prop
-import detector
+
+import ewgeo.atm as atm
+import ewgeo.detector as detector
+import ewgeo.prop as prop
+from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils.constants import kT
+from ewgeo.utils.unit_conversions import lin_to_db, db_to_lin, kft_to_km
+
 from examples import chapter3
 
 
@@ -25,8 +27,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
-    :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
-                 Default=False
+    :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
+                       Default=False
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
@@ -38,10 +40,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     rng = np.random.default_rng(0)
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter3')
-
-    # Activate seaborn for prettier plots
-    sns.set_theme()
+    prefix = init_output_dir('chapter3')
+    init_plot_style()
 
     # Generate all figures
     fig1 = make_figure_1(prefix)
@@ -356,7 +356,7 @@ def make_figure_8(prefix=None):
     # Noise Power
     bandwidth = 2e5  # channel bandwidth [Hz]
     noise_figure = 5  # noise figure [dB]
-    noise_pwr = lin_to_db(utils.constants.kT*bandwidth)+noise_figure
+    noise_pwr = lin_to_db(kT*bandwidth)+noise_figure
 
     # Signal Power
     eirp = 47    # dBW
