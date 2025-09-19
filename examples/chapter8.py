@@ -1,15 +1,15 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from utils import constants
-from utils.unit_conversions import lin_to_db, db_to_lin
-from utils import print_elapsed, print_progress
-import prop
-import array_df
-import time
+import numpy as np
 import os
 from scipy.io import loadmat, savemat
 from scipy.signal import find_peaks
+import time
 
+from ewgeo import array_df
+from ewgeo import prop
+from ewgeo.utils import print_elapsed, print_progress
+from ewgeo.utils.constants import kT
+from ewgeo.utils.unit_conversions import db_to_lin, lin_to_db
 
 def run_all_examples(generate_data=True):
     """
@@ -71,7 +71,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
     # Compute Received Power at each element
     prop_loss = prop.model.get_path_loss(range_vec, freq, tx_ht_m, rx_ht_m, False, None)
     rx_pwr_dbw = (lin_to_db(tx_pwr) + tx_gain - tx_loss) - prop_loss + rx_gain - rx_loss
-    rx_noise_dbw = lin_to_db(constants.kT*rx_bw_hz)+noise_figure
+    rx_noise_dbw = lin_to_db(kT*rx_bw_hz)+noise_figure
     # snr_db = rx_pwr_dbw - rx_noise_dbw -- not used
     # snr_lin = db_to_lin(snr_db)  # num_sources x 1 -- not used
     rx_pwr_w = db_to_lin(rx_pwr_dbw)
@@ -130,7 +130,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
     # Compute Received Power at each element
     prop_loss = prop.model.get_path_loss(range_vec, freq, tx_ht_m, rx_ht_m, False, None)
     rx_pwr_dbw = (lin_to_db(tx_pwr) + tx_gain - tx_loss) - prop_loss + rx_gain - rx_loss
-    rx_noise_dbw = lin_to_db(constants.kT*rx_bw_hz)+noise_figure
+    rx_noise_dbw = lin_to_db(kT*rx_bw_hz)+noise_figure
     # snr_db = rx_pwr_dbw - rx_noise_dbw -- not used
     # snr_lin = db_to_lin(snr_db)  # num_sources x 1 -- not used
     rx_pwr_w = db_to_lin(rx_pwr_dbw)
@@ -184,7 +184,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
     # Compute Received Power at each element
     prop_loss = prop.model.get_path_loss(range_vec, freq, tx_ht_m, rx_ht_m, False, None)
     rx_pwr_dbw = (lin_to_db(tx_pwr) + tx_gain - tx_loss) - prop_loss + rx_gain - rx_loss
-    rx_noise_dbw = lin_to_db(constants.kT*rx_bw_hz)+noise_figure
+    rx_noise_dbw = lin_to_db(kT*rx_bw_hz)+noise_figure
     # snr_db = rx_pwr_dbw - rx_noise_dbw --- not used
     # snr_lin = lin_to_db(snr_db)  # num_sources x 1 --- not used
     rx_pwr_w = db_to_lin(rx_pwr_dbw)
@@ -316,7 +316,7 @@ def example2(rng=np.random.default_rng(), mc_params=None):
     range_vec_m = np.arange(start=100e3, step=20e3, stop=500e3)
     prop_loss = prop.model.get_path_loss(range_vec_m, tx_freq, tx_ht_m, rx_alt_m, False)
     rx_pwr_dbw = lin_to_db(tx_pwr) + tx_gain + rx_gain - tx_loss - rx_loss - prop_loss
-    rx_noise_dbw = lin_to_db(constants.kT*rx_bw_hz) + noise_figure
+    rx_noise_dbw = lin_to_db(kT*rx_bw_hz) + noise_figure
     snr_db = rx_pwr_dbw-rx_noise_dbw
     snr_lin = db_to_lin(snr_db)
     

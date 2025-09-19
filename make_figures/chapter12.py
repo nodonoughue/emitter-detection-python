@@ -9,14 +9,19 @@ Nicholas O'Donoughue
 28 October 2022
 """
 
-import utils
-from utils.covariance import CovarianceMatrix
 import matplotlib.pyplot as plt
 import numpy as np
-import fdoa
+
+import ewgeo.fdoa as fdoa
+from ewgeo.utils import init_output_dir, init_plot_style, make_nd_grid, SearchSpace
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50
+from ewgeo.utils.geo import calc_doppler_diff
+from ewgeo.utils.unit_conversions import lin_to_db
+
 from examples import chapter12
-from utils import SearchSpace
-from utils.unit_conversions import lin_to_db
+
 
 def make_all_figures(close_figs=False, mc_params=None):
     """
@@ -24,14 +29,13 @@ def make_all_figures(close_figs=False, mc_params=None):
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
-    :param force_recalc: If set to False, will skip any figures that are time-consuming to generate.
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter12')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter12')
+    init_plot_style()
 
     # Random Number Generator
     # rng = np.random.default_rng(0)
@@ -106,8 +110,8 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
         this_color = cmap.colors[idx]  # TODO: reference the existing colormap index, instead of starting over
 
         idx2 = idx+1
-        vdiff = utils.geo.calc_doppler_diff(x_source, np.array([0, 0]), x_sensor[idx], v_sensor[idx],
-                                            x_sensor[idx2], v_sensor[idx2], utils.constants.speed_of_light)
+        vdiff = calc_doppler_diff(x_source, np.array([0, 0]), x_sensor[idx], v_sensor[idx],
+                                  x_sensor[idx2], v_sensor[idx2], speed_of_light)
         x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x_sensor[idx], v_sensor[idx],
                                                                 x_sensor[idx2], v_sensor[idx2], vdiff, 1000, 5)
 
@@ -165,15 +169,15 @@ def make_figure_2(prefix=None):
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=5,
                                epsilon=.01)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    x_set, x_grid, grid_shape = make_nd_grid(search_space)
 
     v_sensor0 = np.array([1., 0.])
     v_sensor1 = np.array([1., 0.])
     vt = np.array([0., 0.])
 
     transmit_freq = 1e9  # Hz
-    ddop = utils.geo.calc_doppler_diff(x_set, vt, x_sensor0, v_sensor0,
-                                       x_sensor1, v_sensor1, transmit_freq)
+    ddop = calc_doppler_diff(x_set, vt, x_sensor0, v_sensor0,
+                             x_sensor1, v_sensor1, transmit_freq)
 
     fig2a, ax2a = plt.subplots()
     ax2a.contour(x_grid[0], x_grid[1], np.reshape(ddop, shape=grid_shape), levels=20)
@@ -208,8 +212,8 @@ def make_figure_2(prefix=None):
     vt = np.array([0., 0.])
 
     transmit_freq = 1e9
-    ddop = utils.geo.calc_doppler_diff(x_set, vt, x_sensor0, v_sensor0,
-                                       x_sensor1, v_sensor1, transmit_freq)
+    ddop = calc_doppler_diff(x_set, vt, x_sensor0, v_sensor0,
+                             x_sensor1, v_sensor1, transmit_freq)
 
     fig2b, ax2b = plt.subplots()
     ax2b.contour(x_grid[0], x_grid[1], np.reshape(ddop, shape=grid_shape), levels=11)
@@ -384,10 +388,10 @@ def make_figure_4(prefix):
                  fontsize=12, color=this_color)
 
         # Draw isodoppler lines
-        vdiff = utils.geo.calc_doppler_diff(x_source=x_source, v_source=np.array([0, 0]),
-                                            x_ref=x_now[0], v_ref=v_sensor[0],
-                                            x_test=x_now[1], v_test=v_sensor[1],
-                                            f=utils.constants.speed_of_light)
+        vdiff = calc_doppler_diff(x_source=x_source, v_source=np.array([0, 0]),
+                                  x_ref=x_now[0], v_ref=v_sensor[0],
+                                  x_test=x_now[1], v_test=v_sensor[1],
+                                  f=speed_of_light)
         x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x_ref=x_now[0], v_ref=v_sensor[0],
                                                                 x_test=x_now[1], v_test=v_sensor[1],
                                                                 vdiff=vdiff, num_pts=1000, max_ortho=20)
@@ -487,7 +491,7 @@ def make_figure_6(prefix):
     # Define Sensor Performance
     freq_error = 10  # 1 Hz resolution
     f0 = 1e9
-    rng_rate_std_dev = freq_error*utils.constants.speed_of_light/f0
+    rng_rate_std_dev = freq_error*speed_of_light/f0
     cov_rroa = CovarianceMatrix(rng_rate_std_dev**2 * np.eye(num_sensors))  # covariance matrix structure
     ref_idx = None
     cov_rrdoa = cov_rroa.resample(ref_idx=ref_idx)
@@ -499,11 +503,11 @@ def make_figure_6(prefix):
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=grid_extent,
                                epsilon=grid_spacing)
-    x_source, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    x_source, x_grid, grid_shape = make_nd_grid(search_space)
 
     # Compute CRLB
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
 
     # Set up contours
     contour_levels = [.1, 1, 5, 10, 50, 100, 1000]
@@ -531,7 +535,7 @@ def make_figure_6(prefix):
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
 
     # Draw Figure
     fig6b, ax = plt.subplots()
@@ -546,7 +550,7 @@ def make_figure_6(prefix):
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
 
-    # Figure 6c,d, Impact of fourth sensor on CRLB
+    # Figure 6c, d, Impact of fourth sensor on CRLB
     print('Generating Figure 12.6c...')
 
     # Add a sensor at the origin
@@ -562,7 +566,7 @@ def make_figure_6(prefix):
 
     # Compute CRLB
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
 
     # Draw Figure
     fig6c, ax = plt.subplots()
@@ -582,7 +586,7 @@ def make_figure_6(prefix):
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
 
     # Draw Figure
     fig6d, ax = plt.subplots()

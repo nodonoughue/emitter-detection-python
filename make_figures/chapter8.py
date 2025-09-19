@@ -9,12 +9,15 @@ Nicholas O'Donoughue
 6 May 2021
 """
 
-import utils
-from utils.unit_conversions import lin_to_db, db_to_lin
 import matplotlib.pyplot as plt
 import numpy as np
-import array_df
 import time
+
+import ewgeo.array_df as array_df
+from ewgeo.utils import init_output_dir, init_plot_style, make_taper, print_elapsed, print_progress
+from ewgeo.utils.unit_conversions import lin_to_db, db_to_lin
+
+
 from examples import chapter8
 
 
@@ -22,15 +25,15 @@ def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter.
 
-    :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
-                 Default=False
+    :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
+                       Default=False
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter8')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter8')
+    init_plot_style()
 
     # Random Number Generator
     rng = np.random.default_rng(0)
@@ -287,7 +290,7 @@ def make_figure_7a(prefix=None):
     fig7a = plt.figure()
 
     for taper in taper_types:
-        w, _ = utils.make_taper(num_elements, taper)
+        w, _ = make_taper(num_elements, taper)
         plt.plot(element_idx_vec, w, label=taper)
 
     plt.xlabel('array element index')
@@ -332,7 +335,7 @@ def make_figure_7b(prefix=None):
 
     for taper in taper_types:
         # Make taper
-        w, _ = utils.make_taper(num_elements, taper)
+        w, _ = make_taper(num_elements, taper)
 
         # Take fourier transform, and normalize peak response
         window_spatial_freq = np.fft.fftshift(np.fft.fft(w, n=osf*num_elements))
@@ -522,7 +525,7 @@ def make_figure_12(prefix=None, rng=np.random.default_rng(), mc_params=None):
 
         for idx_mc in np.arange(num_monte_carlo):
             curr_idx = idx_mc + idx_xi * num_monte_carlo
-            utils.print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
+            print_progress(total_iterations, curr_idx, iterations_per_marker, iterations_per_row, t_start)
 
             # Compute beamscan image
             pwr_vec, psi_vec = array_df.solvers.beamscan(x[:, :, idx_mc], v, np.pi/2, 2001)
@@ -546,7 +549,7 @@ def make_figure_12(prefix=None, rng=np.random.default_rng(), mc_params=None):
 
     print('done.')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     fig12 = plt.figure()
     plt.semilogy(snr_db, crlb_rmse_deg, linestyle='--', color='black', label='Det. CRLB')

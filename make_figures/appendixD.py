@@ -9,11 +9,13 @@ Nicholas O'Donoughue
 8 December 2022
 """
 
-import utils
 import matplotlib.pyplot as plt
 import numpy as np
-import atm
-import noise
+
+import ewgeo.atm as atm
+import ewgeo.noise as noise
+from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils.constants import ref_temp
 
 
 def make_all_figures(close_figs=False):
@@ -26,8 +28,8 @@ def make_all_figures(close_figs=False):
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('appendixD')
-    utils.init_plot_style()
+    prefix = init_output_dir('appendixD')
+    init_plot_style()
 
     # Random Number Generator
     # rng = np.random.default_rng(0)
@@ -68,7 +70,7 @@ def make_figure_1(prefix=None):
     print('Generating Figure D.1...')
 
     t_ext = np.arange(300.)
-    # t_total = utils.constants.ref_temp + t_ext
+    # t_total = ref_temp + t_ext
 
     bw = 1e3
     noise_total = noise.model.get_thermal_noise(bandwidth_hz=bw, temp_ext_k=t_ext)
@@ -112,8 +114,6 @@ def make_figure_2(prefix=None):
     noise_temp = noise.model.get_cosmic_noise_temp(freq_hz=freq, rx_alt_m=0, alpha_c=.95)
     noise_temp_sun = noise.model.get_cosmic_noise_temp(freq_hz=freq, rx_alt_m=0, alpha_c=.95, gain_sun_dbi=30)
     noise_temp_moon = noise.model.get_cosmic_noise_temp(freq_hz=freq, rx_alt_m=0, alpha_c=.95, gain_moon_dbi=30)
-
-    ref_temp = utils.constants.ref_temp
 
     fig2, ax = plt.subplots()
     plt.loglog(freq_ghz, noise_temp, linestyle='-', linewidth=1, label='Cosmic Noise')
@@ -164,7 +164,6 @@ def make_figure_3(prefix=None):
                                        np.arange(start=1e9, step=1e9, stop=350e9)),
                                       axis=0))
     freq_ghz = freq_vec/1e9
-    ref_temp = utils.constants.ref_temp
 
     # Open the figure
     fig3, ax = plt.subplots()
@@ -215,7 +214,6 @@ def make_figure_4(prefix=None):
 
     ground_ant_gain_dbi = np.arange(start=-30, stop=0)
 
-    ref_temp = utils.constants.ref_temp
     ground_noise_temp = noise.model.get_ground_noise_temp(ant_gain_ground_dbi=ground_ant_gain_dbi)
 
     fig4, ax = plt.subplots()

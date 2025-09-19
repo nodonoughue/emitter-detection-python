@@ -1,17 +1,19 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 
-import utils
-from fdoa import FDOAPassiveSurveillanceSystem
-from utils import SearchSpace
-from utils.covariance import CovarianceMatrix
-from triang import DirectionFinder
-from tdoa import TDOAPassiveSurveillanceSystem
-from hybrid import HybridPassiveSurveillanceSystem
+from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
+from ewgeo.hybrid import HybridPassiveSurveillanceSystem
+from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.triang import DirectionFinder
+from ewgeo.utils import make_nd_grid, safe_2d_shape, SearchSpace
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.geo import calc_range
+from ewgeo.utils.unit_conversions import convert
 
-_rad2deg = utils.unit_conversions.convert(1, "rad", "deg")
-_deg2rad = utils.unit_conversions.convert(1, "deg", "rad")
+_rad2deg = convert(1, "rad", "deg")
+_deg2rad = convert(1, "deg", "rad")
 
 
 def run_all_examples():
@@ -96,7 +98,7 @@ def example2():
 
     # Set up sensors
     x_tdoa = np.array([[0, 2, 0],[2, -2, 0]])  # avg position(reported)
-    _, n_tdoa = utils.safe_2d_shape(x_tdoa)
+    _, n_tdoa = safe_2d_shape(x_tdoa)
 
     cov_pos_full = CovarianceMatrix(.1 * np.eye(2 * n_tdoa))  # position covar; all are IID
 
@@ -157,13 +159,13 @@ def example3():
 
     # Set up sensors
     x_aoa = np.array([[2., 2., 0.], [2.,  -1., 0.]])
-    num_dims, n_aoa = utils.safe_2d_shape(x_aoa)
+    num_dims, n_aoa = safe_2d_shape(x_aoa)
 
     x_tdoa = np.array([[0., 2., 0.], [2., -1., 0.]])  # avg position (reported)
-    _, n_tdoa = utils.safe_2d_shape(x_tdoa)
+    _, n_tdoa = safe_2d_shape(x_tdoa)
 
     # Find matching sensors
-    dist = utils.geo.calc_range(x1=x_aoa, x2=x_tdoa)
+    dist = calc_range(x1=x_aoa, x2=x_tdoa)
     idx_aoa, idx_tdoa = np.where(dist == 0.)
 
     # Build position covariance matrix
@@ -193,7 +195,7 @@ def example3():
     x_sensor_true = np.concatenate((x_aoa_true, x_tdoa_true), axis=1)
 
     # Let's verify that sensors 2 and 4 are still colocated
-    dist_perturbed = utils.geo.calc_range(x1=x_aoa_true, x2=x_tdoa_true)
+    dist_perturbed = calc_range(x1=x_aoa_true, x2=x_tdoa_true)
     assert np.all(np.fabs(dist_perturbed[idx_aoa, idx_tdoa]) < 1e-6), 'Error generating correlated sensor perturbations.'
 
     # Initialize the PSS
@@ -267,13 +269,13 @@ def example4(do_iterative=False):
     # Set up sensors
     x_tdoa = np.array([[2, 0,  4, 0],
                        [2, 2, 0, 0]])*1e3 # avg position (reported)
-    n_dim, n_tdoa = utils.safe_2d_shape(x_tdoa)
+    n_dim, n_tdoa = safe_2d_shape(x_tdoa)
 
     tdoa_bias = np.array([10, 30, -20, 60])  # TOA bias
 
     err_toa = 100e-9
     cov_toa = CovarianceMatrix((err_toa**2)*np.eye(n_tdoa))
-    cov_roa = cov_toa.multiply(val=utils.constants.speed_of_light**2, overwrite=False)
+    cov_roa = cov_toa.multiply(val=speed_of_light**2, overwrite=False)
 
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=None, variance_is_toa=False)
 
@@ -293,7 +295,7 @@ def example4(do_iterative=False):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=search_size,
                                epsilon=grid_res)
-    x_set, x_grid, out_shape = utils.make_nd_grid(search_space)
+    x_set, x_grid, out_shape = make_nd_grid(search_space)
     extent = ((x_ctr[0]-search_size)/1e3, (x_ctr[0]+search_size)/1e3,
               (x_ctr[1]-search_size)/1e3, (x_ctr[1]+search_size)/1e3)
 
@@ -414,6 +416,7 @@ def example5(do_vel_only_cal=False):
 
     :return: figure handle to generated graphic
     """
+    # TODO: Debug; the plots don't appear to function properly
 
     # Set up sensors
     x_tdoa = np.array([[-1, 0, 1],
@@ -422,8 +425,8 @@ def example5(do_vel_only_cal=False):
     v_fdoa = np.array([[0, 0, 0],
                        [500, 500, 500]])
 
-    n_dim, n_tdoa = utils.safe_2d_shape(x_tdoa)
-    _, n_fdoa = utils.safe_2d_shape(x_fdoa)
+    n_dim, n_tdoa = safe_2d_shape(x_tdoa)
+    _, n_fdoa = safe_2d_shape(x_fdoa)
 
     # Generate Random Velocity Errors
     cov_vel = CovarianceMatrix(100**2 * np.eye(n_dim * n_fdoa))
@@ -434,9 +437,9 @@ def example5(do_vel_only_cal=False):
     err_time = 100e-9
     err_freq = 1
     freq_hz = 10e9
-    lam = utils.constants.speed_of_light / freq_hz  # wavelength
+    lam = speed_of_light / freq_hz  # wavelength
     cov_toa = CovarianceMatrix(err_time**2 * np.eye(n_tdoa))
-    cov_roa = cov_toa.multiply(utils.constants.speed_of_light**2, overwrite=False)
+    cov_roa = cov_toa.multiply(speed_of_light**2, overwrite=False)
     cov_foa = CovarianceMatrix(err_freq**2 * np.eye(n_fdoa))
     cov_rroa = cov_foa.multiply(lam**2, overwrite=False)
 
@@ -453,7 +456,7 @@ def example5(do_vel_only_cal=False):
     x_source = np.array([-3, 4]) * 1e3
     x_cal = np.array([[-2, -1, 0, 1, 2],
                       [-5, -5, -5, -5, -5]]) * 1e3
-    _, num_cal = utils.safe_2d_shape(x_cal)
+    _, num_cal = safe_2d_shape(x_cal)
 
     z = hybrid.measurement(x_source=x_source, v_sensor=v_fdoa_actual)
     z_cal = hybrid.measurement(x_source=x_cal, v_sensor=v_fdoa_actual)
@@ -495,6 +498,7 @@ def example5(do_vel_only_cal=False):
         plt.plot(x_est_fdoa_cal[0], x_est_fdoa_cal[1], linestyle='-.', marker='s', markevery=[-1],
                  label='Solution (w/velocity cal)')
 
+    plt.legend(loc='lower left')
     return fig,
 
 

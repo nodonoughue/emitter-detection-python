@@ -1,4 +1,5 @@
 *__pycache__*
 *.idea*
-figures/*
-examples/*.mat
+figures
+*.mat
+*.egg-info

@@ -1,6 +1,6 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import erf, erfinv
-import matplotlib.pyplot as plt
 
 
 def run_all_examples():

@@ -9,17 +9,20 @@ Nicholas O'Donoughue
 4 December 2022
 """
 
-import utils
 import matplotlib.pyplot as plt
 import numpy as np
-import triang
-import tdoa
-import fdoa
-import hybrid
-from examples import chapter13
-from utils.covariance import CovarianceMatrix
-from utils import SearchSpace
 
+import ewgeo.fdoa as fdoa
+import ewgeo.hybrid as hybrid
+import ewgeo.tdoa as tdoa
+import ewgeo.triang as triang
+from ewgeo.utils import init_output_dir, init_plot_style, make_nd_grid, SearchSpace
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50
+from ewgeo.utils.geo import calc_range
+
+from examples import chapter13
 
 def make_all_figures(close_figs=False, mc_params=None):
     """
@@ -32,8 +35,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     """
 
     # Find the output directory
-    prefix = utils.init_output_dir('chapter13')
-    utils.init_plot_style()
+    prefix = init_output_dir('chapter13')
+    init_plot_style()
 
     # Initializes colorSet - Mx3 RGB vector for successive plot lines
     colors = plt.get_cmap("tab10")
@@ -99,7 +102,7 @@ def make_figure_1(prefix=None, colors=None):
         plt.text(this_x[0]-.2, this_x[1]-.2, '$S_{}$'.format(idx+1), fontsize=10)
 
     # True Measurements
-    range_act = utils.geo.calc_range(x1=x_sensor.T, x2=x_source)
+    range_act = calc_range(x1=x_sensor.T, x2=x_source)
     psi_act = triang.model.measurement(x_sensor=x_sensor.T, x_source=x_source)
     range_diff = tdoa.model.measurement(x_sensor=x_sensor.T, x_source=x_source, ref_idx=tdoa_ref_idx)
     velocity_diff = fdoa.model.measurement(x_sensor=x_sensor.T, v_sensor=v_sensor.T, x_source=x_source, v_source=None,
@@ -179,9 +182,9 @@ def make_figure_2(prefix=None):
     print('Generating Figure 13.2a...')
     ang_err = .2  # rad
     time_err = 1000e-9  # sec
-    rng_err = utils.constants.speed_of_light * time_err  # m
+    rng_err = speed_of_light * time_err  # m
     freq_err = 100  # Hz
-    rng_rate_err = freq_err * utils.constants.speed_of_light / transmit_freq  # m / s
+    rng_rate_err = freq_err * speed_of_light / transmit_freq  # m / s
 
     # Error Covariance Matrices
     covar_ang = CovarianceMatrix(ang_err ** 2 * np.eye(num_sensors))
@@ -204,7 +207,7 @@ def make_figure_2(prefix=None):
     # Figure 12.3c -- Better TDOA
     print('Generating Figure 13.2c...')
     time_err_highres = 100e-9  # sec
-    rng_err_highres = utils.constants.speed_of_light * time_err_highres
+    rng_err_highres = speed_of_light * time_err_highres
     covar_roa_highres = CovarianceMatrix(rng_err_highres ** 2 * np.eye(num_sensors))
     covar_rdoa_highres = covar_roa_highres.resample(ref_idx=tdoa_ref_idx)
     covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa_highres, covar_rrdoa)
@@ -214,7 +217,7 @@ def make_figure_2(prefix=None):
     # Figure 12.3d -- Better FDOA
     print('Generating Figure 13.2d...')
     freq_err_highres = 10  # Hz
-    rng_rate_err_highres = freq_err_highres * utils.constants.speed_of_light / transmit_freq  # m / s
+    rng_rate_err_highres = freq_err_highres * speed_of_light / transmit_freq  # m / s
     covar_rroa_highres = CovarianceMatrix(rng_rate_err_highres ** 2 * np.eye(num_sensors))
     covar_rrdoa_highres = covar_rroa_highres.resample(ref_idx=fdoa_ref_idx)
     covar_rho = CovarianceMatrix.block_diagonal(covar_ang, covar_rdoa, covar_rrdoa_highres)
@@ -373,9 +376,9 @@ def make_figure_7(prefix):
     transmit_freq = 1e9  # Hz
     ang_err = .06  # rad
     time_err = 1e-7  # 100 ns resolution
-    rng_err = utils.constants.speed_of_light * time_err  # m
+    rng_err = speed_of_light * time_err  # m
     freq_err = 10  # Hz
-    rng_rate_err = freq_err * utils.constants.speed_of_light / transmit_freq  # m/s
+    rng_rate_err = freq_err * speed_of_light / transmit_freq  # m/s
 
     # Error Covariance Matrices
     covar_ang = CovarianceMatrix(ang_err ** 2 * np.eye(num_sensors))
@@ -393,7 +396,7 @@ def make_figure_7(prefix):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=max_offset,
                                epsilon=grid_spacing)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    x_set, x_grid, grid_shape = make_nd_grid(search_space)
 
     # Figure 13.7a
     print('Generating Figure 13.7a...')
@@ -402,7 +405,7 @@ def make_figure_7(prefix):
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
     # Set up contours
@@ -438,7 +441,7 @@ def make_figure_7(prefix):
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
     # Draw Figure
@@ -497,9 +500,9 @@ def make_figure_8(prefix):
     # Define Sensor Performance
     transmit_freq = 1e9  # Hz
     time_err = 1e-7  # 100 ns resolution
-    rng_err = utils.constants.speed_of_light * time_err  # m
+    rng_err = speed_of_light * time_err  # m
     freq_err = 10  # Hz
-    rng_rate_err = freq_err * utils.constants.speed_of_light / transmit_freq  # m/s
+    rng_rate_err = freq_err * speed_of_light / transmit_freq  # m/s
 
     # Error Covariance Matrices
     covar_roa = CovarianceMatrix(rng_err ** 2 * np.eye(num_sensors))
@@ -516,7 +519,7 @@ def make_figure_8(prefix):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=max_offset,
                                epsilon=grid_spacing)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    x_set, x_grid, grid_shape = make_nd_grid(search_space)
 
     # Figure 13.8a
     print('Generating Figure 13.8a...')
@@ -525,7 +528,7 @@ def make_figure_8(prefix):
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=None, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
     # Set up contours
@@ -558,11 +561,9 @@ def make_figure_8(prefix):
     print('Generating Figure 13.8b...')
     v_sensor = np.array([[0., 1.], [0., 1.]]) * std_vel
 
-    # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=None, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
-    # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
 
     # Draw Figure
     fig8b, ax = plt.subplots()
@@ -617,7 +618,7 @@ def make_figure_9(prefix):
     # Define Sensor Performance
     ang_err = .06  # rad
     time_err = 1e-7  # 100 ns resolution
-    rng_err = utils.constants.speed_of_light * time_err  # m
+    rng_err = speed_of_light * time_err  # m
 
     # Error Covariance Matrices
     covar_ang = CovarianceMatrix(ang_err ** 2 * np.eye(num_sensors))
@@ -633,14 +634,12 @@ def make_figure_9(prefix):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=max_offset,
                                epsilon=grid_spacing)
-    x_set, x_grid, grid_shape = utils.make_nd_grid(search_space)
+    x_set, x_grid, grid_shape = make_nd_grid(search_space)
 
     # Compute CRLB
-    # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=None, v_fdoa=None,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(utils.errors.compute_cep50(crlb), shape=grid_shape)
-    # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
+    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
 
     # Set up contours
     contour_levels = [.1, 1, 5, 10, 50, 100]

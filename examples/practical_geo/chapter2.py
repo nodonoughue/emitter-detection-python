@@ -1,14 +1,16 @@
-import numpy as np
-import matplotlib.pyplot as plt
 from matplotlib import colormaps as cm
-import utils
-from utils import SearchSpace
-from triang import DirectionFinder
-from tdoa import TDOAPassiveSurveillanceSystem
-from fdoa import FDOAPassiveSurveillanceSystem
-from hybrid import HybridPassiveSurveillanceSystem
+import matplotlib.pyplot as plt
+import numpy as np
 import time
-from utils.covariance import CovarianceMatrix
+
+from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
+from ewgeo.hybrid import HybridPassiveSurveillanceSystem
+from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
+from ewgeo.triang import DirectionFinder
+from ewgeo.utils import print_elapsed, print_progress, safe_2d_shape, SearchSpace
+from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
 
 _rad2deg = 180.0/np.pi
 _deg2rad = np.pi/180.0
@@ -69,9 +71,9 @@ def _make_pss_systems(err_aoa=None, err_time=None, err_freq=None, f0=1.0, tdoa_r
     """
 
     # Count the number of sensors in each type
-    num_dim, num_aoa = utils.safe_2d_shape(x_aoa)
-    _, num_tdoa = utils.safe_2d_shape(x_tdoa)
-    _, num_fdoa = utils.safe_2d_shape(x_fdoa)
+    num_dim, num_aoa = safe_2d_shape(x_aoa)
+    _, num_tdoa = safe_2d_shape(x_tdoa)
+    _, num_fdoa = safe_2d_shape(x_fdoa)
 
     # Define Error Covariance Matrix
     if err_aoa is not None:
@@ -81,7 +83,7 @@ def _make_pss_systems(err_aoa=None, err_time=None, err_freq=None, f0=1.0, tdoa_r
         aoa_pss = None
 
     if err_time is not None:
-        err_r = err_time * utils.constants.speed_of_light
+        err_r = err_time * speed_of_light
         cov_r = (err_r ** 2.0) * np.eye(num_tdoa)  # m ^ 2
         tdoa_pss = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=CovarianceMatrix(cov_r), variance_is_toa=False,
                                                  ref_idx=tdoa_ref_idx)
@@ -89,7 +91,7 @@ def _make_pss_systems(err_aoa=None, err_time=None, err_freq=None, f0=1.0, tdoa_r
         tdoa_pss = None
 
     if err_freq is not None:
-        rr_err = err_freq * utils.constants.speed_of_light / f0  # (m/s)
+        rr_err = err_freq * speed_of_light / f0  # (m/s)
         cov_rr = (rr_err ** 2) * np.eye(num_fdoa)  # (m/s)^2
         fdoa_pss = FDOAPassiveSurveillanceSystem(x=x_fdoa, vel=v_fdoa, cov=CovarianceMatrix(cov_rr),
                                                  ref_idx=fdoa_ref_idx)
@@ -367,13 +369,13 @@ def example3(colors=None):
     print('RMSE: {:.2f} km'.format(rmse_crlb/1e3))
 
     # CEP50
-    cep50_crlb = utils.errors.compute_cep50(crlb)
+    cep50_crlb = compute_cep50(crlb)
     print('CEP50: {:.2f} km'.format(cep50_crlb/1e3))
 
     # 90% Error Ellipse
     conf_interval = 90
-    crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=crlb, num_pts=101,
-                                                   conf_interval=conf_interval)
+    crlb_ellipse = draw_error_ellipse(x=x_source, covariance=crlb, num_pts=101,
+                                      conf_interval=conf_interval)
 
     # ---- Plot Results ----
     x_init = gd_ls_args['x_init']
@@ -456,7 +458,7 @@ def example3_mc(colors=None, mc_params=None):
     iterations_per_row = markers_per_row * iterations_per_marker
     res = {}
     for idx in np.arange(num_monte_carlo):
-        utils.print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
+        print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         res = _mc_iteration(z, pss, ml_args, gd_ls_args)
 
@@ -466,7 +468,7 @@ def example3_mc(colors=None, mc_params=None):
 
     print('done')
     t_elapsed = time.perf_counter() - t_start
-    utils.print_elapsed(t_elapsed)
+    print_elapsed(t_elapsed)
 
     # Compute average error across Monte Carlo Iterations
     rmse_avg_ml = np.sqrt(np.sum(rmse_ml**2)/num_monte_carlo)
@@ -490,13 +492,13 @@ def example3_mc(colors=None, mc_params=None):
     plt.plot(x_arr, rmse_crlb*np.ones_like(x_arr), '--', color='k', label='CRLB')
 
     # CEP50
-    cep50_crlb = utils.errors.compute_cep50(crlb)
+    cep50_crlb = compute_cep50(crlb)
     print('CEP50: {:.2f} km'.format(cep50_crlb/1e3))
 
     # 90% Error Ellipse
     conf_interval = 90
-    crlb_ellipse = utils.errors.draw_error_ellipse(x=x_source, covariance=crlb, num_pts=101,
-                                                   conf_interval=conf_interval)
+    crlb_ellipse = draw_error_ellipse(x=x_source, covariance=crlb, num_pts=101,
+                                      conf_interval=conf_interval)
 
     # ---- Plot Results ----
     x_init = gd_ls_args['x_init']
