@@ -8,7 +8,7 @@ version = "0.0.0"
 authors = [
   { name="Nicholas O'Donoughue", email="nodonoug@rand.org" },
 ]
-description = "Python code companion to Emitter Detection and Geolocation for Electronic Warfare (Artech House, 2019)"
+description = "Python code companion to Emitter Detection and Geolocation for Electronic Warfare (Artech House, 2019) and Practical Geolocation for Electronic Warfare Using MATLAB (Artech House, 2022)"
 readme = "README.md"
 requires-python = ">= 3.12"
 dependencies = [
