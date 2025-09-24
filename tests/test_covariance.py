@@ -258,6 +258,7 @@ def test_resample_hybrid():
     3. TDOA/FDOA
     4. AOA/TDOA/FDOA
     """
+    # TODO: Implement test
 
 def test_multiply():
     """
@@ -266,11 +267,42 @@ def test_multiply():
     Do it with overwrite=True and =False, check the proper behavior of
     the original CovarianceMatrix.
     """
+    c = np.array([[1, .1, .2], [.1, 3, .4], [.2, .4, 3]])
+    c2 = 2*c
+
+    # Overwrite=True
+    cov = CovarianceMatrix(c)
+    cov2 = cov.multiply(2, overwrite=True)
+    assert equal_to_tolerance(cov.cov, c2)  # make sure the multiply worked
+    assert cov2 is None    # make sure no new CovarianceMatrix was returned
+
+    # Overwrite=False
+    cov = CovarianceMatrix(c)
+    cov2 = cov.multiply(2, overwrite=False)
+    assert equal_to_tolerance(cov2.cov, c2)  # make sure the multiply worked
+    assert equal_to_tolerance(cov.cov, c)    # make sure the original is untouched
 
 def test_sample():
     """
     Generate a random sample; check dimensions.
     """
+    c = np.array([[1, .1, .2], [.1, 3, .4], [.2, .4, 3]])
+    cov = CovarianceMatrix(c)
+
+    # Single sample
+    # Should have size (num_measurements, ) if no size specified,
+    # but (num_measurements, 1) if a single sample is explicitly asked for
+    res = cov.sample()
+    assert res.shape == (3,)
+
+    res = cov.sample(1)
+    assert res.shape == (3, 1)
+
+    # Multiple samples at once
+    # Should have size (num_measurements, num_samples)
+    for num_samples in np.random.random_integers(low=5, high=100, size=(10, )):
+        res = cov.sample(num_samples)
+        assert res.shape == (3, num_samples)
 
 def test_sample_shape():
     """
@@ -278,6 +310,13 @@ def test_sample_shape():
 
     Check that the estimated covariance matrix is close to the true covariance.
     """
+    num_samples = int(1e6)
+    c = np.array([[1, .1, .2], [.1, 3, .4], [.2, .4, 3]])
+    cov = CovarianceMatrix(c)
+    res = cov.sample(num_samples)
+
+    c_est = np.cov(res)
+    assert equal_to_tolerance(c_est, c, tol=5e-2)
 
 def equal_to_tolerance(x, y, tol=1e-6)->bool:
     """
