@@ -41,8 +41,37 @@ class Association(Mapping):
     def __len__(self):
         return len(self._tracks_to_measurements)
 
-class Associator(ABC):
+    def __repr__(self):
+        return f'{type(self)}({self._tracks_to_measurements})'
 
+    def __str__(self):
+        return str(self._tracks_to_measurements)
+
+# TODO: Association Window / Gating
+class AssociationGate:
+    """
+    Represents the association gate for a track.
+    """
+    def __init__(self):
+        pass
+
+    def filter(self, track: Track, measurements: list[Measurement])-> list[Measurement]:
+        valid_measurements = [m for m in measurements if self._process(track, m)]
+        return valid_measurements
+
+    def _process(self, track: Track, measurement: Measurement) -> bool:
+        # TODO: Fill in association gate logic
+        # Think about a series of flags and checks that can be run.
+        # Min/Max velocity
+        # Ellipsoid
+        pass
+
+class Associator(ABC):
+    """
+    An object that can be used to associate measurements with tracks.
+
+    This abstract class defines the methods required.
+    """
     def __init__(self):
         pass
 
@@ -50,6 +79,16 @@ class Associator(ABC):
     def associate(self, measurements: list[Measurement], tracks: list[Track])-> Association:
         pass
 
-# TODO: Association Window / Gating
 # TODO: Nearest Neighbor / GNN
+class NNeighborAssociator(Associator):
+
+class GNNAssociator(Associator):
+
+
 # TODO: PDAF / JPDAF
+class PDAFAssociator(Associator):
+
+class JPDAFAssociator(Associator):
+
+
+
