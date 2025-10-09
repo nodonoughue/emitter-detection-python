@@ -3,20 +3,8 @@ import numpy as np
 import numpy.typing as npt
 
 from ewgeo.utils.covariance import CovarianceMatrix
+from . import State, StateSpace
 
-class StateSpace:
-    num_dims: int
-    num_states: int
-    has_pos: bool
-    has_vel: bool
-    has_accel: bool
-    pos_slice: slice or None
-    vel_slice: slice or None
-    pos_vel_slice: slice or None
-    accel_slice: slice or None
-
-    def __init__(self):
-        pass
 
 class MotionModel(ABC):
     """
@@ -25,7 +13,7 @@ class MotionModel(ABC):
     state_space: StateSpace
 
     # Process Equations
-    time_delta: npt.floating
+    time_delta: float
     f: npt.ArrayLike                # Transition Matrix
     process_covar: npt.ArrayLike
     q: npt.ArrayLike                # Process Noise
@@ -34,27 +22,32 @@ class MotionModel(ABC):
         pass
 
     @abstractmethod
-    def make_transition_matrix(self, time_delta: npt.floating):
+    def make_transition_matrix(self, time_delta: float):
         pass
 
     @abstractmethod
-    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: npt.floating):
+    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: float):
         pass
 
-    def predict(self, previous_state: npt.ArrayLike, previous_covar: CovarianceMatrix, time_delta=None):
-
+    def predict(self, curr_state: State, new_time: float):
         # Look up or compute the process noise and transition matrices
-        if time_delta is None or time_delta == self.time_delta:
-            f = self.f
-            q = self.q
-        else:
-            f = self.make_transition_matrix(time_delta)
-            q = self.make_process_covariance_matrix(self.process_covar, time_delta)
+        time_delta = new_time - curr_state.time
+
+        if time_delta is not None and time_delta != self.time_delta:
+            # Generate new ones
+            self.time_delta = time_delta
+            self.f = self.make_transition_matrix(time_delta)
+            self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
 
         # To predict forward, just pre-multiply the previous state with the transition matrix
-        new_state = f @ previous_state
-        new_covar = CovarianceMatrix(f @ previous_covar.cov @ np.transpose(f) + q)
-        return new_state, new_covar
+        new_state = self.f @ curr_state.state
+        if curr_state.covar is None:
+            new_covar = None
+        else:
+            new_covar = CovarianceMatrix(self.f @ curr_state.covar.cov @ np.transpose(self.f) + self.q)
+
+        # Make a new State object
+        return curr_state.copy(state=new_state, covar=new_covar, time=new_time)
 
     def update_time_step(self, time_delta):
         if time_delta is None:
@@ -78,7 +71,7 @@ class ConstantVelocityMotionModel(MotionModel):
     Position and Velocity are tracked states. There is no tracking of acceleration.
     Velocity is assumed to have non-zero-mean Gaussian distribution.
     """
-    def __init__(self, num_dims: int, process_covar: npt.ArrayLike=None, time_delta: npt.floating=None):
+    def __init__(self, num_dims: int, process_covar: npt.ArrayLike=None, time_delta: float=None):
         super().__init__()
 
         state_space = StateSpace()
@@ -90,30 +83,27 @@ class ConstantVelocityMotionModel(MotionModel):
         state_space.has_vel = True
         state_space.has_accel = False
         self.state_space = state_space
+        self.num_dims = num_dims
 
         self.time_delta = time_delta
         self.process_covar = process_covar
-        self.update_time_step(time_delta)  # assign to local variable and update f/q matrices
 
-    def make_transition_matrix(self, time_delta: npt.floating):
+    def make_transition_matrix(self, time_delta: float):
         """
         Implement the transition matrix F for a constant velocity motion model
         """
-        num_dims = self.state_space.num_dims
-        return np.block([[np.eye(num_dims), time_delta*np.eye(num_dims)],
-                         [np.zeros((num_dims, num_dims)), np.eye(num_dims)]])
+        return np.block([[np.eye(self.num_dims), time_delta*np.eye(self.num_dims)],
+                         [np.zeros((self.num_dims, self.num_dims)), np.eye(self.num_dims)]])
 
-    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: npt.floating):
+    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: float):
         """
         Implement the process noise covariance Q for a constant velocity motion model
         """
-        if np.shape(process_covar) != (self.state_space.num_dims, self.state_space.num_dims):
-            raise SyntaxError('process_covar must be a square matrix of shape (num_dims, num_dims)')
+        if np.shape(process_covar) != (self.num_dims, self.num_dims):
+            raise SyntaxError(f'process_covar must be a square matrix of shape ({self.num_dims}, {self.num_dims})')
 
         return np.block([[.25*time_delta**4*process_covar, .5*time_delta**3*process_covar],
                          [.5*time_delta**3*process_covar, time_delta**2*process_covar]])
-
-
 
 
 class ConstantAccelerationMotionModel(MotionModel):
@@ -121,7 +111,7 @@ class ConstantAccelerationMotionModel(MotionModel):
     Position, Velocity, and Acceleration are tracked states.
     Acceleration is assumed to have non-zero-mean Gaussian distribution.
     """
-    def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: npt.floating = None):
+    def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: float = None):
         super().__init__()
 
         # State model is:
@@ -135,26 +125,26 @@ class ConstantAccelerationMotionModel(MotionModel):
         state_space.has_vel = True
         state_space.has_accel = True
         self.state_space = state_space
+        self.num_dims = num_dims
 
         self.time_delta = time_delta
         self.process_covar = process_covar
         self.update_time_step(time_delta)  # assign to local variable and update f/q matrices
 
-    def make_transition_matrix(self, time_delta: npt.floating):
+    def make_transition_matrix(self, time_delta: float):
         """
         Implement the transition matrix F for a constant acceleration motion model
         """
-        num_dims = self.state_space.num_dims
-        return np.block([[np.eye(num_dims), time_delta * np.eye(num_dims), .5 * time_delta ** 2 * np.eye(num_dims)],
-                         [np.zeros((num_dims, num_dims)), np.eye(num_dims), time_delta * np.eye(num_dims)],
-                         [np.zeros((num_dims, 2 * num_dims)), np.eye(num_dims)]])
+        return np.block([[np.eye(self.num_dims), time_delta * np.eye(self.num_dims), .5 * time_delta ** 2 * np.eye(self.num_dims)],
+                         [np.zeros((self.num_dims, self.num_dims)), np.eye(self.num_dims), time_delta * np.eye(self.num_dims)],
+                         [np.zeros((self.num_dims, 2 * self.num_dims)), np.eye(self.num_dims)]])
 
-    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: npt.floating):
+    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: float):
         """
         Implement the process noise covariance Q for a constant acceleration motion model
         """
-        if np.shape(process_covar) != (self.state_space.num_dims, self.state_space.num_dims):
-            raise SyntaxError('process_covar must be a square matrix of shape (num_dims, num_dims)')
+        if np.shape(process_covar) != (self.num_dims, self.num_dims):
+            raise SyntaxError(f'process_covar must be a square matrix of shape ({self.num_dims}, {self.num_dims})')
 
         return np.block([[.25*time_delta**4*process_covar,
                           .5*time_delta**3*process_covar,
@@ -166,11 +156,12 @@ class ConstantAccelerationMotionModel(MotionModel):
                           time_delta*process_covar,
                           process_covar]])
 
+
 class ConstantJerkMotionModel(MotionModel):
     """
 
     """
-    def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: npt.floating = None):
+    def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: float = None):
         super().__init__()
 
         # State model is:
@@ -184,33 +175,33 @@ class ConstantJerkMotionModel(MotionModel):
         state_space.has_vel = True
         state_space.has_accel = True
         self.state_space = state_space
+        self.num_dims = num_dims
 
         self.time_delta = time_delta
         self.process_covar = process_covar
         self.update_time_step(time_delta)  # assign to local variable and update f/q matrices
 
-    def make_transition_matrix(self, time_delta: npt.floating):
+    def make_transition_matrix(self, time_delta: float):
         """
         Implement the transition matrix F for a constant acceleration motion model
         """
-        num_dims = self.state_space.num_dims
-        return np.block([[np.eye(num_dims),
-                          time_delta * np.eye(num_dims),
-                          .5 * time_delta ** 2 * np.eye(num_dims),
-                          1 / 6 * time_delta ** 3 * np.eye(num_dims)],
-                         [np.zeros((num_dims, num_dims)),
-                          np.eye(num_dims),
-                          time_delta * np.eye(num_dims),
-                          .5 * time_delta ** 2 * np.eye(num_dims)],
-                         [np.zeros((num_dims, 2 * num_dims)), np.eye(num_dims), time_delta * np.eye(num_dims)],
-                         [np.zeros((num_dims, 3 * num_dims)), np.eye(num_dims)]])
+        return np.block([[np.eye(self.num_dims),
+                          time_delta * np.eye(self.num_dims),
+                          .5 * time_delta ** 2 * np.eye(self.num_dims),
+                          1 / 6 * time_delta ** 3 * np.eye(self.num_dims)],
+                         [np.zeros((self.num_dims, self.num_dims)),
+                          np.eye(self.num_dims),
+                          time_delta * np.eye(self.num_dims),
+                          .5 * time_delta ** 2 * np.eye(self.num_dims)],
+                         [np.zeros((self.num_dims, 2 * self.num_dims)), np.eye(self.num_dims), time_delta * np.eye(self.num_dims)],
+                         [np.zeros((self.num_dims, 3 * self.num_dims)), np.eye(self.num_dims)]])
 
-    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: npt.floating):
+    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: float):
         """
         Implement the process noise covariance Q for a constant acceleration motion model
         """
-        if np.shape(process_covar) != (self.state_space.num_dims, self.state_space.num_dims):
-            raise SyntaxError('process_covar must be a square matrix of shape (num_dims, num_dims)')
+        if np.shape(process_covar) != (self.num_dims, self.num_dims):
+            raise SyntaxError(f'process_covar must be a square matrix of shape ({self.num_dims}, {self.num_dims})')
 
         return np.block([[time_delta ** 7 / 252 * process_covar,
                           time_delta ** 6 / 72 * process_covar,

@@ -1,54 +1,118 @@
+from abc import ABC, abstractmethod
 import numpy as np
 import numpy.typing as npt
 
-from ewgeo.utils import safe_2d_shape
-from ewgeo.utils.system import PassiveSurveillanceSystem
-from ewgeo.utils.covariance import CovarianceMatrix
-from .kinematic import StateSpace
+from ..utils import safe_2d_shape
+from ..utils.system import PassiveSurveillanceSystem
+from ..utils.covariance import CovarianceMatrix
+from .states import StateSpace, State
 
 
 class Measurement:
-    time: npt.floating
+    time: float
     sensor: PassiveSurveillanceSystem
     zeta: npt.ArrayLike
-    position_estimate: npt.ArrayLike
-    velocity_estimate: npt.ArrayLike or None
-    error_covariance_estimate: CovarianceMatrix  # represents either the pos_estimate (if vel is none) or combined pos/vel estimates
 
-    def __init__(self, time: npt.floating, sensor: PassiveSurveillanceSystem, zeta: npt.ArrayLike):
-        pass
+    def __init__(self, time: float, sensor: PassiveSurveillanceSystem, zeta: npt.ArrayLike):
+        self.time = time
+        self.sensor = sensor
+        self.zeta = zeta
 
-    def make_measurement_model(self, state_space: StateSpace):
+class MeasurementModel:
+    """
+    Parent class to capture the measurement model for a KF/EKF-system.
 
-        # Define functions to sample the position/velocity components of the target state
-        def pos_component(x):
-            return x[state_space.pos_slice]
+    Used to update a track given new measurements
+    """
+    state_space: StateSpace
+    pss: PassiveSurveillanceSystem
 
-        def vel_component(x):
-            return x[state_space.vel_slice] if state_space.has_vel else None
+    def __init__(self, state_space: StateSpace, pss: PassiveSurveillanceSystem):
+        self.state_space = state_space
+        self.pss = pss
 
-        # Non-Linear Measurement Function
-        def z_fun(x):
-            return self.sensor.measurement(x_source=pos_component(x), v_source=vel_component(x))
+    @property
+    def num_measurement_dimensions(self):
+        return self.pss.num_measurements
 
-        # Measurement Function Jacobian
-        def h_fun(x):
-            j = self.sensor.jacobian(x_source=pos_component(x), v_source=vel_component(x))
-            # Jacobian may be either w.r.t. position-only (pss.num_dim rows) or pos/vel,
-            # depending on which type of pss we're calling.
+    @property
+    def num_state_dimensions(self):
+        return self.state_space.num_states
 
-            # Build the H matrix
-            _, num_source_pos = safe_2d_shape(x)
-            h = np.zeros((self.sensor.num_measurements, state_space.num_states, num_source_pos))
-            h[:, state_space.pos_slice, :] = np.transpose(j[:self.sensor.num_dim, :])[:, :, np.newaxis]
-            if state_space.has_vel and j.shape[0] > self.sensor.num_dim:
-                # The state space has velocity components, and the pss returned rows for
-                # the jacobian w.r.t. velocity.
-                h[: state_space.vel_slice, :] = np.transpose(j[self.sensor.num_dim:, :])[:, :, np.newaxis]
+    def measurement(self, state: State, noise: npt.ArrayLike | bool=False) -> Measurement:
+        """
+        Return the measurement associated with the provided state.
 
-            if num_source_pos == 1:
-                # Collapse it to 2D, there's no need for the third dimension
-                h = np.reshape(h, (self.sensor.num_measurements, state_space.num_states))
-            return h
+        :param state: State of the target at which to compute the measurement
+        :param noise: if a bool, then random noise will be generated if True; if a numpy array, then it will be added directly to the result.
+        """
+        args = {'x_source': self.state_space.pos_component(state.state),
+                'v_source': self.state_space.vel_component(state.state)}
+        if noise == True:
+            z = self.pss.noisy_measurement(**args)
+        else:
+            z = self.pss.measurement(**args)
+            if isinstance(noise, np.ndarray):
+                z = z + noise
 
-        return z_fun, h_fun
+        return Measurement(zeta=z, sensor=self.pss, time=state.time)
+
+    def jacobian(self, state: State) -> npt.ArrayLike:
+        j = self.pss.jacobian(x_source=self.state_space.pos_component(state.state),
+                              v_source=self.state_space.vel_component(state.state))
+
+        # Jacobian may be either w.r.t. position-only (pss.num_dim rows) or pos/vel,
+        # depending on which type of pss we're calling.
+
+        # Build the H matrix
+        h = np.zeros((self.num_measurement_dimensions, self.num_state_dimensions))
+        h[:, self.state_space.pos_slice, :] = np.transpose(j[:self.pss.num_dim, :])[:, :, np.newaxis]
+        if self.state_space.has_vel and j.shape[0] > self.pss.num_dim:
+            # The state space has velocity components, and the pss returned rows for
+            # the jacobian w.r.t. velocity.
+            h[: self.state_space.vel_slice, :] = np.transpose(j[self.pss.num_dim:, :])[:, :, np.newaxis]
+
+        return h
+
+    def log_likelihood(self, state1: State, state2: State) -> float:
+        """
+        Return the log-likelihood of the measurement at state1 given the state2 as the underlying truth.
+        """
+
+        # Determine the measurement that comes from state2
+        m = self.measurement(state1)
+
+        # Compute the log likelihood of state1
+        return self.log_likelihood_from_measurement(state=state1, measurement=m)
+
+    def log_likelihood_from_measurement(self, state: State, measurement: Measurement) -> float:
+        return self.pss.log_likelihood(x_source=self.state_space.pos_component(state.state),
+                                       v_source=self.state_space.vel_component(state.state),
+                                       zeta=measurement.zeta)
+
+class Updater(ABC):
+    """
+    Abstract class for a kinematic model that can update a State to some new time.
+    """
+    measurement_model: MeasurementModel
+
+    def __init__(self, measurement_model: MeasurementModel):
+        self.measurement_model = measurement_model
+
+    @abstractmethod
+    def predict_measurement(self, predicted_state: State, measurement_model: MeasurementModel=None, measurement_noise=True):
+        """
+        Predict the measurement implied by the predicted_state, returns a Measurement object with the predicted
+        mean and the covariance matrix of the measurement prediction.
+        """
+        # Compute the predicted measurement and next step's innovation covariance, to assist
+        # with data association
+        z_fun, h_fun = self.measurements[-1].make_measurement_model(self.motion_model.state_space)
+        self.pred_measurement = z_fun(self.pred_state)
+        h_mtx = h_fun(self.pred_state)
+        msmt_cov = self.measurements[-1].sensor.cov.cov
+        self.innov_covar = CovarianceMatrix(h_mtx @ self.pred_covar @ h_mtx.T + msmt_cov)
+
+
+
+

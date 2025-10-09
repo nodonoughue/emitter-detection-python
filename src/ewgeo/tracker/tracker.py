@@ -5,7 +5,7 @@ from .track import Track
 from .association import Associator
 
 class TrackManager:
-    curr_time: npt.floating
+    curr_time: float
     tracks: list[Track]
     _tracklets: list[Track]  # not visible outside this class
     deleted_tracks: list[Track]

@@ -1,4 +1,6 @@
+from matplotlib import pyplot as plt
 import numpy as np
+from numpy import typing as npt
 
 from . import model, perf, solvers
 from ewgeo.utils import safe_2d_shape, SearchSpace
@@ -203,3 +205,14 @@ class DirectionFinder(PassiveSurveillanceSystem):
                 lobs_out[:, :, idx_sensor, idx_case] = np.asarray(this_lob).squeeze()
 
         return lobs_out
+
+    def plot_lobs(self, ax: plt.Axes, zeta: npt.ArrayLike, x_sensor: npt.ArrayLike=None, plot_args: dict= dict(), **kwargs):
+        # Generate a tuple of shape (2, 2, num_lobs, num_cases)
+        # First dimension is physical axis (x,y)
+        # Second dimensions is start/end
+        # Third dimension is across sensors
+        # Fourth dimension is across case
+
+        lobs = np.reshape(self.draw_lobs(zeta=zeta, x_sensor=x_sensor, **kwargs), (2, 2, -1))
+        ax.plot(lobs[0], lobs[1], **plot_args)
+
