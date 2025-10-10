@@ -44,24 +44,40 @@ class Track:
 
     def plot(self, ax: plt.Axes, plot_axes: slice=np.s_[:],
              predicted_state: State=None,
+             do_vel: bool=False, do_cov: bool=True,
+             scale: float=1, cov_ellipse_confidence: float=.75,
              **kwargs):
+        """
+        Plot the states on the provided axis, with an optional scale factor (for converting from m to km, etc.).
 
+        :param ax: Axes object to plot on
+        :param plot_axes: Slice representing which spatial axes to plot (optional)
+        :param predicted_state: Optional predicted state to append to the track plot.
+        :param do_vel: (default=False) If true, then a velocity arrow will be appended to the final (or predicted) state
+        :param do_cov: (default=False) If true, then a covariance ellipse will be plotted around the final (or
+        predicted) state
+        :param scale: (default=1) Scale the track plot by this factor
+        :param cov_ellipse_confidence: (default=0.75) Confidence interval for covariance ellipse visualization
+        :param kwargs: Keyword arguments to pass to ax.plot()
+        """
         # Pull the appropriate state dimensions from each state
         # in the track's history
-        coords = list(zip(*[s.position[plot_axes] for s in self.states]))
+        coords = list(zip(*[s.position[plot_axes]/scale for s in self.states]))
 
         # Line plot
         hdl=ax.plot(*coords, **kwargs, label='Track {}'.format(self.track_id))
 
         if predicted_state is not None:
             # Predicted state
-            pred_coords = [[c[-1], p] for c, p in zip(coords, predicted_state.position[plot_axes])]
+            pred_coords = [[c[-1], p/scale] for c, p in zip(coords, predicted_state.position[plot_axes])]
             ax.plot(*pred_coords, label=None, linestyle='--', color=hdl[0].get_color())
 
             # Velocity and Covariance of predicted state
-            predicted_state.plot(ax=ax, plot_dims=plot_axes, do_pos=False, do_vel=True, do_cov=True, color=hdl[0].get_color())
+            predicted_state.plot(ax=ax, plot_dims=plot_axes, do_pos=False, do_vel=do_vel, do_cov=do_cov,
+                                 color=hdl[0].get_color(), cov_ellipse_confidence=cov_ellipse_confidence, scale=scale)
         else:
             # Velocity and Covariance of final state
-            self.curr_state.plot(ax=ax, plot_dims=plot_axes, do_pos=False, do_vel=True, do_cov=True, color=hdl[0].get_color())
+            self.curr_state.plot(ax=ax, plot_dims=plot_axes, do_pos=False, do_vel=do_vel, do_cov=do_cov,
+                                 color=hdl[0].get_color(), cov_ellipse_confidence=cov_ellipse_confidence, scale=scale)
 
         return hdl
