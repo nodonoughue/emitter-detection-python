@@ -18,6 +18,13 @@ class Measurement:
         self.sensor = sensor
         self.zeta = zeta
 
+    @property
+    def size(self):
+        return len(self.zeta)
+
+    def __str__(self):
+        return f"Measurement at t={self.time}: {self.zeta}"
+
 class MeasurementModel:
     """
     Parent class to capture the measurement model for a KF/EKF-system.
@@ -66,11 +73,11 @@ class MeasurementModel:
 
         # Build the H matrix
         h = np.zeros((self.num_measurement_dimensions, self.num_state_dimensions))
-        h[:, self.state_space.pos_slice, :] = np.transpose(j[:self.pss.num_dim, :])[:, :, np.newaxis]
+        h[:, self.state_space.pos_slice] = np.transpose(j[:self.pss.num_dim, :])
         if self.state_space.has_vel and j.shape[0] > self.pss.num_dim:
             # The state space has velocity components, and the pss returned rows for
             # the jacobian w.r.t. velocity.
-            h[: self.state_space.vel_slice, :] = np.transpose(j[self.pss.num_dim:, :])[:, :, np.newaxis]
+            h[: self.state_space.vel_slice] = np.transpose(j[self.pss.num_dim:, :])
 
         return h
 
@@ -89,30 +96,4 @@ class MeasurementModel:
         return self.pss.log_likelihood(x_source=self.state_space.pos_component(state.state),
                                        v_source=self.state_space.vel_component(state.state),
                                        zeta=measurement.zeta)
-
-class Updater(ABC):
-    """
-    Abstract class for a kinematic model that can update a State to some new time.
-    """
-    measurement_model: MeasurementModel
-
-    def __init__(self, measurement_model: MeasurementModel):
-        self.measurement_model = measurement_model
-
-    @abstractmethod
-    def predict_measurement(self, predicted_state: State, measurement_model: MeasurementModel=None, measurement_noise=True):
-        """
-        Predict the measurement implied by the predicted_state, returns a Measurement object with the predicted
-        mean and the covariance matrix of the measurement prediction.
-        """
-        # Compute the predicted measurement and next step's innovation covariance, to assist
-        # with data association
-        z_fun, h_fun = self.measurements[-1].make_measurement_model(self.motion_model.state_space)
-        self.pred_measurement = z_fun(self.pred_state)
-        h_mtx = h_fun(self.pred_state)
-        msmt_cov = self.measurements[-1].sensor.cov.cov
-        self.innov_covar = CovarianceMatrix(h_mtx @ self.pred_covar @ h_mtx.T + msmt_cov)
-
-
-
 

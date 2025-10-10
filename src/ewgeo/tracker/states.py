@@ -32,6 +32,12 @@ class StateSpace:
     def accel_component(self, x: npt.ArrayLike) -> npt.ArrayLike:
         return x[self.accel_slice] if self.has_accel else None
 
+    def copy(self, **kwargs):
+        new_state_space = StateSpace(**self.__dict__)
+        for key, value in kwargs.items():
+            new_state_space.__setattr__(key, value)
+        return new_state_space
+
 class State:
     """
     Representation of the position, and optionally the velocity and acceleration, of a target at
@@ -46,13 +52,17 @@ class State:
         self.state_space = state_space
         self.time = time
         self.state = np.asarray(state)
-        self.covar = covar
+        self.covar = CovarianceMatrix(covar)
 
     def copy(self, **kwargs):
         new_state=State(self.state_space, self.time, self.state, self.covar)
         for key, value in kwargs.items():
             new_state.__setattr__(key, value)
         return new_state
+
+    @property
+    def size(self) -> int:
+        return self.state_space.num_states
 
     @property
     def position(self) -> npt.ArrayLike:
@@ -123,6 +133,6 @@ class State:
         # Current State Covariance
         if do_cov and self.covar is not None:
             xy_ellipse = draw_error_ellipse(x=coords,
-                                            covariance=self.pos_vel_covar.cov,
+                                            covariance=self.position_covar.cov,
                                             conf_interval=cov_ellipse_confidence)
             plt.plot(*xy_ellipse, **kwargs)

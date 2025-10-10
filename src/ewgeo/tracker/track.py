@@ -3,7 +3,7 @@ import numpy as np
 from typing import MutableSequence
 
 from .states import State, StateSpace
-from ..utils.errors import draw_error_ellipse
+from .transition import MotionModel
 
 
 class Track:
@@ -15,6 +15,7 @@ class Track:
     states: MutableSequence[State]
     num_dims: int
     track_id: str
+    motion_model: MotionModel
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -22,6 +23,16 @@ class Track:
                 self.states = [value]
 
             setattr(self, key, value)
+
+    def __str__(self):
+        if self.track_id is not None:
+            return f'Track {self.track_id}: {self.curr_state.state} @ {self.curr_time:.2f}s'
+        else:
+            return f'Track {id(self)}: {self.curr_state.state} @ {self.curr_time:.2f}s'
+
+    @property
+    def state_space(self)->StateSpace:
+        return self.curr_state.state_space
 
     @property
     def curr_time(self)->float:
@@ -33,16 +44,18 @@ class Track:
 
     def append(self, state=State) -> None:
         self.states.append(state)
-        self.curr_time = state.time
 
     def copy(self, **kwargs):
         # Initialize a new track using all the current track's properties
+        if 'track_id' not in kwargs:
+            # Make sure we don't copy the track ID
+            kwargs['track_id'] = None
         new_track = Track(**self.__dict__)
         for key, value in kwargs.items():
             new_track.__setattr__(key, value)
         return new_track
 
-    def plot(self, ax: plt.Axes, plot_axes: slice=np.s_[:],
+    def plot(self, ax: plt.Axes, plot_dims: slice= np.s_[:],
              predicted_state: State=None,
              do_vel: bool=False, do_cov: bool=True,
              scale: float=1, cov_ellipse_confidence: float=.75,
@@ -51,7 +64,7 @@ class Track:
         Plot the states on the provided axis, with an optional scale factor (for converting from m to km, etc.).
 
         :param ax: Axes object to plot on
-        :param plot_axes: Slice representing which spatial axes to plot (optional)
+        :param plot_dims: Slice representing which spatial axes to plot (optional)
         :param predicted_state: Optional predicted state to append to the track plot.
         :param do_vel: (default=False) If true, then a velocity arrow will be appended to the final (or predicted) state
         :param do_cov: (default=False) If true, then a covariance ellipse will be plotted around the final (or
@@ -62,22 +75,22 @@ class Track:
         """
         # Pull the appropriate state dimensions from each state
         # in the track's history
-        coords = list(zip(*[s.position[plot_axes]/scale for s in self.states]))
+        coords = list(zip(*[s.position[plot_dims] / scale for s in self.states]))
 
         # Line plot
         hdl=ax.plot(*coords, **kwargs, label='Track {}'.format(self.track_id))
 
         if predicted_state is not None:
             # Predicted state
-            pred_coords = [[c[-1], p/scale] for c, p in zip(coords, predicted_state.position[plot_axes])]
+            pred_coords = [[c[-1], p/scale] for c, p in zip(coords, predicted_state.position[plot_dims])]
             ax.plot(*pred_coords, label=None, linestyle='--', color=hdl[0].get_color())
 
             # Velocity and Covariance of predicted state
-            predicted_state.plot(ax=ax, plot_dims=plot_axes, do_pos=False, do_vel=do_vel, do_cov=do_cov,
+            predicted_state.plot(ax=ax, plot_dims=plot_dims, do_pos=False, do_vel=do_vel, do_cov=do_cov,
                                  color=hdl[0].get_color(), cov_ellipse_confidence=cov_ellipse_confidence, scale=scale)
         else:
             # Velocity and Covariance of final state
-            self.curr_state.plot(ax=ax, plot_dims=plot_axes, do_pos=False, do_vel=do_vel, do_cov=do_cov,
+            self.curr_state.plot(ax=ax, plot_dims=plot_dims, do_pos=False, do_vel=do_vel, do_cov=do_cov,
                                  color=hdl[0].get_color(), cov_ellipse_confidence=cov_ellipse_confidence, scale=scale)
 
         return hdl

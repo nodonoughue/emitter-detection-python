@@ -13,13 +13,25 @@ class MotionModel(ABC):
     state_space: StateSpace
 
     # Process Equations
-    time_delta: float
+    time_delta: float | None
     f: npt.ArrayLike                # Transition Matrix
     process_covar: npt.ArrayLike
     q: npt.ArrayLike                # Process Noise
 
     def __init__(self):
         pass
+
+    def copy(self):
+        """
+        Make a new MotionModel object with the same parameters and type as this one
+        """
+        cls = self.__class__
+        result = cls.__new__(cls)
+
+        # The only thing worth copying is the state_space
+        # Other parameters are generated as needed
+        result.state_space = self.state_space.copy()
+        return result
 
     @abstractmethod
     def make_transition_matrix(self, time_delta: float):
@@ -32,6 +44,10 @@ class MotionModel(ABC):
     def predict(self, curr_state: State, new_time: float):
         # Look up or compute the process noise and transition matrices
         time_delta = new_time - curr_state.time
+
+        if time_delta == 0:
+            # We already have a state at this time; nothing to predict forward
+            return curr_state.copy()
 
         if time_delta is not None and time_delta != self.time_delta:
             # Generate new ones

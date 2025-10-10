@@ -10,12 +10,19 @@ from . import ensure_invertible, parse_reference_sensor, resample_covariance_mat
 
 class CovarianceMatrix:
     def __init__(self, cov: npt.ArrayLike, do_cholesky: bool=True, do_inverse: bool=True):
-        self._cov = np.asarray(cov)  # Store the covariance matrix; use copy to make sure it's a fresh copy
-        self._inv = None
-        self._lower = None
-        self._do_parse = True
-        self._do_cholesky = do_cholesky
-        self._do_inverse = do_inverse
+        if isinstance(cov, CovarianceMatrix):
+            # Copy it instead (this is a deepcopy), then set all the
+            # attributes of the current object to point to those of the copy.
+            new_cov = cov.copy()
+            for key, value in new_cov.__dict__.items():
+                setattr(self, key, value)
+        else:
+            self._cov = np.asarray(cov)  # Store the covariance matrix; use copy to make sure it's a fresh copy
+            self._inv = None
+            self._lower = None
+            self._do_parse = True
+            self._do_cholesky = do_cholesky
+            self._do_inverse = do_inverse
 
     """
     =========================================================
