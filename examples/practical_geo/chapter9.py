@@ -41,21 +41,21 @@ def example1():
     # Define starting states
     ids = ['001','002','003']
     state_vecs = [[0, 2e3, 0, 100],
-                  [1e3, 2e3, 100, 0],
+                  [1e3, 2e3, 70,-10],
                   [1e3, 1.5e3, 50, 50]]
     state_covars = [
         CovarianceMatrix(np.array([[2e4, 1e2, 0, 0],
-                                   [1e2, 1e4, 0, 0],
-                                   [0, 0, 3e3, 1e2],
-                                   [0, 0, 1e2, 1e3]])),
-        CovarianceMatrix(np.array([[2e4, 1e2, 0, 0],
-                                   [1e2, 1e4, 0, 0],
-                                   [0, 0, 3e3, 1e2],
-                                   [0, 0, 1e2, 1e3]])),
-        CovarianceMatrix(np.array([[2e4, 1e3, 0, 0],
+                                   [1e2, 2e4, 0, 0],
+                                   [0, 0, 2e3, 0],
+                                   [0, 0, 0, 2e3]])),
+        CovarianceMatrix(np.array([[2e4, 2e3, 0, 0],
+                                   [2e3, 2.5e4, 0, 0],
+                                   [0, 0, 2e3, 0],
+                                   [0, 0, 0, 2e3]])),
+        CovarianceMatrix(np.array([[4e4, 1e3, 0, 0],
                                    [1e3, 1e5, 0, 0],
-                                   [0, 0, 3e3, 1e2],
-                                   [0, 0, 1e2, 1e3]]))]
+                                   [0, 0, 2e3, 0],
+                                   [0, 0, 0, 2e3]]))]
 
     # Define the State Space; easiest method is to instantiate
     # a transition model
@@ -91,8 +91,8 @@ def example1():
 
     # Define measurements
     new_state_vecs = np.array([[150, 2450, 25, 100],
-                               [1250,1900,75,-25],
-                               [1350,1800,25,50]])
+                               [1250,1975,75,-25],
+                               [1230,1600,25,50]])
     new_time = 5
     new_states = [ewt.State(state_space=state_space,
                             time=new_time,
@@ -108,7 +108,7 @@ def example1():
     hdls = [t.plot(ax=ax, plot_axes=plot_axes, predicted_state=p, **plot_args) for (t, p) in zip(tracks, predicted_states)]
     pss.plot_sensors(ax=ax, label='DF System')
     plt.scatter(*coords, s=100, color='k', label='New States (truth)')
-    [pss.plot_lobs(ax=ax, zeta=m.zeta, plot_args={'color': 'k', 'linestyle': '-.','label':None}, scale=2e3) for m in measurements]
+    # [pss.plot_lobs(ax=ax, zeta=m.zeta, plot_args={'color': 'k', 'linestyle': '-.','label':None}, scale=2e3) for m in measurements]
     plt.legend()
 
 

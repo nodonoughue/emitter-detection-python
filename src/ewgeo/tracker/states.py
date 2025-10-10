@@ -60,11 +60,11 @@ class State:
 
     @property
     def velocity(self):
-        return self.state_space.vel_component(self.state)
+        return self.state_space.vel_component(self.state) if self.has_vel else None
 
     @property
     def acceleration(self):
-        return self.state_space.accel_component(self.state)
+        return self.state_space.accel_component(self.state) if self.has_accel else None
 
     @property
     def has_vel(self):
@@ -84,7 +84,7 @@ class State:
 
     @property
     def velocity_covar(self):
-        if self.covar is None:
+        if self.covar is None or not self.has_vel:
             return None
         else:
             vel_slice = self.state_space.vel_slice
@@ -92,7 +92,7 @@ class State:
 
     @property
     def acceleration_covar(self):
-        if self.covar is None:
+        if self.covar is None or not self.has_accel:
             return None
         else:
             accel_slice = self.state_space.accel_slice
@@ -121,5 +121,5 @@ class State:
         if do_cov and self.covar is not None:
             xy_ellipse = draw_error_ellipse(x=coords,
                                             covariance=self.pos_vel_covar.cov,
-                                            conf_interval=50)
+                                            conf_interval=.75)
             plt.plot(*xy_ellipse, **kwargs)
