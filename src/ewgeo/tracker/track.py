@@ -78,16 +78,17 @@ class Track:
         coords = list(zip(*[s.position[plot_dims] / scale for s in self.states]))
 
         # Line plot
-        hdl=ax.plot(*coords, **kwargs, label='Track {}'.format(self.track_id))
+        hdl=ax.plot(*coords, **kwargs, label=f"Track {self.track_id}")
 
         if predicted_state is not None:
             # Predicted state
             pred_coords = [[c[-1], p/scale] for c, p in zip(coords, predicted_state.position[plot_dims])]
-            ax.plot(*pred_coords, label=None, linestyle='--', color=hdl[0].get_color())
+            ax.plot(*pred_coords, linestyle='--', color=hdl[0].get_color(), label=f"Track {self.track_id} Predicted State")
 
             # Velocity and Covariance of predicted state
             predicted_state.plot(ax=ax, plot_dims=plot_dims, do_pos=False, do_vel=do_vel, do_cov=do_cov,
-                                 color=hdl[0].get_color(), cov_ellipse_confidence=cov_ellipse_confidence, scale=scale)
+                                 color=hdl[0].get_color(), cov_ellipse_confidence=cov_ellipse_confidence, scale=scale,
+                                 linestyle='--')
         else:
             # Velocity and Covariance of final state
             self.curr_state.plot(ax=ax, plot_dims=plot_dims, do_pos=False, do_vel=do_vel, do_cov=do_cov,

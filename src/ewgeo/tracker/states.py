@@ -119,20 +119,20 @@ class State:
     def plot(self, ax=plt.Axes, plot_dims: slice=np.s_[:],
              do_pos: bool=True, do_vel: bool=False, do_cov: bool=False,
              scale: float=1, cov_ellipse_confidence: float=0.75,
-             **kwargs):
+             linestyle: str='-', **kwargs):
 
         # Plot Position
         coords = self.position[plot_dims]/scale
         if do_pos:
-            ax.scatter(*coords, **kwargs)
+            ax.scatter(*coords, **kwargs, linestyle=linestyle)
 
         # Plot Velocity
         if do_vel and self.has_vel:
-            ax.quiver(*coords, *self.velocity[plot_dims]/scale, **kwargs)
+            ax.quiver(*coords, *self.velocity[plot_dims]/scale, **kwargs, linestyle=linestyle)
 
         # Current State Covariance
         if do_cov and self.covar is not None:
             xy_ellipse = draw_error_ellipse(x=coords,
                                             covariance=self.position_covar.cov,
                                             conf_interval=cov_ellipse_confidence)
-            plt.plot(*xy_ellipse, **kwargs)
+            plt.plot(*xy_ellipse, **kwargs, linestyle=linestyle)

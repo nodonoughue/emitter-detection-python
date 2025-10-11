@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 import numpy as np
+from matplotlib import pyplot as plt
 from numpy import typing as npt
+from prettytable import PrettyTable
 from scipy.stats import chi2, multivariate_normal
 from scipy.optimize import linear_sum_assignment
+from stonesoup.types import hypothesis
 
 from . import State, MotionModel
 from .measurement import Measurement, MeasurementModel
@@ -169,7 +172,7 @@ class Hypothesis:
         self._likelihood = likelihood
         self._log_likelihood = np.log(likelihood)
 
-    def update_track(self, spawn_new_track: bool=False)->Track:
+    def update_track(self, spawn_new_track: bool=False, ax: plt.Axes=None, plot_dims: slice=np.s_[:])->Track:
         # Apply this hypothesis and update the track
         if spawn_new_track:
             t = self.track.copy()
@@ -179,6 +182,10 @@ class Hypothesis:
         # No measurement -- nothing to update
         if self.measurement is None:
             return t
+
+        # Plot the results
+        if ax is not None:
+            hdl = t.plot(ax=ax, do_vel=False, do_cov=True, predicted_state=self.predicted_state, marker='^')
 
         # Compute the Kalman Gain, which is the product of the predicted state covariance, the transpose of the
         # measurement Jacobian, and the inverse of the innovation covariance
@@ -193,6 +200,12 @@ class Hypothesis:
 
         # Make a new State object and add it to the track
         new_state = t.curr_state.copy(state=new_state_vec, covar=CovarianceMatrix(new_state_covar), time=self.measurement.time)
+        if ax is not None:
+            # Plot a dashed line from the current state to the new one
+            plt.plot(*zip(t.curr_state.position[plot_dims], new_state.position[plot_dims]),
+                     color=hdl[0].get_color(), linestyle=':', label=f'Track {self.track.track_id}, Updated State')
+            new_state.plot(ax=ax, do_vel=False, do_cov=True, color=hdl[0].get_color(), linestyle=':')
+
         t.append(new_state)
         return t
 
@@ -279,9 +292,15 @@ class Associator(ABC):
 
 class NNAssociator(Associator):
 
-    def associate(self, tracks: list[Track], measurements: list[Measurement])-> dict[Track, Hypothesis]:
+    def associate(self, tracks: list[Track], measurements: list[Measurement], print_table: bool=False)-> dict[Track, Hypothesis]:
         # TODO: Test
         hypotheses = {}
+
+        if print_table:
+            table = PrettyTable()
+            table.field_names = ['Track'] + [f"Msmt {i}" for i in range(len(measurements))]
+            table.float_format = ".2"
+
         for track in tracks:
             # Generate a hypothesis for each track; we'll start with the null hypothesis
             null_hypothesis = Hypothesis(track=track, measurement=None)
@@ -295,6 +314,8 @@ class NNAssociator(Associator):
             this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=self.motion_model) for m in measurements]
             # print('Generating hypotheses for track ', track.track_id, '...')
             # [print(h) for h in this_hypotheses]
+            if print_table:
+                table.add_row([track.__str__()] + [h.distance for h in this_hypotheses])
 
             [h.apply_distance_gate(self.gate_probability) for h in this_hypotheses]
 
@@ -313,7 +334,13 @@ class NNAssociator(Associator):
                 # All measurements failed the acceptance gate test;
                 # Use the null hypothesis
                 hypotheses[track] = null_hypothesis
-                print('...NN=null')
+                # print('...NN=null')
+
+
+
+        if print_table:
+            print('Nearest Neighbor Association Distances')
+            print(table)
 
         # Convert to an Association object and return
         return hypotheses

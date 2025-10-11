@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.linalg import block_diag
-import time
+
 
 import ewgeo.tracker as ewt
 from ewgeo.tracker.association import NNAssociator
+from ewgeo.tracker.measurement import Measurement
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.unit_conversions import convert
@@ -48,7 +49,7 @@ def example1():
         CovarianceMatrix(np.array([[4e4, -1e4, 0, 0],
                                    [-1e4, 1e4, 0, 0],
                                    [0, 0, 1e3, -5e2],
-                                   [0, 0, -5e2, 2e2]])),
+                                   [0, 0, -5e2, 5e2]])),
         CovarianceMatrix(np.array([[2e4, 1e4, 0, 0],
                                    [1e4, 4e4, 0, 0],
                                    [0, 0, 6e2, 4e2],
@@ -71,7 +72,6 @@ def example1():
                       [200, 800]])
     c_zeta = CovarianceMatrix(np.power(np.diag([3, 3])*_deg2rad,2))
     pss = DirectionFinder(x=x_aoa, cov=c_zeta, do_2d_aoa=False)
-    msmt = ewt.measurement.MeasurementModel(state_space=state_space, pss=pss)
 
     # Plot the initial laydown
     plot_dims = np.s_[:2] # just plot the first two dimensions
@@ -89,19 +89,24 @@ def example1():
     plt.ylim([-500,3000])
 
     # Define measurements
-    new_state_vecs = np.array([[150, 2650, 25, 100],
-                               [1450,1775,75,-25],
-                               [1650,1740,25,50]])
+    zeta = [[1.811, 1.652],
+             [1.153, 0.703],
+             [1.042, 0.608],
+             [1.679, 1.454]]
     new_time = 5
+    measurements = [Measurement(time=new_time, sensor=pss, zeta=z) for z in zeta]
+
+    # For plotting, let's generate some new states from these measurements
+    x_source = [pss.least_square(m, x_init=np.array([500,1000])) for m in zeta]
     new_states = [ewt.State(state_space=state_space,
                             time=new_time,
-                            state=new_s) for new_s in new_state_vecs]
+                            state=np.concat((x[0], [0,0]), axis=0))
+                  for x in x_source]
+    coords = list(zip(*[s.position for s in new_states]))
+
     # Build a state covariance error from the CRLB
     for s in new_states:
         s.covar = CovarianceMatrix(block_diag(pss.compute_crlb(s.position),1e6*np.eye(2)))
-
-    coords=list(zip(*[s.position for s in new_states]))
-    measurements = [msmt.measurement(s, noise=False) for s in new_states]
 
     # Predict the states forward and replot
     predicted_states = [transition.predict(t.curr_state, new_time=new_time) for t in tracks]
@@ -121,9 +126,13 @@ def example1():
 
     # Set up the Nearest Neighbor Association Scheme
     associator = NNAssociator(motion_model=transition, gate_probability=.75)
-    hypotheses = associator.associate(tracks=tracks, measurements=measurements)
+    hypotheses = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
 
-    [h.update_track() for h in hypotheses.values()]
+    # Make a plot for the hypothesis assignments
+    fig, ax = plt.subplots()
+    [h.update_track(ax=ax) for h in hypotheses.values()]
+    plt.scatter(*coords, s=25, color='k', label='New States (truth)')
+    plt.legend()
 
     figs = []
     fig, ax = plt.subplots()
