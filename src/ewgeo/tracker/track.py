@@ -3,7 +3,6 @@ import numpy as np
 from typing import MutableSequence
 
 from .states import State, StateSpace
-from .transition import MotionModel
 
 
 class Track:
@@ -14,8 +13,8 @@ class Track:
     initial_state: State
     states: MutableSequence[State]
     num_dims: int
-    track_id: str
-    motion_model: MotionModel
+    track_id: str = ""
+    num_missed_detections: int = 0
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -42,8 +41,12 @@ class Track:
     def curr_state(self)->State:
         return self.states[-1]
 
-    def append(self, state=State) -> None:
+    def append(self, state=State, missed_detection: bool=False) -> None:
         self.states.append(state)
+        if missed_detection:
+            self.num_missed_detections += 1
+        else:
+            self.num_missed_detections = 0
 
     def copy(self, **kwargs):
         # Initialize a new track using all the current track's properties
@@ -86,7 +89,7 @@ class Track:
             ax.plot(*pred_coords, linestyle='--', color=hdl[0].get_color(), label=f"Track {self.track_id} Predicted State")
 
             # Velocity and Covariance of predicted state
-            predicted_state.plot(ax=ax, plot_dims=plot_dims, do_pos=False, do_vel=do_vel, do_cov=do_cov,
+            predicted_state.plot(ax=ax, plot_dims=plot_dims, do_pos=True, do_vel=do_vel, do_cov=do_cov,
                                  color=hdl[0].get_color(), cov_ellipse_confidence=cov_ellipse_confidence, scale=scale,
                                  linestyle='--')
         else:

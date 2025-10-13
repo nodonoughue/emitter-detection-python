@@ -2,8 +2,6 @@ import numpy.typing as npt
 
 from .measurement import Measurement
 from .track import Track
-from .association import Associator
-
 
 # TODO: Make an Initiator class -- update the text
 # TODO: Make a Deleter class -- update the text
@@ -17,9 +15,9 @@ class TrackManager:
     deleted_tracklets: list[Track]
     unassociated_measurements: list[Measurement]
 
-    deleter: Deleter
-    promoter: Promoter
-    initiator: Initiator
+    # deleter: Deleter
+    # promoter: Promoter
+    # initiator: Initiator
 
 
     def __init__(self):

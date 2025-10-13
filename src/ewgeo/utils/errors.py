@@ -190,6 +190,7 @@ def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
                          90 -- 90 percent
                          95 -- 95 percent
                          99 -- 99 percent
+                         xx -- any floating point value between 0 and 1
     :return x: x-coordinate defining error ellipse
     :return y: y-coordinate defining error ellipse
     """

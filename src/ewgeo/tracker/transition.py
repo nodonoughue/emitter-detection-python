@@ -3,7 +3,7 @@ import numpy as np
 import numpy.typing as npt
 
 from ewgeo.utils.covariance import CovarianceMatrix
-from . import State, StateSpace
+from . import State, StateSpace, Track
 
 
 class MotionModel(ABC):
@@ -41,13 +41,17 @@ class MotionModel(ABC):
     def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: float):
         pass
 
-    def predict(self, curr_state: State, new_time: float):
+    def predict(self, s: State | Track, new_time: float):
+        # If a track is provided as the current state, parse its current state
+        if isinstance(s, Track):
+            s = s.curr_state
+
         # Look up or compute the process noise and transition matrices
-        time_delta = new_time - curr_state.time
+        time_delta = new_time - s.time
 
         if time_delta == 0:
             # We already have a state at this time; nothing to predict forward
-            return curr_state.copy()
+            return s.copy()
 
         if time_delta is not None and time_delta != self.time_delta:
             # Generate new ones
@@ -56,14 +60,14 @@ class MotionModel(ABC):
             self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
 
         # To predict forward, just pre-multiply the previous state with the transition matrix
-        new_state = self.f @ curr_state.state
-        if curr_state.covar is None:
+        new_state = self.f @ s.state
+        if s.covar is None:
             new_covar = None
         else:
-            new_covar = CovarianceMatrix(self.f @ curr_state.covar.cov @ np.transpose(self.f) + self.q)
+            new_covar = CovarianceMatrix(self.f @ s.covar.cov @ np.transpose(self.f) + self.q)
 
         # Make a new State object
-        return curr_state.copy(state=new_state, covar=new_covar, time=new_time)
+        return s.copy(state=new_state, covar=new_covar, time=new_time)
 
     def update_time_step(self, time_delta):
         if time_delta is None:

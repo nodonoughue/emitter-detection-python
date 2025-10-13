@@ -54,6 +54,9 @@ class State:
         self.state = np.asarray(state)
         self.covar = CovarianceMatrix(covar)
 
+    def __str__(self):
+        return f"State at t={self.time}: {self.state}"
+
     def copy(self, **kwargs):
         new_state=State(self.state_space, self.time, self.state, self.covar)
         for key, value in kwargs.items():

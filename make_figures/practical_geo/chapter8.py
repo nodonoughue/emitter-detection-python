@@ -1,7 +1,7 @@
 """
-Draw Figures - Chapter 7
+Draw Figures - Chapter 8
 
-This script generates all the figures that appear in Chapter 7 of the textbook.
+This script generates all the figures that appear in Chapter 8 of the textbook.
 
 Ported from MATLAB Code
 
