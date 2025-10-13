@@ -4,6 +4,11 @@ from .measurement import Measurement
 from .track import Track
 from .association import Associator
 
+
+# TODO: Make an Initiator class -- update the text
+# TODO: Make a Deleter class -- update the text
+# TODO: Make a Promoter class -- update the text
+
 class TrackManager:
     curr_time: float
     tracks: list[Track]
@@ -11,6 +16,11 @@ class TrackManager:
     deleted_tracks: list[Track]
     deleted_tracklets: list[Track]
     unassociated_measurements: list[Measurement]
+
+    deleter: Deleter
+    promoter: Promoter
+    initiator: Initiator
+
 
     def __init__(self):
         pass
