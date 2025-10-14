@@ -4,10 +4,6 @@ from .association import Associator, MissedDetectionHypothesis
 from .measurement import Measurement
 from .track import Track
 
-# TODO: Make an Initiator class -- update the text
-# TODO: Make a Deleter class -- update the text
-# TODO: Make a Promoter class -- update the text
-
 class Initiator(ABC):
     @abstractmethod
     def initiate(self, measurements: list[Measurement]) -> list[Track]:
@@ -79,22 +75,27 @@ class TrackManager:
         hypothesis_dict, unassoc_msmts = self.associator.associate(tracks=self.tracks, measurements=measurements)
 
         # Update the hypotheses
-        [h.update_track() for h in hypothesis_dict.items()]
+        hypotheses = hypothesis_dict.items()
+        [h.update_track() for h in hypotheses]
 
         # Return the unused measurements
         return unassoc_msmts
 
     def promote(self, measurements: list[Measurement]) -> list[Measurement]:
         # Generate hypotheses to match measurements to the tentative tracks
-        tentative_hypotheses, unassoc_msmt = self.associator.associate(tracks=self._tentative_tracks,
-                                                                       measurements=measurements)
+        hypothesis_dict, unassoc_msmt = self.associator.associate(tracks=self._tentative_tracks,
+                                                                  measurements=measurements)
+
+        # Update the tracks associated with these hypotheses
+        tentative_hypotheses = hypothesis_dict.items()
+        [h.update_track() for h in tentative_hypotheses]
 
         # Any hypotheses that are not a MissedDetectionHypothesis can be passed to
-        # promoter for evaluation
-        tracks_to_test = [t for t, m in tentative_hypotheses.items() if not isinstance(m, MissedDetectionHypothesis)]
+        # the promoter for evaluation
+        tracks_to_test = [h.track for h in tentative_hypotheses if not isinstance(h, MissedDetectionHypothesis)]
         tracks_to_promote = self.promoter.promote(tracks=tracks_to_test)
 
-        # Add the promoted tracks to the track list, and remove them from the tentative tracks list
+        # Add the promoted tracks to the track list and remove them from the tentative tracks list
         for t in tracks_to_promote:
             self.tracks.append(t)
             self._tentative_tracks.remove(t)
