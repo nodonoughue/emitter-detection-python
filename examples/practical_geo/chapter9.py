@@ -2,12 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.linalg import block_diag
 
-
-import ewgeo.tracker as ewt
-from ewgeo.tracker import StateSpace, Track
+from ewgeo.tracker import StateSpace, State, Track
 from ewgeo.tracker.association import NNAssociator, GNNAssociator, PDAAssociator
 from ewgeo.tracker.measurement import Measurement
-from ewgeo.tracker.transition import MotionModel
+from ewgeo.tracker.transition import MotionModel, ConstantVelocityMotionModel
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import PassiveSurveillanceSystem
@@ -55,14 +53,14 @@ def __init_example1():
     # Define the State Space; easiest method is to instantiate
     # a transition model
     process_covar = np.diag([25, 25])
-    transition = ewt.transition.ConstantVelocityMotionModel(num_dims=2, process_covar=process_covar)
+    transition = ConstantVelocityMotionModel(num_dims=2, process_covar=process_covar)
     state_space = transition.state_space
 
     # Make the initial track states
-    states = [ewt.State(state_space=state_space, time=0, state=s, covar=c) for (s, c) in zip(state_vecs, state_covars)]
+    states = [State(state_space=state_space, time=0, state=s, covar=c) for (s, c) in zip(state_vecs, state_covars)]
 
     # Initialize a Track with each one
-    tracks = [ewt.track.Track(track_id=i, initial_state=s) for (i, s) in zip(ids, states)]
+    tracks = [Track(track_id=i, initial_state=s) for (i, s) in zip(ids, states)]
 
     # Define Measurement System
     x_aoa = np.array([[750, 300],
@@ -106,9 +104,9 @@ def example1():
 
     # For plotting, let's generate some new states from these measurements
     x_source = [pss.least_square(m.zeta, x_init=np.array([500,1000])) for m in measurements]
-    new_states = [ewt.State(state_space=state_space,
-                            time=new_time,
-                            state=np.concat((x[0], [0,0]), axis=0))
+    new_states = [State(state_space=state_space,
+                        time=new_time,
+                        state=np.concat((x[0], [0,0]), axis=0))
                   for x in x_source]
     coords = list(zip(*[s.position for s in new_states]))
 

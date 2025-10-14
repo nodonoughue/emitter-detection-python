@@ -4,12 +4,12 @@ import time
 
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
+from ewgeo import tracker
 from ewgeo.utils import print_progress, print_elapsed, safe_2d_shape
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.constraints import fixed_alt
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import draw_error_ellipse
-from ewgeo.utils import tracker
 from ewgeo.utils.unit_conversions import convert
 
 _ft2m = convert(1, from_unit="ft", to_unit="m")
@@ -97,15 +97,23 @@ def example1(mc_params=None):
     # ===  Set Up Tracker
     sigma_a = 1
 
-    f_fun, q_fun, state_space = tracker.make_kinematic_model('cv',num_dims,sigma_a**2)
-    num_states = state_space['num_states']
-    pos_slice = state_space['pos_slice']
-    vel_slice = state_space['vel_slice']
-    f = f_fun(t_inc) # generate state transition matrix
-    q = q_fun(t_inc) # generate process noise covariance matrix
+    motion_model = tracker.MotionModel.make_motion_model('cv',num_dims,sigma_a**2)
+    state_space = motion_model.state_space
+    num_states = state_space.num_states
+    pos_slice = state_space.pos_slice
+    vel_slice = state_space.vel_slice
+    motion_model.update_time_step(t_inc)
+    f = motion_model.f # generate state transition matrix
+    q = motion_model.q # generate process noise covariance matrix
 
-    z_fun, h_fun = tracker.make_measurement_model(pss=tdoa, state_space=state_space)
+    msmt_model = tracker.MeasurementModel(pss=tdoa, state_space=motion_model.state_space)
     # msmt function and linearized msmt function
+    def z_fun(x):
+        # msmt_model.measurement wants a State object; x is the state vector, let's wrap it
+        # it returns a Measurement object, but ekf_update just wants zeta
+        return msmt_model.measurement(tracker.State(state_space=state_space, state=x, time=0.)).zeta
+    def h_fun(x):
+        return msmt_model.jacobian(tracker.State(state_space=state_space, state=x, time=0.))
 
     # ===  Initialize Track State
     x_pred = np.zeros((num_states,))
@@ -368,12 +376,14 @@ def example2(rng=np.random.default_rng()):
     sigma_a = .05
     num_dims = 3 # number of dimensions to use in state
 
-    f_fun, q_fun, state_space = tracker.make_kinematic_model('cv',num_dims,sigma_a**2)
-    num_states = state_space['num_states']
-    pos_slice = state_space['pos_slice']
-    vel_slice = state_space['vel_slice']
-    f = f_fun(t_inc) # generate state transition matrix
-    q = q_fun(t_inc) # generate process noise covariance matrix
+    motion_model = tracker.MotionModel.make_motion_model('cv',num_dims,sigma_a**2)
+    state_space = motion_model.state_space
+    num_states = state_space.num_states
+    pos_slice = state_space.pos_slice
+    vel_slice = state_space.vel_slice
+    motion_model.update_time_step(t_inc)
+    f = motion_model.f # generate state transition matrix
+    q = motion_model.q # generate process noise covariance matrix
 
     # ===  Initialize Track State
     x_pred = np.zeros((num_states,))
@@ -408,6 +418,15 @@ def example2(rng=np.random.default_rng()):
     iter_per_marker = 1
     iter_per_row = markers_per_row * iter_per_marker
 
+    msmt_model = tracker.MeasurementModel(pss=aoa, state_space=state_space)
+    # msmt function and linearized msmt function
+    def z_fun(x):
+        # msmt_model.measurement wants a State object; x is the state vector, let's wrap it
+        return msmt_model.measurement(tracker.State(state_space=state_space, state=x, time=0.)).zeta
+
+    def h_fun(x):
+        return msmt_model.jacobian(tracker.State(state_space=state_space, state=x, time=0.))
+
     # at least 1 iteration per marker, no more than 100 iterations per marker
     t_start = time.perf_counter()
     
@@ -424,12 +443,10 @@ def example2(rng=np.random.default_rng()):
         # Grab Current Measurement
         this_zeta = zeta[:, idx]
 
-        # Update msmt function
+        # Update sensor positions
         this_x_aoa = x_aoa_full[:num_dims, idx]
         aoa.pos = this_x_aoa
         
-        z_fun, h_fun = tracker.make_measurement_model(pss=aoa, state_space=state_space)
-
         # Update Position Estimate
         # Previous prediction stored in x_pred, P_pred
         # Updated estimate will be stored in x_est, P_est
@@ -512,12 +529,12 @@ def example2(rng=np.random.default_rng()):
     rmse_est = np.sqrt(np.sum(np.fabs(err_est)**2, axis=0))
 
     fig3=plt.figure()
-    plt.plot(t_vec,rmse_cov_est,label='RMSE (est. cov.)')
+    hdl0 =plt.plot(t_vec,rmse_cov_est,label='RMSE (est. cov.)')
 
-    plt.plot(t_vec[1:], rmse_cov_pred[:-1], label='RMSE (pred. cov)')
+    hdl1 =plt.plot(t_vec[1:], rmse_cov_pred[:-1], label='RMSE (pred. cov)')
     # set(gca,'ColorOrderIndex',1)
-    plt.plot(t_vec,rmse_est,'--',label='RMSE (est. act.)')
-    plt.plot(t_vec[1:], rmse_pred, '--', label='RMSE (pred. act.)')
+    plt.plot(t_vec,rmse_est,'--',label='RMSE (est. act.)', color=hdl0[0].get_color())
+    plt.plot(t_vec[1:], rmse_pred, '--', label='RMSE (pred. act.)', color=hdl1[0].get_color())
     plt.grid(True)
     plt.xlabel('Time [sec]')
     plt.ylabel('Error [m]')

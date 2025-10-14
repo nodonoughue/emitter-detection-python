@@ -13,7 +13,8 @@ import numpy as np
 
 from ewgeo.triang import DirectionFinder
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
-from ewgeo.utils import init_output_dir, init_plot_style, safe_2d_shape, tracker
+from ewgeo import tracker
+from ewgeo.utils import init_output_dir, init_plot_style, safe_2d_shape
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50
 from ewgeo.utils.unit_conversions import convert

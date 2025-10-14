@@ -13,8 +13,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
-import ewgeo.tracker as ewt
-from ewgeo.tracker.association import Hypothesis, MissedDetectionHypothesis
+from ewgeo.tracker import State, Track
+from ewgeo.tracker.association import Hypothesis, MissedDetectionHypothesis, NNAssociator
+from ewgeo.tracker.measurement import MeasurementModel
+from ewgeo.tracker.transition import ConstantVelocityMotionModel
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils import init_output_dir, init_plot_style
 from ewgeo.utils.covariance import CovarianceMatrix
@@ -71,17 +73,16 @@ def make_figure_2(prefix=None):
     # Plot a track, its prediction and error covariance, and a set of four measurements nearby
 
     # Initialize the states for the track
-    transition = ewt.transition.ConstantVelocityMotionModel(num_dims=2,
-                                                            process_covar=np.eye(2)*100)
+    transition = ConstantVelocityMotionModel(num_dims=2, process_covar=np.eye(2)*100)
     state_vecs = np.array([[0.0, 0.0, 1.0, 1.0],
                            [0.5, 0.5, 1.0, 0.0],
                            [1.0, 0.5, 0.5, 1.0],
                            [1.25, 1.0, 0.5, 0.5]])*1e3
     time_step = 0.5
     time = np.arange(len(state_vecs))*time_step
-    states = [ewt.State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
+    states = [State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
     states[-1].covar = CovarianceMatrix(np.diag([2.0, 0.75, 0.4, 0.4])*1e4)
-    track = ewt.Track(states=states)
+    track = Track(states=states)
 
     new_time = time[-1] + time_step
     prediction = transition.predict(s=track, new_time=new_time) # predict state for the next measurement
@@ -92,7 +93,7 @@ def make_figure_2(prefix=None):
                                         cov=CovarianceMatrix(np.diag([1.0, 1.0, 1.0])*1e2),
                                         variance_is_toa=False,
                                         ref_idx=0)
-    msmt_model = ewt.measurement.MeasurementModel(pss=pss, state_space=transition.state_space)
+    msmt_model = MeasurementModel(pss=pss, state_space=transition.state_space)
 
     # Find the predicted measurement and measurement error covariance (for drawing an ellipse)
     prediction_msmt = msmt_model.measurement(state=prediction, noise=False)
@@ -107,7 +108,7 @@ def make_figure_2(prefix=None):
     num_states = transition.state_space.num_states
     cov = np.eye(num_states) * 5e4
     state_vecs = np.random.multivariate_normal(mean=prediction.state, cov=cov, size=num_meas)
-    truth_states = [ewt.State(state_space=transition.state_space, time=new_time, state=x) for x in state_vecs]
+    truth_states = [State(state_space=transition.state_space, time=new_time, state=x) for x in state_vecs]
     truth_msmts = [msmt_model.measurement(state=s, noise=False) for s in truth_states]
     msmt_to_state_dict = dict(zip(truth_msmts, truth_states))
 
@@ -206,14 +207,14 @@ def make_figure_3(prefix=None):
     # Define the State Space; easiest method is to instantiate
     # a transition model
     process_covar = np.diag([25,25])
-    transition = ewt.transition.ConstantVelocityMotionModel(num_dims=2, process_covar=process_covar)
+    transition = ConstantVelocityMotionModel(num_dims=2, process_covar=process_covar)
     state_space = transition.state_space
 
     # Make the initial track states
-    states = [ewt.State(state_space=state_space, time=0, state=s, covar=c) for (s, c) in zip(state_vecs, state_covars)]
+    states = [State(state_space=state_space, time=0, state=s, covar=c) for (s, c) in zip(state_vecs, state_covars)]
 
     # Initialize a Track with each one and predict forward to the next measurement
-    tracks = [ewt.track.Track(track_id=i, initial_state=s) for (i, s) in zip(ids, states)]
+    tracks = [Track(track_id=i, initial_state=s) for (i, s) in zip(ids, states)]
     new_time = 5
     predicted_states = [transition.predict(t.curr_state, new_time=new_time) for t in tracks]
 
@@ -222,19 +223,19 @@ def make_figure_3(prefix=None):
                       [200, 800]])
     c_zeta = CovarianceMatrix(np.power(np.diag([3, 3])*_deg2rad,2))
     pss = DirectionFinder(x=x_aoa, cov=c_zeta, do_2d_aoa=False)
-    msmt_model = ewt.measurement.MeasurementModel(pss=pss, state_space=state_space)
+    msmt_model = MeasurementModel(pss=pss, state_space=state_space)
 
     # Let's make some new random states based on the predicted states for each track, and a few clutter-type states
     new_states = []
     num_meas_per_track = 3 # let's make two possible associations with each track
     for p in predicted_states:
         x = np.random.multivariate_normal(mean=p.state, cov=p.covar.cov, size=num_meas_per_track)
-        s = [ewt.State(state=xx, state_space=transition.state_space, time=new_time) for xx in x]
+        s = [State(state=xx, state_space=transition.state_space, time=new_time) for xx in x]
         new_states.extend(s)
 
     num_background_msmt = 15
     x = np.random.multivariate_normal(mean=np.array([1e3,1e3,0,0]), cov=np.diag([5e4,5e4,100,100]), size=num_background_msmt)
-    new_states.extend([ewt.State(state=xx, state_space=transition.state_space, time=new_time) for xx in x])
+    new_states.extend([State(state=xx, state_space=transition.state_space, time=new_time) for xx in x])
     measurements = [msmt_model.measurement(s) for s in new_states]
 
     # x/y plot
@@ -258,7 +259,7 @@ def make_figure_3(prefix=None):
 
     # Set up the Nearest Neighbor Association Scheme
     gate_probability=.75
-    associator = ewt.association.NNAssociator(motion_model=transition, gate_probability=gate_probability)
+    associator = NNAssociator(motion_model=transition, gate_probability=gate_probability)
     hypotheses, _ = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
 
     trk_label = 'Predicted Track Measurement'
@@ -385,7 +386,7 @@ def make_figure_8(prefix=None):
     print('Generating Figure 9.8...')
 
     # Initialize the states for the track
-    transition = ewt.transition.ConstantVelocityMotionModel(num_dims=2,
+    transition = ConstantVelocityMotionModel(num_dims=2,
                                                             process_covar=np.eye(2) * 1000)
     state_vecs = np.array([[0.0, 0.0, 1.0, 1.0],
                            [0.5, 0.5, 1.0, 0.0],
@@ -393,9 +394,9 @@ def make_figure_8(prefix=None):
                            [1.25, 1.0, 0.5, 0.5]]) * 1e3
     time_step = 1
     time = np.arange(len(state_vecs)) * time_step
-    states = [ewt.State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
+    states = [State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
     states[-1].covar = CovarianceMatrix(np.diag([2.0, 0.75, 0.4, 0.4]) * 1e4)
-    track = ewt.Track(states=states,id='0')
+    track = Track(states=states,id='0')
 
     num_missed_detections = 3
 

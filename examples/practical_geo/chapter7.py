@@ -3,7 +3,8 @@ import numpy as np
 
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import make_nd_grid, safe_2d_shape, SearchSpace, tracker
+from ewgeo import tracker
+from ewgeo.utils import make_nd_grid, safe_2d_shape, SearchSpace
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
@@ -331,7 +332,7 @@ def example3():
         else:
             # EKF Update
             this_x, this_p = tracker.ekf_update(x_prev=prev_x, p_prev=prev_p, zeta=this_zeta, cov=aoa.cov.cov,
-                                                z_fun=z_fun, h_fun=h_fun)
+                                            z_fun=z_fun, h_fun=h_fun)
 
         # Store the results and update the variables
         x_est[:, idx] = this_x
@@ -441,7 +442,7 @@ def example4():
         else:
             # EKF Update
             this_x, this_p = tracker.ekf_update(x_prev=prev_x, p_prev=prev_p, zeta=zeta,
-                                                cov=aoa.cov.cov, z_fun=aoa.measurement, h_fun=h_fun)
+                                            cov=aoa.cov.cov, z_fun=aoa.measurement, h_fun=h_fun)
 
         # Store the results and update the variables
         x_est[:, idx] = this_x
