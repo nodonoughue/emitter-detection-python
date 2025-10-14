@@ -80,13 +80,24 @@ class Track:
         # in the track's history
         coords = list(zip(*[s.position[plot_dims] / scale for s in self.states]))
 
+        plot_args = {}
+        if 'label' not in kwargs.keys():
+            plot_args['label'] = f"Track {self.track_id}"
         # Line plot
-        hdl=ax.plot(*coords, **kwargs, label=f"Track {self.track_id}")
+        hdl=ax.plot(*coords, **kwargs, **plot_args)
 
         if predicted_state is not None:
             # Predicted state
             pred_coords = [[c[-1], p/scale] for c, p in zip(coords, predicted_state.position[plot_dims])]
-            ax.plot(*pred_coords, linestyle='--', color=hdl[0].get_color(), label=f"Track {self.track_id} Predicted State")
+            if 'label' in kwargs.keys():
+                if kwargs['label'] is None:
+                    this_label=None
+                else:
+                    this_label = f"{kwargs['label']} Predicted State"
+            else:
+                this_label = "Predicted State"
+
+            ax.plot(*pred_coords, linestyle='--', color=hdl[0].get_color(), label=this_label)
 
             # Velocity and Covariance of predicted state
             predicted_state.plot(ax=ax, plot_dims=plot_dims, do_pos=True, do_vel=do_vel, do_cov=do_cov,

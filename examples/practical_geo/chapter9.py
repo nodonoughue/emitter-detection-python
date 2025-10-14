@@ -134,7 +134,7 @@ def example1():
 
     # Set up the Nearest Neighbor Association Scheme
     associator = NNAssociator(motion_model=transition, gate_probability=.75)
-    hypotheses = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
+    hypotheses, _ = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
 
     # Make a plot for the hypothesis assignments
     fig, ax = plt.subplots()
@@ -142,6 +142,7 @@ def example1():
     [h.update_track(ax=ax) for h in hypotheses.values()]
     plt.scatter(*coords, s=25, color='k', label='New States (truth)')
     plt.legend()
+    plt.title('Predicted and Updated Track States after NN Association')
 
     fig, ax = plt.subplots()
     figs.append(fig)
@@ -176,7 +177,7 @@ def example2():
 
     # Set up the Global Nearest Neighbor Association Scheme
     associator = GNNAssociator(motion_model=transition, gate_probability=.75)
-    hypotheses = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
+    hypotheses, _ = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
     [h.update_track() for h in hypotheses.values()]
 
     # Make a plot for the hypothesis assignments
@@ -213,7 +214,7 @@ def example3():
 
     # Set up the Global Nearest Neighbor Association Scheme
     associator = PDAAssociator(motion_model=transition, gate_probability=.75)
-    hypotheses = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
+    hypotheses, _ = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
     [h.update_track() for h in hypotheses.values()]
 
     # Make a plot for the hypothesis assignments

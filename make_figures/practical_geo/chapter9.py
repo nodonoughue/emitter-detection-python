@@ -14,6 +14,7 @@ import numpy as np
 
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 import ewgeo.tracker as ewt
+from ewgeo.tracker.association import Hypothesis, MissedDetectionHypothesis
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils import init_output_dir, init_plot_style
 from ewgeo.utils.covariance import CovarianceMatrix
@@ -44,8 +45,9 @@ def make_all_figures(close_figs=False, mc_params=None):
     figs4_5 = make_figure_4_5(prefix)
     fig6 = make_figure_6(prefix)
     fig7 = make_figure_7(prefix)
+    fig8 = make_figure_8(prefix)
 
-    figs = list(figs2a_b) + list(figs3a_b) + list(figs4_5) + list(fig6) + list(fig7)
+    figs = list(figs2a_b) + list(figs3a_b) + list(figs4_5) + list(fig6) + list(fig7) + list(fig8)
     if close_figs:
         [plt.close(fig) for fig in figs]
         return None
@@ -107,17 +109,33 @@ def make_figure_2(prefix=None):
     state_vecs = np.random.multivariate_normal(mean=prediction.state, cov=cov, size=num_meas)
     truth_states = [ewt.State(state_space=transition.state_space, time=new_time, state=x) for x in state_vecs]
     truth_msmts = [msmt_model.measurement(state=s, noise=False) for s in truth_states]
+    msmt_to_state_dict = dict(zip(truth_msmts, truth_states))
+
+    # Make hypotheses
+    hypotheses = [Hypothesis(track=track, measurement=m, motion_model=transition) for m in truth_msmts]
+
+    # Apply the distance gate
+    [h.apply_distance_gate(gate_probability) for h in hypotheses]
+    valid_msmts = [h.measurement for h in hypotheses if h.is_valid]
+    invalid_msmts = [h.measurement for h in hypotheses if not h.is_valid]
+    valid_states = [msmt_to_state_dict[m] for m in valid_msmts]
+    invalid_states = [msmt_to_state_dict[m] for m in invalid_msmts]
 
     # Plot the track and prediction
     figs = []
     fig, ax = plt.subplots()
     figs.append(fig)
+    default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     track.plot(ax=ax, predicted_state=prediction, do_cov=True, do_vel=False,
-               cov_ellipse_confidence=gate_probability, marker='o')
-    pss.plot_sensors(ax=ax, label='DF System', marker='+')
-    label='Measurements'
-    for s in truth_states:
-        s.plot(ax=ax, do_cov=False, do_vel=False, label=label, color='k', marker='v')
+               cov_ellipse_confidence=gate_probability, marker='o', color=default_colors[0])
+    pss.plot_sensors(ax=ax, label='DF System', marker='+', color=default_colors[1])
+    label='Valid Measurements'
+    for s in valid_states:
+        s.plot(ax=ax, do_cov=False, do_vel=False, label=label, marker='v', color=default_colors[2])
+        label=None
+    label='Invalid Measurements'
+    for s in invalid_states:
+        s.plot(ax=ax, do_cov=False, do_vel=False, label=label, marker='^', color=default_colors[3])
         label=None
     plt.grid(True)
     plt.legend()
@@ -128,11 +146,15 @@ def make_figure_2(prefix=None):
     # Plot the Measurements and Prediction in Zeta-space
     fig, ax = plt.subplots()
     figs.append(fig)
-    ax.scatter(prediction_msmt.zeta[0], prediction_msmt.zeta[1], marker='o', color='k', label='Prediction')
-    ax.plot(pred_gate[0], pred_gate[1], color='k', label='Acceptance Gate')
-    label='Measurements'
-    for m in truth_msmts:
-        ax.scatter(m.zeta[0], m.zeta[1], marker='v', color='k', label=label)
+    ax.scatter(prediction_msmt.zeta[0], prediction_msmt.zeta[1], marker='o', color=default_colors[0], label='Prediction')
+    ax.plot(pred_gate[0], pred_gate[1], color=default_colors[0], label='Acceptance Gate')
+    label='Valid Measurements'
+    for m in valid_msmts:
+        ax.scatter(m.zeta[0], m.zeta[1], marker='v', label=label, color=default_colors[2])
+        label=None
+    label='Invalid Measurements'
+    for m in invalid_msmts:
+        ax.scatter(m.zeta[0], m.zeta[1], marker='^', label=label, color=default_colors[3])
         label=None
     plt.grid(True)
     plt.xlabel('$\\tau_{0,1}$')
@@ -168,19 +190,18 @@ def make_figure_3(prefix=None):
     state_vecs = [[0, 2e3, 0, 100],
                   [1e3, 2e3, 70,-10],
                   [1e3, 1.3e3, 70, 50]]
-    state_covars = [
-        CovarianceMatrix(np.array([[1e4, 1e2, 0, 0],
-                                   [1e2, 2e4, 0, 0],
-                                   [0, 0, 2e2, 0],
-                                   [0, 0, 0, 2e2]])),
-        CovarianceMatrix(np.array([[4e4, -1e4, 0, 0],
-                                   [-1e4, 1e4, 0, 0],
-                                   [0, 0, 1e3, -5e2],
-                                   [0, 0, -5e2, 5e2]])),
-        CovarianceMatrix(np.array([[2e4, 1e4, 0, 0],
-                                   [1e4, 4e4, 0, 0],
-                                   [0, 0, 6e2, 4e2],
-                                   [0, 0, 4e2, 6e2]]))]
+    state_covars = [CovarianceMatrix(np.array([[1e4, 1e2, 0, 0],
+                                               [1e2, 2e4, 0, 0],
+                                               [0, 0, 2e2, 0],
+                                               [0, 0, 0, 2e2]])),
+                    CovarianceMatrix(np.array([[4e4, -1e4, 0, 0],
+                                               [-1e4, 1e4, 0, 0],
+                                               [0, 0, 1e3, -5e2],
+                                               [0, 0, -5e2, 5e2]])),
+                    CovarianceMatrix(np.array([[2e4, 1e4, 0, 0],
+                                               [1e4, 4e4, 0, 0],
+                                               [0, 0, 6e2, 4e2],
+                                               [0, 0, 4e2, 6e2]]))]
 
     # Define the State Space; easiest method is to instantiate
     # a transition model
@@ -236,23 +257,38 @@ def make_figure_3(prefix=None):
                 marker='v', color='k', label='Measurements')
 
     # Set up the Nearest Neighbor Association Scheme
-    associator = ewt.association.NNAssociator(motion_model=transition, gate_probability=.75)
-    hypotheses = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
+    gate_probability=.75
+    associator = ewt.association.NNAssociator(motion_model=transition, gate_probability=gate_probability)
+    hypotheses, _ = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
 
+    trk_label = 'Predicted Track Measurement'
+    gate_label = 'Association Gate'
+    msmt_label = 'Associated Measurement'
     for t, p in zip(tracks, predicted_states):
         h = hypotheses[t]  # find the corresponding hypothesis
 
         # Plot a line from the predicted measurement to the selected one
         z = msmt_model.measurement(p).zeta
-        hdl=plt.plot([z[0], h.measurement.zeta[0]], [z[1], h.measurement.zeta[1]], linestyle='--',
-                     label=f"Associated Measurement for Track {t.track_id}")
+        hdl=plt.plot([z[0], h.measurement.zeta[0]], [z[1], h.measurement.zeta[1]], linestyle='-',
+                     label=None)
 
         # Plot the predicted measurement directly
-        plt.scatter(z[0], z[1], marker='o', label=f"Track {t.track_id}", edgecolors=hdl[0].get_color())
+        plt.scatter(z[0], z[1], marker='o', color=hdl[0].get_color(), label=trk_label)
+        trk_label = None
+        pred_gate = draw_error_ellipse(x=h.measurement_prediction.zeta,
+                                       covariance=h.innovation_covar.cov,
+                                       conf_interval=gate_probability)
+        plt.plot(pred_gate[0], pred_gate[1], color=hdl[0].get_color(), linestyle='--',
+                 label=gate_label)
+        gate_label=None
+        plt.scatter(h.measurement.zeta[0], h.measurement.zeta[1], marker='v', color=hdl[0].get_color(),
+                    label=msmt_label)
+        msmt_label=None
 
-    plt.xlabel('$\theta_0$ [rad]')
-    plt.ylabel('$\theta_1$ [rad]')
+    plt.xlabel('$\\theta_0$ [rad]')
+    plt.ylabel('$\\theta_1$ [rad]')
     plt.title('Predicted Measurements and Associated Measurements')
+    plt.legend()
 
     # Output to file
     if prefix is not None:
@@ -331,6 +367,66 @@ def make_figure_7(prefix=None):
         labels = ['fig7']
         if len(labels) != len(figs):
             print('**Error saving figure 9.7; unexpected number of figures generated.')
+        else:
+            for fig, label in zip(figs, labels):
+                fig.savefig(prefix + label + '.svg')
+                fig.savefig(prefix + label + '.png')
+
+    return figs
+
+def make_figure_8(prefix=None):
+    """
+    Figure 9.8
+
+    :param prefix: output directory to place generated figure
+    :return: handle
+    """
+
+    print('Generating Figure 9.8...')
+
+    # Initialize the states for the track
+    transition = ewt.transition.ConstantVelocityMotionModel(num_dims=2,
+                                                            process_covar=np.eye(2) * 1000)
+    state_vecs = np.array([[0.0, 0.0, 1.0, 1.0],
+                           [0.5, 0.5, 1.0, 0.0],
+                           [1.0, 0.5, 0.5, 1.0],
+                           [1.25, 1.0, 0.5, 0.5]]) * 1e3
+    time_step = 1
+    time = np.arange(len(state_vecs)) * time_step
+    states = [ewt.State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
+    states[-1].covar = CovarianceMatrix(np.diag([2.0, 0.75, 0.4, 0.4]) * 1e4)
+    track = ewt.Track(states=states,id='0')
+
+    num_missed_detections = 3
+
+    # Plot the track
+    figs = []
+    fig, ax = plt.subplots()
+    figs.append(fig)
+    default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    track.plot(ax=ax, color=default_colors[0], label='Initial Track', do_cov=True, do_vel=False, marker='o')
+    last_state = track.curr_state
+    cov_label='State Error Covariance'
+    for idx in range(num_missed_detections):
+        h = MissedDetectionHypothesis(track=track,
+                                      likelihood=1.0,
+                                      motion_model=transition,
+                                      time = track.curr_time + time_step)
+        h.update_track()
+        ax.plot(*zip((last_state.position, track.curr_state.position)),linestyle='--',label=None,color=default_colors[idx+1])
+        track.curr_state.plot(ax=ax, color=default_colors[idx+1], do_pos=True, do_cov=False,
+                              label=f"{idx+1} Missed Detection")
+        track.curr_state.plot(ax=ax, color=default_colors[idx+1],do_pos=False,do_cov=True,label=cov_label,linestyle='--')
+        cov_label=None
+        last_state=track.curr_state
+    plt.grid(True)
+    plt.legend()
+    plt.title('Error Covariance Growth as Missed Detections Accumulate')
+    # Output to file
+    if prefix is not None:
+        labels = ['fig8']
+        if len(labels) != len(figs):
+            print('**Error saving figure 9.8; unexpected number of figures generated.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')

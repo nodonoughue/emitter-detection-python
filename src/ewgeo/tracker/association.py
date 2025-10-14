@@ -218,15 +218,15 @@ class Hypothesis:
         return f'Hypothesis({self.track}, {self.measurement}), distance = {self.distance}, likelihood = {self.likelihood}'
 
 class MissedDetectionHypothesis(Hypothesis):
-    def __init__(self, track: Track, measurement_model: MeasurementModel, motion_model: MotionModel, likelihood: float, time: float):
-        dummy_measurement = Measurement(sensor=measurement_model.pss, time=time, zeta=np.zeros(measurement_model.num_measurement_dimensions, ))
+    def __init__(self, track: Track, motion_model: MotionModel, likelihood: float, time: float):
+        dummy_measurement = Measurement(sensor=None, time=time, zeta=0.0)
         super().__init__(track, dummy_measurement, motion_model)
 
         # The innovation of a missed detection is zero, set some dummy values for likelihood, as well
         self._likelihood = likelihood
         self._log_likelihood = np.log(likelihood)
-        self._innov = np.zeros_like(track.curr_state.state)
-        self._innov_covar = self.predicted_state.covar.copy()
+        self._innov = None
+        self._innov_covar = None
 
     def update_track(self, spawn_new_track: bool = False, ax: plt.Axes = None, plot_dims: slice = np.s_[:])->Track:
         """
@@ -242,10 +242,6 @@ class MissedDetectionHypothesis(Hypothesis):
         # Plot the results
         if ax is not None:
             hdl = t.plot(ax=ax, do_vel=False, do_cov=True, predicted_state=self.predicted_state, marker='^')
-
-        # Update the Estimate
-        new_state_vec = self.predicted_state.state + kalman_gain @ self.innovation
-        new_state_covar = (np.eye(t.curr_state.size) - kalman_gain @ measurement_jacobian) @ prediction_state_covar
 
         # Make a copy of the predicted state, and add it to the track
         new_state = self.predicted_state.copy()
@@ -271,30 +267,50 @@ class GMMHypothesis(Hypothesis):
         self._hypotheses = hypotheses
         self._weights = weights if weights is not None else np.ones(len(hypotheses))
 
-        self.reduce()
-
-    def reduce(self):
+    def update_track(self, spawn_new_track: bool=False, ax: plt.Axes = None, plot_dims: slice = np.s_[:])->Track:
         """
         Reduce the Gaussian Mixture of hypotheses to a single hypothesis and return that.
         """
 
-        # First, compute the innovation as the weighted sum of innovations
-        innovations = np.asarray([h.innovation for h in self._hypotheses])
-        self._innov = np.average(innovations, axis=0, weights=self._weights)
+        # Spawn a new track, if needed
+        if spawn_new_track:
+            t = self.track.copy()
+        else:
+            t = self.track
 
-        # Calculate the covariance
-        delta_innov = innovations - self._innov
-        covars = np.stack([h.innovation_covar.cov for h in self._hypotheses], axis=2)
-        covar = np.sum(covars*self._weights, axis=2) + self._weights * delta_innov @ delta_innov.T
-        self._innov_covar = CovarianceMatrix(covar)
+        if len(self._hypotheses) == 1 and isinstance(self._hypotheses[0], MissedDetectionHypothesis):
+            # The only one is a missed detection hypothesis
+            new_state = self._hypotheses[0].update_track(spawn_new_track=True).curr_state
+            t.append(new_state, missed_detection=True)
+        else:
+            # First, compute the state as the weighted sum of the updated states; spawn a new track so we don't impact
+            # the existing one
+            states = [h.update_track(spawn_new_track=True).curr_state for h in self._hypotheses]
+            state_vecs = np.asarray([s.state for s in states])
+            updated_state_vec = np.average(state_vecs, axis=0, weights=self._weights)
 
-        # Make a dummy measurement -- this is needed so that update_track will function
-        new_state = State(state_space=self._hypotheses[0].track.state_space,
-                          time=self._hypotheses[0].measurement.time,
-                          state=self.predicted_state.state + self._innov,
-                          covar=self._innov_covar)
-        self._measurement = Measurement(sensor=None, time=self._hypotheses[0].measurement.time,
-                                        zeta=self._measurement_model.measurement(new_state))
+            # Calculate the covariance
+            delta_state = state_vecs - updated_state_vec
+            covars = np.stack([s.covar.cov for s in states], axis=2)
+            covar = np.sum(covars*self._weights, axis=2) + delta_state.T @ (self._weights[:, np.newaxis] * delta_state)
+            updated_state_covar = CovarianceMatrix(covar)
+
+            # Wrap it in a new state
+            new_state = states[0].copy(state=updated_state_vec, covar=updated_state_covar)
+
+
+            # Append the state
+            t.append(new_state)
+
+        # Plot the results
+        if ax is not None:
+            hdl = t.plot(ax=ax, do_vel=False, do_cov=True, predicted_state=self.predicted_state, marker='^')
+            # Plot a dashed line from the current state to the new one
+            plt.plot(*zip(t.curr_state.position[plot_dims], new_state.position[plot_dims]),
+                     color=hdl[0].get_color(), linestyle=':', label=f'Track {self.track.track_id}, Updated State')
+            new_state.plot(ax=ax, do_vel=False, do_cov=True, color=hdl[0].get_color(), linestyle=':')
+
+        return t
 
     @property
     def predicted_state(self) -> State:
@@ -364,16 +380,20 @@ class Associator(ABC):
             self.gate_probability = gate_probability
 
     @abstractmethod
-    def associate(self, measurements: list[Measurement], tracks: list[Track])-> dict[Track, Hypothesis]:
+    def associate(self, measurements: list[Measurement],
+                  tracks: list[Track])-> tuple[dict[Track, Hypothesis], list[Measurement]]:
         pass
 
 
 
 class NNAssociator(Associator):
 
-    def associate(self, tracks: list[Track], measurements: list[Measurement], print_table: bool=False)-> dict[Track, Hypothesis]:
+    def associate(self, tracks: list[Track],
+                  measurements: list[Measurement],
+                  print_table: bool=False)-> tuple[dict[Track, Hypothesis], list[Measurement]]:
         # TODO: Test
         hypotheses = {}
+        unassociated_measurements = measurements[:]
 
         if print_table:
             table = PrettyTable()
@@ -410,6 +430,7 @@ class NNAssociator(Associator):
                 # Add the association, removing it from the list of measurements
                 best_hypothesis = this_hypotheses[idx]
                 hypotheses[track] = best_hypothesis
+                unassociated_measurements.remove(best_hypothesis.measurement)
                 # print(f'...NN={best_hypothesis}')
             else:
                 # All measurements failed the acceptance gate test;
@@ -423,12 +444,13 @@ class NNAssociator(Associator):
             print(table)
 
         # Convert to an Association object and return
-        return hypotheses
+        return hypotheses, unassociated_measurements
 
 
 class GNNAssociator(Associator):
 
-    def associate(self, measurements: list[Measurement], tracks: list[Track], print_table: bool=False)-> dict[Track, Hypothesis]:
+    def associate(self, measurements: list[Measurement],
+                  tracks: list[Track], print_table: bool=False) -> tuple[dict[Track, Hypothesis], list[Measurement]]:
         # TODO: Test
 
         if print_table:
@@ -461,17 +483,16 @@ class GNNAssociator(Associator):
 
         # Collect the valid hypotheses
         good_hypotheses = {}
-        if print_table:
-            data_rows = table.rows
-
+        unassociated_measurements = measurements[:]
         for r, c in zip(row_ind, col_ind):
             good_hypotheses[tracks[r]] = hypotheses[r][c]
+            unassociated_measurements.remove(hypotheses[r][c].measurement)
 
         if print_table:
             print(f"Global Nearest Neighbor Association Distances (total distance={total_cost:.2f})")
             print(table)
 
-        return good_hypotheses
+        return good_hypotheses, unassociated_measurements
 
 
 class PDAAssociator(Associator):
@@ -481,14 +502,24 @@ class PDAAssociator(Associator):
         super().__init__(motion_model, gate_probability)
         self.detection_probability = detection_probability
         
-    def associate(self, tracks: list[Track], measurements: list[Measurement], print_table: bool=False) -> dict[Track, GMMHypothesis] :
+    def associate(self, tracks: list[Track],
+                  measurements: list[Measurement],
+                  print_table: bool=False)-> tuple[dict[Track, GMMHypothesis], list[Measurement]]:
+
         if print_table:
             table = PrettyTable()
             table.field_names = ['Track', 'Miss'] + [f"Msmt {i}" for i in range(len(measurements))]
             table.float_format = ".2"
 
         hypotheses = {}
+        unassociated_measurements = measurements[:]
         for track in tracks:
+            # Initialize a Null Hypothesis
+            p_miss = 1 - self.detection_probability*self.gate_probability
+            null_hypothesis = MissedDetectionHypothesis(track=track,
+                                                        likelihood=p_miss,
+                                                        motion_model=self.motion_model,
+                                                        time=measurements[0].time)
             # Generate the full set of hypotheses and apply the acceptance gate
             this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=self.motion_model) for m in measurements]
             [h.apply_distance_gate(self.gate_probability) for h in this_hypotheses]
@@ -496,9 +527,12 @@ class PDAAssociator(Associator):
 
             # Keep only those hypotheses that passed the acceptance gate
             good_hypotheses = [h for h in this_hypotheses if h.is_valid]
-            null_hypothesis = Hypothesis(track=track, measurement=None)
-            null_hypothesis.override_likelihood(1 - self.detection_probability*self.gate_probability)
             good_hypotheses.append(null_hypothesis) # Add a missed detection hypothesis
+
+            # Remove any measurements that are used in this PDA filter from the set of unassociated ones
+            for h in good_hypotheses:
+                if h.measurement in unassociated_measurements:
+                    unassociated_measurements.remove(h.measurement)
 
             # Normalize the hypotheses
             likelihoods = np.asarray([h.likelihood for h in good_hypotheses])
@@ -516,4 +550,4 @@ class PDAAssociator(Associator):
             print('PDA Associator Table of Likelihoods')
             print(table)
 
-        return hypotheses
+        return hypotheses, unassociated_measurements
