@@ -1,5 +1,6 @@
-import numpy.typing as npt
+from abc import ABC, abstractmethod
 
+from .association import Associator, MissedDetectionHypothesis
 from .measurement import Measurement
 from .track import Track
 
@@ -7,76 +8,120 @@ from .track import Track
 # TODO: Make a Deleter class -- update the text
 # TODO: Make a Promoter class -- update the text
 
+class Initiator(ABC):
+    @abstractmethod
+    def initiate(self, measurements: list[Measurement]) -> list[Track]:
+        pass
+
+class Promoter(ABC):
+    @abstractmethod
+    def promote(self, tracks: list[Track]) -> list[Track]:
+        pass
+
+class Deleter(ABC):
+    @abstractmethod
+    def delete(self, tracks: list[Track]) -> list[Track]:
+        pass
+
 class TrackManager:
-    curr_time: float
+    # Parameters
+    keep_all_tracks: bool = False
+    deleter = None
+    initiator = None
+    promoter = None
+    associator: Associator
+
+    # Track/State Properties
     tracks: list[Track]
-    _tracklets: list[Track]  # not visible outside this class
-    deleted_tracks: list[Track]
-    deleted_tracklets: list[Track]
-    unassociated_measurements: list[Measurement]
+    _tentative_tracks: list[Track]  # not visible outside this class
+    deleted_tracks: list[Track]     # only populated if keep_all_tracks is True
 
-    # deleter: Deleter
-    # promoter: Promoter
-    # initiator: Initiator
+    def __init__(self, associator: Associator, initiator, promoter, deleter, keep_all_tracks: bool=False):
+        self.associator = associator
+        self.initiator = initiator
+        self.promoter = promoter
+        self.deleter = deleter
+        self.keep_all_tracks = keep_all_tracks
+        self.deleted_tracks = []
+        self.tracks = []
+        self._tentative_tracks = []
 
+    @property
+    def all_tracks(self):
+        return self.tracks + self.deleted_tracks
 
-    def __init__(self):
-        pass
+    def execute(self, measurements, reuse_measurements: bool=False):
 
-    def associate_to_tracks(self, measurements: list[Measurement]):
-        """
-        Accept a list of measurements.
+        # Associate measurements with existing tracks
+        # Returns any unused measurements
+        unassociated_measurements = self.update(measurements=measurements)
 
-        Unassociated measurements are added to the list unassociated_measurements.
-        """
-        pass
+        # Associate measurements with tentative tracks, look for any that can be promoted
+        if reuse_measurements:
+            # Pass the full set of measurements to the tentative tracks
+            measurements_for_tentative_tracks = measurements[:]
+        else:
+            # Only pass those measurements that were not used to update firm tracks
+            measurements_for_tentative_tracks = unassociated_measurements[:]
+        unassociated_measurements_2 = self.promote(measurements=measurements_for_tentative_tracks)
 
-    def initialize_new_tracks(self):
-        """
-        Form new tracks from unassociated_measurements.
+        # Create new tracks with unused measurements; only include those that did not get used for either
+        # firm or tentative tracks
+        measurements_for_new_tracks = [m for m in unassociated_measurements if m in unassociated_measurements_2]
+        self.initiate(measurements=measurements_for_new_tracks)
 
-        Any measurements that are used to form a track are removed from the list.
-        Any new tracks are added to the list tracklets.
-        """
-        pass
+        # Delete tracks
+        self.delete()
 
-    def prune_unassociated_measurements(self):
-        """
-        Remove any measurements that were not used to form a track and have gotten stale.
-        """
-        pass
+    def update(self, measurements: list[Measurement]) -> list[Measurement]:
 
-    def promote_tracks(self):
-        """
-        Look for tracklets that should be promoted to full tracks
-        """
-        pass
+        # Generate hypotheses
+        hypothesis_dict, unassoc_msmts = self.associator.associate(tracks=self.tracks, measurements=measurements)
 
-    def delete_tracks(self):
-        """
-        Look for tracks that should be deleted; move them to deleted_tracks.
-        """
+        # Update the hypotheses
+        [h.update_track() for h in hypothesis_dict.items()]
 
-        # Find tracks to delete
-        tracks_to_delete = []
-        for track in self.tracks:
-            if track.is_stale:
-                tracks_to_delete.append(track)
+        # Return the unused measurements
+        return unassoc_msmts
 
-        # Delete them
-        for track in tracks_to_delete:
-            self.tracks.remove(track)
-            self.deleted_tracks.append(track)
+    def promote(self, measurements: list[Measurement]) -> list[Measurement]:
+        # Generate hypotheses to match measurements to the tentative tracks
+        tentative_hypotheses, unassoc_msmt = self.associator.associate(tracks=self._tentative_tracks,
+                                                                       measurements=measurements)
 
-        # Do the same for tracklets
-        tracks_to_delete = []
-        for track in self._tracklets:
-            if track.is_stale:
-                tracks_to_delete.append(track)
+        # Any hypotheses that are not a MissedDetectionHypothesis can be passed to
+        # promoter for evaluation
+        tracks_to_test = [t for t, m in tentative_hypotheses.items() if not isinstance(m, MissedDetectionHypothesis)]
+        tracks_to_promote = self.promoter.promote(tracks=tracks_to_test)
 
-        # Delete them
-        for track in tracks_to_delete:
-            self._tracklets.remove(track)
-            self.deleted_tracklets.append(track)
+        # Add the promoted tracks to the track list, and remove them from the tentative tracks list
+        for t in tracks_to_promote:
+            self.tracks.append(t)
+            self._tentative_tracks.remove(t)
+
+        return unassoc_msmt
+
+    def initiate(self, measurements: list[Measurement]):
+        new_tracks = self.initiator.initiate(measurements=measurements)
+        self._tentative_tracks.extend(new_tracks)
+
+    def delete(self):
+        # Test the firm tracks
+        tracks_to_delete = self.deleter.delete(tracks=self.tracks)
+
+        # Remove the tracks by creating a new list that excludes them
+        self.tracks = [t for t in self.tracks if t not in tracks_to_delete]
+
+        if self.keep_all_tracks:
+            self.deleted_tracks.extend(tracks_to_delete)
+
+        # Repeat with the tentative tracks
+        tracks_to_delete = self.deleter.delete(tracks=self._tentative_tracks)
+
+        # Remove the tracks by creating a new list that excludes them
+        self._tentative_tracks = [t for t in self._tentative_tracks if t not in tracks_to_delete]
+
+        if self.keep_all_tracks:
+            self.deleted_tracks.extend(tracks_to_delete)
 
         return
