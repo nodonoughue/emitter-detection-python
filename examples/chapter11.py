@@ -216,11 +216,16 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     cep50_grad = np.zeros(shape=(num_iterations,))
 
     for ii in np.arange(num_iterations):
-        bias_ls[:, ii] = np.mean(np.squeeze(err_ls[:, ii, :]), axis=1)
-        bias_grad[:, ii] = np.mean(np.squeeze(err_grad[:, ii, :]), axis=1)
+        this_err_ls = err_ls[:, ii, :]
+        this_err_grad = err_grad[:, ii, :]
+        this_bias_ls = bias_ls[:, ii]
+        this_bias_grad = bias_grad[:, ii]
 
-        cov_ls[:, :, ii] = np.cov(np.squeeze(err_ls[:, ii, :])) + bias_ls[:, ii].dot(bias_ls[:, ii].T)
-        cov_grad[:, :, ii] = np.cov(np.squeeze(err_grad[:, ii, :])) + bias_grad[:, ii].dot(bias_grad[:, ii].T)
+        bias_ls[:, ii] = np.mean(this_err_ls, axis=1)
+        bias_grad[:, ii] = np.mean(this_err_grad, axis=1)
+
+        cov_ls[:, :, ii] = np.cov(this_err_ls) + this_bias_ls[:,np.newaxis] @ this_bias_ls[np.newaxis,:]
+        cov_grad[:, :, ii] = np.cov(this_err_grad) + this_bias_grad[:,np.newaxis] @ this_bias_grad[np.newaxis,:]
 
         cep50_ls[ii] = compute_cep50(cov_ls[:, :, ii])/1e3  # [km]
         cep50_grad[ii] = compute_cep50(cov_grad[:, :, ii])/1e3  # [km]

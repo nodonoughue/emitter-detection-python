@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 
 from . import model
 from ewgeo.utils import make_pdfs, SearchSpace
@@ -6,8 +7,14 @@ from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.solvers import bestfix_solver, gd_solver, ls_solver, ml_solver
 
 
-def max_likelihood(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, search_space: SearchSpace, ref_idx=None,
-                   do_resample=False, bias=None, **kwargs):
+def max_likelihood(x_sensor: npt.ArrayLike,
+                   v_sensor: npt.ArrayLike,
+                   zeta: npt.ArrayLike,
+                   cov: CovarianceMatrix,
+                   search_space: SearchSpace,
+                   ref_idx=None,
+                   do_resample: bool=False,
+                   bias: npt.ArrayLike or None=None, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -42,8 +49,16 @@ def max_likelihood(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, search_space
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, v_source=None, ref_idx=None,
-                     do_resample=False, bias=None, **kwargs):
+def gradient_descent(x_sensor: npt.ArrayLike,
+                     v_sensor: npt.ArrayLike,
+                     zeta: npt.ArrayLike,
+                     cov: CovarianceMatrix,
+                     x_init: npt.ArrayLike,
+                     v_source: npt.ArrayLike or None=None,
+                     ref_idx=None,
+                     do_resample: bool=False,
+                     bias: npt.ArrayLike or None=None,
+                     **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -65,11 +80,11 @@ def gradient_descent(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, v_
     """
 
     # Initialize measurement error and jacobian functions
-    def y(this_x):
+    def y(this_x: npt.ArrayLike):
         return zeta - model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
                                         x_source=this_x, v_source=v_source, ref_idx=ref_idx, bias=bias)
 
-    def jacobian(this_x):
+    def jacobian(this_x: npt.ArrayLike):
         return model.jacobian(x_sensor=x_sensor, v_sensor=v_sensor,
                               x_source=this_x, v_source=v_source,
                               ref_idx=ref_idx)
@@ -84,8 +99,15 @@ def gradient_descent(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, v_
     return x, x_full
 
 
-def least_square(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
-                 bias=None, **kwargs):
+def least_square(x_sensor: npt.ArrayLike,
+                 v_sensor: npt.ArrayLike,
+                 zeta: npt.ArrayLike,
+                 cov: CovarianceMatrix,
+                 x_init: npt.ArrayLike,
+                 ref_idx=None,
+                 do_resample=False,
+                 bias: npt.ArrayLike or None=None,
+                 **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -106,12 +128,12 @@ def least_square(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, ref_id
     """
 
     # Initialize measurement error and Jacobian function handles
-    def y(this_x):
+    def y(this_x: npt.ArrayLike):
         return zeta - model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
                                         x_source=this_x, v_source=None,
                                         ref_idx=ref_idx, bias=bias)
 
-    def jacobian(this_x):
+    def jacobian(this_x: npt.ArrayLike):
         return model.jacobian(x_sensor=x_sensor, v_sensor=v_sensor,
                               x_source=this_x, v_source=None,
                               ref_idx=ref_idx)
@@ -126,7 +148,13 @@ def least_square(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, x_init, ref_id
     return x, x_full
 
 
-def bestfix(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, search_space: SearchSpace, ref_idx=None, pdf_type=None,
+def bestfix(x_sensor: npt.ArrayLike,
+            v_sensor: npt.ArrayLike,
+            zeta: npt.ArrayLike,
+            cov: CovarianceMatrix,
+            search_space: SearchSpace,
+            ref_idx=None,
+            pdf_type=None,
             do_resample=False):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
@@ -168,7 +196,7 @@ def bestfix(x_sensor, v_sensor, zeta, cov: CovarianceMatrix, search_space: Searc
     zeta = np.squeeze(zeta)
 
     # Generate the PDF
-    def msmt(x):
+    def msmt(x: npt.ArrayLike):
         # We have to squeeze rho, so let's also squeeze msmt
         return np.squeeze(model.measurement(x_sensor=x_sensor, v_sensor=v_sensor,
                                             x_source=x, v_source=None, ref_idx=ref_idx))

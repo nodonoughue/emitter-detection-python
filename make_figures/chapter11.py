@@ -595,7 +595,6 @@ def make_figure_7_8(prefix=None, rng=np.random.default_rng(), mc_params=None):
     :param prefix: output directory to place generated figure
     :param rng: random number generator
     :param mc_params: Optional struct to control Monte Carlo trial size
-    :param force_recalc: optional flag (default=True), if False then the example does not run
     :return: figure handle
     """
 
@@ -790,4 +789,4 @@ def make_figure_10(prefix=None):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 10})

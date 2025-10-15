@@ -4,7 +4,6 @@ import time
 
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils import print_elapsed, print_progress, make_nd_grid, safe_2d_shape, SearchSpace
-from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
 from ewgeo.utils.geo import calc_range

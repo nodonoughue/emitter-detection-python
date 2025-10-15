@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 import time
 
 
@@ -10,7 +11,10 @@ from ewgeo.utils.geo import calc_range, calc_range_diff
 from ewgeo.utils.unit_conversions import db_to_lin
 
 
-def measurement(x_sensor, x_source, ref_idx=None, bias=None):
+def measurement(x_sensor: npt.ArrayLike,
+                x_source: npt.ArrayLike,
+                ref_idx=None,
+                bias: npt.ArrayLike or None=None):
     """
     Computes TDOA measurements and converts to range difference of arrival (by compensating for the speed of light).
 
@@ -57,7 +61,9 @@ def measurement(x_sensor, x_source, ref_idx=None, bias=None):
     return np.atleast_1d(rdoa.squeeze() if n_source == 1 else rdoa)
 
 
-def jacobian(x_sensor, x_source, ref_idx=None):
+def jacobian(x_sensor: npt.ArrayLike,
+             x_source: npt.ArrayLike,
+             ref_idx=None):
     """
     # Returns the Jacobian matrix for a set of TDOA measurements.
 
@@ -108,7 +114,11 @@ def jacobian(x_sensor, x_source, ref_idx=None):
     return j
 
 
-def jacobian_uncertainty(x_sensor, x_source, ref_idx=None, do_bias=False, do_pos_error=False):
+def jacobian_uncertainty(x_sensor: npt.ArrayLike,
+                         x_source: npt.ArrayLike,
+                         ref_idx=None,
+                         do_bias: bool=False,
+                         do_pos_error: bool=False):
     """
     Returns the Jacobian matrix for a set of TDOA measurements in the presence of sensor
     uncertainty, in the form of measurement bias and/or sensor position errors..
@@ -158,8 +168,15 @@ def jacobian_uncertainty(x_sensor, x_source, ref_idx=None, do_bias=False, do_pos
     return j
 
 
-def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, ref_idx=None, do_resample=False,
-                   variance_is_toa=True, bias=None, print_progress=False):
+def log_likelihood(x_sensor: npt.ArrayLike,
+                   zeta: npt.ArrayLike,
+                   cov: CovarianceMatrix,
+                   x_source: npt.ArrayLike,
+                   ref_idx=None,
+                   do_resample: bool=False,
+                   variance_is_toa: bool=True,
+                   bias: npt.ArrayLike or None=None,
+                   print_progress=False):
     """
     Computes the Log Likelihood for TDOA sensor measurement, given the received range difference measurement vector
     zeta, covariance matrix cov, and set of candidate source positions x_source.
@@ -247,7 +264,13 @@ def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, ref_idx=None
     return ell
 
 
-def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, ref_idx=None, do_resample=False,
+def error(x_sensor: npt.ArrayLike,
+          cov: CovarianceMatrix,
+          x_source: npt.ArrayLike,
+          x_max: npt.ArrayLike,
+          num_pts: npt.ArrayLike,
+          ref_idx=None,
+          do_resample=False,
           variance_is_toa=True):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each
@@ -311,7 +334,7 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, ref_idx=Non
     return epsilon
 
 
-def toa_error_peak_detection(snr):
+def toa_error_peak_detection(snr: npt.ArrayLike):
     """
     Computes the error in time of arrival estimation for a peak detection 
     algorithm, based on input SNR.
@@ -332,7 +355,10 @@ def toa_error_peak_detection(snr):
     return 1/(2*snr_lin)
 
 
-def toa_error_cross_corr(snr, bandwidth, pulse_len, bandwidth_rms=None):
+def toa_error_cross_corr(snr: npt.ArrayLike,
+                         bandwidth: npt.ArrayLike,
+                         pulse_len: npt.ArrayLike,
+                         bandwidth_rms: npt.ArrayLike or None=None):
     """
     Computes the timing error for a Cross-Correlation time of arrival
     estimator, given the input signal's bandwidth, pulse length, and RMS
@@ -360,7 +386,11 @@ def toa_error_cross_corr(snr, bandwidth, pulse_len, bandwidth_rms=None):
     return 1/(8*np.pi*a)
 
 
-def draw_isochrone(x_ref, x_test, range_diff, num_pts, max_ortho):
+def draw_isochrone(x_ref: npt.ArrayLike,
+                   x_test: npt.ArrayLike,
+                   range_diff: npt.ArrayLike,
+                   num_pts: int,
+                   max_ortho: float):
     """
     Finds the isochrone with the stated range difference from points x1
     and x2.  Generates an arc with 2*numPts-1 points, that spans up to
@@ -443,7 +473,7 @@ def draw_isochrone(x_ref, x_test, range_diff, num_pts, max_ortho):
     return x_iso, y_iso
 
 
-def grad_x(x_sensor, x_source, ref_idx=None):
+def grad_x(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     """
     Return the gradient of TDOA measurements, with sensor uncertainties, with respect to target position, x.
     Equation 6.27. The sensor uncertainties don't impact the gradient for TDOA, so this reduces to the previously
@@ -467,7 +497,7 @@ def grad_x(x_sensor, x_source, ref_idx=None):
     return jacobian(x_sensor=x_sensor, x_source=x_source, ref_idx=ref_idx)
 
 
-def grad_bias(x_sensor, x_source, ref_idx=None):
+def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     """
     Return the gradient of TDOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
     terms, from equation 6.31.
@@ -504,7 +534,7 @@ def grad_bias(x_sensor, x_source, ref_idx=None):
     return grad
 
 
-def grad_sensor_pos(x_sensor, x_source, ref_idx=None):
+def grad_sensor_pos(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     """
     Compute the gradient of TDOA measurements, with sensor uncertainties, with respect to sensor position,
     equation 6.31.
@@ -550,7 +580,7 @@ def grad_sensor_pos(x_sensor, x_source, ref_idx=None):
     return grad_pos
 
 
-def generate_parameter_indices(x_sensor, do_bias=True):
+def generate_parameter_indices(x_sensor: npt.ArrayLike, do_bias: bool=True):
     """
     Return index mapping for parameter estimation, using the assumed standard mapping of
         theta = [x_source, sensor_bias, x_sensor]

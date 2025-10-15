@@ -11,6 +11,7 @@ Nicholas O'Donoughue
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 
 import ewgeo.fdoa as fdoa
 import ewgeo.hybrid as hybrid
@@ -240,7 +241,12 @@ def make_figure_2(prefix=None):
     return fig2a, fig2b, fig2c, fig2d
 
 
-def _make_figure2_subfigure(x_sensor, v_sensor, x_source, covar_rho: CovarianceMatrix, x_max, num_pts):
+def _make_figure2_subfigure(x_sensor: npt.ArrayLike,
+                            v_sensor: npt.ArrayLike,
+                            x_source: npt.ArrayLike,
+                            covar_rho: CovarianceMatrix,
+                            x_max: npt.ArrayLike,
+                            num_pts: int):
 
     # Generate the likelihood; for plotting
     # Alternatively, we could plot the error (eps)
@@ -669,4 +675,4 @@ def make_figure_9(prefix):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1000, 'min_num_monte_carlo': 10})

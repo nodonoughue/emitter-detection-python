@@ -1,27 +1,23 @@
 import numpy as np
+import numpy.typing as npt
 
 from . import model
-from ewgeo.utils import make_pdfs, parse_reference_sensor, safe_2d_shape, SearchSpace
+from ewgeo.utils import parse_reference_sensor, safe_2d_shape
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.perf import compute_crlb_gaussian
-from ewgeo.utils.solvers import bestfix_solver, gd_solver, ls_solver, ml_solver
 from ewgeo.utils.system import DifferencePSS
 
 
 class FDOAPassiveSurveillanceSystem(DifferencePSS):
     bias = None
 
-    _default_fdoa_bias_search_epsilon = 1 # meters/second
-    _default_fdoa_bias_search_size = 11 # num elements per search dimension
-    _default_fdoa_vel_search_epsilon = 1 # meters/second
-    _default_fdoa_vel_search_size = 11 # num elements per search dimensions
+    _default_fdoa_bias_search_epsilon: float = 1 # meters/second
+    _default_fdoa_bias_search_size: int = 11 # num elements per search dimension
+    _default_fdoa_vel_search_epsilon: float = 1 # meters/second
+    _default_fdoa_vel_search_size: int = 11 # num elements per search dimensions
 
-    def __init__(self,x, cov, **kwargs):
-        # Handle empty covariance matrix inputs
-        if cov is None:
-            # Make a dummy; unit variance
-            _, num_sensors = safe_2d_shape(x)
-            cov = CovarianceMatrix(np.eye(num_sensors))
+    def __init__(self,x: npt.ArrayLike,
+                 cov: CovarianceMatrix or npt.ArrayLike or None=None, **kwargs):
         super().__init__(x=x, cov=cov, **kwargs)
 
         # Overwrite uncertainty search defaults
@@ -36,14 +32,14 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ## These methods handle the physical model for a FDOA-based PSS, and are just wrappers for the static
     ## functions defined in model.py
     ## ============================================================================================================== ##
-    def measurement(self, x_source, v_source=None, x_sensor=None, v_sensor=None, bias=None):
+    def measurement(self, x_source, v_source: npt.ArrayLike or None=None, x_sensor: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None, bias: npt.ArrayLike or None=None):
         if x_sensor is None: x_sensor = self.pos
         if v_sensor is None: v_sensor = self.vel
         if bias is None: bias = self.bias
         return model.measurement(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source,
                                  ref_idx=self.ref_idx, bias=bias)
 
-    def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
+    def jacobian(self, x_source, v_source: npt.ArrayLike or None=None, x_sensor: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None):
         if x_sensor is None: x_sensor = self.pos
         if v_sensor is None: v_sensor = self.vel
         return model.jacobian(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source,
@@ -53,7 +49,7 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         return model.jacobian_uncertainty(x_sensor=self.pos, x_source=x_source, v_sensor=self.vel,
                                           ref_idx=self.ref_idx, **kwargs)
 
-    def log_likelihood(self, zeta, x_source, x_sensor=None, v_sensor=None, v_source=None, bias=None, **kwargs):
+    def log_likelihood(self, zeta, x_source, x_sensor: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None, v_source: npt.ArrayLike or None=None, bias: npt.ArrayLike or None=None, **kwargs):
         if x_sensor is None: x_sensor = self.pos
         if v_sensor is None: v_sensor = self.vel
         if bias is None: bias = self.bias
@@ -80,24 +76,10 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle the interface to solvers
     ## ============================================================================================================== ##
-    def max_likelihood(self, zeta, search_space:SearchSpace, cal_data: dict=None, **kwargs):
-        # Perform sensor calibration
-        if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-        else:
-            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
+    # The super() version of max_likelihood functions just fine for FDOA solvers.
+    # def max_likelihood(self, zeta, search_space:SearchSpace, cal_data: dict=None, **kwargs):
+        # return super().max_likelihood(zeta, search_space, cal_data, **kwargs)
 
-        # Likelihood function for ML Solvers
-        def ell(pos_vel, **ell_kwargs):
-            # Determine if the input is position only, or position & velocity
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-            return self.log_likelihood(x_sensor=x_sensor, v_sensor=v_sensor,
-                                       zeta=zeta, x_source=this_pos, v_source=this_vel, **ell_kwargs)
-
-        # Call the util function
-        x_est, likelihood, x_grid = ml_solver(ell=ell, search_space=search_space, **kwargs)
-
-        return x_est, likelihood, x_grid
 
     # todo: delete when it's working
     # def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, **kwargs):
@@ -106,85 +88,88 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     #                                               epsilon=epsilon, do_resample=False, v_sensor=self.vel,
     #                                               do_sensor_bias=do_sensor_bias, **kwargs)
 
-    def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
-        # Perform sensor calibration
-        if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-        else:
-            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
-
-        # Initialize measurement error and jacobian functions
-        def y(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-            return zeta - self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor,
-                                           v_sensor=v_sensor, bias=bias)
-
-        def this_jacobian(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-            n_dim, _ = safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
-            j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
-            # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
-            # excise just the position portion
-            return j[:n_dim]
-
-        # Call generic Gradient Descent solver
-        x_est, x_full = gd_solver(y=y, jacobian=this_jacobian, cov=self.cov, x_init=x_init, **kwargs)
-
-        return x_est, x_full
-
-    def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
-        # Perform sensor calibration
-        if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-        else:
-            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
-
-            # Initialize measurement error and jacobian functions
-            def y(pos_vel):
-                this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-                return zeta - self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor,
-                                               v_sensor=v_sensor, bias=bias)
-
-            def this_jacobian(pos_vel):
-                this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-                n_dim, _ = safe_2d_shape(pos_vel)  # is the calling function asking for just pos or pos/vel?
-                j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
-                # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
-                # excise just the position portion
-                return j[:n_dim]
-
-            # Call generic Gradient Descent solver
-            x_est, x_full = ls_solver(zeta=y, jacobian=this_jacobian, cov=self.cov, x_init=x_init,
-                                                    **kwargs)
-
-            return x_est, x_full
-
-    def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None, cal_data: dict=None):
-        # Perform sensor calibration
-        if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-        else:
-            x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
-
-        # Generate the PDF
-        def measurement(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-            return self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor,
-                                    bias=bias)
-
-        pdfs = make_pdfs(measurement, zeta, pdf_type, self.cov.cov)
-
-        # Call the util function
-        x_est, likelihood, x_grid = bestfix_solver(pdfs, search_space)
-
-        return x_est, likelihood, x_grid
+    # def gradient_descent(self,
+    #                      zeta: npt.ArrayLike,
+    #                      x_init: npt.ArrayLike,
+    #                      cal_data: dict=None, **kwargs):
+    #     # Perform sensor calibration
+    #     if cal_data is not None:
+    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
+    #     else:
+    #         x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
+    #
+    #     # Initialize measurement error and jacobian functions
+    #     def y(pos_vel):
+    #         this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+    #         return zeta - self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor,
+    #                                        v_sensor=v_sensor, bias=bias)
+    #
+    #     def this_jacobian(pos_vel):
+    #         this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+    #         n_dim, _ = safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
+    #         j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
+    #         # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
+    #         # excise just the position portion
+    #         return j[:n_dim]
+    #
+    #     # Call generic Gradient Descent solver
+    #     x_est, x_full = gd_solver(y=y, jacobian=this_jacobian, cov=self.cov, x_init=x_init, **kwargs)
+    #
+    #     return x_est, x_full
+    #
+    # def least_square(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs):
+    #     # Perform sensor calibration
+    #     if cal_data is not None:
+    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
+    #     else:
+    #         x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
+    #
+    #         # Initialize measurement error and jacobian functions
+    #         def y(pos_vel):
+    #             this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+    #             return zeta - self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor,
+    #                                            v_sensor=v_sensor, bias=bias)
+    #
+    #         def this_jacobian(pos_vel):
+    #             this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+    #             n_dim, _ = safe_2d_shape(pos_vel)  # is the calling function asking for just pos or pos/vel?
+    #             j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
+    #             # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
+    #             # excise just the position portion
+    #             return j[:n_dim]
+    #
+    #         # Call generic Gradient Descent solver
+    #         x_est, x_full = ls_solver(zeta=y, jacobian=this_jacobian, cov=self.cov, x_init=x_init,
+    #                                                 **kwargs)
+    #
+    #         return x_est, x_full
+    #
+    # def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None, cal_data: dict=None):
+    #     # Perform sensor calibration
+    #     if cal_data is not None:
+    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
+    #     else:
+    #         x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
+    #
+    #     # Generate the PDF
+    #     def measurement(pos_vel):
+    #         this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
+    #         return self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor,
+    #                                 bias=bias)
+    #
+    #     pdfs = make_pdfs(measurement, zeta, pdf_type, self.cov.cov)
+    #
+    #     # Call the util function
+    #     x_est, likelihood, x_grid = bestfix_solver(pdfs, search_space)
+    #
+    #     return x_est, likelihood, x_grid
 
     ## ============================================================================================================== ##
     ## Performance Methods
     ##
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
-    def compute_crlb(self, x_source, v_source=None, **kwargs):
+    def compute_crlb(self, x_source, v_source: npt.ArrayLike or None=None, **kwargs):
 
         def this_jacobian(pos_vel):
             this_pos, this_vel = self.parse_source_pos_vel(pos_vel, default_vel=v_source)
@@ -200,12 +185,12 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These are generic utility functions that are unique to this class
     ## ============================================================================================================== ##
-    def error(self, x_source, x_max, num_pts, v_source=None):
+    def error(self, x_source, x_max, num_pts, v_source: npt.ArrayLike or None=None):
         return model.error(x_sensor=self.pos, x_source=x_source, v_sensor=self.vel, v_source=v_source,
                            x_max=x_max, num_pts=num_pts, cov=self.cov,
                            do_resample=False, ref_idx=self.ref_idx)
 
-    def draw_isodoppler(self, vel_diff, num_pts, max_ortho, v_source=None, x_sensor=None, v_sensor=None):
+    def draw_isodoppler(self, vel_diff, num_pts, max_ortho, v_source: npt.ArrayLike or None=None, x_sensor: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None):
         if x_sensor is None:
             x_sensor = self.pos
         if v_sensor is None:

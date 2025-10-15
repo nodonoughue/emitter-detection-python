@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import time
 
 from ewgeo.utils import is_broadcastable, make_nd_grid, parse_reference_sensor, print_elapsed, safe_2d_shape, SearchSpace
@@ -9,7 +10,12 @@ from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.geo import calc_doppler_diff
 
 
-def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, bias=None):
+def measurement(x_sensor: npt.ArrayLike,
+                x_source: npt.ArrayLike,
+                v_sensor: npt.ArrayLike or None=None,
+                v_source: npt.ArrayLike or None=None,
+                ref_idx=None,
+                bias: npt.ArrayLike or None=None):
     """
     # Computed range rate difference measurements, using the
     # final sensor as a common reference for all FDOA measurements.
@@ -61,7 +67,11 @@ def measurement(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, 
     return np.atleast_1d(rrdoa.squeeze() if n_source == 1 else rrdoa)
 
 
-def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
+def jacobian(x_sensor: npt.ArrayLike,
+             x_source: npt.ArrayLike,
+             v_sensor: npt.ArrayLike or None=None,
+             v_source: npt.ArrayLike or None=None,
+             ref_idx=None):
     """
     # Returns the Jacobian matrix for FDOA of a source at x_source
     # (n_dim x n_source) from sensors at x_sensor (n_dim x n_sensor) with velocity
@@ -117,7 +127,13 @@ def jacobian(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     return np.concatenate((result_pos, result_vel), axis=0)  # 2*n_dim x nPair x n_source
 
 
-def jacobian_uncertainty(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None, do_bias=False, do_pos_error=False):
+def jacobian_uncertainty(x_sensor: npt.ArrayLike,
+                         x_source: npt.ArrayLike,
+                         v_sensor: npt.ArrayLike or None=None,
+                         v_source: npt.ArrayLike or None=None,
+                         ref_idx=None,
+                         do_bias: bool=False,
+                         do_pos_error: bool=False):
     """
     Returns the Jacobian matrix for a set of FDOA measurements in the presence of sensor
     uncertainty, in the form of measurement bias and/or sensor position errors..
@@ -171,8 +187,16 @@ def jacobian_uncertainty(x_sensor, x_source, v_sensor=None, v_source=None, ref_i
     return j
 
 
-def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
-                   v_sensor=None, v_source=None, ref_idx=None, do_resample=False, bias=None, print_progress=False):
+def log_likelihood(x_sensor: npt.ArrayLike,
+                   rho_dot: npt.ArrayLike,
+                   cov: CovarianceMatrix,
+                   x_source: npt.ArrayLike,
+                   v_sensor: npt.ArrayLike or None=None,
+                   v_source: npt.ArrayLike or None=None,
+                   ref_idx=None,
+                   do_resample: bool=False,
+                   bias: npt.ArrayLike or None=None,
+                   print_progress: bool=False):
     """
     # Computes the Log Likelihood for FDOA sensor measurement, given the
     # received measurement vector rho_dot, covariance matrix C,
@@ -258,8 +282,15 @@ def log_likelihood(x_sensor, rho_dot, cov: CovarianceMatrix, x_source,
     return ell
 
 
-def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts,
-          v_sensor=None, v_source=None, ref_idx=None, do_resample=False):
+def error(x_sensor: npt.ArrayLike,
+          cov: CovarianceMatrix,
+          x_source: npt.ArrayLike,
+          x_max: npt.ArrayLike,
+          num_pts: int,
+          v_sensor: npt.ArrayLike or None=None,
+          v_source: npt.ArrayLike or None=None,
+          ref_idx=None,
+          do_resample: bool=False):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each
     dimension.  For each point, compute the FDOA solution for each sensor
@@ -315,7 +346,14 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts,
     return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
 
 
-def draw_isodoppler(x_ref, v_ref, x_test, v_test, vdiff, num_pts, max_ortho, v_source=None):
+def draw_isodoppler(x_ref: npt.ArrayLike,
+                    v_ref: npt.ArrayLike,
+                    x_test: npt.ArrayLike,
+                    v_test: npt.ArrayLike,
+                    vdiff: npt.ArrayLike,
+                    num_pts: int,
+                    max_ortho: npt.ArrayLike,
+                    v_source: npt.ArrayLike or None=None):
     """
     # Finds the isochrone with the stated range rate difference from points x1
     # and x2.  Generates an arc with 2*numPts-1 points, that spans up to
@@ -420,7 +458,11 @@ def draw_isodoppler(x_ref, v_ref, x_test, v_test, vdiff, num_pts, max_ortho, v_s
     return x_iso, y_iso
 
 
-def grad_x(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
+def grad_x(x_sensor: npt.ArrayLike,
+           x_source: npt.ArrayLike,
+           v_sensor: npt.ArrayLike or None=None,
+           v_source: npt.ArrayLike or None=None,
+           ref_idx=None):
     """
     Return the gradient of FDOA measurements, with sensor uncertainties, with respect to target position, x.
     Equation 6.31. The sensor uncertainties don't impact the gradient for FDOA, so this reduces to the previously
@@ -446,7 +488,7 @@ def grad_x(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
     return jacobian(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source, ref_idx=ref_idx)
 
 
-def grad_bias(x_sensor, x_source, ref_idx=None):
+def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     """
     Return the gradient of FDOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
     terms.
@@ -483,7 +525,11 @@ def grad_bias(x_sensor, x_source, ref_idx=None):
     return grad
 
 
-def grad_sensor_pos(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=None):
+def grad_sensor_pos(x_sensor: npt.ArrayLike,
+                    x_source: npt.ArrayLike,
+                    v_sensor: npt.ArrayLike or None=None,
+                    v_source: npt.ArrayLike or None=None,
+                    ref_idx=None):
     """
     Compute the gradient of FDOA measurements, with sensor uncertainties, with respect to sensor position and velocity.
 
@@ -547,7 +593,7 @@ def grad_sensor_pos(x_sensor, x_source, v_sensor=None, v_source=None, ref_idx=No
     return grad
 
 
-def _check_inputs(x_source, v_source, x_sensor, v_sensor):
+def _check_inputs(x_source: npt.ArrayLike, v_source: npt.ArrayLike, x_sensor: npt.ArrayLike, v_sensor: npt.ArrayLike):
     if v_sensor is None and v_source is None:
         raise ValueError('At least one of either v_sensor or v_source must be defined to use FDOA.')
     elif v_sensor is None:

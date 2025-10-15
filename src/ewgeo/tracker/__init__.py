@@ -14,7 +14,7 @@ from . import measurement
 from . import tracker
 
 def kf_update(x_prev: npt.ArrayLike, p_prev: npt.ArrayLike,
-              zeta: npt.ArrayLike, cov: npt.ArrayLike, h: npt.ArrayLike) -> tuple[npt.ArrayLike, npt.ArrayLike]:
+              zeta: npt.ArrayLike, cov: npt.ArrayLike, h: npt.ArrayLike) -> tuple[npt.NDArray, npt.NDArray]:
     """
     Conduct a Kalman Filter update, given the previous state estimate and covariance, a measurement, and
     the measurement matrix.

@@ -1,19 +1,16 @@
-from abc import ABC, abstractmethod
 import numpy as np
 import numpy.typing as npt
 
-from ..utils import safe_2d_shape
 from ..utils.system import PassiveSurveillanceSystem
-from ..utils.covariance import CovarianceMatrix
 from .states import StateSpace, State
 
 
 class Measurement:
     time: float
-    sensor: PassiveSurveillanceSystem
+    sensor: PassiveSurveillanceSystem or None
     zeta: npt.ArrayLike
 
-    def __init__(self, time: float, sensor: PassiveSurveillanceSystem, zeta: npt.ArrayLike):
+    def __init__(self, time: float, sensor: PassiveSurveillanceSystem or None, zeta: npt.ArrayLike):
         self.time = time
         self.sensor = sensor
         self.zeta = zeta
@@ -51,7 +48,8 @@ class MeasurementModel:
         Return the measurement associated with the provided state.
 
         :param state: State of the target at which to compute the measurement
-        :param noise: if a bool, then random noise will be generated if True; if a numpy array, then it will be added directly to the result.
+        :param noise: if it is a bool, then random noise will be generated if it is True and nothing if it is False;
+                      if it is a numpy array, then it will be added directly to the result.
         """
         args = {'x_source': self.state_space.pos_component(state.state),
                 'v_source': self.state_space.vel_component(state.state)}
@@ -64,7 +62,7 @@ class MeasurementModel:
 
         return Measurement(zeta=z, sensor=self.pss, time=state.time)
 
-    def jacobian(self, state: State) -> npt.ArrayLike:
+    def jacobian(self, state: State) -> npt.NDArray:
         j = self.pss.jacobian(x_source=self.state_space.pos_component(state.state),
                               v_source=self.state_space.vel_component(state.state))
 
@@ -86,11 +84,11 @@ class MeasurementModel:
         Return the log-likelihood of the measurement at state1 given the state2 as the underlying truth.
         """
 
-        # Determine the measurement that comes from state2
+        # Determine the measurement that comes from state1
         m = self.measurement(state1)
 
-        # Compute the log likelihood of state1
-        return self.log_likelihood_from_measurement(state=state1, measurement=m)
+        # Compute the log likelihood of the measurement given the state is state2
+        return self.log_likelihood_from_measurement(state=state2, measurement=m)
 
     def log_likelihood_from_measurement(self, state: State, measurement: Measurement) -> float:
         return self.pss.log_likelihood(x_source=self.state_space.pos_component(state.state),

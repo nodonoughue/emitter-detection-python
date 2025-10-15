@@ -11,6 +11,7 @@ Nicholas O'Donoughue
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 
 import ewgeo.fdoa as fdoa
 from ewgeo.utils import init_output_dir, init_plot_style, make_nd_grid, SearchSpace
@@ -309,7 +310,13 @@ def make_figure_3(prefix):
     return fig3a, fig3b, fig3c, fig3d
 
 
-def _make_figure3_subfigure(eps, x_vec, y_vec, x_sensor, v_sensor, x_source, sensors_to_plot):
+def _make_figure3_subfigure(eps: npt.ArrayLike,
+                            x_vec: npt.NDArray[np.float64],
+                            y_vec: npt.ArrayLike,
+                            x_sensor: npt.ArrayLike,
+                            v_sensor: npt.ArrayLike,
+                            x_source: npt.ArrayLike,
+                            sensors_to_plot: npt.NDArray[np.int64]):
 
     # Open the plot
     fig, ax = plt.subplots()
@@ -653,4 +660,4 @@ def make_figures_7_8(prefix, mc_params=None):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 10, 'min_num_monte_carlo': 10})

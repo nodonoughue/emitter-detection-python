@@ -75,7 +75,7 @@ class TrackManager:
         hypothesis_dict, unassoc_msmts = self.associator.associate(tracks=self.tracks, measurements=measurements)
 
         # Update the hypotheses
-        hypotheses = hypothesis_dict.items()
+        hypotheses = hypothesis_dict.values()
         [h.update_track() for h in hypotheses]
 
         # Return the unused measurements
@@ -87,7 +87,7 @@ class TrackManager:
                                                                   measurements=measurements)
 
         # Update the tracks associated with these hypotheses
-        tentative_hypotheses = hypothesis_dict.items()
+        tentative_hypotheses = hypothesis_dict.values()
         [h.update_track() for h in tentative_hypotheses]
 
         # Any hypotheses that are not a MissedDetectionHypothesis can be passed to

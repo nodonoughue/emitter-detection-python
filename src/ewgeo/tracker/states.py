@@ -23,13 +23,13 @@ class StateSpace:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    def pos_component(self, x: npt.ArrayLike) -> npt.ArrayLike:
+    def pos_component(self, x: npt.ArrayLike) -> npt.NDArray:
         return x[self.pos_slice]
 
-    def vel_component(self, x: npt.ArrayLike) -> npt.ArrayLike:
+    def vel_component(self, x: npt.ArrayLike) -> npt.NDArray:
         return x[self.vel_slice] if self.has_vel else None
 
-    def accel_component(self, x: npt.ArrayLike) -> npt.ArrayLike:
+    def accel_component(self, x: npt.ArrayLike) -> npt.NDArray:
         return x[self.accel_slice] if self.has_accel else None
 
     def copy(self, **kwargs):
@@ -68,15 +68,15 @@ class State:
         return self.state_space.num_states
 
     @property
-    def position(self) -> npt.ArrayLike:
+    def position(self) -> npt.NDArray:
         return self.state_space.pos_component(self.state)
 
     @property
-    def velocity(self) -> npt.ArrayLike:
+    def velocity(self) -> npt.NDArray:
         return self.state_space.vel_component(self.state) if self.has_vel else None
 
     @property
-    def acceleration(self) -> npt.ArrayLike:
+    def acceleration(self) -> npt.NDArray:
         return self.state_space.accel_component(self.state) if self.has_accel else None
 
     @property
@@ -88,7 +88,7 @@ class State:
         return self.state_space.has_accel
 
     @ property
-    def position_covar(self) -> CovarianceMatrix:
+    def position_covar(self) -> CovarianceMatrix or None:
         if self.covar is None:
             return None
         else:
@@ -96,7 +96,7 @@ class State:
             return CovarianceMatrix(self.covar.cov[pos_slice, pos_slice])
 
     @property
-    def velocity_covar(self) -> CovarianceMatrix:
+    def velocity_covar(self) -> CovarianceMatrix or None:
         if self.covar is None or not self.has_vel:
             return None
         else:
@@ -104,7 +104,7 @@ class State:
             return CovarianceMatrix(self.covar.cov[vel_slice, vel_slice])
 
     @property
-    def acceleration_covar(self) -> CovarianceMatrix:
+    def acceleration_covar(self) -> CovarianceMatrix or None:
         if self.covar is None or not self.has_accel:
             return None
         else:
@@ -112,7 +112,7 @@ class State:
             return CovarianceMatrix(self.covar.cov[accel_slice, accel_slice])
 
     @property
-    def pos_vel_covar(self) -> CovarianceMatrix:
+    def pos_vel_covar(self) -> CovarianceMatrix or None:
         if self.covar is None:
             return None
         else:

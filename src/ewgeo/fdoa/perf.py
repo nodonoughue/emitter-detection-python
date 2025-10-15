@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 
 from . import model
 from ewgeo.utils import safe_2d_shape
@@ -7,8 +8,14 @@ from ewgeo.utils.perf import compute_crlb_gaussian
 from ewgeo.utils.unit_conversions import db_to_lin
 
 
-def compute_crlb(x_sensor, v_sensor, x_source, cov: CovarianceMatrix, v_source=None, ref_idx=None, do_resample=True,
-                 print_progress=False, **kwargs):
+def compute_crlb(x_sensor: npt.ArrayLike,
+                 v_sensor: npt.ArrayLike,
+                 x_source: npt.ArrayLike,
+                 cov: CovarianceMatrix,
+                 v_source: npt.ArrayLike or None=None,
+                 ref_idx=None,
+                 do_resample: bool=True,
+                 print_progress: bool=False, **kwargs):
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_fdoa (Ndim x N) with velocity v_fdoa.
@@ -43,7 +50,7 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov: CovarianceMatrix, v_source=N
         cov = cov.resample(ref_idx=ref_idx)
 
     # Define a wrapper for the jacobian matrix that accepts only the position 'x'
-    def jacobian(x):
+    def jacobian(x: npt.ArrayLike):
         j= model.jacobian(x_sensor=x_sensor, v_sensor=v_sensor,
                           x_source=x, v_source=v_source, ref_idx=ref_idx)
         # the jacobian will return the gradient with respect to both position and velocity, if asked for
@@ -56,7 +63,9 @@ def compute_crlb(x_sensor, v_sensor, x_source, cov: CovarianceMatrix, v_source=N
     return crlb
 
 
-def freq_crlb(sample_time, num_samples, snr_db):
+def freq_crlb(sample_time: npt.ArrayLike,
+              num_samples: npt.NDArray[np.int64],
+              snr_db: npt.ArrayLike):
     """
     Compute the CRLB for the frequency difference estimate from a pair of
     sensors, given the time duration of the sampled signals, receiver
@@ -82,7 +91,7 @@ def freq_crlb(sample_time, num_samples, snr_db):
     return sigma
 
 
-def freq_diff_crlb(time_s, bw_hz, snr_db):
+def freq_diff_crlb(time_s: npt.ArrayLike, bw_hz: npt.ArrayLike, snr_db: npt.ArrayLike):
     """
     Compute the CRLB for the frequency difference estimate from a pair of
     sensors, given the time duration of the sampled signals, receiver

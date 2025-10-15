@@ -10,7 +10,7 @@ from ewgeo.utils.geo import find_intersect
 from ewgeo.utils.solvers import ml_solver, gd_solver, ls_solver, bestfix_solver
 
 
-def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, search_space:SearchSpace, do_2d_aoa=False, bias=None,
+def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, search_space:SearchSpace, do_2d_aoa=False, bias: npt.ArrayLike or None=None,
                    **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
@@ -42,7 +42,7 @@ def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, search_space:SearchSpa
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias=None, **kwargs):
+def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias: npt.ArrayLike or None=None, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -73,7 +73,7 @@ def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, x_init, do_2d_aoa=Fa
     return x, x_full
 
 
-def least_square(x_sensor, zeta, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias=None, **kwargs):
+def least_square(x_sensor, zeta, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias: npt.ArrayLike or None=None, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 

@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 from scipy.linalg import block_diag
 import time
 
@@ -10,9 +11,17 @@ from ewgeo.utils import print_progress as print_progress_inner
 from ewgeo.utils.covariance import CovarianceMatrix
 
 
-def measurement(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, angle_bias=None,
-                range_bias=None, range_rate_bias=None):
+def measurement(x_source: npt.ArrayLike, 
+                x_aoa: npt.ArrayLike=None, 
+                x_tdoa: npt.ArrayLike=None, 
+                x_fdoa: npt.ArrayLike=None, 
+                v_fdoa: npt.ArrayLike=None, 
+                v_source: npt.ArrayLike or None=None,
+                do_2d_aoa: bool=False, 
+                tdoa_ref_idx=None, fdoa_ref_idx=None, 
+                angle_bias: npt.ArrayLike or None=None,
+                range_bias: npt.ArrayLike or None=None, 
+                range_rate_bias: npt.ArrayLike or None=None):
     """
     Computes hybrid measurements, for AOA, TDOA, and FDOA sensors.
 
@@ -56,8 +65,15 @@ def measurement(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_s
     return z
 
 
-def jacobian(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-             do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
+def jacobian(x_source: npt.ArrayLike, 
+             x_aoa: npt.ArrayLike=None,
+             x_tdoa: npt.ArrayLike=None,
+             x_fdoa: npt.ArrayLike=None,
+             v_fdoa: npt.ArrayLike=None,
+             v_source: npt.ArrayLike or None=None,
+             do_2d_aoa: bool=False,
+             tdoa_ref_idx=None,
+             fdoa_ref_idx=None):
     """
     # Returns the Jacobian matrix for hybrid set of AOA, TDOA, and FDOA
     # measurements.
@@ -111,9 +127,17 @@ def jacobian(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_sour
     return np.concatenate((j_aoa, j_tdoa, j_fdoa), axis=1)
 
 
-def jacobian_uncertainty(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                         do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None,
-                         do_bias=False, do_pos_error=False):
+def jacobian_uncertainty(x_source: npt.ArrayLike,
+                         x_aoa: npt.ArrayLike=None,
+                         x_tdoa: npt.ArrayLike=None,
+                         x_fdoa: npt.ArrayLike=None,
+                         v_fdoa: npt.ArrayLike=None,
+                         v_source: npt.ArrayLike or None=None,
+                         do_2d_aoa: bool=False,
+                         tdoa_ref_idx=None,
+                         fdoa_ref_idx=None,
+                         do_bias: bool=False,
+                         do_pos_error: bool=False):
     """
     Returns the Jacobian matrix for a set of TDOA measurements in the presence of sensor
     uncertainty, in the form of measurement bias and/or sensor position errors.
@@ -168,10 +192,22 @@ def jacobian_uncertainty(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=
     return j
 
 
-def log_likelihood(x_source, zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None,
-                   v_fdoa=None, v_source=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None,
-                   do_resample=False, angle_bias=None, range_bias=None, range_rate_bias=None,
-                   print_progress=False):
+def log_likelihood(x_source: npt.ArrayLike,
+                   zeta: npt.ArrayLike,
+                   cov: CovarianceMatrix,
+                   x_aoa: npt.ArrayLike=None,
+                   x_tdoa: npt.ArrayLike=None,
+                   x_fdoa: npt.ArrayLike=None,
+                   v_fdoa: npt.ArrayLike=None,
+                   v_source: npt.ArrayLike or None=None,
+                   do_2d_aoa: bool=False,
+                   tdoa_ref_idx=None,
+                   fdoa_ref_idx=None,
+                   do_resample: bool=False,
+                   angle_bias: npt.ArrayLike or None=None,
+                   range_bias: npt.ArrayLike or None=None,
+                   range_rate_bias: npt.ArrayLike or None=None,
+                   print_progress: bool=False):
     """
     Computes the Log Likelihood for Hybrid sensor measurement (AOA, TDOA, and
     FDOA), given the received measurement vector zeta, covariance matrix C,
@@ -266,8 +302,19 @@ def log_likelihood(x_source, zeta, cov: CovarianceMatrix, x_aoa=None, x_tdoa=Non
     return ell
 
 
-def error(x_source, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-          x_max=1, num_pts=11, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False):
+def error(x_source: npt.ArrayLike,
+          cov: CovarianceMatrix,
+          x_aoa: npt.ArrayLike=None,
+          x_tdoa: npt.ArrayLike=None,
+          x_fdoa: npt.ArrayLike=None,
+          v_fdoa: npt.ArrayLike=None,
+          v_source: npt.ArrayLike or None=None,
+          x_max: npt.ArrayLike=1,
+          num_pts: int=11,
+          do_2d_aoa: bool=False,
+          tdoa_ref_idx=None,
+          fdoa_ref_idx=None,
+          do_resample: bool=False):
     """
     Construct a 2-D field from -x_max to +x_max, using numPts in each
     dimension.  For each point, compute the hybrid solution for each sensor
@@ -330,8 +377,15 @@ def error(x_source, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None,
     return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
 
 
-def grad_x(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-           do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
+def grad_x(x_source: npt.ArrayLike,
+           x_aoa: npt.ArrayLike=None,
+           x_tdoa: npt.ArrayLike=None,
+           x_fdoa: npt.ArrayLike=None,
+           v_fdoa: npt.ArrayLike=None,
+           v_source: npt.ArrayLike or None=None,
+           do_2d_aoa: bool=False,
+           tdoa_ref_idx=None,
+           fdoa_ref_idx=None):
     """
     Return the gradient of Hybrid measurements, with sensor uncertainties, with respect to target position, x.
     Equation 6.43. This function calls grad_x for each sensor type in succession, then concatenates the results.
@@ -370,8 +424,15 @@ def grad_x(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source
     return grad
 
 
-def grad_bias(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-              do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
+def grad_bias(x_source: npt.ArrayLike,
+              x_aoa: npt.ArrayLike=None,
+              x_tdoa: npt.ArrayLike=None,
+              x_fdoa: npt.ArrayLike=None,
+              v_fdoa: npt.ArrayLike=None,
+              v_source: npt.ArrayLike or None=None,
+              do_2d_aoa: bool=False,
+              tdoa_ref_idx=None,
+              fdoa_ref_idx=None):
     """
     Return the gradient of FDOA measurements, with sensor uncertainties, with respect to the unknown measurement bias
     terms.
@@ -424,8 +485,15 @@ def grad_bias(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_sou
     return grad
 
 
-def grad_sensor_pos(x_source, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                    do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None):
+def grad_sensor_pos(x_source: npt.ArrayLike,
+                    x_aoa: npt.ArrayLike=None,
+                    x_tdoa: npt.ArrayLike=None,
+                    x_fdoa: npt.ArrayLike=None,
+                    v_fdoa: npt.ArrayLike=None,
+                    v_source: npt.ArrayLike or None=None,
+                    do_2d_aoa: bool=False,
+                    tdoa_ref_idx=None,
+                    fdoa_ref_idx=None):
     """
     Compute the gradient of hybrid measurements, with sensor uncertainties, with respect to sensor position and
     velocity, according to equation 6.43.

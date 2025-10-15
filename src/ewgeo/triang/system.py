@@ -11,16 +11,12 @@ from ewgeo.utils.system import PassiveSurveillanceSystem
 class DirectionFinder(PassiveSurveillanceSystem):
     do_2d_aoa: bool = False
 
-    _default_aoa_bias_search_epsilon = 0.1 # degrees
-    _default_aoa_bias_search_size = 11 # num search points per dimension
+    _default_aoa_bias_search_epsilon: float = 0.1 # degrees
+    _default_aoa_bias_search_size: int = 11 # num search points per dimension
 
-    def __init__(self,x, cov, do_2d_aoa=False, **kwargs):
-        # Handle empty covariance matrix inputs
-        if cov is None:
-            # Make a dummy; unit variance
-            num_dim, num_sensors = safe_2d_shape(x)
-            num_measurements = num_sensors * (2 if do_2d_aoa else 1)
-            cov = CovarianceMatrix(np.eye(num_measurements))
+    def __init__(self,x: npt.ArrayLike,
+                 cov: CovarianceMatrix or npt.ArrayLike or None=None,
+                 do_2d_aoa: bool=False, **kwargs):
 
         super().__init__(x, cov, **kwargs)
 
@@ -30,33 +26,50 @@ class DirectionFinder(PassiveSurveillanceSystem):
         self.default_bias_search_epsilon = self._default_aoa_bias_search_epsilon
         self.default_bias_search_size = self._default_aoa_bias_search_size
 
+    @property
+    def num_measurements(self):
+        return self.pos.shape[1] * (2 if self.do_2d_aoa else 1)
+
     ## ============================================================================================================== ##
     ## Model Methods
     ##
     ## These methods handle the physical model for a Triangulation-based PSS, and are just wrappers for the static
     ## functions defined in model.py
     ## ============================================================================================================== ##
-    def measurement(self, x_source, x_sensor=None, bias=None, v_sensor=None, v_source=None):
+    def measurement(self, x_source, x_sensor: npt.ArrayLike or None=None, bias: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None, v_source: npt.ArrayLike or None=None):
         if x_sensor is None: x_sensor = self.pos
         if bias is None: bias = self.bias
         return model.measurement(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa, bias=bias)
 
-    def jacobian(self, x_source, v_source=None, x_sensor=None, v_sensor=None):
+    def jacobian(self, x_source, v_source: npt.ArrayLike or None=None, x_sensor: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None):
         if x_sensor is None: x_sensor = self.pos
         return model.jacobian(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
 
     def jacobian_uncertainty(self, x_source, **kwargs):
         return model.jacobian_uncertainty(x_sensor=self.pos, x_source=x_source, do_2d_aoa=self.do_2d_aoa, **kwargs)
 
-    def log_likelihood(self, x_source, zeta, x_sensor=None, bias=None, v_sensor=None, v_source=None, **kwargs):
+    def log_likelihood(self,
+                       x_source: npt.ArrayLike,
+                       zeta: npt.ArrayLike,
+                       x_sensor: npt.ArrayLike or None=None,
+                       bias: npt.ArrayLike or None=None,
+                       v_sensor: npt.ArrayLike or None=None,
+                       v_source: npt.ArrayLike or None=None,
+                       **kwargs):
         if x_sensor is None: x_sensor = self.pos
         if bias is None: bias = self.bias
+        if 'do_2d_aoa' not in kwargs: kwargs['do_2d_aoa'] = self.do_2d_aoa
         return model.log_likelihood(x_sensor=x_sensor, zeta=zeta, x_source=x_source, cov=self.cov,
-                                    do_2d_aoa=self.do_2d_aoa, bias=bias, **kwargs)
+                                    bias=bias, **kwargs)
 
-    # def log_likelihood_uncertainty(self, zeta, theta, **kwargs):
-    #     return model.log_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, theta=theta, cov=self.cov,
-    #                                             cov_pos=self.cov_pos, do_2d_aoa=self.do_2d_aoa, **kwargs)
+    def grad_x(self, x_source: npt.ArrayLike):
+        return model.grad_x(x_sensor=self.pos, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
+
+    def grad_bias(self, x_source: npt.ArrayLike):
+        return model.grad_bias(x_sensor=self.pos, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
+
+    def grad_sensor_pos(self, x_source: npt.ArrayLike):
+        return model.grad_sensor_pos(x_sensor=self.pos, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
 
     ## ============================================================================================================== ##
     ## Solver Methods
@@ -64,15 +77,12 @@ class DirectionFinder(PassiveSurveillanceSystem):
     ## These methods handle the interface to solvers
     ## ============================================================================================================== ##
     def max_likelihood(self, zeta, search_space: SearchSpace, cal_data: dict=None, **kwargs):
-        # Perform sensor calibration
-        if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-        else:
-            x_sensor, v_sensor, bias = self.pos, None, self.bias
+        # Specify the do_2d_aoa flag, if not already provided
+        if 'do_2d_aoa' not in kwargs:
+            kwargs['do_2d_aoa'] = self.do_2d_aoa
 
-        # Call the non-calibration solver
-        return solvers.max_likelihood(x_sensor=x_sensor, zeta=zeta, cov=self.cov, do_2d_aoa=self.do_2d_aoa,
-                                      search_space=search_space, bias=bias, **kwargs)
+        # Call the super method
+        return super().max_likelihood(zeta, search_space, cal_data=cal_data, **kwargs)
 
     # def max_likelihood_uncertainty(self, zeta, source_search: SearchSpace,
     #                                do_sensor_bias=False, do_sensor_pos=False, do_sensor_vel=False,
@@ -112,29 +122,29 @@ class DirectionFinder(PassiveSurveillanceSystem):
     #                                               do_2d_aoa=self.do_2d_aoa, epsilon=epsilon,
     #                                               do_sensor_bias=do_sensor_bias, **kwargs)
 
-    def gradient_descent(self, zeta, x_init, cal_data: dict=None, **kwargs):
-        # Perform sensor calibration
-        if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-        else:
-            x_sensor, v_sensor, bias = self.pos, None, self.bias
+    # def gradient_descent(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs):
+    #     # Perform sensor calibration
+    #     if cal_data is not None:
+    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
+    #     else:
+    #         x_sensor, v_sensor, bias = self.pos, None, self.bias
+    #
+    #     return solvers.gradient_descent(x_sensor=x_sensor, zeta=zeta, cov=self.cov, bias=bias, do_2d_aoa=self.do_2d_aoa,
+    #                                     x_init=x_init, **kwargs)
 
-        return solvers.gradient_descent(x_sensor=x_sensor, zeta=zeta, cov=self.cov, bias=bias, do_2d_aoa=self.do_2d_aoa,
-                                        x_init=x_init, **kwargs)
+    # def least_square(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs):
+    #     # Perform sensor calibration
+    #     if cal_data is not None:
+    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
+    #     else:
+    #         x_sensor, v_sensor, bias = self.pos, None, self.bias
+    #
+    #     return solvers.least_square(x_sensor=self.pos, zeta=zeta, cov=self.cov, x_init=x_init, bias=bias,
+    #                                 do_2d_aoa=self.do_2d_aoa, **kwargs)
 
-    def least_square(self, zeta, x_init, cal_data: dict=None, **kwargs):
-        # Perform sensor calibration
-        if cal_data is not None:
-            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-        else:
-            x_sensor, v_sensor, bias = self.pos, None, self.bias
-
-        return solvers.least_square(x_sensor=self.pos, zeta=zeta, cov=self.cov, x_init=x_init, bias=bias,
-                                    do_2d_aoa=self.do_2d_aoa, **kwargs)
-
-    def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None):
-        return solvers.bestfix(x_sensor=self.pos, zeta=zeta, cov=self.cov,
-                               search_space=search_space, pdf_type=pdf_type)
+    # def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None):
+    #     return solvers.bestfix(x_sensor=self.pos, zeta=zeta, cov=self.cov,
+    #                            search_space=search_space, pdf_type=pdf_type)
 
     def angle_bisector(self, zeta):
         return solvers.angle_bisector(self.pos, zeta)
@@ -159,12 +169,12 @@ class DirectionFinder(PassiveSurveillanceSystem):
         return model.error(x_sensor=self.pos, x_source=x_source, x_max=x_max, num_pts=num_pts, cov=self.cov,
                            do_2d_aoa=self.do_2d_aoa)
 
-    def draw_lobs(self, zeta, x_sensor=None, **kwargs):
+    def draw_lobs(self, zeta, x_sensor: npt.ArrayLike or None=None, **kwargs):
         """
         Draw lines of bearing from each sensor corresponding to each measurement
 
         :param zeta: ndarray; size of the first dimension is the number of measurements, any other dimensions are
-                              interepreted as additional cases to run (num_cases = np.prod(np.shape(zeta)[1:]))
+                              interpreted as additional cases to run (num_cases = np.prod(np.shape(zeta)[1: ]))
         :param x_sensor: optional ndarray; if empty, then self.pos will be used
         :param kwargs: other named arguments will be passed to triang.model.draw_lob().
         :return lobs: numpy array with four dimensions: num_dims (2 or 3) x 2 x num_sensors x num_cases.
@@ -185,7 +195,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
         # assert num_zeta == num_measurements, "Sensor measurement dimension mismatch."
         zeta_reshape = np.reshape(zeta, shape=(num_zeta, num_cases))
 
-        # Initialize the outputs
+        # Initialize the output
         # Dimensions are: (2 or 3) x 2 x num_sensors x num_cases
         lobs_out = np.zeros(shape=(2, 2, num_sensors, num_cases))
 
@@ -206,12 +216,13 @@ class DirectionFinder(PassiveSurveillanceSystem):
 
         return lobs_out
 
-    def plot_lobs(self, ax: plt.Axes, zeta: npt.ArrayLike, x_sensor: npt.ArrayLike=None, plot_args: dict= dict(), **kwargs):
+    def plot_lobs(self, ax: plt.Axes, zeta: npt.ArrayLike, x_sensor: npt.ArrayLike=None, plot_args: dict=None, **kwargs):
         # Generate a tuple of shape (2, 2, num_lobs, num_cases)
         # First dimension is physical axis (x,y)
         # Second dimensions is start/end
         # Third dimension is across sensors
         # Fourth dimension is across case
+        if plot_args is None: plot_args = {} # Make an empty dict so that ax.plot doesn't throw an error
 
         lobs = np.reshape(self.draw_lobs(zeta=zeta, x_sensor=x_sensor, **kwargs), (2, 2, -1))
         ax.plot(lobs[0], lobs[1], **plot_args)

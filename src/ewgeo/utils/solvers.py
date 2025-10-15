@@ -312,7 +312,7 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
 
 
 def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
-              prior=None, prior_wt: float = 0., print_progress=False):
+              prior=None, prior_wt: float = 0., print_progress=False, **kwargs):
     """
     Execute ML estimation through brute force computational methods.
 
@@ -332,6 +332,7 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
                   the true source location, according to some prior distribution. Will be multiplied by log10 when
                   combined with the likelihood distribution (which is assumed to be a log likelihood).
     :param prior_wt: Weight to apply to the prior distribution; (1-prior_wt) will be applied to the likelihood function.
+    :param **kwargs: Additional keyword arguments to pass to ell.
     :return x_est: Estimated minimum
     :return A: Likelihood computed at each x position in the search space
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
@@ -342,11 +343,13 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
 
     # Constrain the likelihood, if needed
     if ineq_constraints is not None or eq_constraints is not None:
-        ell = constrain_likelihood(ell=ell, eq_constraints=eq_constraints,
-                                   ineq_constraints=ineq_constraints, tol=constraint_tolerance)
+        ell = constrain_likelihood(ell=ell,
+                                   eq_constraints=eq_constraints,
+                                   ineq_constraints=ineq_constraints,
+                                   tol=constraint_tolerance)
 
     # Evaluate the likelihood function at each coordinate in the search space
-    likelihood = ell(x_set, print_progress=print_progress)
+    likelihood = ell(x_set, print_progress=print_progress, **kwargs)
 
     if prior is not None and prior_wt > 0:
         pdf_prior = np.reshape(prior(x_set), shape=likelihood.shape)

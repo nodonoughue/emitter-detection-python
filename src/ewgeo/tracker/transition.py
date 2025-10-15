@@ -95,7 +95,7 @@ class MotionModel(ABC):
                 self.q = self.make_process_covariance_matrix(self.process_covar, self.time_delta)
         return
 
-    def validate_process_covar_input(self, process_covar: npt.ArrayLike)-> npt.ArrayLike:
+    def validate_process_covar_input(self, process_covar: npt.ArrayLike)-> npt.NDArray:
         if process_covar is None:
             process_covar = self.process_covar
 

@@ -1,6 +1,5 @@
 from matplotlib import pyplot as plt
 import numpy as np
-from typing import MutableSequence
 
 from .states import State, StateSpace
 
@@ -11,7 +10,7 @@ class Track:
     """
     # Parameters
     initial_state: State
-    states: MutableSequence[State]
+    states: list[State]
     num_dims: int
     track_id: str = ""
     num_missed_detections: int = 0

@@ -1,13 +1,26 @@
+import numpy.typing as npt
+
 from . import model
 from ewgeo.utils import make_pdfs, SearchSpace
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.solvers import bestfix_solver, gd_solver, ls_solver, ml_solver
 
 
-def max_likelihood(zeta, cov: CovarianceMatrix, search_space: SearchSpace,
-                   x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                   do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None,
-                   do_resample=False, angle_bias=None, range_bias=None, range_rate_bias=None, **kwargs):
+def max_likelihood(zeta: npt.ArrayLike,
+                   cov: CovarianceMatrix,
+                   search_space: SearchSpace,
+                   x_aoa: npt.ArrayLike=None,
+                   x_tdoa: npt.ArrayLike=None,
+                   x_fdoa: npt.ArrayLike=None,
+                   v_fdoa: npt.ArrayLike=None,
+                   v_source: npt.ArrayLike or None=None,
+                   do_2d_aoa: bool=False,
+                   tdoa_ref_idx=None,
+                   fdoa_ref_idx=None,
+                   do_resample: bool=False,
+                   angle_bias: npt.ArrayLike or None=None,
+                   range_bias: npt.ArrayLike or None=None,
+                   range_rate_bias: npt.ArrayLike or None=None, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -35,7 +48,7 @@ def max_likelihood(zeta, cov: CovarianceMatrix, search_space: SearchSpace,
                                   tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Set up function handle
-    def ell(x, **ell_kwargs):
+    def ell(x: npt.ArrayLike, **ell_kwargs):
         return model.log_likelihood(x_aoa=x_aoa, x_tdoa=x_tdoa,
                                     x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                     zeta=zeta, x_source=x, v_source=v_source,
@@ -51,9 +64,21 @@ def max_likelihood(zeta, cov: CovarianceMatrix, search_space: SearchSpace,
     return x_est, likelihood, x_grid
 
 
-def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
-                     v_source=None, do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
-                     angle_bias=None, range_bias=None, range_rate_bias=None, **kwargs):
+def gradient_descent(zeta: npt.ArrayLike,
+                     cov: CovarianceMatrix,
+                     x_init: npt.ArrayLike,
+                     x_aoa: npt.ArrayLike=None,
+                     x_tdoa: npt.ArrayLike=None,
+                     x_fdoa: npt.ArrayLike=None,
+                     v_fdoa: npt.ArrayLike=None,
+                     v_source: npt.ArrayLike or None=None,
+                     do_2d_aoa: bool=False,
+                     tdoa_ref_idx=None,
+                     fdoa_ref_idx=None,
+                     do_resample: bool=False,
+                     angle_bias: npt.ArrayLike or None=None,
+                     range_bias: npt.ArrayLike or None=None,
+                     range_rate_bias: npt.ArrayLike or None=None, **kwargs):
     """
     Computes the gradient descent solution for FDOA processing.
 
@@ -79,13 +104,13 @@ def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=Non
     """
 
     # Initialize measurement error and jacobian functions
-    def y(this_x):
+    def y(this_x: npt.ArrayLike):
         return zeta - model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                         x_source=this_x, v_source=v_source, do_2d_aoa=do_2d_aoa,
                                         tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
                                         angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
 
-    def jacobian(this_x):
+    def jacobian(this_x: npt.ArrayLike):
         return model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                               x_source=this_x, v_source=v_source,
                               do_2d_aoa=do_2d_aoa, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
@@ -101,9 +126,21 @@ def gradient_descent(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=Non
     return x, x_full
 
 
-def least_square(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-                 do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
-                 angle_bias=None, range_bias=None, range_rate_bias=None, **kwargs):
+def least_square(zeta: npt.ArrayLike,
+                 cov: CovarianceMatrix,
+                 x_init: npt.ArrayLike,
+                 x_aoa: npt.ArrayLike=None,
+                 x_tdoa: npt.ArrayLike=None,
+                 x_fdoa: npt.ArrayLike=None,
+                 v_fdoa: npt.ArrayLike=None,
+                 v_source: npt.ArrayLike or None=None,
+                 do_2d_aoa: bool=False,
+                 tdoa_ref_idx=None,
+                 fdoa_ref_idx=None,
+                 do_resample: bool=False,
+                 angle_bias: npt.ArrayLike or None=None,
+                 range_bias: npt.ArrayLike or None=None,
+                 range_rate_bias: npt.ArrayLike or None=None, **kwargs):
     """
     Computes the least square solution for FDOA processing.
 
@@ -129,13 +166,13 @@ def least_square(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x
     """
 
     # Initialize measurement error and Jacobian function handles
-    def y(this_x):
+    def y(this_x: npt.ArrayLike):
         return zeta - model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                         x_source=this_x, v_source=v_source, do_2d_aoa=do_2d_aoa,
                                         tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
                                         angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
 
-    def jacobian(this_x):
+    def jacobian(this_x: npt.ArrayLike):
         return model.jacobian(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                               x_source=this_x, v_source=v_source, do_2d_aoa=do_2d_aoa,
                               tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
@@ -151,9 +188,18 @@ def least_square(zeta, cov: CovarianceMatrix, x_init, x_aoa=None, x_tdoa=None, x
     return x, x_full
 
 
-def bestfix(zeta, cov: CovarianceMatrix, search_space: SearchSpace,
-            x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, v_source=None,
-            do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
+def bestfix(zeta: npt.ArrayLike,
+            cov: CovarianceMatrix,
+            search_space: SearchSpace,
+            x_aoa: npt.ArrayLike=None,
+            x_tdoa: npt.ArrayLike=None,
+            x_fdoa: npt.ArrayLike=None,
+            v_fdoa: npt.ArrayLike=None,
+            v_source: npt.ArrayLike or None=None,
+            do_2d_aoa: bool=False,
+            tdoa_ref_idx=None,
+            fdoa_ref_idx=None,
+            do_resample: bool=False,
             pdf_type=None):
     """
     Construct the BestFix estimate by systematically evaluating the PDF at
@@ -192,7 +238,7 @@ def bestfix(zeta, cov: CovarianceMatrix, search_space: SearchSpace,
     """
 
     # Generate the PDF
-    def measurement(this_x):
+    def measurement(this_x: npt.ArrayLike):
         return model.measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa,
                                  x_source=this_x, v_source=v_source, do_2d_aoa=do_2d_aoa,
                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)

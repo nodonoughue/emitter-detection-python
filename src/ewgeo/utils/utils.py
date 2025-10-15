@@ -12,7 +12,7 @@ import time
 from .unit_conversions import lin_to_db
 
 
-def init_plot_style(dpi=400):
+def init_plot_style(dpi: int=400):
     """
     Initialize plotting styles, including output resolution
     """
@@ -25,7 +25,7 @@ def init_plot_style(dpi=400):
     sns.set_theme(context='paper', palette='colorblind')
 
 
-def init_output_dir(subdir=''):
+def init_output_dir(subdir: str='')-> str:
     """
     Create the output directory for figures, if needed, and return address as a prefix string
 
@@ -45,7 +45,7 @@ def init_output_dir(subdir=''):
     return dir_nm + os.sep
 
 
-def sinc_derivative(x):
+def sinc_derivative(x: npt.ArrayLike)-> npt.NDArray:
     """
     Returns the derivative of sinc(x), which is given
           y= (x * cos(x) - sin(x)) / x^2
@@ -72,7 +72,7 @@ def sinc_derivative(x):
                         [0, lambda z: (z * np.cos(z) - np.sin(z)) / (z ** 2)])
 
 
-def make_taper(taper_len: int, taper_type: str):
+def make_taper(taper_len: int, taper_type: str)-> (npt.NDArray, float):
     """
     Generate an amplitude taper of length N, according to the desired taperType, and optional set of parameters
 
@@ -119,9 +119,9 @@ def make_taper(taper_len: int, taper_type: str):
     return w, snr_loss
 
 
-def parse_reference_sensor(ref_idx, num_sensors:int=0):
+def parse_reference_sensor(ref_idx: str or npt.NDArray[np.int64] or None, num_sensors:int=0)-> (npt.NDArray, npt.NDArray):
     """
-    Accepts a reference index setting (either None, a scalar integer, or a 2 x N array of sensor pairs),
+    Accepts a reference index setting (either None, a string 'full', a scalar integer, or an array of sensor pairs),
     and returns matching vectors for test and reference indices.
 
     :param ref_idx: reference index setting, acceptable formats are:
@@ -143,10 +143,13 @@ def parse_reference_sensor(ref_idx, num_sensors:int=0):
         test_idx_vec = np.arange(num_sensors-1)
         ref_idx_vec = np.full(num_sensors - 1, num_sensors-1)
 
-    elif isinstance(ref_idx, str) and ref_idx.lower() == 'full':
-        # Generate all possible sensor pairs
-        pairs = np.array(list(combinations(np.arange(num_sensors), 2)))
-        test_idx_vec, ref_idx_vec = pairs[:, 0], pairs[:, 1]
+    elif isinstance(ref_idx, str):
+        if ref_idx.lower() == 'full':
+            # Generate all possible sensor pairs
+            pairs = np.array(list(combinations(np.arange(num_sensors), 2)))
+            test_idx_vec, ref_idx_vec = pairs[:, 0], pairs[:, 1]
+        else:
+            raise ValueError(f"Unrecognized reference index setting, {ref_idx}.")
 
     elif np.isscalar(ref_idx):
         # Check for error condition
@@ -164,8 +167,11 @@ def parse_reference_sensor(ref_idx, num_sensors:int=0):
     return test_idx_vec, ref_idx_vec
 
 
-def resample_covariance_matrix(cov: npt.ArrayLike, test_idx: npt.ArrayLike, ref_idx: npt.ArrayLike,
-                               test_weights=None, ref_weights=None) -> npt.ArrayLike:
+def resample_covariance_matrix(cov: npt.ArrayLike,
+                               test_idx: npt.ArrayLike,
+                               ref_idx: npt.ArrayLike,
+                               test_weights: npt.ArrayLike=None,
+                               ref_weights: npt.ArrayLike=None) -> npt.NDArray:
     """
     Resample a 2D covariance matrix to generate the covariance matrix that would result from a series of difference
     operations on the underlying random variables. See Section 3.3.1 of the 2022 text for derivation of the covariance
@@ -260,7 +266,11 @@ def resample_covariance_matrix(cov: npt.ArrayLike, test_idx: npt.ArrayLike, ref_
     return cov_out
 
 
-def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx=None, test_weights=None, ref_weights=None):
+def resample_noise(noise: npt.ArrayLike,
+                   test_idx: npt.ArrayLike = None,
+                   ref_idx: str or npt.ArrayLike or None=None,
+                   test_weights: npt.ArrayLike=None,
+                   ref_weights: npt.ArrayLike=None) -> npt.NDArray:
     """
     Generate resampled noise according to the set of test and reference sensors provided. See Section 3.3.1 of the 2022
     text for a discussion of sensor pairs and noise statistics. If the input noise is distributed according to a
@@ -350,7 +360,7 @@ def resample_noise(noise: npt.ArrayLike, test_idx: npt.ArrayLike = None, ref_idx
     return noise_out
 
 
-def ensure_invertible(covariance, epsilon=1e-20):
+def ensure_invertible(covariance: npt.ArrayLike, epsilon: float=1e-20)-> npt.NDArray:
     """
     Check the input matrix by finding the eigenvalues and checking that they are all >= a small value
     (epsilon), to ensure that it can be inverted.
@@ -417,7 +427,10 @@ def ensure_invertible(covariance, epsilon=1e-20):
     return cov_out
 
 
-def make_pdfs(measurement_function, measurements, pdf_type='MVN', covariance: npt.ArrayLike = 1):
+def make_pdfs(measurement_function,
+              measurements: npt.ArrayLike,
+              pdf_type: str='MVN',
+              covariance: npt.ArrayLike = 1):
     """
     Generate a joint PDF or set of unitary PDFs representing the measurements, given the measurement_function,
     covariance matrix and pdf_type
@@ -454,7 +467,7 @@ def make_pdfs(measurement_function, measurements, pdf_type='MVN', covariance: np
     return pdfs
 
 
-def print_elapsed(t_elapsed):
+def print_elapsed(t_elapsed: float):
     """
     Print the elapsed time, provided in seconds.
 
@@ -468,10 +481,13 @@ def print_elapsed(t_elapsed):
     minutes_elapsed = np.floor((t_elapsed - 3600 * hrs_elapsed) / 60)
     secs_elapsed = t_elapsed - hrs_elapsed * 3600 - minutes_elapsed * 60
 
-    print('Elapsed Time: {} hrs, {} min, {:.2f} sec'.format(hrs_elapsed, minutes_elapsed, secs_elapsed))
+    if hrs_elapsed > 0:
+        print('Elapsed Time: {} hrs, {:.2f} min'.format(hrs_elapsed, minutes_elapsed + secs_elapsed/60))
+    else:
+        print('Elapsed Time: {} min, {:.2f} sec'.format(minutes_elapsed, secs_elapsed))
 
 
-def print_predicted(t_elapsed, pct_elapsed, do_elapsed=False):
+def print_predicted(t_elapsed: float, pct_elapsed: float, do_elapsed: bool=False):
     """
     Print the elapsed and predicted time, provided in seconds.
 
@@ -486,18 +502,30 @@ def print_predicted(t_elapsed, pct_elapsed, do_elapsed=False):
     if do_elapsed:
         hrs_elapsed = np.floor(t_elapsed / 3600)
         minutes_elapsed = (t_elapsed - 3600 * hrs_elapsed) / 60
-
-        print('Elapsed Time: {:.0f} hrs, {:.2f} min. '.format(hrs_elapsed, minutes_elapsed), end='')
+        if hrs_elapsed > 0:
+            print('Elapsed Time: {} hrs, {:.2f} min. '.format(hrs_elapsed, minutes_elapsed), end='')
+        else:
+            minutes_elapsed = np.floor(minutes_elapsed)
+            secs_elapsed = t_elapsed - minutes_elapsed * 60
+            print('Elapsed Time: {} min, {:.2f} sec. '.format(minutes_elapsed, secs_elapsed), end='')
 
     t_remaining = t_elapsed * (1 - pct_elapsed) / pct_elapsed
 
     hrs_remaining = np.floor(t_remaining / 3600)
     minutes_remaining = (t_remaining - 3600 * hrs_remaining) / 60
 
-    print('Estimated Time Remaining: {} hrs, {:.2f} min'.format(hrs_remaining, minutes_remaining))
+    if hrs_remaining > 0:
+        print('Estimated Time Remaining: {} hrs, {:.2f} min'.format(hrs_remaining, minutes_remaining))
+    else:
+        minutes_remaining = np.floor(minutes_remaining)
+        secs_remaining = t_remaining - minutes_remaining * 60
+        print('Estimated Time Remaining: {} min, {:.2f} sec'.format(minutes_remaining, secs_remaining))
 
-
-def print_progress(num_total, curr_idx, iterations_per_marker, iterations_per_row, t_start):
+def print_progress(num_total: int,
+                   curr_idx: int,
+                   iterations_per_marker: int,
+                   iterations_per_row: int,
+                   t_start: float):
     """
     Print progress for a long-duration simulation, including progress markers (dots),
     and predicted time remaining.
@@ -521,7 +549,7 @@ def print_progress(num_total, curr_idx, iterations_per_marker, iterations_per_ro
         print_predicted(t_elapsed, pct_elapsed, do_elapsed=True)
 
 
-def safe_2d_shape(x: np.array) -> np.array:
+def safe_2d_shape(x: npt.ArrayLike)-> npt.NDArray:
     """
     Compute the 2D shape of the input, x, safely. Avoids errors when the input is a 1D array (in which case, the
     second output is 1).  Any dimensions higher than the second are ignored.
@@ -549,13 +577,13 @@ class SearchSpace:
     num_parameters: int
     x_ctr: npt.ArrayLike
     epsilon: npt.ArrayLike
-    points_per_dim: npt.ArrayLike[int]
+    points_per_dim: npt.NDArray[np.int64]
     max_offset: npt.ArrayLike
 
     def __init__(self,
                  x_ctr:npt.ArrayLike,
                  epsilon:npt.ArrayLike=None,
-                 points_per_dim:npt.ArrayLike=None,
+                 points_per_dim:npt.NDArray[np.int64]=None,
                  max_offset:npt.ArrayLike=None):
         self.x_ctr = x_ctr
 
@@ -591,7 +619,7 @@ class SearchSpace:
         for attr in attrs:
             setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=b.shape))
 
-def make_nd_grid(search_space: SearchSpace):
+def make_nd_grid(search_space: SearchSpace)-> (npt.NDArray, tuple[npt.NDArray], tuple[int]):
     """
     Create and return an ND search grid, based on the specified center of the search space, extent, and grid spacing.
 
@@ -643,7 +671,7 @@ def make_nd_grid(search_space: SearchSpace):
     return x_set, x_grid, points_per_dim
 
 
-def is_broadcastable(a, b):
+def is_broadcastable(a: npt.ArrayLike, b: npt.ArrayLike)-> bool:
     """
     Determine if two inputs are broadcastable. In other words, check all common dimensions, and
     ensure that they are either equal or of length 1.
@@ -669,7 +697,7 @@ def is_broadcastable(a, b):
         return False
 
 
-def modulo2pi(x):
+def modulo2pi(x: npt.ArrayLike)-> npt.NDArray:
     """
     Perform a 2*pi modulo operation, but with the result centered on zero, spanning
     from -pi to pi, rather than on the interval 0 to 2*pi.
@@ -694,7 +722,7 @@ def modulo2pi(x):
     return result
 
 
-def remove_outliers(data, axis=0, remove_nan=False):
+def remove_outliers(data: npt.ArrayLike, axis: int=0, remove_nan: bool=False)->npt.NDArray:
     """
     Remove outliers from a dataset.  If it is a vector, the outliers are individual datapoints. If it is an array,
     then outlier detection is run across the specified dimension (default=0), and any sub-arrays containing an outlier
@@ -735,7 +763,7 @@ def remove_outliers(data, axis=0, remove_nan=False):
 
     return data_out
 
-def ensure_iterable(var, flatten=False)->Iterable:
+def ensure_iterable(var, flatten: bool=False)->Iterable:
     """
     Ensure that the input is an iterable. If it is not, wrap it in a list.
 
@@ -769,8 +797,14 @@ def ensure_iterable(var, flatten=False)->Iterable:
     return var
 
 
-def parse_sensor_coords(x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None, do_2d_aoa=False,
-                        tdoa_ref_idx=None, fdoa_ref_idx=None):
+def parse_sensor_coords(x_aoa: npt.ArrayLike=None,
+                        x_tdoa: npt.ArrayLike=None,
+                        x_fdoa: npt.ArrayLike=None,
+                        v_fdoa: npt.ArrayLike=None,
+                        do_2d_aoa: bool=False,
+                        tdoa_ref_idx=None,
+                        fdoa_ref_idx=None):
+
     n_dim1, n_aoa = safe_2d_shape(x_aoa)  # returns 0, 0 if x_aoa is None
     n_dim2, n_tdoa = safe_2d_shape(x_tdoa)
     n_dim3, n_fdoa = safe_2d_shape(x_fdoa)

@@ -99,7 +99,7 @@ class Hypothesis:
         return self._msmt_pred
 
     @property
-    def innovation(self) -> npt.ArrayLike:
+    def innovation(self) -> npt.NDArray:
         if self._innov is None and self._measurement is not None:
             self._innov = self.measurement.zeta - self.measurement_prediction.zeta
         return self._innov

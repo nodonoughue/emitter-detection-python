@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 from scipy.linalg import pinvh
 
 from . import model
@@ -8,8 +9,13 @@ from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.solvers import bestfix_solver, gd_solver, ls_solver, ml_solver
 
 
-def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, search_space:SearchSpace, ref_idx=None,
-                   do_resample=False, variance_is_toa=False, bias=None, **kwargs):
+def max_likelihood(x_sensor, zeta: npt.ArrayLike,
+                   cov: CovarianceMatrix,
+                   search_space:SearchSpace,
+                   ref_idx=None,
+                   do_resample: bool=False,
+                   variance_is_toa: bool=False,
+                   bias: npt.ArrayLike or None=None, **kwargs):
     """
     Construct the ML Estimate by systematically evaluating the log
     likelihood function at a series of coordinates, and returning the index
@@ -104,8 +110,14 @@ def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, search_space:SearchSpa
 #     return x_est, bias_est, sensor_pos_est, likelihood, x_grid
 
 
-def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
-                     variance_is_toa=False, bias=None, **kwargs):
+def gradient_descent(x_sensor: npt.ArrayLike,
+                     zeta: npt.ArrayLike,
+                     cov: CovarianceMatrix,
+                     x_init: npt.ArrayLike,
+                     ref_idx=None,
+                     do_resample: bool=False,
+                     variance_is_toa: bool=False,
+                     bias: npt.ArrayLike or None=None, **kwargs):
     """
     Computes the gradient descent solution for tdoa processing.
 
@@ -143,7 +155,7 @@ def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None
 
 
 def least_square(x_sensor, zeta, cov: CovarianceMatrix, x_init, ref_idx=None, do_resample=False,
-                 variance_is_toa=False, bias=None, **kwargs):
+                 variance_is_toa=False, bias: npt.ArrayLike or None=None, **kwargs):
     """
     Computes the least square solution for tdoa processing.
 
