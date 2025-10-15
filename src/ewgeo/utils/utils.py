@@ -547,10 +547,10 @@ def safe_2d_shape(x: np.array) -> np.array:
 
 class SearchSpace:
     num_parameters: int
-    x_ctr: np.ndarray
-    epsilon: np.ndarray
-    points_per_dim: np.ndarray[np.int_]
-    max_offset: np.ndarray
+    x_ctr: npt.ArrayLike
+    epsilon: npt.ArrayLike
+    points_per_dim: npt.ArrayLike[int]
+    max_offset: npt.ArrayLike
 
     def __init__(self,
                  x_ctr:npt.ArrayLike,

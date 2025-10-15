@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 
 from . import safe_2d_shape, SearchSpace
 from .covariance import CovarianceMatrix
@@ -9,6 +10,7 @@ from. solvers import ml_solver, sensor_calibration
 class PassiveSurveillanceSystem(ABC):
     cov: CovarianceMatrix or None = None
     pos: np.ndarray
+    pos: npt.ArrayLike
     num_sensors: int
     num_dim: int
     num_measurements: int
@@ -17,6 +19,8 @@ class PassiveSurveillanceSystem(ABC):
     bias: np.ndarray or None = None              # User-defined sensor measurement biases
     vel: np.ndarray or None = None               # Sensor velocity; ignored if not defined
     cov_pos: CovarianceMatrix or None = None     # Assumed sensor position error covariance
+    bias: npt.ArrayLike or None = None              # User-defined sensor measurement biases
+    vel: npt.ArrayLike or None = None               # Sensor velocity; ignored if not defined
 
     # Default Values
     # --- No default sensor bias search resolution; let each PSS type overwrite this
@@ -30,10 +34,13 @@ class PassiveSurveillanceSystem(ABC):
     default_sensor_vel_search_epsilon = 0
     default_sensor_vel_search_size = 1  # By default, we can't search across sensor velocity
 
-    def __init__(self, x: np.ndarray, cov: CovarianceMatrix or None, bias=None, cov_pos=None, vel=None):
-        if len(np.shape(x))<2: x = np.expand_dims(x, 1) # Add a second dimension, if there isn't one
+    def __init__(self, x: npt.ArrayLike,
+                 cov: CovarianceMatrix or npt.ArrayLike or None=None,
+                 bias: npt.ArrayLike or None=None,
+                 cov_pos: CovarianceMatrix or npt.ArrayLike or None=None,
+                 vel: npt.ArrayLike or None=None):
+        if len(np.shape(x))<2: x = np.expand_dims(x, 1) # Add a second dimension if there isn't one
         self.pos = x
-        self.cov = cov
 
         num_dim, num_sensors = safe_2d_shape(x)
         self.num_sensors = num_sensors
@@ -41,9 +48,35 @@ class PassiveSurveillanceSystem(ABC):
         self.num_measurements = self.cov.cov.shape[0]
 
         # Populate optional fields
+        self.cov = cov
         self.bias = bias
         self.cov_pos = cov_pos
         self.vel = vel
+
+    @property
+    def cov(self):
+        return self._cov
+
+    @cov.setter
+    def cov(self, value: CovarianceMatrix or npt.ArrayLike or None):
+        if isinstance(value, CovarianceMatrix) or value is None:
+            # Nothing to do; set the parameter
+            self._cov = value
+        else:
+            self._cov = CovarianceMatrix(value)
+        return
+
+    @property
+    def cov_pos(self):
+        return self._cov_pos
+
+    @cov_pos.setter
+    def cov_pos(self, value: CovarianceMatrix or npt.ArrayLike or None):
+        if isinstance(value, CovarianceMatrix) or value is None:
+            self._cov_pos = value
+        else:
+            self._cov_pos = CovarianceMatrix(value)
+        return
 
     # ==================== Model Methods ===================
     # These methods define the sensor measurement model, and must be implemented.
@@ -610,7 +643,9 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
 
     parent = None
 
-    def __init__(self, x: np.ndarray, cov: CovarianceMatrix or None, ref_idx, **kwargs):
+    def __init__(self, x: npt.ArrayLike,
+                 cov: CovarianceMatrix or npt.ArrayLike or None,
+                 ref_idx: str or npt.ArrayLike, **kwargs):
         (super().__init__(x, cov, **kwargs))
 
         if cov is not None:
