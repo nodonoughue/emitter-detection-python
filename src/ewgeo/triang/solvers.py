@@ -3,150 +3,11 @@ import math
 import numpy as np
 import numpy.typing as npt
 
-from . import model
-from ewgeo.utils import make_pdfs, safe_2d_shape, SearchSpace
-from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils import safe_2d_shape
 from ewgeo.utils.geo import find_intersect
-from ewgeo.utils.solvers import ml_solver, gd_solver, ls_solver, bestfix_solver
 
 
-def max_likelihood(x_sensor, zeta, cov: CovarianceMatrix, search_space:SearchSpace, do_2d_aoa=False, bias: npt.ArrayLike or None=None,
-                   **kwargs):
-    """
-    Construct the ML Estimate by systematically evaluating the log
-    likelihood function at a series of coordinates, and returning the index
-    of the maximum.  Optionally returns the full set of evaluated
-    coordinates, as well.
-
-    Ported from MATLAB Code
-    
-    Nicholas O'Donoughue
-    22 February 2021
-    
-    :param x_sensor: Sensor positions [m]
-    :param zeta: AOA measurement vector [rad]
-    :param cov: Measurement error covariance matrix
-    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
-    :return x_est: Estimated source position [m]
-    :return likelihood: Likelihood computed across the entire set of candidate source positions
-    :return x_grid: Candidate source positions
-    """
-
-    # Set up function handle
-    def ell(x, **ell_kwargs):
-        return model.log_likelihood(x_sensor, zeta, cov, x, do_2d_aoa=do_2d_aoa, bias=bias, **ell_kwargs)
-
-    # Call the util function
-    x_est, likelihood, x_grid = ml_solver(ell, search_space=search_space, **kwargs)
-
-    return x_est, likelihood, x_grid
-
-
-def gradient_descent(x_sensor, zeta, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias: npt.ArrayLike or None=None, **kwargs):
-    """
-    Computes the gradient descent solution for FDOA processing.
-
-    Ported from MATLAB code.
-
-    Nicholas O'Donoughue
-    22 February 2021
-
-    :param x_sensor: Sensor positions [m]
-    :param zeta: AOA Measurement vector [rad]
-    :param cov: Measurement error covariance matrix
-    :param x_init: Initial estimate of source position [m]
-    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
-    :return x: Estimated source position
-    :return x_full: Iteration-by-iteration estimated source positions
-    """
-
-    # Initialize measurement error and jacobian functions
-    def y(this_x):
-        return zeta - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa, bias=bias)
-
-    def jacobian(this_x):
-        return model.jacobian(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
-
-    # Call generic Gradient Descent solver
-    x, x_full = gd_solver(y=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
-
-    return x, x_full
-
-
-def least_square(x_sensor, zeta, cov: CovarianceMatrix, x_init, do_2d_aoa=False, bias: npt.ArrayLike or None=None, **kwargs):
-    """
-    Computes the least square solution for FDOA processing.
-
-    Ported from MATLAB Code
-
-    Nicholas O'Donoughue
-    22 February 2021
-
-    :param x_sensor: Sensor positions [m]
-    :param zeta: AOA Measurements [rad]
-    :param cov: Measurement Error Covariance Matrix [(m/s)^2]
-    :param x_init: Initial estimate of source position [m]
-    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
-    :return x: Estimated source position
-    :return x_full: Iteration-by-iteration estimated source positions
-    """
-
-    # Initialize measurement error and Jacobian function handles
-    def y(this_x):
-        return zeta - model.measurement(x_sensor, this_x, do_2d_aoa=do_2d_aoa, bias=bias)
-
-    def jacobian(this_x):
-        return model.jacobian(x_sensor, this_x, do_2d_aoa=do_2d_aoa)
-
-    # Call the generic Least Square solver
-    x, x_full = ls_solver(zeta=y, jacobian=jacobian, cov=cov, x_init=x_init, **kwargs)
-
-    return x, x_full
-
-
-def bestfix(x_sensor, zeta, cov: CovarianceMatrix, search_space: SearchSpace, pdf_type=None, do_2d_aoa=False):
-    """
-    Construct the BestFix estimate by systematically evaluating the PDF at
-    a series of coordinates, and returning the index of the maximum.
-    Optionally returns the full set of evaluated coordinates, as well.
-
-    Assumes a multi-variate Gaussian distribution with covariance matrix C,
-    and unbiased estimates at each sensor.  Note that the BestFix algorithm
-    implicitly assumes each measurement is independent, so any cross-terms in
-    the covariance matrix C are ignored.
-
-    Ref:
-     Eric Hodson, "Method and arrangement for probabilistic determination of
-     a target location," U.S. Patent US5045860A, 1990, https://patents.google.com/patent/US5045860A
-
-    Ported from MATLAB Code
-
-    Nicholas O'Donoughue
-    21 February 2021
-
-    :param x_sensor: Sensor positions [m]
-    :param zeta: Measurement vector [rad]
-    :param cov: Measurement error covariance matrix
-    :param pdf_type: String indicating the type of distribution to use. See +utils/makePDFs.m for options.
-    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
-    :return x_est: Estimated source position [m]
-    :return likelihood: Likelihood computed across the entire set of candidate source positions
-    :return x_grid: Candidate source positions
-    """
-
-    # Generate the PDF
-    def measurement(x):
-        return model.measurement(x_sensor, x, do_2d_aoa=do_2d_aoa)
-
-    pdfs = make_pdfs(measurement, zeta, pdf_type, cov.cov)
-
-    # Call the util function
-    x_est, likelihood, x_grid = bestfix_solver(pdfs, search_space)
-
-    return x_est, likelihood, x_grid
-
-
-def angle_bisector(x_sensor, zeta):
+def angle_bisector(x_sensor: npt.ArrayLike, zeta: npt.ArrayLike):
     """
     Compute the center via intersection of angle bisectors for  
     3 or more LOBs given by sensor positions xi and angle 
@@ -202,7 +63,7 @@ def angle_bisector(x_sensor, zeta):
     return x_est/num_sets
 
 
-def centroid(x_sensor, zeta):
+def centroid(x_sensor: npt.ArrayLike, zeta: npt.ArrayLike):
     """
     Compute the centroid of the intersection of 3 or more LOBs given by
     sensor positions x_source and angle of arrival measurements zeta.
@@ -239,7 +100,7 @@ def centroid(x_sensor, zeta):
     return x_est/num_sets
 
 
-def _parse_sensor_triplets(x_sensor):
+def _parse_sensor_triplets(x_sensor: npt.ArrayLike):
 
     # Parse Inputs
     num_dim, num_sensors = safe_2d_shape(x_sensor)

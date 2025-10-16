@@ -57,11 +57,6 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
                                     v_sensor=v_sensor, v_source=v_source, ref_idx=self.ref_idx,
                                     do_resample=False, bias=bias, **kwargs)
 
-    # def log_likelihood_uncertainty(self, zeta, theta, **kwargs):
-    #     return model.log_likelihood_uncertainty(x_sensor=self.pos, rho_dot=zeta, theta=theta, cov=self.cov,
-    #                                             cov_pos=self.cov_pos, ref_idx=self.ref_idx,
-    #                                             v_sensor=self.vel, do_resample=False, **kwargs)
-
     def grad_x(self, x_source):
         return model.grad_x(x_sensor=self.pos, x_source=x_source, ref_idx=self.ref_idx)
 
@@ -76,93 +71,7 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle the interface to solvers
     ## ============================================================================================================== ##
-    # The super() version of max_likelihood functions just fine for FDOA solvers.
-    # def max_likelihood(self, zeta, search_space:SearchSpace, cal_data: dict=None, **kwargs):
-        # return super().max_likelihood(zeta, search_space, cal_data, **kwargs)
-
-
-    # todo: delete when it's working
-    # def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, **kwargs):
-    #     return max_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, cov=self.cov, cov_pos=self.cov_pos,
-    #                                               ref_idx=self.ref_idx, x_ctr=x_ctr, search_size=search_size,
-    #                                               epsilon=epsilon, do_resample=False, v_sensor=self.vel,
-    #                                               do_sensor_bias=do_sensor_bias, **kwargs)
-
-    # def gradient_descent(self,
-    #                      zeta: npt.ArrayLike,
-    #                      x_init: npt.ArrayLike,
-    #                      cal_data: dict=None, **kwargs):
-    #     # Perform sensor calibration
-    #     if cal_data is not None:
-    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-    #     else:
-    #         x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
-    #
-    #     # Initialize measurement error and jacobian functions
-    #     def y(pos_vel):
-    #         this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-    #         return zeta - self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor,
-    #                                        v_sensor=v_sensor, bias=bias)
-    #
-    #     def this_jacobian(pos_vel):
-    #         this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-    #         n_dim, _ = safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
-    #         j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
-    #         # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
-    #         # excise just the position portion
-    #         return j[:n_dim]
-    #
-    #     # Call generic Gradient Descent solver
-    #     x_est, x_full = gd_solver(y=y, jacobian=this_jacobian, cov=self.cov, x_init=x_init, **kwargs)
-    #
-    #     return x_est, x_full
-    #
-    # def least_square(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs):
-    #     # Perform sensor calibration
-    #     if cal_data is not None:
-    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-    #     else:
-    #         x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
-    #
-    #         # Initialize measurement error and jacobian functions
-    #         def y(pos_vel):
-    #             this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-    #             return zeta - self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor,
-    #                                            v_sensor=v_sensor, bias=bias)
-    #
-    #         def this_jacobian(pos_vel):
-    #             this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-    #             n_dim, _ = safe_2d_shape(pos_vel)  # is the calling function asking for just pos or pos/vel?
-    #             j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor)
-    #             # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
-    #             # excise just the position portion
-    #             return j[:n_dim]
-    #
-    #         # Call generic Gradient Descent solver
-    #         x_est, x_full = ls_solver(zeta=y, jacobian=this_jacobian, cov=self.cov, x_init=x_init,
-    #                                                 **kwargs)
-    #
-    #         return x_est, x_full
-    #
-    # def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None, cal_data: dict=None):
-    #     # Perform sensor calibration
-    #     if cal_data is not None:
-    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-    #     else:
-    #         x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
-    #
-    #     # Generate the PDF
-    #     def measurement(pos_vel):
-    #         this_pos, this_vel = self.parse_source_pos_vel(pos_vel, np.zeros_like(pos_vel))
-    #         return self.measurement(x_source=this_pos, v_source=this_vel, x_sensor=x_sensor, v_sensor=v_sensor,
-    #                                 bias=bias)
-    #
-    #     pdfs = make_pdfs(measurement, zeta, pdf_type, self.cov.cov)
-    #
-    #     # Call the util function
-    #     x_est, likelihood, x_grid = bestfix_solver(pdfs, search_space)
-    #
-    #     return x_est, likelihood, x_grid
+    #  No need to overload any of the super class' solver methods.
 
     ## ============================================================================================================== ##
     ## Performance Methods

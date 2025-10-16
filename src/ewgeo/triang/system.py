@@ -84,73 +84,12 @@ class DirectionFinder(PassiveSurveillanceSystem):
         # Call the super method
         return super().max_likelihood(zeta, search_space, cal_data=cal_data, **kwargs)
 
-    # def max_likelihood_uncertainty(self, zeta, source_search: SearchSpace,
-    #                                do_sensor_bias=False, do_sensor_pos=False, do_sensor_vel=False,
-    #                                bias_search: SearchSpace=None, pos_search: SearchSpace=None, vel_search=None,
-    #                                **kwargs):
-    #
-    #     # Make sure at least one term is true; otherwise this is just ML
-    #     if not do_sensor_bias and not do_sensor_pos and not do_sensor_vel:
-    #         return self.max_likelihood(zeta, source_search, **kwargs)
-    #
-    #     # Build the Search Space
-    #     # First, we get the center, epsilon, and search_size for the uncertainty terms
-    #     # (sensor measurement bias, sensor positions, and sensor velocities)
-    #     unc_search_space = self.make_uncertainty_search_space(source_search,
-    #                                                           do_sensor_bias=do_sensor_bias,
-    #                                                           do_sensor_pos=do_sensor_pos,
-    #                                                           do_source_vel=source_search.num_parameters==2*self.num_dim,
-    #                                                           bias_search=bias_search, pos_search=pos_search,
-    #                                                           vel_search=vel_search)
-    #
-    #     # Append the Source Pos/Vel search
-    #     # x_ctr must be n-dimensional or 2*n_dimensional.
-    #     assert np.size(x_ctr) == self.num_dim or np.size(x_ctr) == 2*self.num_dim, 'Unexpected search center size.'
-    #     # Make sure epsilon and search_size are vectors, not scalars
-    #     if len(epsilon)==1: epsilon = epsilon * np.ones_like(x_ctr)
-    #     if len(search_size)==1: search_size = search_size * np.ones_like(x_ctr)
-    #
-    #     # Append the uncertainty search
-    #     x_ctr = np.concatenate((x_ctr, unc_search_space['x_ctr']))
-    #     epsilon = np.concatenate((epsilon, unc_search_space['epsilon']))
-    #     search_size = np.concatenate((search_size, unc_search_space['search_size']))
-    #
-    #     def ell(x):
-    #
-    #     return solvers.max_likelihood_uncertainty(x_sensor=self.pos, psi=zeta, x_ctr=x_ctr, cov=self.cov,
-    #                                               cov_pos=self.cov_pos, search_size=search_size,
-    #                                               do_2d_aoa=self.do_2d_aoa, epsilon=epsilon,
-    #                                               do_sensor_bias=do_sensor_bias, **kwargs)
-
-    # def gradient_descent(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs):
-    #     # Perform sensor calibration
-    #     if cal_data is not None:
-    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-    #     else:
-    #         x_sensor, v_sensor, bias = self.pos, None, self.bias
-    #
-    #     return solvers.gradient_descent(x_sensor=x_sensor, zeta=zeta, cov=self.cov, bias=bias, do_2d_aoa=self.do_2d_aoa,
-    #                                     x_init=x_init, **kwargs)
-
-    # def least_square(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs):
-    #     # Perform sensor calibration
-    #     if cal_data is not None:
-    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-    #     else:
-    #         x_sensor, v_sensor, bias = self.pos, None, self.bias
-    #
-    #     return solvers.least_square(x_sensor=self.pos, zeta=zeta, cov=self.cov, x_init=x_init, bias=bias,
-    #                                 do_2d_aoa=self.do_2d_aoa, **kwargs)
-
-    # def bestfix(self, zeta, search_space: SearchSpace, pdf_type=None):
-    #     return solvers.bestfix(x_sensor=self.pos, zeta=zeta, cov=self.cov,
-    #                            search_space=search_space, pdf_type=pdf_type)
-
     def angle_bisector(self, zeta):
         return solvers.angle_bisector(self.pos, zeta)
 
     def centroid(self, zeta):
         return solvers.centroid(self.pos, zeta)
+
     ## ============================================================================================================== ##
     ## Performance Methods
     ##

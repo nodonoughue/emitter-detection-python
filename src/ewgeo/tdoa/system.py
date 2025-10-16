@@ -66,11 +66,6 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         return model.log_likelihood(x_sensor=x_sensor, zeta=zeta, x_source=x_source, cov=self.cov, ref_idx=self.ref_idx,
                                     variance_is_toa=False, do_resample=False, bias=bias, **kwargs)
 
-    # def log_likelihood_uncertainty(self, zeta, theta, **kwargs):
-    #     return model.log_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, theta=theta, cov=self.cov,
-    #                                             cov_pos=self.cov_pos, ref_idx=self.ref_idx,
-    #                                             variance_is_toa=False, do_resample=False, **kwargs)
-
     def grad_x(self, x_source: npt.ArrayLike):
         return model.grad_x(x_sensor=self.pos, x_source=x_source, ref_idx=self.ref_idx)
 
@@ -85,61 +80,6 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle the interface to solvers
     ## ============================================================================================================== ##
-    # The super() method works fine; delete this.
-    # def max_likelihood(self, zeta, search_space: SearchSpace, cal_data: dict=None, **kwargs):
-    #     # Perform sensor calibration
-    #     if cal_data is not None:
-    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-    #     else:
-    #         x_sensor, v_sensor, bias = self.pos, None, self.bias
-    #
-    #     # Call the non-calibration solver
-    #     return solvers.max_likelihood(x_sensor=x_sensor, zeta=zeta, cov=self.cov, ref_idx=self.ref_idx,
-    #                                   search_space=search_space, bias=bias,
-    #                                   do_resample=False, variance_is_toa=False, **kwargs)
-
-    # The super() method works fine; delete this.
-    # def max_likelihood_uncertainty(self, zeta, x_ctr, search_size, epsilon=None, do_sensor_bias=False, cov_pos=None,
-    #                                **kwargs):
-    #     if cov_pos is None: cov_pos = self.cov_pos
-    #
-    #     return solvers.max_likelihood_uncertainty(x_sensor=self.pos, zeta=zeta, cov=self.cov, cov_pos=cov_pos,
-    #                                               ref_idx=self.ref_idx, x_ctr=x_ctr, search_size=search_size,
-    #                                               epsilon=epsilon, do_resample=False, variance_is_toa=False,
-    #                                               do_sensor_bias=do_sensor_bias, **kwargs)
-
-    # def gradient_descent(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs):
-    #     # Perform sensor calibration
-    #     if cal_data is not None:
-    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-    #     else:
-    #         x_sensor, v_sensor, bias = self.pos, None, self.bias
-    #
-    #     return solvers.gradient_descent(x_sensor=x_sensor, zeta=zeta, cov=self.cov, x_init=x_init, ref_idx=self.ref_idx,
-    #                                     do_resample=False, variance_is_toa=False, **kwargs)
-    #
-    # def least_square(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs):
-    #     # Perform sensor calibration
-    #     if cal_data is not None:
-    #         x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-    #     else:
-    #         x_sensor, v_sensor, bias = self.pos, None, self.bias
-    #
-    #     return solvers.least_square(x_sensor=x_sensor, zeta=zeta, cov=self.cov, x_init=x_init, ref_idx=self.ref_idx,
-    #                                 do_resample=False, variance_is_toa=False, **kwargs)
-    #
-    # def bestfix(self, zeta: npt.ArrayLike, search_space: SearchSpace, pdf_type=None, cal_data: dict=None):
-    #     # Perform sensor calibration
-    #     if cal_data is not None:
-    #         x_sensor, _, bias = self.sensor_calibration(**cal_data)
-    #     else:
-    #         x_sensor, _, bias = self.pos, None, self.bias
-    #
-    #     # ToDo: Get bestfix to accept a bias term
-    #     return solvers.bestfix(x_sensor=x_sensor, zeta=zeta, cov=self.cov,
-    #                            search_space=search_space, pdf_type=pdf_type,
-    #                            do_resample=False, variance_is_toa=False)
-
     def chan_ho(self, zeta: npt.ArrayLike, cal_data: dict=None):
         # Perform sensor calibration
         if cal_data is not None:
