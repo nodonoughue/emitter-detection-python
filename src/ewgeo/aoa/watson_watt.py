@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import time
 
 from ewgeo.utils.unit_conversions import db_to_lin
 
@@ -93,16 +94,20 @@ def run_example(mc_params=None):
         # Generate Monte Carlo Noise with unit power -- generate one for each MC trial
         ref_pwr = np.sqrt(np.mean(r0**2))  # root-mean-square of reference signal
         noise_base_r = [np.random.normal(loc=0., scale=ref_pwr, size=(this_num_samples, 1))
-                        for _ in np.arange(this_num_monte_carlo)]
+                        for _ in range(this_num_monte_carlo)]
         noise_base_x = [np.random.normal(loc=0., scale=ref_pwr, size=(this_num_samples, 1))
-                        for _ in np.arange(this_num_monte_carlo)]
+                        for _ in range(this_num_monte_carlo)]
         noise_base_y = [np.random.normal(loc=0., scale=ref_pwr, size=(this_num_samples, 1))
-                        for _ in np.arange(this_num_monte_carlo)]
+                        for _ in range(this_num_monte_carlo)]
 
         # Loop over SNR levels
+        num_snr = len(snr_db_vec)
+        iter_per_marker = 10
+        iter_per_row = min(iter_per_marker * 40,num_snr)
+        t_start = time.perf_counter()
         for idx_snr, this_snr_db in enumerate(snr_db_vec.tolist()):
-            if np.mod(idx_snr/10.) == 0:
-                print('.', end='', flush=True)
+            utils.print_progress(num_total=num_snr, curr_idx=idx_snr, iterations_per_marker=iter_per_marker,
+                                 iterations_per_row=iter_per_row, t_start=t_start)
 
             # Compute noise power, scale base noise
             noise_amp = np.sqrt(db_to_lin(-this_snr_db))
@@ -122,6 +127,8 @@ def run_example(mc_params=None):
             crlb_psi[idx_num_samples, idx_snr] = np.abs(crlb(this_snr_db, this_num_samples))
 
         print('done.')
+        t_elapsed = time.perf_counter() - t_start
+        print_elapsed(t_elapsed)
 
     # Generate the plot
     sns.set_theme()

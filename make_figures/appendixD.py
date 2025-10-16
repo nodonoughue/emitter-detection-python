@@ -38,12 +38,12 @@ def make_all_figures(close_figs=False):
     # colors = plt.get_cmap("tab10")
 
     # Generate all figures
-    fig1 = make_figure_1(prefix)
-    fig2 = make_figure_2(prefix)
-    fig3 = make_figure_3(prefix)
-    fig4 = make_figure_4(prefix)
+    figs = []
+    figs.extend(make_figure_1(prefix))
+    figs.extend(make_figure_2(prefix))
+    figs.extend(make_figure_3(prefix))
+    figs.extend(make_figure_4(prefix))
 
-    figs = [fig1, fig2, fig3, fig4]
     if close_figs:
         for fig in figs:
             plt.close(fig)
@@ -87,7 +87,7 @@ def make_figure_1(prefix=None):
         plt.savefig(prefix + 'fig1.png')
         plt.savefig(prefix + 'fig1.svg')
 
-    return fig1
+    return fig1,
 
 
 def make_figure_2(prefix=None):
@@ -137,7 +137,7 @@ def make_figure_2(prefix=None):
         fig2.savefig(prefix + 'fig2.png')
         fig2.savefig(prefix + 'fig2.svg')
 
-    return fig2
+    return fig2,
 
 
 def make_figure_3(prefix=None):
@@ -194,7 +194,7 @@ def make_figure_3(prefix=None):
         fig3.savefig(prefix + 'fig3.png')
         fig3.savefig(prefix + 'fig3.svg')
 
-    return fig3
+    return fig3,
 
 
 def make_figure_4(prefix=None):
@@ -232,7 +232,7 @@ def make_figure_4(prefix=None):
         fig4.savefig(prefix + 'fig4.png')
         fig4.savefig(prefix + 'fig4.svg')
 
-    return fig4
+    return fig4,
 
 
 if __name__ == "__main__":

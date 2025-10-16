@@ -36,9 +36,8 @@ def make_all_figures(close_figs=False):
     # colors = plt.get_cmap("tab10")
 
     # Generate all figures
-    fig4 = make_figure_4(prefix)
+    figs = make_figure_4(prefix)
 
-    figs = [fig4]
     if close_figs:
         for fig in figs:
             plt.close(fig)
@@ -117,7 +116,7 @@ def make_figure_4(prefix=None):
         fig4.savefig(prefix + 'fig4.png')
         fig4.savefig(prefix + 'fig4.svg')
 
-    return fig4
+    return fig4,
 
 
 if __name__ == "__main__":

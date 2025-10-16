@@ -71,7 +71,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     x_source = 5*baseline*np.array([np.cos(th), np.sin(th)], )
     v_source = np.zeros_like(x_source)
 
-    # Generate noise free measurement
+    # Generate noise-free measurement
     rho_actual = fdoa.measurement(x_source=x_source, v_source=v_source)
 
     # Initialize Solvers
@@ -121,7 +121,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    for idx in np.arange(num_monte_carlo):
+    for idx in range(num_monte_carlo):
         print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(fdoa, ml_search, args)

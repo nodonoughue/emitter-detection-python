@@ -37,15 +37,14 @@ def make_all_figures(close_figs=False, mc_params=None):
     cmap = plt.get_cmap("tab10")
 
     # Generate all figures
-    fig1 = make_figure_1(prefix, cmap)
-    fig2 = make_figure_2(prefix, cmap)
-    fig3 = make_figure_3(prefix)
-    fig4 = make_figure_4(prefix)
-    fig5a, fig5b = make_figure_5(prefix, mc_params)
-    fig6 = make_figure_6(prefix)
-    fig7 = make_figure_7(prefix)
-
-    figs = [fig1, fig2, fig3, fig4, fig5a, fig5b, fig6, fig7]
+    figs = []
+    figs.extend(make_figure_1(prefix, cmap))
+    figs.extend(make_figure_2(prefix, cmap))
+    figs.extend(make_figure_3(prefix))
+    figs.extend(make_figure_4(prefix))
+    figs.extend(make_figure_5(prefix, mc_params))
+    figs.extend(make_figure_6(prefix))
+    figs.extend(make_figure_7(prefix))
 
     if close_figs:
         for fig in figs:
@@ -140,7 +139,7 @@ def make_figure_1(prefix=None, cmap=None):
         fig1.savefig(prefix + 'fig1.png')
         fig1.savefig(prefix + 'fig1.svg')
 
-    return fig1
+    return fig1,
 
 
 def make_figure_2(prefix=None, cmap=None):
@@ -232,7 +231,7 @@ def make_figure_2(prefix=None, cmap=None):
         fig2.savefig(prefix + 'fig2.png')
         fig2.savefig(prefix + 'fig2.svg')
 
-    return fig2
+    return fig2,
 
 
 def make_figure_3(prefix=None):
@@ -308,7 +307,7 @@ def make_figure_3(prefix=None):
         fig3.savefig(prefix + 'fig3.png')
         fig3.savefig(prefix + 'fig3.svg')
 
-    return fig3
+    return fig3,
 
 
 def make_figure_4(prefix=None):
@@ -376,7 +375,7 @@ def make_figure_4(prefix=None):
         fig4.savefig(prefix + 'fig4.png')
         fig4.savefig(prefix + 'fig4.svg')
 
-    return fig4
+    return fig4,
 
 
 def make_figure_5(prefix=None, mc_params=None):
@@ -431,7 +430,7 @@ def make_figure_6(prefix=None):
         fig6.savefig(prefix + 'fig6.png')
         fig6.savefig(prefix + 'fig6.svg')
 
-    return fig6
+    return fig6,
 
 
 def make_figure_7(prefix=None):
@@ -455,7 +454,7 @@ def make_figure_7(prefix=None):
         fig7.savefig(prefix + 'fig7.png')
         fig7.savefig(prefix + 'fig7.svg')
 
-    return fig7
+    return fig7,
 
 
 if __name__ == "__main__":

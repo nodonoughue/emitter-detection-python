@@ -43,14 +43,14 @@ def make_all_figures(close_figs=False, mc_params=None):
     init_plot_style()
 
     # Generate all figures
-    figs1_2 = make_figures_1_2(prefix, mc_params)
-    figs3_4 = make_figures_3_4(prefix, mc_params)
-    fig5 = make_figure_5(prefix, mc_params)
-    fig7 = make_figure_7(prefix)
-    fig8 = make_figure_8(prefix, mc_params)
-    fig10 = make_figure_10(prefix)
+    figs = []
+    figs.extend(make_figures_1_2(prefix, mc_params))
+    figs.extend(make_figures_3_4(prefix, mc_params))
+    figs.extend(make_figure_5(prefix, mc_params))
+    figs.extend(make_figure_7(prefix))
+    figs.extend(make_figure_8(prefix, mc_params))
+    figs.extend(make_figure_10(prefix))
 
-    figs = list(figs1_2) +  list(figs3_4) + list(fig5) + list(fig7) + list(fig8) + list(fig10)
     if close_figs:
         [plt.close(fig) for fig in figs]
         return None

@@ -45,17 +45,16 @@ def make_all_figures(close_figs=False, mc_params=None):
     # cmap = plt.get_cmap("tab10")
 
     # Generate all figures
-    fig1a, fig1b = make_figure_1(prefix)
-    fig2 = make_figure_2(prefix)
-    fig3 = make_figure_3(prefix)
-    fig4 = make_figure_4(prefix)
-    fig5 = make_figure_5(prefix)
-    fig6a, fig6b = make_figure_6(prefix)
-    fig7a, fig7b, fig8 = make_figure_7_8(prefix, rng, mc_params)
-    fig9 = make_figure_9(prefix)
-    fig10 = make_figure_10(prefix)
-
-    figs = [fig1a, fig1b, fig2, fig3, fig4, fig5, fig6a, fig6b, fig7a, fig7b, fig8, fig9, fig10]
+    figs = []
+    figs.extend(make_figure_1(prefix))
+    figs.extend(make_figure_2(prefix))
+    figs.extend(make_figure_3(prefix))
+    figs.extend(make_figure_4(prefix))
+    figs.extend(make_figure_5(prefix))
+    figs.extend(make_figure_6(prefix))
+    figs.extend(make_figure_7_8(prefix, rng, mc_params))
+    figs.extend(make_figure_9(prefix))
+    figs.extend(make_figure_10(prefix))
 
     if close_figs:
         for fig in figs:
@@ -78,7 +77,7 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     Nicholas O'Donoughue
     8 March 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory to place the generated figure
     :param cmap: colormap
     :param do_uncertainty: Boolean flag (default=False). If true, uncertainty intervals will be printed around the TDOA
                         solution in Figure 1b.
@@ -246,7 +245,7 @@ def make_figure_2(prefix=None):
     x_sensor1 = np.array([0, 0])
     x_sensor2 = np.array([1, 0])
 
-    # Define set of RangeDiffs
+    # Define a set of RangeDiffs
     num_isochrones = 15
     range_diff_vec = np.linspace(start=-.9, stop=.9, num=num_isochrones)
     num_points = 1000  # number of points for isochrone drawing
@@ -282,7 +281,7 @@ def make_figure_2(prefix=None):
         fig2.savefig(prefix + 'fig2.png')
         fig2.savefig(prefix + 'fig2.svg')
 
-    return fig2
+    return fig2,
 
 
 def make_figure_3(prefix=None, rng=np.random.default_rng()):
@@ -294,7 +293,7 @@ def make_figure_3(prefix=None, rng=np.random.default_rng()):
     Nicholas O'Donoughue
     8 March 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory to place the generated figure
     :param rng: random number generator [Optional]
     :return: figure handle
     """
@@ -337,7 +336,7 @@ def make_figure_3(prefix=None, rng=np.random.default_rng()):
         fig3.savefig(prefix + 'fig3.png')
         fig3.savefig(prefix + 'fig3.svg')
 
-    return fig3
+    return fig3,
 
 
 def make_figure_4(prefix=None, rng=np.random.default_rng()):
@@ -349,7 +348,7 @@ def make_figure_4(prefix=None, rng=np.random.default_rng()):
     Nicholas O'Donoughue
     8 March 2022
 
-    :param prefix: output directory to place generated figure
+    :param prefix: output directory to place the generated figure
     :param rng: random number generator [Optional]
     :return: figure handle
     """
@@ -410,7 +409,7 @@ def make_figure_4(prefix=None, rng=np.random.default_rng()):
     ax2.set_title('Cross Correlation')
     ax2.set_xlim(np.array([-1., 1.])*(noise_len-1)*1e3/fs)
 
-    # Remove axis ticks to clean up plot
+    # Remove axis ticks to clean up the plot
     for ax in (ax0, ax1, ax2):
         ax.set_yticklabels([])
         ax.set_xticklabels([])
@@ -419,7 +418,7 @@ def make_figure_4(prefix=None, rng=np.random.default_rng()):
         fig4.savefig(prefix + 'fig4.png')
         fig4.savefig(prefix + 'fig4.svg')
 
-    return fig4
+    return fig4,
 
 
 def make_figure_5(prefix=None):
@@ -439,7 +438,7 @@ def make_figure_5(prefix=None):
 
     # Link-16 Pulse Parameters
     #   Chip Duration = 200 ns (implies 5 MHz bandwidth)
-    #     Assume flat pass-band shape
+    #   We assume a flat shape to the pass-band
     #   6.4 microseconds per pulse
 
     # Define Pulse Parameters
@@ -476,13 +475,13 @@ def make_figure_5(prefix=None):
         fig5.savefig(prefix + "fig5.svg")
         fig5.savefig(prefix + "fig5.png")
 
-    return fig5
+    return fig5,
 
 
 def make_figure_6(prefix=None):
     """
     Figures 6a and 6b - Plot of TDOA CRLB for 3 (6a) and 4 (6b)
-    sensor scenarios with 1 microsecond timing error
+    sensor scenarios with 1-microsecond timing error
 
     Ported from MATLAB Code
 
@@ -540,7 +539,7 @@ def make_figure_6(prefix=None):
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
 
-    # Figure 6b, Impact of fourth sensor on CRLB
+    # Figure 6b, Impact of the fourth sensor on CRLB
     print('Generating Figure 11.6b...')
 
     # Add a sensor at the origin
@@ -594,7 +593,7 @@ def make_figure_7_8(prefix=None, rng=np.random.default_rng(), mc_params=None):
 
     :param prefix: output directory to place generated figure
     :param rng: random number generator
-    :param mc_params: Optional struct to control Monte Carlo trial size
+    :param mc_params: Optional struct to control the Monte Carlo trial size
     :return: figure handle
     """
 
@@ -693,7 +692,7 @@ def make_figure_9(prefix=None):
         fig9.savefig(prefix + 'fig9.svg')
         fig9.savefig(prefix + 'fig9.png')
 
-    return fig9
+    return fig9,
 
 
 def make_figure_10(prefix=None):
@@ -785,7 +784,7 @@ def make_figure_10(prefix=None):
         fig10.savefig(prefix + 'fig10.svg')
         fig10.savefig(prefix + 'fig10.png')
 
-    return fig10
+    return fig10,
 
 
 if __name__ == "__main__":

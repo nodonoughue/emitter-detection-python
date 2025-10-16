@@ -144,6 +144,7 @@ class ConstantVelocityMotionModel(MotionModel):
         state_space.vel_slice = np.s_[num_dims:2*num_dims]
         state_space.pos_vel_slice = np.s_[:2*num_dims]
         state_space.accel_slice = None
+        state_space.has_pos = True
         state_space.has_vel = True
         state_space.has_accel = False
         self.state_space = state_space
@@ -191,6 +192,7 @@ class ConstantAccelerationMotionModel(MotionModel):
         state_space.vel_slice = np.s_[num_dims:2 * num_dims]
         state_space.pos_vel_slice = np.s_[:2 * num_dims]
         state_space.accel_slice = np.s_[2 * num_dims:3 * num_dims]
+        state_space.has_pos = True
         state_space.has_vel = True
         state_space.has_accel = True
         self.state_space = state_space
@@ -245,6 +247,7 @@ class ConstantJerkMotionModel(MotionModel):
         state_space.vel_slice = np.s_[num_dims:2 * num_dims]
         state_space.pos_vel_slice = np.s_[:2 * num_dims]
         state_space.accel_slice = np.s_[2 * num_dims:3 * num_dims]
+        state_space.has_pos = True
         state_space.has_vel = True
         state_space.has_accel = True
         self.state_space = state_space

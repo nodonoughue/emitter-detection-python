@@ -27,13 +27,12 @@ from examples.practical_geo import chapter9
 
 _deg2rad = convert(1, from_unit="deg", to_unit="rad")
 
-def make_all_figures(close_figs=False, mc_params=None):
+def make_all_figures(close_figs=False):
     """
     Call all the figure generators for this chapter
 
     :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                        Default=False
-    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: List of figure handles
     """
 
@@ -42,14 +41,14 @@ def make_all_figures(close_figs=False, mc_params=None):
     init_plot_style()
 
     # Generate all figures
-    figs2a_b = make_figure_2(prefix)
-    figs3a_b = make_figure_3(prefix)
-    figs4_5 = make_figure_4_5(prefix)
-    fig6 = make_figure_6(prefix)
-    fig7 = make_figure_7(prefix)
-    fig8 = make_figure_8(prefix)
+    figs = []
+    figs.extend(make_figure_2(prefix))
+    figs.extend(make_figure_3(prefix))
+    figs.extend(make_figure_4_5(prefix))
+    figs.extend(make_figure_6(prefix))
+    figs.extend(make_figure_7(prefix))
+    figs.extend(make_figure_8(prefix))
 
-    figs = list(figs2a_b) + list(figs3a_b) + list(figs4_5) + list(fig6) + list(fig7) + list(fig8)
     if close_figs:
         [plt.close(fig) for fig in figs]
         return None
@@ -79,12 +78,12 @@ def make_figure_2(prefix=None):
                            [1.0, 0.5, 0.5, 1.0],
                            [1.25, 1.0, 0.5, 0.5]])*1e3
     time_step = 0.5
-    time = np.arange(len(state_vecs))*time_step
+    time = np.arange(len(state_vecs), dtype=float)*time_step
     states = [State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
     states[-1].covar = CovarianceMatrix(np.diag([2.0, 0.75, 0.4, 0.4])*1e4)
     track = Track(states=states)
 
-    new_time = time[-1] + time_step
+    new_time: float = time[-1].item() + time_step  # use the .item() command to force the output to be a scalar float
     prediction = transition.predict(s=track, new_time=new_time) # predict state for the next measurement
     gate_probability = 0.95
 
@@ -436,4 +435,4 @@ def make_figure_8(prefix=None):
     return figs
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 1})
+    make_all_figures(close_figs=False)

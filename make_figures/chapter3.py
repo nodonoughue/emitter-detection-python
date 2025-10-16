@@ -44,16 +44,15 @@ def make_all_figures(close_figs=False, mc_params=None):
     init_plot_style()
 
     # Generate all figures
-    fig1 = make_figure_1(prefix)
-    fig2 = make_figure_2(prefix)
-    fig3 = make_figure_3(prefix)
-    fig4 = make_figure_4(prefix)
-    fig7 = make_figure_7(prefix)
-    fig8 = make_figure_8(prefix)
-    fig9 = make_figure_9(prefix, rng, colors, mc_params)
-    fig10 = make_figure_10(prefix, rng, colors, mc_params)
-
-    figs = [fig1, fig2, fig3, fig4, fig7, fig8, fig9, fig10]
+    figs = []
+    figs.extend(make_figure_1(prefix))
+    figs.extend(make_figure_2(prefix))
+    figs.extend(make_figure_3(prefix))
+    figs.extend(make_figure_4(prefix))
+    figs.extend(make_figure_7(prefix))
+    figs.extend(make_figure_8(prefix))
+    figs.extend(make_figure_9(prefix, rng, colors, mc_params))
+    figs.extend(make_figure_10(prefix, rng, colors, mc_params))
 
     if close_figs:
         for fig in figs:
@@ -120,7 +119,7 @@ def make_figure_1(prefix=None):
         fig1.savefig(prefix + 'fig1.svg')
         fig1.savefig(prefix + 'fig1.png')
 
-    return fig1
+    return fig1,
 
 
 def make_figure_2(prefix=None):
@@ -187,7 +186,7 @@ def make_figure_2(prefix=None):
         fig2.savefig(prefix + 'fig2.svg')
         fig2.savefig(prefix + 'fig2.png')
 
-    return fig2
+    return fig2,
 
 
 def make_figure_3(prefix=None):
@@ -228,7 +227,7 @@ def make_figure_3(prefix=None):
         fig3.savefig(prefix + 'fig3.svg')
         fig3.savefig(prefix + 'fig3.png')
 
-    return fig3
+    return fig3,
 
 
 def make_figure_4(prefix=None):
@@ -273,7 +272,7 @@ def make_figure_4(prefix=None):
         fig4.savefig(prefix + 'fig4.svg')
         fig4.savefig(prefix + 'fig4.png')
 
-    return fig4
+    return fig4,
 
 
 def make_figure_7(prefix=None):
@@ -324,7 +323,7 @@ def make_figure_7(prefix=None):
         fig7.savefig(prefix + 'fig7.svg')
         fig7.savefig(prefix + 'fig7.png')
 
-    return fig7
+    return fig7,
 
 
 def make_figure_8(prefix=None):
@@ -385,7 +384,7 @@ def make_figure_8(prefix=None):
         fig8.savefig(prefix + 'fig8.svg')
         fig8.savefig(prefix + 'fig8.png')
 
-    return fig8
+    return fig8,
 
 
 def make_figure_9(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
@@ -413,7 +412,7 @@ def make_figure_9(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
         fig9.savefig(prefix + 'fig9.svg')
         fig9.savefig(prefix + 'fig9.png')
 
-    return fig9
+    return fig9,
 
 
 def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
@@ -441,7 +440,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_par
         fig10.savefig(prefix + 'fig10.svg')
         fig10.savefig(prefix + 'fig10.png')
 
-    return fig10
+    return fig10,
 
 
 if __name__ == "__main__":

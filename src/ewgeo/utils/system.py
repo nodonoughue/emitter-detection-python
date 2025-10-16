@@ -275,6 +275,8 @@ class PassiveSurveillanceSystem(ABC):
         :param bias_search: SearchSpace for measurement bias search
         :param pos_search: SearchSpace for sensor position
         :param vel_search: SearchSpace for sensor velocity
+        :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
+                           the console. [default=False]
         :return x_est:  estimated source position (or position and velocity)
         :return likelihood: array of likelihood values at each position in the combined SearchSpace
         :return th_grid: grid of search positions

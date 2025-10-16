@@ -32,11 +32,11 @@ def make_all_figures(close_figs=False):
     init_plot_style()
 
     # Generate all figures
-    fig2a = make_figure_2a(prefix)
-    fig2b = make_figure_2b(prefix)
-    fig2c = make_figure_2c(prefix)
+    figs = []
+    figs.extend(make_figure_2a(prefix))
+    figs.extend(make_figure_2b(prefix))
+    figs.extend(make_figure_2c(prefix))
 
-    figs = [fig2a, fig2b, fig2c]
     if close_figs:
         for fig in figs:
             plt.close(fig)
@@ -68,7 +68,7 @@ def make_figure_2a(prefix=None):
         fig2a.savefig(prefix + 'fig2a.svg')
         fig2a.savefig(prefix + 'fig2a.png')
 
-    return fig2a
+    return fig2a,
 
 
 def make_figure_2b(prefix=None):
@@ -91,7 +91,7 @@ def make_figure_2b(prefix=None):
         fig2b.savefig(prefix + 'fig2b.svg')
         fig2b.savefig(prefix + 'fig2b.png')
 
-    return fig2b
+    return fig2b,
 
 
 def make_figure_2c(prefix=None):
@@ -114,7 +114,7 @@ def make_figure_2c(prefix=None):
         fig2c.savefig(prefix + 'fig2c.svg')
         fig2c.savefig(prefix + 'fig2c.png')
 
-    return fig2c
+    return fig2c,
 
 
 if __name__ == "__main__":

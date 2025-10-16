@@ -46,7 +46,7 @@ def chan_ho(x_sensor: npt.ArrayLike,
         assert np.size(ref_idx) == 1, 'The Chan-Ho solver currently requires a single reference sensor.'
 
         # Re-arrange the sensors
-        sort_idx = [i for i in np.arange(n_sensor) if i != ref_idx]
+        sort_idx = [i for i in range(n_sensor) if i != ref_idx]
         sort_idx.append(int(ref_idx))
         x_sensor = x_sensor[:, sort_idx]
 

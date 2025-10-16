@@ -34,10 +34,10 @@ def make_all_figures(close_figs=False, mc_params=None):
     init_plot_style()
 
     # Generate all figures
-    figs_10_11 = make_figures_10_11(prefix, mc_params)
-    fig12 = make_figure_12(prefix, mc_params)
+    figs = []
+    figs.extend(make_figures_10_11(prefix, mc_params))
+    figs.extend(make_figure_12(prefix, mc_params))
 
-    figs = list(figs_10_11) + list(fig12)
     if close_figs:
         for fig in figs:
             plt.close(fig)

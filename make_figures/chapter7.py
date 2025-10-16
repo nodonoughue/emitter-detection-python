@@ -25,7 +25,7 @@ def make_all_figures(close_figs=False, mc_params=None):
     """
     Call all the figure generators for this chapter
 
-    :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
+    :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
     :force_recalc: If set to False, will skip any figures that are time-consuming to generate.
     :param mc_params: Optional struct to control Monte Carlo trial size
@@ -43,19 +43,18 @@ def make_all_figures(close_figs=False, mc_params=None):
     colors = plt.get_cmap('tab10')
 
     # Generate all figures
-    fig1 = make_figure_1(prefix)
-    fig3 = make_figure_3(prefix, rng, colors, mc_params)
-    fig5 = make_figure_5(prefix, rng, colors, mc_params)
-    fig6b = make_figure_6b(prefix)
-    fig7 = make_figure_7(prefix, rng, colors, mc_params)
-    fig8 = make_figure_8(prefix)
-    fig10 = make_figure_10(prefix, rng, colors, mc_params)
-    fig12 = make_figure_12(prefix)
-    fig14 = make_figure_14(prefix)
-    fig15b = make_figure_15b(prefix)
-    fig16 = make_figure_16(prefix)
-
-    figs = [fig1, fig3, fig5, fig6b, fig7, fig8, fig10, fig12, fig14, fig15b, fig16]
+    figs = []
+    figs.extend(make_figure_1(prefix))
+    figs.extend(make_figure_3(prefix, rng, colors, mc_params))
+    figs.extend(make_figure_5(prefix, rng, colors, mc_params))
+    figs.extend(make_figure_6b(prefix))
+    figs.extend(make_figure_7(prefix, rng, colors, mc_params))
+    figs.extend(make_figure_8(prefix))
+    figs.extend(make_figure_10(prefix, rng, colors, mc_params))
+    figs.extend(make_figure_12(prefix))
+    figs.extend(make_figure_14(prefix))
+    figs.extend(make_figure_15b(prefix))
+    figs.extend(make_figure_16(prefix))
 
     if close_figs:
         for fig in figs:
@@ -109,7 +108,7 @@ def make_figure_1(prefix=None):
         fig1.savefig(prefix + 'fig1.png')
         fig1.savefig(prefix + 'fig1.svg')
     
-    return fig1
+    return fig1,
 
 
 def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
@@ -235,7 +234,7 @@ def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
         fig3.savefig(prefix + 'fig3.png')
         fig3.savefig(prefix + 'fig3.svg')
 
-    return fig3
+    return fig3,
 
 
 def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
@@ -356,7 +355,7 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
         fig5.savefig(prefix + 'fig5.svg')
         fig5.savefig(prefix + 'fig5.png')
 
-    return fig5
+    return fig5,
 
 
 def make_figure_6b(prefix=None):
@@ -396,7 +395,7 @@ def make_figure_6b(prefix=None):
         fig6b.savefig(prefix + 'fig6b.png')
         fig6b.savefig(prefix + 'fig6b.svg')
 
-    return fig6b
+    return fig6b,
 
 
 def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
@@ -518,7 +517,7 @@ def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
         fig7.savefig(prefix + 'fig7.png')
         fig7.savefig(prefix + 'fig7.svg')
 
-    return fig7
+    return fig7,
 
 
 def make_figure_8(prefix=None):
@@ -562,7 +561,7 @@ def make_figure_8(prefix=None):
         fig8b.savefig(prefix + 'fig8b.png')
         fig8b.savefig(prefix + 'fig8b.svg')
 
-    return fig8b
+    return fig8b,
 
 
 def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
@@ -692,7 +691,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_par
         fig10.savefig(prefix + 'fig10.svg')
         fig10.savefig(prefix + 'fig10.png')
 
-    return fig10
+    return fig10,
 
 
 def make_figure_12(prefix=None):
@@ -733,7 +732,7 @@ def make_figure_12(prefix=None):
         fig12.savefig(prefix + 'fig12.svg')
         fig12.savefig(prefix + 'fig12.png')
 
-    return fig12
+    return fig12,
 
 
 def make_figure_14(prefix=None):
@@ -760,7 +759,7 @@ def make_figure_14(prefix=None):
         fig14.savefig(prefix + 'fig14.svg')
         fig14.savefig(prefix + 'fig14.png')
 
-    return fig14
+    return fig14,
 
 
 def make_figure_15b(prefix=None):
@@ -804,7 +803,7 @@ def make_figure_15b(prefix=None):
         fig15b.savefig(prefix + 'fig15b.svg')
         fig15b.savefig(prefix + 'fig15b.png')
 
-    return fig15b
+    return fig15b,
 
 
 def make_figure_16(prefix=None):
@@ -844,7 +843,7 @@ def make_figure_16(prefix=None):
         fig16.savefig(prefix + 'fig16.svg')
         fig16.savefig(prefix + 'fig16.png')
 
-    return fig16
+    return fig16,
 
 
 if __name__ == "__main__":

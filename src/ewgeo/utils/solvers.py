@@ -316,6 +316,8 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
     """
     Execute ML estimation through brute force computational methods.
 
+    Any unexpected keyword arguments will be pass on as keyword arguments to the function ell, when it is called.
+
     Ported from MATLAB code.
 
     Nicholas O'Donoughue
@@ -332,7 +334,8 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
                   the true source location, according to some prior distribution. Will be multiplied by log10 when
                   combined with the likelihood distribution (which is assumed to be a log likelihood).
     :param prior_wt: Weight to apply to the prior distribution; (1-prior_wt) will be applied to the likelihood function.
-    :param **kwargs: Additional keyword arguments to pass to ell.
+    :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
+                           the console. [default=False]
     :return x_est: Estimated minimum
     :return A: Likelihood computed at each x position in the search space
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
@@ -379,6 +382,7 @@ def bestfix_solver(pdfs, search_space: SearchSpace):
 
     :param pdfs: Lx1 cell list of PDF functions, each of which represents the probability that an input position
                  (Ndim x 3 array) is the true source position for one of the measurements.
+    :param search_space: SearchSpace object defining the space over which to search
     :return x_est: Estimated position
     :return result: Likelihood computed at each x position in the search space
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.

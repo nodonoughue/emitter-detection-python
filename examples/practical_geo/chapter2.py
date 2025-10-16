@@ -407,6 +407,7 @@ def example3_mc(colors=None, mc_params=None):
     16 January 2025
 
     :param colors:
+    :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle to generated graphic
     """
 

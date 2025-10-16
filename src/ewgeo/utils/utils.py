@@ -119,7 +119,8 @@ def make_taper(taper_len: int, taper_type: str)-> (npt.NDArray, float):
     return w, snr_loss
 
 
-def parse_reference_sensor(ref_idx: str or npt.NDArray[np.int64] or None, num_sensors:int=0)-> (npt.NDArray, npt.NDArray):
+def parse_reference_sensor(ref_idx: str or npt.NDArray[np.int64] or None,
+                           num_sensors:int=0)-> (npt.NDArray[np.int64], npt.NDArray[np.int64]):
     """
     Accepts a reference index setting (either None, a string 'full', a scalar integer, or an array of sensor pairs),
     and returns matching vectors for test and reference indices.
@@ -139,7 +140,7 @@ def parse_reference_sensor(ref_idx: str or npt.NDArray[np.int64] or None, num_se
     """
 
     if ref_idx is None:
-        # Default behavior is to use the last sensor as a common reference
+        # The default behavior is to use the last sensor as a common reference
         test_idx_vec = np.arange(num_sensors-1)
         ref_idx_vec = np.full(num_sensors - 1, num_sensors-1)
 
@@ -153,7 +154,7 @@ def parse_reference_sensor(ref_idx: str or npt.NDArray[np.int64] or None, num_se
 
     elif np.isscalar(ref_idx):
         # Check for error condition
-        if not (0 <= ref_idx < num_sensors):
+        if not (0 <= int(ref_idx) < num_sensors):
             raise ValueError('Bad reference index; unable to parse.')
 
         # Scalar reference index, use all other sensors as test sensors
@@ -184,7 +185,7 @@ def resample_covariance_matrix(cov: npt.ArrayLike,
             measurement. Those entries in the covariance matrix are not resampled.
     :param test_weights: Optional weights to apply to each measurement when resampling.
     :param ref_weights: Optional weights to apply to each measurement when resampling.
-    :return: two-dimensional  numpy array, representing the re-sampled covariance matrix.
+    :return: two-dimensional numpy array, representing the re-sampled covariance matrix.
     """
 
     # Parse Inputs
@@ -266,9 +267,9 @@ def resample_covariance_matrix(cov: npt.ArrayLike,
     return cov_out
 
 
-def resample_noise(noise: npt.ArrayLike,
-                   test_idx: npt.ArrayLike = None,
-                   ref_idx: str or npt.ArrayLike or None=None,
+def resample_noise(noise: npt.NDArray[np.float64],
+                   test_idx: npt.NDArray[np.int64] = None,
+                   ref_idx: str or npt.NDArray[np.int64] or None=None,
                    test_weights: npt.ArrayLike=None,
                    ref_weights: npt.ArrayLike=None) -> npt.NDArray:
     """
@@ -282,7 +283,7 @@ def resample_noise(noise: npt.ArrayLike,
     :param ref_idx: numpy 1D array of indices for the reference sensor for each measurement. Any NaN
             entries are treated as test-only measurements (e.g., angle of arrival) that don't require a reference
             measurement. Those entries in the covariance matrix are not resampled.
-            If test_idx is None, then ref_idx is passed to parse_reference_sensor, and may be any valid input
+            If test_idx is None, then ref_idx is passed to parse_reference_sensor and may be any valid input
             to that function.
     :param test_weights: Optional weights to apply to each measurement when resampling.
     :param ref_weights: Optional weights to apply to each measurement when resampling.
@@ -294,9 +295,13 @@ def resample_noise(noise: npt.ArrayLike,
     if test_idx is None:
         # We need to use the ref_idx
         test_idx_vec, ref_idx_vec = parse_reference_sensor(ref_idx, n_sensor)
+        # Make sure test/ref indices are ints
+        test_idx_vec = np.array(test_idx_vec, dtype=int)
+        ref_idx_vec = np.array(ref_idx_vec, dtype=int)
     else:
-        test_idx_vec = test_idx
-        ref_idx_vec = ref_idx
+        # Cast the inputs as dtype=int, they'll be used as indices later
+        test_idx_vec = np.array(test_idx, dtype=int)
+        ref_idx_vec = np.array(ref_idx, dtype=int)
 
     # Determine output size
     n_test = np.size(test_idx_vec)
@@ -322,8 +327,7 @@ def resample_noise(noise: npt.ArrayLike,
         shp_ref_wt = np.size(ref_weights)
 
     # Function to execute at each entry of output covariance matrix
-    def element_func(idx_row):
-        idx_row = idx_row.astype(int)
+    def element_func(idx_row: int):
         a_i = test_idx_vec[idx_row % n_test]
         b_i = ref_idx_vec[idx_row % n_ref]
 
@@ -343,17 +347,16 @@ def resample_noise(noise: npt.ArrayLike,
         mask_bi = ~np.isnan(b_i)
 
         if not np.all(mask_ai):
-            noise_ai[mask_ai] = noise[a_i[mask_ai].astype(int)]
+            noise_ai[mask_ai] = noise[a_i[mask_ai]]
         else:
-            noise_ai = noise[a_i.astype(int)]
+            noise_ai = noise[a_i]
 
         if not np.all(mask_bi):
-            noise_bi[mask_bi] = noise[b_i[mask_bi].astype(int)]
+            noise_bi[mask_bi] = noise[b_i[mask_bi]]
         else:
-            noise_bi = noise[b_i.astype(int)]
+            noise_bi = noise[b_i]
 
         res = b_i_wt * noise_bi - a_i_wt * noise_ai
-        # raise ValueError('mo')
         return res
 
     noise_out = np.fromfunction(element_func, (n_pair_out, ), dtype=float)
@@ -380,7 +383,7 @@ def ensure_invertible(covariance: npt.ArrayLike, epsilon: float=1e-20)-> npt.NDA
 
     # Check input dimensions
     if np.isscalar(covariance):
-        return covariance  # Input is a scalar; it is invertible by definition
+        return np.asarray(covariance)  # Input is a scalar; it is invertible by definition
 
     sz = np.shape(covariance)
     assert len(sz) > 1, 'Input must have at least two dimensions.'
@@ -412,10 +415,10 @@ def ensure_invertible(covariance: npt.ArrayLike, epsilon: float=1e-20)-> npt.NDA
             # Add the diagonal loading term
             this_cov += d
 
-            # Re-examine the eigenvalue
+            # Reexamine the eigenvalue
             lam, v = np.linalg.eigh(this_cov)
 
-            # Increase the magnitude of diagonal loading (for the next iteration)
+            # Increase the amount of diagonal loading (for the next iteration) by an order of magnitude
             d *= 10.0
 
         # Store the modified covariance matrix in the output
@@ -435,9 +438,9 @@ def make_pdfs(measurement_function,
     Generate a joint PDF or set of unitary PDFs representing the measurements, given the measurement_function,
     covariance matrix and pdf_type
 
-    The only currently supported pdf types are:
-        'mvn'       multivariate normal
-        'normal'    normal (each measurement is independent)
+    The only currently supported probability distribution types are:
+        'mvn': multivariate normal
+        'normal': normal (each measurement is independent)
 
     Ported from MATLAB Code
 
@@ -474,7 +477,7 @@ def print_elapsed(t_elapsed: float):
     Nicholas O'Donoughue
     6 May 2021
 
-    :param t_elapsed: elapsed time, in seconds
+    :param t_elapsed: elapsed time in seconds
     """
 
     hrs_elapsed = np.floor(t_elapsed / 3600)
@@ -494,7 +497,7 @@ def print_predicted(t_elapsed: float, pct_elapsed: float, do_elapsed: bool=False
     Nicholas O'Donoughue
     6 May 2021
 
-    :param t_elapsed: elapsed time, in seconds
+    :param t_elapsed: elapsed time in seconds
     :param pct_elapsed:
     :param do_elapsed:
     """
@@ -549,7 +552,7 @@ def print_progress(num_total: int,
         print_predicted(t_elapsed, pct_elapsed, do_elapsed=True)
 
 
-def safe_2d_shape(x: npt.ArrayLike)-> npt.NDArray:
+def safe_2d_shape(x: npt.ArrayLike)-> tuple[int, int]:
     """
     Compute the 2D shape of the input, x, safely. Avoids errors when the input is a 1D array (in which case, the
     second output is 1).  Any dimensions higher than the second are ignored.
@@ -557,9 +560,9 @@ def safe_2d_shape(x: npt.ArrayLike)-> npt.NDArray:
     Nicholas O'Donoughue
     19 May 2021
 
-    :param x: ND array to determine the size of.
-    :return dim1: length of first dimension
-    :return dim2: length of second dimension
+    :param x: ND array to analyze.
+    :return dim1: Length of the first dimension.
+    :return dim2: Length of the second dimension.
     """
 
     if x is None:
@@ -681,7 +684,7 @@ def is_broadcastable(a: npt.ArrayLike, b: npt.ArrayLike)-> bool:
 
     :param a: first input array
     :param b: second input array
-    :return result:  Boolean (true is a and b are broadcastable)
+    :return result:  Boolean (true if a and b are broadcastable)
     """
 
     while len(np.shape(a)) > len(np.shape(b)):
@@ -699,24 +702,24 @@ def is_broadcastable(a: npt.ArrayLike, b: npt.ArrayLike)-> bool:
 
 def modulo2pi(x: npt.ArrayLike)-> npt.NDArray:
     """
-    Perform a 2*pi modulo operation, but with the result centered on zero, spanning
-    from -pi to pi, rather than on the interval 0 to 2*pi.
+    Perform a 2*pi modulo operation, but with the result centered on zero, on
+    the interval (-pi, pi), rather than (0, 2*pi).
 
     8 December 2022
     Nicholas O'Donoughue
 
     :param x: Numpy array-like or scalar
-    :return: Modulo, centered on 0 (on the interval -pi to pi)
+    :return: Modulo, centered on 0
     """
 
     # Shift the input so that zero is now pi
     x_shift = x + np.pi
 
-    # Perform a modulo operation; result is on the interval [0, 2*pi)
+    # Perform a modulo operation. The result is on the interval [0, 2*pi)
     x_modulo = x_shift % (2*np.pi)
 
     # Undo the shift, so that a zero input is now a zero output.
-    # Result is on the interval [-pi, pi]
+    # The result is on the interval [-pi, pi]
     result = x_modulo - np.pi
 
     return result
@@ -725,7 +728,7 @@ def modulo2pi(x: npt.ArrayLike)-> npt.NDArray:
 def remove_outliers(data: npt.ArrayLike, axis: int=0, remove_nan: bool=False)->npt.NDArray:
     """
     Remove outliers from a dataset.  If it is a vector, the outliers are individual datapoints. If it is an array,
-    then outlier detection is run across the specified dimension (default=0), and any sub-arrays containing an outlier
+    then outlier detection is run across the specified dimension (default=0), and any subarrays containing an outlier
     are excised.
     
     Behavior is built to reflect MATLAB's rmoutliers, with the default (median) processing type.
@@ -767,7 +770,7 @@ def ensure_iterable(var, flatten: bool=False)->Iterable:
     """
     Ensure that the input is an iterable. If it is not, wrap it in a list.
 
-    Optionally searched for nested iterables and flatten them, so that all entries
+    Optionally search for nested iterables and flatten them, so that all entries
     can be iterated over in a single for loop.
 
     Nicholas O'Donoughue

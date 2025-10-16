@@ -233,6 +233,8 @@ def log_likelihood(x_source: npt.ArrayLike,
     :param angle_bias: AOA measurement bias
     :param range_bias: TDOA measurement bias
     :param range_rate_bias: FDOA measurement bias
+    :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
+                           the console. [default=False]
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -270,7 +272,7 @@ def log_likelihood(x_source: npt.ArrayLike,
         print('Computing Log Likelihood...')
 
     # Loop across source positions
-    for idx_source in np.arange(n_source_pos):
+    for idx_source in range(n_source_pos):
         if print_progress:
             print_progress_inner(num_total=n_source_pos, curr_idx=idx_source,
                                  iterations_per_marker=iter_per_marker,

@@ -123,7 +123,7 @@ def example1(mc_params=None):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    for idx in np.arange(num_monte_carlo):
+    for idx in range(num_monte_carlo):
         print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(pss=hybrid, ml_search=ml_search, args=args)
@@ -255,7 +255,7 @@ def example2(mc_params=None):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    for idx in np.arange(num_monte_carlo):
+    for idx in range(num_monte_carlo):
         print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(pss=hybrid, ml_search=ml_search, args=args)

@@ -39,18 +39,17 @@ def make_all_figures(close_figs=False, mc_params=None):
     rng = np.random.default_rng(0)
 
     # Generate all figures
-    fig3 = make_figure_3(prefix)
-    fig4 = make_figure_4(prefix)
-    fig5 = make_figure_5(prefix)
-    fig6 = make_figure_6(prefix)
-    fig7a = make_figure_7a(prefix)
-    fig7b = make_figure_7b(prefix)
-    fig9 = make_figure_9(prefix, rng)
-    fig10 = make_figure_10(prefix)
-    fig12 = make_figure_12(prefix, rng, mc_params)
-    fig13 = make_figure_13(prefix, rng, mc_params)
-
-    figs = [fig3, fig4, fig5, fig6, fig7a, fig7b, fig9, fig10, fig12, fig13]
+    figs = []
+    figs.extend(make_figure_3(prefix))
+    figs.extend(make_figure_4(prefix))
+    figs.extend(make_figure_5(prefix))
+    figs.extend(make_figure_6(prefix))
+    figs.extend(make_figure_7a(prefix))
+    figs.extend(make_figure_7b(prefix))
+    figs.extend(make_figure_9(prefix, rng))
+    figs.extend(make_figure_10(prefix))
+    figs.extend(make_figure_12(prefix, rng, mc_params))
+    figs.extend(make_figure_13(prefix, rng, mc_params))
 
     if close_figs:
         for fig in figs:
@@ -103,7 +102,7 @@ def make_figure_3(prefix=None):
         fig3.savefig(prefix + 'fig3.png')
         fig3.savefig(prefix + 'fig3.svg')
 
-    return fig3
+    return fig3,
 
 
 def make_figure_4(prefix=None):
@@ -151,7 +150,7 @@ def make_figure_4(prefix=None):
         fig4.savefig(prefix + 'fig4.png')
         fig4.savefig(prefix + 'fig4.svg')
 
-    return fig4
+    return fig4,
 
 
 def make_figure_5(prefix=None):
@@ -202,7 +201,7 @@ def make_figure_5(prefix=None):
         fig5.savefig(prefix + 'fig5.png')
         fig5.savefig(prefix + 'fig5.svg')
 
-    return fig5
+    return fig5,
 
 
 def make_figure_6(prefix=None):
@@ -264,7 +263,7 @@ def make_figure_6(prefix=None):
         fig6.savefig(prefix + 'fig6.png')
         fig6.savefig(prefix + 'fig6.svg')
 
-    return fig6
+    return fig6,
 
 
 def make_figure_7a(prefix=None):
@@ -303,7 +302,7 @@ def make_figure_7a(prefix=None):
         fig7a.savefig(prefix + 'fig7a.png')
         fig7a.savefig(prefix + 'fig7a.svg')
 
-    return fig7a
+    return fig7a,
 
 
 def make_figure_7b(prefix=None):
@@ -353,7 +352,7 @@ def make_figure_7b(prefix=None):
         fig7b.savefig(prefix + 'fig7b.png')
         fig7b.savefig(prefix + 'fig7b.svg')
 
-    return fig7b
+    return fig7b,
 
 
 def make_figure_9(prefix=None, rng=np.random.default_rng()):
@@ -432,7 +431,7 @@ def make_figure_9(prefix=None, rng=np.random.default_rng()):
         fig9.savefig(prefix + 'fig11.png')
         fig9.savefig(prefix + 'fig11.svg')
 
-    return fig9
+    return fig9,
     
 
 def make_figure_10(prefix=None):
@@ -456,7 +455,7 @@ def make_figure_10(prefix=None):
         fig10.savefig(prefix + 'fig10.png')
         fig10.savefig(prefix + 'fig10.svg')
 
-    return fig10
+    return fig10,
 
 
 def make_figure_12(prefix=None, rng=np.random.default_rng(), mc_params=None):
@@ -567,7 +566,7 @@ def make_figure_12(prefix=None, rng=np.random.default_rng(), mc_params=None):
         fig12.savefig(prefix + 'fig12.png')
         fig12.savefig(prefix + 'fig12.svg')
 
-    return fig12
+    return fig12,
 
 
 def make_figure_13(prefix=None, rng=np.random.default_rng(), mc_params=None):
@@ -597,7 +596,7 @@ def make_figure_13(prefix=None, rng=np.random.default_rng(), mc_params=None):
         fig13.savefig(prefix + 'fig13.png')
         fig13.savefig(prefix + 'fig13.svg')
 
-    return fig13
+    return fig13,
 
 
 if __name__ == "__main__":

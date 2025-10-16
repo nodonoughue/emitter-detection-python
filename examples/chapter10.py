@@ -33,9 +33,9 @@ def example1(mc_params=None):
     Nicholas O'Donoughue
     18 May 2021
 
-    :param mc_params: Optional struct to control Monte Carlo trial size
-    :return fig_geo: figure handle to generated graphic with geographic layout
-    :return fig_err: figure handle to generated graphic with error as a function of iteration
+    :param mc_params: Optional struct to control the Monte Carlo trial size
+    :return fig_geo: figure handle for the generated graphic with geographic layout
+    :return fig_err: figure handle for the generated graphic with error as a function of iteration
     """
 
     # Define sensor positions and PSS object
@@ -56,7 +56,7 @@ def example1(mc_params=None):
     # Error Values
     angle_error = 3*np.sqrt(np.diag(covar_psi.cov))
 
-    # Start first figure; geometry
+    # Start the first figure; geometry
     fig_geo = plt.figure()
 
     # Geometry
@@ -121,7 +121,7 @@ def example1(mc_params=None):
     iterations_per_marker = 1
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
-    for idx in np.arange(num_monte_carlo):
+    for idx in range(num_monte_carlo):
         print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         result = _mc_iteration(pss=triang, ml_search=ml_search, args=args)
@@ -276,7 +276,7 @@ def example2():
     Nicholas O'Donoughue
     18 May 2021
 
-    :return: figure handle to generated graphic
+    :return: figure handle to the generated graphic
     """
 
     # Occasionally, we divide by zero.  This represents invalid scenarios.  The result is
@@ -349,7 +349,7 @@ def example3():
     Nicholas O'Donoughue
     18 May 2021
     
-    :return: figure handle to generated graphic
+    :return: figure handle to the generated graphic
     """
     
     # Define sensor positions

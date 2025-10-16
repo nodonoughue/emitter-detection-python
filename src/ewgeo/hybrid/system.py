@@ -144,27 +144,27 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         return self.num_aoa_measurements + self.num_tdoa_measurements + self.num_fdoa_measurements
 
     @property
-    def aoa_sensor_idx(self)-> npt.NDArray[npt.int64]:
+    def aoa_sensor_idx(self)-> npt.NDArray[np.int64]:
         return np.arange(self.num_aoa_sensors)
 
     @property
-    def tdoa_sensor_idx(self)-> npt.NDArray[npt.int64]:
+    def tdoa_sensor_idx(self)-> npt.NDArray[np.int64]:
         return np.arange(self.num_tdoa_sensors) + self.num_aoa_sensors
 
     @property
-    def fdoa_sensor_idx(self)-> npt.NDArray[npt.int64]:
+    def fdoa_sensor_idx(self)-> npt.NDArray[np.int64]:
         return np.arange(self.num_fdoa_sensors) + self.num_aoa_sensors + self.num_tdoa_sensors
 
     @property
-    def aoa_measurement_idx(self)-> npt.NDArray[npt.int64]:
+    def aoa_measurement_idx(self)-> npt.NDArray[np.int64]:
         return np.arange(self.num_aoa_measurements)
 
     @property
-    def tdoa_measurement_idx(self)-> npt.NDArray[npt.int64]:
+    def tdoa_measurement_idx(self)-> npt.NDArray[np.int64]:
         return np.arange(self.num_tdoa_measurements) + self.num_aoa_measurements
 
     @property
-    def fdoa_measurement_idx(self)-> npt.NDArray[npt.int64]:
+    def fdoa_measurement_idx(self)-> npt.NDArray[np.int64]:
         return np.arange(self.num_fdoa_measurements) + self.num_tdoa_measurements + self.num_aoa_measurements
 
     @property

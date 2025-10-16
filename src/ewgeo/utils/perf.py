@@ -58,7 +58,7 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
         print('Computing CRLB solution for {} source positions...'.format(n_source))
 
     # Repeat CRLB for each of the n_source test positions
-    for idx in np.arange(n_source):
+    for idx in range(n_source):
         if print_progress:
             utils.print_progress(num_total=n_source, curr_idx=idx, iterations_per_marker=iter_per_marker,
                                  iterations_per_row=iter_per_row, t_start=t_start)

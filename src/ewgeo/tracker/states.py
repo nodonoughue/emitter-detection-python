@@ -14,10 +14,10 @@ class StateSpace:
     has_pos: bool
     has_vel: bool
     has_accel: bool
-    pos_slice: slice
-    vel_slice: slice
-    pos_vel_slice: slice
-    accel_slice: slice
+    pos_slice: slice or None
+    vel_slice: slice or None
+    pos_vel_slice: slice or None
+    accel_slice: slice or None
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():

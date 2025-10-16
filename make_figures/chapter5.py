@@ -19,7 +19,7 @@ def make_all_figures(close_figs=False):
     """
     Call all the figure generators for this chapter
 
-    :close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
+    :param close_figs: Boolean flag.  If true, will close all figures after generating them; for batch scripting.
                  Default=False
     :return: List of figure handles
     """
@@ -29,11 +29,10 @@ def make_all_figures(close_figs=False):
     init_plot_style()
 
     # Generate all figures
-    fig4 = make_figure_4(prefix)
-    fig6 = make_figure_6(prefix)
-    fig7 = make_figure_7(prefix)
-
-    figs = [fig4, fig6, fig7]
+    figs = []
+    figs.extend(make_figure_4(prefix))
+    figs.extend(make_figure_6(prefix))
+    figs.extend(make_figure_7(prefix))
 
     if close_figs:
         for fig in figs:
@@ -68,7 +67,7 @@ def make_figure_4(prefix=None):
         fig4.savefig(prefix + 'fig4.svg')
         fig4.savefig(prefix + 'fig4.png')
 
-    return fig4
+    return fig4,
 
 
 def make_figure_6(prefix=None):
@@ -93,7 +92,7 @@ def make_figure_6(prefix=None):
         fig6.savefig(prefix + 'fig6.svg')
         fig6.savefig(prefix + 'fig6.png')
 
-    return fig6
+    return fig6,
 
 
 def make_figure_7(prefix=None):
@@ -118,7 +117,7 @@ def make_figure_7(prefix=None):
         fig7.savefig(prefix + 'fig7.svg')
         fig7.savefig(prefix + 'fig7.png')
 
-    return fig7
+    return fig7,
 
 
 if __name__ == "__main__":

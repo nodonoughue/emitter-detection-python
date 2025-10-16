@@ -36,15 +36,15 @@ def make_all_figures(close_figs=False, mc_params=None):
     init_plot_style()
 
     # Generate all figures
-    figs_5_6 = make_figures_5_6(prefix, mc_params)
-    fig_8 = make_figure_8(prefix, mc_params)
-    fig_10 = make_figure_10(prefix, mc_params)
-    fig_13 = make_figure_13(prefix, mc_params)
-    fig_14 = make_figure_14(prefix)
-    fig_15 = make_figure_15(prefix)
-    fig_16 = make_figure_16(prefix, mc_params)
+    figs = []
+    figs.extend(make_figures_5_6(prefix, mc_params))
+    figs.extend(make_figure_8(prefix, mc_params))
+    figs.extend(make_figure_10(prefix, mc_params))
+    figs.extend(make_figure_13(prefix, mc_params))
+    figs.extend(make_figure_14(prefix))
+    figs.extend(make_figure_15(prefix))
+    figs.extend(make_figure_16(prefix, mc_params))
 
-    figs = list(figs_5_6) + list(fig_8) + list(fig_10) + list(fig_13) + list(fig_14) + list(fig_15) + list(fig_16)
     if close_figs:
         for fig in figs:
             plt.close(fig)
@@ -229,7 +229,7 @@ def make_figure_14(prefix=None):
         fig.savefig(prefix + label + '.svg')
         fig.savefig(prefix + label + '.png')
 
-    return [fig]
+    return fig,
 
 
 def make_figure_15(prefix=None):

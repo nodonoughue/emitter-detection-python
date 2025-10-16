@@ -25,13 +25,13 @@ def measurement(x_sensor: npt.ArrayLike,
     Nicholas O'Donoughue
     21 January 2021
 
-    :param x_sensor: nDim x n_sensor array of sensor positions
-    :param x_source: nDim x n_source array of source positions
-    :param v_sensor: nDim x nSensor array of sensor velocities
-    :param v_source: nDim x n_source array of source velocities
-    :param ref_idx: Scalar index of reference sensor or nDim x nPair matrix of sensor pairings
-    :param bias: nSensor x 1 array of range-rate bias terms
-    :return rrdoa: nSensor -1 x n_source array of RRDOA measurements
+    :param x_sensor: nDim x n_sensor array of sensor positions.
+    :param x_source: nDim x n_source array of source positions.
+    :param v_sensor: nDim x nSensor array of sensor velocities.
+    :param v_source: nDim x n_source array of source velocities.
+    :param ref_idx: Scalar index of reference sensor or nDim x nPair matrix of sensor pairings.
+    :param bias: nSensor x 1 array of range-rate bias terms.
+    :return rrdoa: nSensor -1 x n_source array of RRDOA measurements.
     """
 
     # Parse inputs
@@ -39,7 +39,6 @@ def measurement(x_sensor: npt.ArrayLike,
     test_idx_vec, ref_idx_vec = parse_reference_sensor(ref_idx, n_sensor)
 
     # Make sure that x_source is 2D
-    # We could use np.atleast_2d, but that will add the new dimension at the start, not the end
     if len(x_source.shape) == 1:
         x_source = x_source[:, np.newaxis]
     if len(v_source.shape) == 1:
@@ -73,21 +72,20 @@ def jacobian(x_sensor: npt.ArrayLike,
              v_source: npt.ArrayLike or None=None,
              ref_idx=None):
     """
-    # Returns the Jacobian matrix for FDOA of a source at x_source
-    # (n_dim x n_source) from sensors at x_sensor (n_dim x n_sensor) with velocity
-    # v_sensor.
+    Returns the Jacobian matrix for FDOA of a source at x_source (n_dim x n_source) from sensors at x_sensor
+    (n_dim x n_sensor) with velocity v_sensor.
 
-    Ported from MATLAB Code
+    Ported from MATLAB Code.
 
     Nicholas O'Donoughue
     21 January 2021
 
-    :param x_sensor: n_dim x n_sensor vector of sensor positions
-    :param x_source: n_dim x n_source vector of source positions
-    :param v_sensor: n_dim x n_sensor vector of sensor velocities
-    :param v_source: n_dim x n_source vector of source velocities
-    :param ref_idx: Scalar index of reference sensor, or n_dim x nPair matrix of sensor pairings
-    :return j: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
+    :param x_sensor: n_dim x n_sensor vector of sensor positions.
+    :param x_source: n_dim x n_source vector of source positions.
+    :param v_sensor: n_dim x n_sensor vector of sensor velocities.
+    :param v_source: n_dim x n_source vector of source velocities.
+    :param ref_idx: Scalar index of reference sensor, or n_dim x nPair matrix of sensor pairings.
+    :return j: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position.
     """
     # ToDo: Think about refactoring as a two-element response (j_pos, j_vel) for easier parsing at the output
 
@@ -143,14 +141,14 @@ def jacobian_uncertainty(x_sensor: npt.ArrayLike,
     Nicholas O'Donoughue
     30 April 2025
 
-    :param x_sensor: nDim x nTDOA array of TDOA sensor positions
-    :param x_source: nDim x n_source array of source positions
-    :param v_sensor: n_dim x n_sensor vector of sensor velocities
-    :param v_source: n_dim x n_source vector of source velocities
-    :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA
-    :param do_bias: if True, jacobian includes gradient w.r.t. measurement biases
-    :param do_pos_error: if True, jacobian includes gradient w.r.t. sensor pos/vel errors
-    :return: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
+    :param x_sensor: nDim x nTDOA array of TDOA sensor positions.
+    :param x_source: nDim x n_source array of source positions.
+    :param v_sensor: n_dim x n_sensor vector of sensor velocities.
+    :param v_source: n_dim x n_source vector of source velocities.
+    :param ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for TDOA.
+    :param do_bias: if True, jacobian includes gradient w.r.t. measurement biases.
+    :param do_pos_error: if True, jacobian includes gradient w.r.t. sensor pos/vel errors.
+    :return: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position.
     """
 
     # Parse inputs
@@ -215,6 +213,9 @@ def log_likelihood(x_sensor: npt.ArrayLike,
     :param v_source: n_dim x n_source vector of source velocities
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
+    :param bias: sensor measurement biases
+    :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
+                           the console. [default=False]
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -253,7 +254,7 @@ def log_likelihood(x_sensor: npt.ArrayLike,
 
         print('Computing Log Likelihood...')
 
-    for idx_source in np.arange(n_source):
+    for idx_source in range(n_source):
         if print_progress:
             print_progress_inner(num_total=n_source, curr_idx=idx_source,
                                  iterations_per_marker=iter_per_marker,
@@ -364,15 +365,17 @@ def draw_isodoppler(x_ref: npt.ArrayLike,
     Nicholas O'Donoughue
     21 January 2021
 
-    :param x_ref: Position of first sensor (Ndim x 1) [m]
-    :param v_ref: Velocity vector of first sensor (Ndim x 1) [m/s]
-    :param x_test: Position of second sensor (Ndim x 1) [m]
-    :param v_test: Velocity vector of second sensor (Ndim x 1) [m/s]
-    :param vdiff: Desired velocity difference [m/s]
-    :param num_pts: Number of points to compute
-    :param max_ortho: Maximum offset from line of sight between x1 and x2 [m]
-    :return x_iso: First dimension of iso doppler curve [m]
-    :return y_iso: Second dimension of iso doppler curve [m]
+    :param x_ref: Position of first sensor (Ndim x 1) [m].
+    :param v_ref: Velocity vector of first sensor (Ndim x 1) [m/s].
+    :param x_test: Position of second sensor (Ndim x 1) [m].
+    :param v_test: Velocity vector of second sensor (Ndim x 1) [m/s].
+    :param vdiff: Desired velocity difference [m/s].
+    :param num_pts: Number of points to compute.
+    :param max_ortho: Maximum offset from line of sight between x1 and x2 [m].
+    :param v_source: Optional velocity vector of source at each position
+                     (0 if not defined) [m/s].
+    :return x_iso: First dimension of iso doppler curve [m].
+    :return y_iso: Second dimension of iso doppler curve [m].
     """
 
     # Set frequency to 3e8, so that c/f_0 is unity, and output of dopDiff
@@ -477,7 +480,7 @@ def grad_x(x_sensor: npt.ArrayLike,
     :param x_sensor:    FDOA sensor positions
     :param x_source:    Source positions
     :param v_sensor:    Optional FDOA sensor velocities (0 if not defined)
-    :param v_source:    Optional FDOA source velocities (0 if not defined)
+    :param v_source: Optional FDOA source velocities (0 if not defined)
     :param ref_idx:     Reference index (optional)
     :return jacobian:   Jacobian matrix representing the desired gradient
     """

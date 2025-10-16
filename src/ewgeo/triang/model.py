@@ -170,6 +170,7 @@ def jacobian_uncertainty(x_sensor, x_source, do_2d_aoa=False, do_bias=False, do_
 
     :param x_sensor: nDim x n_sensor array of sensor positions
     :param x_source: nDim x n_source array of source positions
+    :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :param do_bias: if True, jacobian includes gradient w.r.t. measurement biases
     :param do_pos_error: if True, jacobian includes gradient w.r.t. sensor pos/vel errors
     :return: n_dim x nMeasurement x n_source matrix of Jacobians, one for each candidate source position
@@ -222,6 +223,9 @@ def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=Fa
     :param cov: AOA measurement error covariance matrix; object of the CovarianceMatrix class
     :param x_source: Candidate source positions
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
+    :param bias: sensor measurement biases
+    :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
+                           the console. [default=False]
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -253,7 +257,7 @@ def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=Fa
 
         print('Computing Log Likelihood...')
 
-    for idx_source in np.arange(n_source_pos):
+    for idx_source in range(n_source_pos):
         if print_progress:
             utils.print_progress(num_total=n_source_pos, curr_idx=idx_source,
                                  iterations_per_marker=iter_per_marker,
@@ -458,14 +462,14 @@ def grad_sensor_pos(x_sensor, x_source, do_2d_aoa=False):
     _grad_x = grad_x(x_sensor, x_source, do_2d_aoa)
 
     grad = np.zeros((n_dim*n_sensor, n_sensor, n_source))
-    for i in np.arange(n_sensor):
+    for i in range(n_sensor):
         start = n_dim * i
         end = start + n_dim
         grad[start:end, i, :] = _grad_x[:, i, :]  # The first n_sensor columns are J_az
 
     if do_2d_aoa:
         grad_el = np.zeros_like(grad)
-        for i in np.arange(n_sensor):
+        for i in range(n_sensor):
             start = n_dim * i
             end = start + n_dim
             grad_el[start:end, i, :] = _grad_x[:, n_sensor + i, :]  # The second n_sensor columns are J_el

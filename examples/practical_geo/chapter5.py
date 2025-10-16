@@ -27,7 +27,7 @@ def run_all_examples():
     return list(example1()) + list(example2()) + list(example3()) + list(example4()) + list(example5())
 
 
-def example1(do_mod_cov=False):
+def example1(do_mod_cov: bool=False):
     """
     Executes Example 5.1.
 
@@ -36,8 +36,9 @@ def example1(do_mod_cov=False):
     Nicholas O'Donoughue
     1 April 2025
 
-    :param do_mod_cov: boolean; if True then the covariance matrix is modified as discussed in Video 5.1.
-    :return: figure handle to generated graphic
+    :param do_mod_cov: Optional boolean flag. If it is true, then the covariance matrix is modified as discussed in
+                       Video 5.1.
+    :return: Figure handle for the generated graphic.
     """
 
     # Set up sensors
@@ -47,7 +48,7 @@ def example1(do_mod_cov=False):
 
     # Define received signals and covariance matrix
     psi = np.array([80, 87]) * _deg2rad
-    cov = CovarianceMatrix(np.diag([0.1, 1.0]))  # second sensor is 10x worse than first sensor
+    cov = CovarianceMatrix(np.diag([0.1, 1.0]))  # the second sensor is 10x worse than the first sensor
     if do_mod_cov:
         cov = CovarianceMatrix(np.diag([0.05, 0.2]))
     x_init = np.array([0, 1])  # initial guess
@@ -80,8 +81,8 @@ def example1(do_mod_cov=False):
     x_gd, x_gd_full = aoa.gradient_descent(**gd_args)
 
     # Gradient Descent Solution; Constrained
-    y_soln = 25.
-    a, _ = fixed_cartesian('y', y_soln)
+    y_solution = 25.
+    a, _ = fixed_cartesian('y', y_solution)
     constraint_arg = {'eq_constraints': [a]}
     x_gd_const, x_gd_full_const = aoa.gradient_descent(**gd_args, **constraint_arg)
 
@@ -123,7 +124,7 @@ def example2():
     Nicholas O'Donoughue
     7 February 2025
 
-    :return: figure handle to generated graphic
+    :return: figure handle for the generated graphic
     """
 
     def _ex2_inner(this_x_tdoa, this_x_init, title=None):
@@ -227,7 +228,7 @@ def example3():
     Nicholas O'Donoughue
     7 February 2025
 
-    :return: figure handle to generated graphic
+    :return: figure handle for the generated graphic
     """
 
     # Set up scene
@@ -254,8 +255,6 @@ def example3():
 
     cov_aoa = CovarianceMatrix(err_aoa**2 * np.eye(2))  # 2D AOA measurement covariance
     cov_roa = CovarianceMatrix(err_roa**2 * np.eye(num_tdoa))  # ROA measurement covariance
-    # cov_raw = CovarianceMatrix(scipy.linalg.block_diag(cov_aoa, cov_roa))  # convert to Covariance Matrix object
-    # cov_msmt = cov_raw.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, do_2d_aoa=True, tdoa_ref_idx=ref_idx)
 
     # Make PSS Objects
     aoa = DirectionFinder(x=x_aoa, cov=cov_aoa, do_2d_aoa=True)
@@ -334,7 +333,7 @@ def example4():
     Nicholas O'Donoughue
     3 April 2025
 
-    :return: figure handle to generated graphic
+    :return: figure handle for the generated graphic
     """
 
     # Set up scene
@@ -436,7 +435,7 @@ def example5():
     Nicholas O'Donoughue
     7 February 2025
 
-    :return: figure handle to generated graphic
+    :return: figure handle for the generated graphic
     """
 
     # Set up scenario
@@ -466,8 +465,8 @@ def example5():
     cov_prior = np.array([[5., 1., 0.], [1., 50., 0.], [0., 0., 10.]])*1e6
 
     def prior(x):
-        # x is (n_dim x n_position) array of potential source positions; compute mvnpdf for each, but don't bother
-        # with cross-terms
+        # x is (n_dim x n_position) array of potential source positions; compute the probability for each, but don't
+        # bother with cross-terms
         return np.array([scipy.stats.multivariate_normal.pdf(this_x, mean=x_prior, cov=cov_prior) for this_x in x.T])
 
     # Measurement

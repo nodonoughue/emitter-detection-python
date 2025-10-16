@@ -43,15 +43,15 @@ def make_all_figures(close_figs=False, mc_params=None):
     colors = plt.get_cmap("tab10")
 
     # Generate all figures
-    fig1 = make_figure_1(prefix, colors)
-    fig2a, fig2b, fig2c, fig2d = make_figure_2(prefix)
-    fig3, fig4 = make_figures_3_4(prefix, mc_params)
-    fig5, fig6 = make_figures_5_6(prefix, mc_params)
-    fig7a, fig7b = make_figure_7(prefix)
-    fig8a, fig8b = make_figure_8(prefix)
-    fig9 = make_figure_9(prefix)
+    figs = []
+    figs.extend(make_figure_1(prefix, colors))
+    figs.extend(make_figure_2(prefix))
+    figs.extend(make_figures_3_4(prefix, mc_params))
+    figs.extend(make_figures_5_6(prefix, mc_params))
+    figs.extend(make_figure_7(prefix))
+    figs.extend(make_figure_8(prefix))
+    figs.extend(make_figure_9(prefix))
 
-    figs = [fig1, fig2a, fig2b, fig2c, fig2d, fig3, fig4, fig5, fig6, fig7a, fig7b, fig8a, fig8b, fig9]
     if close_figs:
         for fig in figs:
             plt.close(fig)
@@ -144,7 +144,7 @@ def make_figure_1(prefix=None, colors=None):
         fig1.savefig(prefix + 'fig1.png')
         fig1.savefig(prefix + 'fig1.svg')
 
-    return fig1
+    return fig1,
 
 
 def make_figure_2(prefix=None):
@@ -268,7 +268,7 @@ def _make_figure2_subfigure(x_sensor: npt.ArrayLike,
     plt.text(x_source[0]/1e3 + 2, x_source[1]/1e3 - 2, 'Source', fontsize=12)
 
     # Annotate the sensors
-    for sensor_num in np.arange(np.size(x_sensor, axis=0)):
+    for sensor_num in range(np.size(x_sensor, axis=0)):
         this_x = x_sensor[sensor_num]
         this_v = v_sensor[sensor_num]
 
@@ -671,7 +671,7 @@ def make_figure_9(prefix):
         fig9.savefig(prefix + 'fig9.png')
         fig9.savefig(prefix + 'fig9.svg')
 
-    return fig9
+    return fig9,
 
 
 if __name__ == "__main__":

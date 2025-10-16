@@ -1,7 +1,7 @@
 import numpy.typing as npt
 
 from . import model, perf, solvers
-from ewgeo.utils import parse_reference_sensor, SearchSpace
+from ewgeo.utils import parse_reference_sensor
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import DifferencePSS

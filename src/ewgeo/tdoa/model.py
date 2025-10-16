@@ -195,6 +195,8 @@ def log_likelihood(x_sensor: npt.ArrayLike,
     :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
     it is in m^2
     :param bias: sensor measurement biases
+    :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
+                           the console. [default=False]
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 

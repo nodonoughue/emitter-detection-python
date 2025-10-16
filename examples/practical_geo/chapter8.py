@@ -143,7 +143,7 @@ def example1(mc_params=None):
     rmse_cov_pred = np.zeros((num_time, ))
     num_ell_pts = 101 # number of points for ellipse drawing
     x_ell_est = np.zeros((2,num_ell_pts,num_time))
-    for idx in np.arange(num_time):
+    for idx in range(num_time):
         print_progress(num_time, idx, iterations_per_marker, iterations_per_row, t_start)
 
         # Grab Current Measurement
@@ -213,7 +213,7 @@ def example1(mc_params=None):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
 
-    for idx_mc in np.arange(num_monte_carlo):
+    for idx_mc in range(num_monte_carlo):
         print_progress(num_monte_carlo, idx_mc, iterations_per_marker, iterations_per_row, t_start)
 
         # Generate Measurements
@@ -436,7 +436,7 @@ def example2(rng=np.random.default_rng()):
     rmse_cov_pred = np.zeros((num_time,))
     num_ell_pts = 101 # number of points for ellipse drawing
     x_ell_est = np.zeros((2,num_ell_pts,num_time))
-    for idx in np.arange(num_time):
+    for idx in range(num_time):
         print_progress(num_total=num_time, curr_idx=idx, iterations_per_marker=iter_per_marker,
                        iterations_per_row=iter_per_row, t_start=t_start)
 

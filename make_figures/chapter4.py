@@ -43,17 +43,16 @@ def make_all_figures(close_figs=False, mc_params=None):
     init_plot_style()
 
     # Generate all figures
-    fig1a = make_figure_1a(prefix)
-    fig1b = make_figure_1b(prefix, rng, mc_params)
-    fig2a = make_figure_2a(prefix, rng)
-    fig2b = make_figure_2b(prefix, rng, mc_params)
-    fig3 = make_figure_3(prefix)
-    fig5 = make_figure_5(prefix, colors)
-    fig6 = make_figure_6(prefix, rng, colors, mc_params)
-    fig7 = make_figure_7(prefix)
-    fig8 = make_figure_8(prefix, colors)
-
-    figs = [fig1a, fig1b, fig2a, fig2b, fig3, fig5, fig6, fig7, fig8]
+    figs = []
+    figs.extend(make_figure_1a(prefix))
+    figs.extend(make_figure_1b(prefix, rng, mc_params))
+    figs.extend(make_figure_2a(prefix, rng))
+    figs.extend(make_figure_2b(prefix, rng, mc_params))
+    figs.extend(make_figure_3(prefix))
+    figs.extend(make_figure_5(prefix, colors))
+    figs.extend(make_figure_6(prefix, rng, colors, mc_params))
+    figs.extend(make_figure_7(prefix))
+    figs.extend(make_figure_8(prefix, colors))
 
     if close_figs:
         for fig in figs:
@@ -115,7 +114,7 @@ def make_figure_1a(prefix=None):
         fig1a.savefig(prefix + 'fig1a.svg')
         fig1a.savefig(prefix + 'fig1a.png')
 
-    return fig1a
+    return fig1a,
 
 
 def make_figure_1b(prefix=None, rng=np.random.default_rng(), mc_params=None):
@@ -197,7 +196,7 @@ def make_figure_1b(prefix=None, rng=np.random.default_rng(), mc_params=None):
         fig1b.savefig(prefix + 'fig1b.svg')
         fig1b.savefig(prefix + 'fig1b.png')
 
-    return fig1b
+    return fig1b,
 
 
 def make_figure_2a(prefix=None, rng=np.random.default_rng()):
@@ -233,7 +232,7 @@ def make_figure_2a(prefix=None, rng=np.random.default_rng()):
     # Convert from bits to symbols
     data_symbols = np.reshape(np.exp(1j*np.pi*data_bits_full), shape=(num_full_bits, 1))
     code_symbols = np.reshape(np.exp(1j*np.pi*code_bits_full), shape=(num_full_bits, 1))
-    out_symbols = np.reshape(np.exp(1j*np.pi*out_bits_full), newshape=(num_full_bits, 1))
+    out_symbols = np.reshape(np.exp(1j*np.pi*out_bits_full), shape=(num_full_bits, 1))
 
     # Generate the signals
     osf = 16  # Samples per cycle
@@ -274,7 +273,7 @@ def make_figure_2a(prefix=None, rng=np.random.default_rng()):
         fig2a.savefig(prefix + 'fig2a.svg')
         fig2a.savefig(prefix + 'fig2a.png')
 
-    return fig2a
+    return fig2a,
 
 
 def make_figure_2b(prefix=None, rng=np.random.default_rng(), mc_params=None):
@@ -368,7 +367,7 @@ def make_figure_2b(prefix=None, rng=np.random.default_rng(), mc_params=None):
         fig2b.savefig(prefix + 'fig2b.svg')
         fig2b.savefig(prefix + 'fig2b.png')
 
-    return fig2b
+    return fig2b,
 
 
 def make_figure_3(prefix=None):
@@ -405,7 +404,7 @@ def make_figure_3(prefix=None):
         fig3.savefig(prefix + 'fig3.svg')
         fig3.savefig(prefix + 'fig3.png')
 
-    return fig3
+    return fig3,
 
 
 def make_figure_5(prefix=None, colors=None):
@@ -454,7 +453,7 @@ def make_figure_5(prefix=None, colors=None):
         fig5.savefig(prefix + 'fig5.svg')
         fig5.savefig(prefix + 'fig5.png')
 
-    return fig5
+    return fig5,
 
 
 def make_figure_6(prefix=None, rng=np.random.default_rng(), colors=None, mc_params=None):
@@ -579,7 +578,7 @@ def make_figure_6(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
         fig6.savefig(prefix + 'fig6.svg')
         fig6.savefig(prefix + 'fig6.png')
 
-    return fig6
+    return fig6,
 
 
 def make_figure_7(prefix=None):
@@ -604,7 +603,7 @@ def make_figure_7(prefix=None):
         fig7.savefig(prefix + 'fig7.svg')
         fig7.savefig(prefix + 'fig7.png')
 
-    return fig7
+    return fig7,
 
 
 def make_figure_8(prefix=None, colors=None):
@@ -630,7 +629,7 @@ def make_figure_8(prefix=None, colors=None):
         fig8.savefig(prefix + 'fig8.svg')
         fig8.savefig(prefix + 'fig8.png')
 
-    return fig8
+    return fig8,
 
 
 if __name__ == "__main__":
