@@ -28,7 +28,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
 
     @property
     def num_measurements(self):
-        return self.pos.shape[1] * (2 if self.do_2d_aoa else 1)
+        return safe_2d_shape(self.pos)[1] * (2 if self.do_2d_aoa else 1)
 
     ## ============================================================================================================== ##
     ## Model Methods

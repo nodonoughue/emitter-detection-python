@@ -597,12 +597,12 @@ class SearchSpace:
             # infer from points_per_dim and epsilon
             assert epsilon is not None and points_per_dim is not None, 'Not enough inputs.'
             self.epsilon = epsilon
-            self.points_per_dim = points_per_dim
+            self.points_per_dim = np.array(points_per_dim, dtype=int)
             self.max_offset = self.epsilon * (self.points_per_dim - 1) / 2
         elif epsilon is None:
             # infer from points_per_dim and max_offset
             assert max_offset is not None and points_per_dim is not None, 'Not enough inputs.'
-            self.points_per_dim = points_per_dim
+            self.points_per_dim = np.array(points_per_dim, dtype=int)
             self.max_offset = max_offset
             out_shape = np.amax(np.shape(points_per_dim), np.shape(max_offset))
             self.epsilon = np.divide(max_offset, points_per_dim - 1, out=np.ones(out_shape), where=points_per_dim>1)

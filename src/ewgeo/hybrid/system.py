@@ -49,16 +49,25 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         return
 
+    def get_attr_from_pss(self, attr: str, concat_dim=None)-> npt.ArrayLike:
+        """
+        Get an attribute from the subordinate PSS systems and concatenate along the specified dimension.
+
+        :param attr: Attribute name to get from the subordinate PSS systems (str).
+        :param concat_dim: Dimension along which to concatenate the attribute values (int or None). If None,
+                           then the arrays are flattened before use.
+        :return: Attribute values concatenated along the specified dimension.
+        """
+        arr = [getattr(pss, attr) for pss in [self.aoa, self.tdoa, self.fdoa]
+               if pss is not None and getattr(pss, attr) is not None] # ignore any empty PSS fields,
+        if not arr:
+            return None
+        else:
+            return np.concatenate(arr, axis=concat_dim)
+
     @property
     def pos(self):
-        x_arr = []
-        if self.aoa is not None:
-            x_arr.append(self.aoa.pos)
-        if self.tdoa is not None:
-            x_arr.append(self.tdoa.pos)
-        if self.fdoa is not None:
-            x_arr.append(self.fdoa.pos)
-        return np.concatenate(x_arr, axis=1)
+        return self.get_attr_from_pss('pos', concat_dim=1)
 
     @pos.setter
     def pos(self, x: npt.ArrayLike):
@@ -74,26 +83,33 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
     @property
     def vel(self):
-        v_arr = []
-        if self.aoa is not None:
-            v_arr.append(np.zeros_like(self.aoa.pos))
-        if self.tdoa is not None:
-            v_arr.append(np.zeros_like(self.tdoa.pos))
-        if self.fdoa is not None:
-            v_arr.append(self.fdoa.vel)
-        return np.concatenate(v_arr, axis=1)
+        return self.get_attr_from_pss('vel', concat_dim=1)
 
     @vel.setter
     def vel(self, v: npt.ArrayLike):
-        desired_dims = (self.num_dim, self.num_sensors)
-        if np.any(v.shape != desired_dims):
-            raise ValueError(f'Input array shape {v.shape} does not match desired shape {desired_dims}.')
-        if self.aoa:
-            self.aoa.vel = v[:, self.aoa_sensor_idx]
-        if self.tdoa:
-            self.tdoa.vel = v[:, self.tdoa_sensor_idx]
-        if self.fdoa:
-            self.fdoa.vel = v[:, self.fdoa_sensor_idx]
+        if v is None:
+            # Delete it from all defined subordinates
+            [delattr(pss,'vel') for pss in [self.aoa, self.tdoa, self.fdoa] if pss is not None]
+            return
+        else:
+            # Check dimensions, parse the velocity, and distribute the result
+            desired_dims_full = (self.num_dim, self.num_sensors)
+            desired_dims_partial = (self.num_dim, self.num_fdoa_sensors)
+            if np.shape(v) == desired_dims_partial:
+                # Only FDOA velocity defined
+                # Clear it from AOA/TDOA, for good measure
+                [delattr(pss, 'vel') for pss in [self.aoa, self.tdoa] if pss is not None]
+                self.fdoa.vel = v
+            elif np.shape(v) == desired_dims_full:
+                if self.aoa:
+                    self.aoa.vel = v[:, self.aoa_sensor_idx]
+                if self.tdoa:
+                    self.tdoa.vel = v[:, self.tdoa_sensor_idx]
+                if self.fdoa:
+                    self.fdoa.vel = v[:, self.fdoa_sensor_idx]
+            else:
+                raise ValueError(f'Unable to parse input array shape {np.shape(v)}.')
+        return
 
     @property
     def num_aoa_sensors(self):
@@ -153,6 +169,9 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
     @property
     def default_bias_search_epsilon(self)-> npt.NDArray[np.float64]:
+        """
+        The bias search term needs to be either a scalar, or have shape (num_measurements,).
+        """
         bias_search_epsilon = []
         for pss in [self.aoa, self.tdoa, self.fdoa]:
             if pss is None: continue
@@ -163,23 +182,30 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
     @property
     def default_bias_search_size(self)-> npt.NDArray[np.int64]:
+        """
+        The bias search term needs to be either a scalar, or have shape (num_measurements,).
+        """
         bias_search_size = []
         for pss in [self.aoa, self.tdoa, self.fdoa]:
             if pss is None: continue
 
             # Add defaults from this PSS
             bias_search_size.append([pss.default_bias_search_size] * pss.num_measurements)
-        return np.concatenate(bias_search_size, axis=None)
+        return np.concatenate(bias_search_size, axis=None).astype(int)
 
     @property
     def default_sensor_pos_search_epsilon(self) -> npt.NDArray[np.float64]:
+        """
+        The sensor pos search term needs to either be scalar, or have the same shape as
+        self.pos
+        """
         sensor_pos_search_epsilon = []
         for pss in [self.aoa, self.tdoa, self.fdoa]:
             if pss is None: continue
 
             # Add defaults from this PSS
-            sensor_pos_search_epsilon.append([pss.default_sensor_pos_search_epsilon] * pss.num_sensors * self.num_dim)
-        return np.concatenate(sensor_pos_search_epsilon, axis=None)
+            sensor_pos_search_epsilon.append(pss.default_sensor_pos_search_epsilon * np.ones([self.num_dim, pss.num_sensors]))
+        return np.concatenate(sensor_pos_search_epsilon, axis=1)
 
     @property
     def default_sensor_pos_search_size(self) -> npt.NDArray[np.int64]:
@@ -188,8 +214,8 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
             if pss is None: continue
 
             # Add defaults from this PSS
-            sensor_pos_search_size.append([pss.default_sensor_pos_search_size] * pss.num_sensors * self.num_dim)
-        return np.concatenate(sensor_pos_search_size, axis=None)
+            sensor_pos_search_size.append(pss.default_sensor_pos_search_size * np.ones([self.num_dim, pss.num_sensors]))
+        return np.concatenate(sensor_pos_search_size, axis=1).astype(int)
 
     @property
     def default_sensor_vel_search_epsilon(self) -> npt.NDArray[np.float64]:
@@ -201,7 +227,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     @property
     def default_sensor_vel_search_size(self) -> npt.NDArray[np.int64]:
         if self.fdoa is not None:
-            return self.fdoa.default_sensor_vel_search_size
+            return np.array(self.fdoa.default_sensor_vel_search_size, dtype=int)
         else:
             return None
 
