@@ -122,7 +122,7 @@ def make_taper(taper_len: int, taper_type: str)-> (npt.NDArray, float):
 def parse_reference_sensor(ref_idx: str or npt.NDArray[np.int64] or None,
                            num_sensors:int=0)-> (npt.NDArray[np.int64], npt.NDArray[np.int64]):
     """
-    Accepts a reference index setting (either None, a string 'full', a scalar integer, or an array of sensor pairs),
+    Accepts a reference index setting (either None, a string 'full', a scalar integer, or an array of sensor pairs)
     and returns matching vectors for test and reference indices.
 
     :param ref_idx: reference index setting, acceptable formats are:
@@ -192,18 +192,7 @@ def resample_covariance_matrix(cov: npt.ArrayLike,
     n_sensor = np.size(cov, axis=0)
 
     # Determine output size
-    n_test = np.size(test_idx)
-    n_ref = np.size(ref_idx)
-    n_pair_out = np.fmax(n_test, n_ref)
-
-    # Error Checking
-    if 1 < n_test != n_ref > 1:
-        raise TypeError("Error calling covariance matrix resample.  "
-                        "Reference and test vectors must have the same shape.")
-
-    if np.any(test_idx >= n_sensor) or np.any(ref_idx >= n_sensor):
-        raise TypeError("Error calling covariance matrix resample.  "
-                        "Indices exceed the dimensions of the covariance matrix.")
+    n_pair_out = parse_ref_vec_output_size(test_idx, ref_idx)
 
     # Parse sensor weights
     shp_test_wt = 1
@@ -304,18 +293,7 @@ def resample_noise(noise: npt.NDArray[np.float64],
         ref_idx_vec = np.array(ref_idx, dtype=int)
 
     # Determine output size
-    n_test = np.size(test_idx_vec)
-    n_ref = np.size(ref_idx_vec)
-    n_pair_out = np.fmax(n_test, n_ref)
-
-    # Error Checking
-    if 1 < n_test != n_ref > 1:
-        raise TypeError("Error calling covariance matrix resample.  "
-                        "Reference and test vectors must have the same shape.")
-
-    if np.any(test_idx_vec >= n_sensor) or np.any(ref_idx_vec >= n_sensor):
-        raise TypeError("Error calling covariance matrix resample.  "
-                        "Indices exceed the dimensions of the covariance matrix.")
+    n_pair_out = parse_ref_vec_output_size(test_idx_vec, ref_idx_vec)
 
     # Parse sensor weights
     shp_test_wt = 1
@@ -362,6 +340,22 @@ def resample_noise(noise: npt.NDArray[np.float64],
     noise_out = np.fromfunction(element_func, (n_pair_out, ), dtype=float)
     return noise_out
 
+
+def parse_ref_vec_output_size(test_idx_vec: npt.NDArray[np.int64], ref_idx_vec: npt.NDArray[np.int64])-> int:
+    n_test = np.size(test_idx_vec)
+    n_ref = np.size(ref_idx_vec)
+    n_pair_out = np.fmax(n_test, n_ref)
+
+    # Error Checking
+    if 1 < n_test != n_ref > 1:
+        raise TypeError("Error calling covariance matrix resample.  "
+                        "Reference and test vectors must have the same shape.")
+
+    if np.any(test_idx_vec >= n_sensor) or np.any(ref_idx_vec >= n_sensor):
+        raise TypeError("Error calling covariance matrix resample.  "
+                        "Indices exceed the dimensions of the covariance matrix.")
+
+    return n_pair_out
 
 def ensure_invertible(covariance: npt.ArrayLike, epsilon: float=1e-20)-> npt.NDArray:
     """
@@ -436,7 +430,7 @@ def make_pdfs(measurement_function,
               covariance: npt.ArrayLike = 1):
     """
     Generate a joint PDF or set of unitary PDFs representing the measurements, given the measurement_function,
-    covariance matrix and pdf_type
+    covariance matrix, and pdf_type
 
     The only currently supported probability distribution types are:
         'mvn': multivariate normal

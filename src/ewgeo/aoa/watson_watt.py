@@ -8,7 +8,7 @@ from ewgeo.utils.unit_conversions import db_to_lin
 
 def crlb(snr, num_samples):
     """
-    Compute the lower bound on unbiased estimation error for a Watson - Watt based angle of arrival receiver.
+    Compute the lower bound on unbiased estimation error for a Watson-Watt-based angle of arrival receiver.
 
     Ported from MATLAB code.
 

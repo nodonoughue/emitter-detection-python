@@ -437,9 +437,10 @@ class CovarianceMatrix:
 
         if mean_vec is not None:
             # Make sure that mean_vec is a 1d array
-            if len(mean_vec.shape) > 1 and np.prod(mean_vec.shape[1:]) > 1:
+            mean_vec_dims = safe_2d_shape(mean_vec)
+            if mean_vec_dims[1] > 1:
                 warnings.warn("Input mean_vec is not a 1D array; it will be ignored.")
-            elif num_measurements != mean_vec.shape[0]:
+            elif num_measurements != mean_vec_dims[0]:
                 warnings.warn("Input mean_vec size does not match the covariance matrix; it will be ignored.")
             else:
                 # Add a new axis to the end of mean_vec, to ensure proper broadcasting to y

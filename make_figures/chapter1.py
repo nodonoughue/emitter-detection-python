@@ -106,7 +106,7 @@ def make_figure_1(prefix=None, rng=np.random.default_rng()):
     # Add overlay text
     plt.text(index_1+(num_samples/50), amplitude_1, 'Detection', fontsize=12)
     plt.text(index_2, amplitude_2+.5, 'Missed Detection', fontsize=12)
-    plt.text(index_spike-10, threshold+4, 'False Alarm', fontsize=12)
+    plt.text(index_spike.item()-10, threshold+4, 'False Alarm', fontsize=12)
 
     # Add legend
     plt.legend(loc='upper left')
@@ -245,8 +245,8 @@ def make_figure_3(prefix=None):
     plt.scatter(xs[0], xs[1], marker='^', label='Transmitter', zorder=3)
     
     # Position Labels
-    plt.text(x1[0]+.05, x1[1]-.1, '$S_1$')
-    plt.text(x2[0]+.05, x2[1]-.1, '$S_2$')
+    plt.text(x1[0].item() +.05, x1[1].item() -.1, '$S_1$')
+    plt.text(x2[0].item() +.05, x2[1].item() -.1, '$S_2$')
     
     # Adjust Axes
     plt.legend(loc='lower right')
