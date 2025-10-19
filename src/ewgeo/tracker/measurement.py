@@ -7,10 +7,10 @@ from .states import StateSpace, State
 
 class Measurement:
     time: float
-    sensor: PassiveSurveillanceSystem or None
+    sensor: PassiveSurveillanceSystem | None
     zeta: npt.ArrayLike
 
-    def __init__(self, time: float, sensor: PassiveSurveillanceSystem or None, zeta: npt.ArrayLike):
+    def __init__(self, time: float, sensor: PassiveSurveillanceSystem | None, zeta: npt.ArrayLike):
         self.time = time
         self.sensor = sensor
         self.zeta = zeta

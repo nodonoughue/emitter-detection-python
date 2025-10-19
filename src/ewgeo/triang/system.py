@@ -15,7 +15,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
     _default_aoa_bias_search_size: int = 11 # num search points per dimension
 
     def __init__(self,x: npt.ArrayLike,
-                 cov: CovarianceMatrix or npt.ArrayLike or None=None,
+                 cov: CovarianceMatrix | npt.ArrayLike | None=None,
                  do_2d_aoa: bool=False, **kwargs):
 
         super().__init__(x, cov, **kwargs)
@@ -36,12 +36,12 @@ class DirectionFinder(PassiveSurveillanceSystem):
     ## These methods handle the physical model for a Triangulation-based PSS, and are just wrappers for the static
     ## functions defined in model.py
     ## ============================================================================================================== ##
-    def measurement(self, x_source, x_sensor: npt.ArrayLike or None=None, bias: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None, v_source: npt.ArrayLike or None=None):
+    def measurement(self, x_source, x_sensor: npt.ArrayLike | None=None, bias: npt.ArrayLike | None=None, v_sensor: npt.ArrayLike | None=None, v_source: npt.ArrayLike | None=None):
         if x_sensor is None: x_sensor = self.pos
         if bias is None: bias = self.bias
         return model.measurement(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa, bias=bias)
 
-    def jacobian(self, x_source, v_source: npt.ArrayLike or None=None, x_sensor: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None):
+    def jacobian(self, x_source, v_source: npt.ArrayLike | None=None, x_sensor: npt.ArrayLike | None=None, v_sensor: npt.ArrayLike | None=None):
         if x_sensor is None: x_sensor = self.pos
         return model.jacobian(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
 
@@ -51,10 +51,10 @@ class DirectionFinder(PassiveSurveillanceSystem):
     def log_likelihood(self,
                        x_source: npt.ArrayLike,
                        zeta: npt.ArrayLike,
-                       x_sensor: npt.ArrayLike or None=None,
-                       bias: npt.ArrayLike or None=None,
-                       v_sensor: npt.ArrayLike or None=None,
-                       v_source: npt.ArrayLike or None=None,
+                       x_sensor: npt.ArrayLike| None=None,
+                       bias: npt.ArrayLike | None=None,
+                       v_sensor: npt.ArrayLike | None=None,
+                       v_source: npt.ArrayLike | None=None,
                        **kwargs):
         if x_sensor is None: x_sensor = self.pos
         if bias is None: bias = self.bias
@@ -95,9 +95,6 @@ class DirectionFinder(PassiveSurveillanceSystem):
     ##
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
-    def compute_crlb(self, x_source, print_progress=False, **kwargs):
-        return perf.compute_crlb(x_sensor=self.pos, cov=self.cov, x_source=x_source, do_2d_aoa=self.do_2d_aoa,
-                                 print_progress=print_progress, **kwargs)
 
     ## ============================================================================================================== ##
     ## Helper Methods
@@ -108,7 +105,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
         return model.error(x_sensor=self.pos, x_source=x_source, x_max=x_max, num_pts=num_pts, cov=self.cov,
                            do_2d_aoa=self.do_2d_aoa)
 
-    def draw_lobs(self, zeta, x_sensor: npt.ArrayLike or None=None, **kwargs):
+    def draw_lobs(self, zeta, x_sensor: npt.ArrayLike | None=None, **kwargs):
         """
         Draw lines of bearing from each sensor corresponding to each measurement
 

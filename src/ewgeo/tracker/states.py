@@ -14,10 +14,10 @@ class StateSpace:
     has_pos: bool
     has_vel: bool
     has_accel: bool
-    pos_slice: slice or None
-    vel_slice: slice or None
-    pos_vel_slice: slice or None
-    accel_slice: slice or None
+    pos_slice: slice | None
+    vel_slice: slice | None
+    pos_vel_slice: slice | None
+    accel_slice: slice | None
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -88,7 +88,7 @@ class State:
         return self.state_space.has_accel
 
     @ property
-    def position_covar(self) -> CovarianceMatrix or None:
+    def position_covar(self) -> CovarianceMatrix | None:
         if self.covar is None:
             return None
         else:
@@ -96,7 +96,7 @@ class State:
             return CovarianceMatrix(self.covar.cov[pos_slice, pos_slice])
 
     @property
-    def velocity_covar(self) -> CovarianceMatrix or None:
+    def velocity_covar(self) -> CovarianceMatrix | None:
         if self.covar is None or not self.has_vel:
             return None
         else:
@@ -104,7 +104,7 @@ class State:
             return CovarianceMatrix(self.covar.cov[vel_slice, vel_slice])
 
     @property
-    def acceleration_covar(self) -> CovarianceMatrix or None:
+    def acceleration_covar(self) -> CovarianceMatrix | None:
         if self.covar is None or not self.has_accel:
             return None
         else:
@@ -112,7 +112,7 @@ class State:
             return CovarianceMatrix(self.covar.cov[accel_slice, accel_slice])
 
     @property
-    def pos_vel_covar(self) -> CovarianceMatrix or None:
+    def pos_vel_covar(self) -> CovarianceMatrix | None:
         if self.covar is None:
             return None
         else:

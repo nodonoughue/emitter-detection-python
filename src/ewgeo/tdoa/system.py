@@ -14,7 +14,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
     _default_tdoa_bias_search_size: int = 11 # num search points per dimension
 
     def __init__(self,x: npt.ArrayLike,
-                 cov: CovarianceMatrix or npt.ArrayLike or None=None,
+                 cov: CovarianceMatrix | npt.ArrayLike | None=None,
                  variance_is_toa=True, **kwargs):
 
         # First, we need to convert from TOA to ROA
@@ -38,18 +38,18 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
     ## functions defined in model.py
     ## ============================================================================================================== ##
     def measurement(self, x_source: npt.ArrayLike,
-                    x_sensor: npt.ArrayLike or None=None,
-                    bias: npt.ArrayLike or None=None,
-                    v_sensor: npt.ArrayLike or None=None,
-                    v_source: npt.ArrayLike or None=None):
+                    x_sensor: npt.ArrayLike | None=None,
+                    bias: npt.ArrayLike | None=None,
+                    v_sensor: npt.ArrayLike | None=None,
+                    v_source: npt.ArrayLike | None=None):
         if x_sensor is None: x_sensor = self.pos
         if bias is None: bias = self.bias
         return model.measurement(x_sensor=x_sensor, x_source=x_source, ref_idx=self.ref_idx, bias=bias)
 
     def jacobian(self, x_source: npt.ArrayLike,
-                 v_source: npt.ArrayLike or None=None,
-                 x_sensor: npt.ArrayLike or None=None,
-                 v_sensor: npt.ArrayLike or None=None):
+                 v_source: npt.ArrayLike | None=None,
+                 x_sensor: npt.ArrayLike | None=None,
+                 v_sensor: npt.ArrayLike | None=None):
         if x_sensor is None: x_sensor = self.pos
         return model.jacobian(x_sensor=x_sensor, x_source=x_source, ref_idx=self.ref_idx)
 
@@ -57,10 +57,10 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         return model.jacobian_uncertainty(x_sensor=self.pos, x_source=x_source, ref_idx=self.ref_idx, **kwargs)
 
     def log_likelihood(self, zeta: npt.ArrayLike, x_source: npt.ArrayLike,
-                       x_sensor: npt.ArrayLike or None=None,
-                       bias: npt.ArrayLike or None=None,
-                       v_sensor: npt.ArrayLike or None=None,
-                       v_source: npt.ArrayLike or None=None, **kwargs):
+                       x_sensor: npt.ArrayLike | None=None,
+                       bias: npt.ArrayLike | None=None,
+                       v_sensor: npt.ArrayLike | None=None,
+                       v_source: npt.ArrayLike | None=None, **kwargs):
         if x_sensor is None: x_sensor = self.pos
         if bias is None: bias = self.bias
         return model.log_likelihood(x_sensor=x_sensor, zeta=zeta, x_source=x_source, cov=self.cov, ref_idx=self.ref_idx,
@@ -96,9 +96,6 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
-    def compute_crlb(self, x_source: npt.ArrayLike, **kwargs):
-        return perf.compute_crlb(x_sensor=self.pos, x_source=x_source, cov=self.cov, ref_idx=self.ref_idx,
-                                  do_resample=False, variance_is_toa=False, **kwargs)
 
     ## ============================================================================================================== ##
     ## Helper Methods
@@ -110,7 +107,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
                            do_resample=False, variance_is_toa=False, ref_idx=self.ref_idx)
 
     def draw_isochrones(self, range_diff: npt.ArrayLike, num_pts: int, max_ortho: float,
-                        x_sensor: npt.ArrayLike or None=None):
+                        x_sensor: npt.ArrayLike | None=None):
         if x_sensor is None:
             x_sensor = self.pos
 

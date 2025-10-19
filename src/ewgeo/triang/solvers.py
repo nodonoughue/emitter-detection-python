@@ -122,7 +122,7 @@ def _parse_sensor_triplets(x_sensor: npt.ArrayLike):
     return sensor_sets, num_sets
 
 
-def _find_vertices(x: npt.ArrayLike, zeta: npt.ArrayLike) -> (npt.ArrayLike, npt.ArrayLike, npt.ArrayLike):
+def _find_vertices(x: npt.ArrayLike, zeta: npt.ArrayLike) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
     # Find vertices
     v0 = find_intersect(x[:, 0], zeta[0], x[:, 1], zeta[1])
     v1 = find_intersect(x[:, 1], zeta[1], x[:, 2], zeta[2])

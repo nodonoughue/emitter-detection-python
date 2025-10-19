@@ -6,7 +6,7 @@ import ewgeo.utils as utils
 from ewgeo.utils.covariance import CovarianceMatrix
 
 
-def measurement(x_sensor, x_source, do_2d_aoa=False, bias: npt.ArrayLike or None=None):
+def measurement(x_sensor, x_source, do_2d_aoa=False, bias: npt.ArrayLike | None=None):
     """
     Computes angle of arrival measurements.
 
@@ -202,7 +202,7 @@ def jacobian_uncertainty(x_sensor, x_source, do_2d_aoa=False, do_bias=False, do_
 
     return j
 
-def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=False, bias: npt.ArrayLike or None=None,
+def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=False, bias: npt.ArrayLike | None=None,
                    print_progress=True):
     """
     Computes the Log Likelihood for AOA sensor measurement, given the

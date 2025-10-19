@@ -14,7 +14,7 @@ from ewgeo.utils.unit_conversions import db_to_lin
 def measurement(x_sensor: npt.ArrayLike,
                 x_source: npt.ArrayLike,
                 ref_idx=None,
-                bias: npt.ArrayLike or None=None):
+                bias: npt.ArrayLike | None=None):
     """
     Computes TDOA measurements and converts to range difference of arrival (by compensating for the speed of light).
 
@@ -175,7 +175,7 @@ def log_likelihood(x_sensor: npt.ArrayLike,
                    ref_idx=None,
                    do_resample: bool=False,
                    variance_is_toa: bool=True,
-                   bias: npt.ArrayLike or None=None,
+                   bias: npt.ArrayLike | None=None,
                    print_progress=False):
     """
     Computes the Log Likelihood for TDOA sensor measurement, given the received range difference measurement vector
@@ -360,7 +360,7 @@ def toa_error_peak_detection(snr: npt.ArrayLike):
 def toa_error_cross_corr(snr: npt.ArrayLike,
                          bandwidth: npt.ArrayLike,
                          pulse_len: npt.ArrayLike,
-                         bandwidth_rms: npt.ArrayLike or None=None):
+                         bandwidth_rms: npt.ArrayLike | None=None):
     """
     Computes the timing error for a Cross-Correlation time of arrival
     estimator, given the input signal's bandwidth, pulse length, and RMS

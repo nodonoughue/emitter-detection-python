@@ -17,7 +17,7 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     _default_fdoa_vel_search_size: int = 11 # num elements per search dimensions
 
     def __init__(self,x: npt.ArrayLike,
-                 cov: CovarianceMatrix or npt.ArrayLike or None=None, **kwargs):
+                 cov: CovarianceMatrix | npt.ArrayLike | None=None, **kwargs):
         super().__init__(x=x, cov=cov, **kwargs)
 
         # Overwrite uncertainty search defaults
@@ -32,14 +32,14 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ## These methods handle the physical model for a FDOA-based PSS, and are just wrappers for the static
     ## functions defined in model.py
     ## ============================================================================================================== ##
-    def measurement(self, x_source, v_source: npt.ArrayLike or None=None, x_sensor: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None, bias: npt.ArrayLike or None=None):
+    def measurement(self, x_source, v_source: npt.ArrayLike | None=None, x_sensor: npt.ArrayLike | None=None, v_sensor: npt.ArrayLike | None=None, bias: npt.ArrayLike | None=None):
         if x_sensor is None: x_sensor = self.pos
         if v_sensor is None: v_sensor = self.vel
         if bias is None: bias = self.bias
         return model.measurement(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source,
                                  ref_idx=self.ref_idx, bias=bias)
 
-    def jacobian(self, x_source, v_source: npt.ArrayLike or None=None, x_sensor: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None):
+    def jacobian(self, x_source, v_source: npt.ArrayLike | None=None, x_sensor: npt.ArrayLike | None=None, v_sensor: npt.ArrayLike | None=None):
         if x_sensor is None: x_sensor = self.pos
         if v_sensor is None: v_sensor = self.vel
         return model.jacobian(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source,
@@ -49,7 +49,11 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         return model.jacobian_uncertainty(x_sensor=self.pos, x_source=x_source, v_sensor=self.vel,
                                           ref_idx=self.ref_idx, **kwargs)
 
-    def log_likelihood(self, zeta, x_source, x_sensor: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None, v_source: npt.ArrayLike or None=None, bias: npt.ArrayLike or None=None, **kwargs):
+    def log_likelihood(self, zeta, x_source: npt.ArrayLike,
+                       x_sensor: npt.ArrayLike | None=None,
+                       v_sensor: npt.ArrayLike | None=None,
+                       v_source: npt.ArrayLike | None=None,
+                       bias: npt.ArrayLike | None=None, **kwargs):
         if x_sensor is None: x_sensor = self.pos
         if v_sensor is None: v_sensor = self.vel
         if bias is None: bias = self.bias
@@ -78,28 +82,19 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
-    def compute_crlb(self, x_source, v_source: npt.ArrayLike or None=None, **kwargs):
-
-        def this_jacobian(pos_vel):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, default_vel=v_source)
-            n_dim, _ = safe_2d_shape(pos_vel) # is the calling function asking for just pos or pos/vel?
-            # Jacobian returns 2*self.n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
-            # excise just the position portion
-            return self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=self.pos, v_sensor=self.vel)[:n_dim]
-
-        return compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov, **kwargs)
 
     ## ============================================================================================================== ##
     ## Helper Methods
     ##
     ## These are generic utility functions that are unique to this class
     ## ============================================================================================================== ##
-    def error(self, x_source, x_max, num_pts, v_source: npt.ArrayLike or None=None):
+    def error(self, x_source, x_max, num_pts, v_source: npt.ArrayLike | None=None):
         return model.error(x_sensor=self.pos, x_source=x_source, v_sensor=self.vel, v_source=v_source,
                            x_max=x_max, num_pts=num_pts, cov=self.cov,
                            do_resample=False, ref_idx=self.ref_idx)
 
-    def draw_isodoppler(self, vel_diff, num_pts, max_ortho, v_source: npt.ArrayLike or None=None, x_sensor: npt.ArrayLike or None=None, v_sensor: npt.ArrayLike or None=None):
+    def draw_isodoppler(self, vel_diff, num_pts, max_ortho,
+    v_source: npt.ArrayLike | None=None, x_sensor: npt.ArrayLike | None=None, v_sensor: npt.ArrayLike | None=None):
         if x_sensor is None:
             x_sensor = self.pos
         if v_sensor is None:

@@ -6,19 +6,20 @@ import numpy.typing as npt
 
 from . import make_pdfs, safe_2d_shape, SearchSpace
 from .covariance import CovarianceMatrix
+from .perf import compute_crlb_gaussian
 from .solvers import ml_solver, gd_solver, ls_solver, bestfix_solver, sensor_calibration
 
 class PassiveSurveillanceSystem(ABC):
-    _cov: CovarianceMatrix or None = None
+    _cov: CovarianceMatrix | None = None
     pos: npt.ArrayLike
     num_sensors: int
     num_dim: int
     num_measurements: int
 
     # Optional Fields
-    bias: npt.ArrayLike or None = None              # User-defined sensor measurement biases
-    vel: npt.ArrayLike or None = None               # Sensor velocity; ignored if not defined
-    _cov_pos: CovarianceMatrix or None = None    # Assumed sensor position error covariance
+    bias: npt.ArrayLike | None = None              # User-defined sensor measurement biases
+    vel: npt.ArrayLike | None = None               # Sensor velocity; ignored if not defined
+    _cov_pos: CovarianceMatrix | None = None    # Assumed sensor position error covariance
 
     # Default Values
     # --- No default sensor bias search resolution; let each PSS type overwrite this
@@ -33,10 +34,10 @@ class PassiveSurveillanceSystem(ABC):
     default_sensor_vel_search_size: int = 1  # By default, we can't search across sensor velocity
 
     def __init__(self, x: npt.ArrayLike,
-                 cov: CovarianceMatrix or npt.ArrayLike or None=None,
-                 bias: npt.ArrayLike or None=None,
-                 cov_pos: CovarianceMatrix or npt.ArrayLike or None=None,
-                 vel: npt.ArrayLike or None=None):
+                 cov: CovarianceMatrix | npt.ArrayLike | None=None,
+                 bias: npt.ArrayLike | None=None,
+                 cov_pos: CovarianceMatrix | npt.ArrayLike | None=None,
+                 vel: npt.ArrayLike | None=None):
         if len(np.shape(x))<2: x = np.expand_dims(x, 1) # Add a second dimension if there isn't one
         self.pos = x
 
@@ -65,7 +66,7 @@ class PassiveSurveillanceSystem(ABC):
         return self._cov
 
     @cov.setter
-    def cov(self, value: CovarianceMatrix or npt.ArrayLike or None):
+    def cov(self, value: CovarianceMatrix | npt.ArrayLike | None):
         if isinstance(value, CovarianceMatrix) or value is None:
             # Nothing to do; set the parameter
             self._cov = value
@@ -74,11 +75,11 @@ class PassiveSurveillanceSystem(ABC):
         return
 
     @property
-    def cov_pos(self)-> CovarianceMatrix or None:
+    def cov_pos(self)-> CovarianceMatrix | None:
         return self._cov_pos
 
     @cov_pos.setter
-    def cov_pos(self, value: CovarianceMatrix or npt.ArrayLike or None):
+    def cov_pos(self, value: CovarianceMatrix | npt.ArrayLike | None):
         if isinstance(value, CovarianceMatrix) or value is None:
             self._cov_pos = value
         else:
@@ -89,10 +90,10 @@ class PassiveSurveillanceSystem(ABC):
     # These methods define the sensor measurement model, and must be implemented.
     @abstractmethod
     def measurement(self, x_source: npt.ArrayLike, 
-                    x_sensor: npt.ArrayLike or None=None, 
-                    bias: npt.ArrayLike or None=None, 
-                    v_sensor: npt.ArrayLike or None=None, 
-                    v_source: npt.ArrayLike or None=None)-> npt.NDArray:
+                    x_sensor: npt.ArrayLike | None=None,
+                    bias: npt.ArrayLike | None=None,
+                    v_sensor: npt.ArrayLike | None=None,
+                    v_source: npt.ArrayLike | None=None)-> npt.NDArray:
         pass
 
     def measurement_from_pos_vel(self, pos_vel: npt.ArrayLike, **kwargs)-> npt.NDArray:
@@ -130,17 +131,19 @@ class PassiveSurveillanceSystem(ABC):
 
     @abstractmethod
     def jacobian(self, x_source: npt.ArrayLike, 
-                 v_source: npt.ArrayLike or None=None, 
-                 x_sensor: npt.ArrayLike or None=None, 
-                 v_sensor: npt.ArrayLike or None=None)-> npt.NDArray:
+                 v_source: npt.ArrayLike | None=None,
+                 x_sensor: npt.ArrayLike | None=None,
+                 v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
         pass
 
     def jacobian_from_posvel(self, pos_vel: npt.ArrayLike, **kwargs):
         """
-        Wrapper for the jacobian function that accepts one required input a pos_vel vector that is either (num_dim, num_source) or (2*num_dim, num_source)
+        Wrapper for the jacobian function that accepts one input a pos_vel vector that is either (num_dim, num_source)
+        or (2*num_dim, num_source)
 
         In the former case, it is taken to be solely a position vector, and the jacobian w.r.t position is returned.
-        In the latter, the jacobian is returned with respect to position and velocity (and the second half of pos_vel is used as source velocity)
+        In the latter, the jacobian is returned with respect to position and velocity (and the second half of pos_vel
+        is used as source velocity)
         """
         pos, vel = self.parse_source_pos_vel(pos_vel, default_vel=np.zeros_like(pos_vel))
         j = self.jacobian(x_source=pos, v_source=vel, **kwargs)
@@ -154,10 +157,10 @@ class PassiveSurveillanceSystem(ABC):
     @abstractmethod
     def log_likelihood(self, x_source: npt.ArrayLike,
                        zeta: npt.ArrayLike,
-                       x_sensor: npt.ArrayLike or None=None,
-                       bias: npt.ArrayLike or None=None,
-                       v_sensor: npt.ArrayLike or None=None,
-                       v_source: npt.ArrayLike or None=None, **kwargs):
+                       x_sensor: npt.ArrayLike | None=None,
+                       bias: npt.ArrayLike | None=None,
+                       v_sensor: npt.ArrayLike | None=None,
+                       v_source: npt.ArrayLike | None=None, **kwargs):
         pass
 
     def log_likelihood_from_posvel(self, pos_vel: npt.ArrayLike, **kwargs):
@@ -236,8 +239,8 @@ class PassiveSurveillanceSystem(ABC):
     # These methods define the basic solver methods, and associated utilities, and must be implemented.
     def max_likelihood(self, zeta: npt.ArrayLike,
                        search_space: SearchSpace,
-                       bias: npt.ArrayLike or None=None,
-                       cal_data: dict or None=None,
+                       bias: npt.ArrayLike | None=None,
+                       cal_data: dict | None=None,
                        **kwargs):
 
         if cal_data is not None:
@@ -396,7 +399,7 @@ class PassiveSurveillanceSystem(ABC):
     def sensor_calibration(self,
                            zeta_cal: npt.ArrayLike,
                            x_cal: npt.ArrayLike,
-                           v_cal: npt.ArrayLike or None=None,
+                           v_cal: npt.ArrayLike | None=None,
                            pos_search: SearchSpace=None,
                            vel_search: SearchSpace=None,
                            bias_search: SearchSpace=None,
@@ -708,9 +711,9 @@ class PassiveSurveillanceSystem(ABC):
 
     # ==================== Performance Methods ================
     # These methods define basic performance predictions, and must be implemented
-    @abstractmethod
     def compute_crlb(self, x_source, **kwargs):
-        pass
+        return compute_crlb_gaussian(x_source=x_source, jacobian=self.jacobian_from_posvel, cov=self.cov,
+                                     **kwargs)
 
     # ==================== Helper Methods =====================
     def plot_sensors(self, scale: float=1, ax: Axes=None, **kwargs):
@@ -765,20 +768,20 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
     When accessing the covariance matrix, the difference-level covariance will be returned. To access the sensor-level
     covariance matrix directly, reference the cov_raw parameter.
     """
-    _ref_idx: npt.ArrayLike or str or None = None       # specification for sensor pairs to use in difference operation
-                                                        # Accepted values are:
-                                                        #   int                         Index of common reference sensor
-                                                        #   (2, num_pairs) ndarray      List of sensor pairs
-                                                        #   'full'                      Use all possible sensor pairs
-    _cov_resample: CovarianceMatrix or None             # difference-level covariance matrix
-    _cov_raw: CovarianceMatrix or None                  # sensor-level covariance matrix
+    _ref_idx: npt.ArrayLike | str | None = None       # specification for sensor pairs to use in difference operation
+                                                      # Accepted values are:
+                                                      #   int                         Index of common reference sensor
+                                                      #   (2, num_pairs) ndarray      List of sensor pairs
+                                                      #   'full'                      Use all possible sensor pairs
+    _cov_resample: CovarianceMatrix | None           # difference-level covariance matrix
+    _cov_raw: CovarianceMatrix | None                # sensor-level covariance matrix
     _do_resample: bool = True
 
     parent = None
 
     def __init__(self, x: npt.ArrayLike,
-                 cov: CovarianceMatrix or npt.ArrayLike or None,
-                 ref_idx: str or npt.ArrayLike=None,
+                 cov: CovarianceMatrix | npt.ArrayLike | None,
+                 ref_idx: str | npt.ArrayLike=None,
                  do_resample: bool = True,
                  **kwargs):
         (super().__init__(x, cov, **kwargs))
@@ -798,10 +801,10 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
         return self._cov_resample
 
     @cov.setter
-    def cov(self, cov: CovarianceMatrix or npt.ArrayLike or None):
+    def cov(self, cov: CovarianceMatrix | npt.ArrayLike | None):
         self.update_covariance_matrix(cov)
 
-    def update_covariance_matrix(self, cov: CovarianceMatrix or npt.ArrayLike or None,
+    def update_covariance_matrix(self, cov: CovarianceMatrix | npt.ArrayLike | None,
                                  do_resample: bool = True):
         # Must be input as a raw covariance matrix; one per sensor. Set the
         # do_resample flag.
@@ -837,7 +840,7 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
         return self._ref_idx
 
     @ref_idx.setter
-    def ref_idx(self, idx: str or npt.ArrayLike or None):
+    def ref_idx(self, idx: str | npt.ArrayLike | None):
         self._ref_idx = idx
         self._do_resample = True  # Reset the do_resample flag
         if self.parent is not None: self.parent._do_resample = True

@@ -72,7 +72,7 @@ def sinc_derivative(x: npt.ArrayLike)-> npt.NDArray:
                         [0, lambda z: (z * np.cos(z) - np.sin(z)) / (z ** 2)])
 
 
-def make_taper(taper_len: int, taper_type: str)-> (npt.NDArray, float):
+def make_taper(taper_len: int, taper_type: str)-> tuple[npt.NDArray, float]:
     """
     Generate an amplitude taper of length N, according to the desired taperType, and optional set of parameters
 
@@ -119,8 +119,8 @@ def make_taper(taper_len: int, taper_type: str)-> (npt.NDArray, float):
     return w, snr_loss
 
 
-def parse_reference_sensor(ref_idx: str or npt.NDArray[np.int64] or None,
-                           num_sensors:int=0)-> (npt.NDArray[np.int64], npt.NDArray[np.int64]):
+def parse_reference_sensor(ref_idx: str | npt.NDArray[np.int64] | None,
+                           num_sensors:int=0)-> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64]]:
     """
     Accepts a reference index setting (either None, a string 'full', a scalar integer, or an array of sensor pairs)
     and returns matching vectors for test and reference indices.
@@ -258,7 +258,7 @@ def resample_covariance_matrix(cov: npt.ArrayLike,
 
 def resample_noise(noise: npt.NDArray[np.float64],
                    test_idx: npt.NDArray[np.int64] = None,
-                   ref_idx: str or npt.NDArray[np.int64] or None=None,
+                   ref_idx: str | npt.NDArray[np.int64] | None=None,
                    test_weights: npt.ArrayLike=None,
                    ref_weights: npt.ArrayLike=None) -> npt.NDArray:
     """
@@ -616,7 +616,7 @@ class SearchSpace:
         for attr in attrs:
             setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=b.shape))
 
-def make_nd_grid(search_space: SearchSpace)-> (npt.NDArray, tuple[npt.NDArray], tuple[int]):
+def make_nd_grid(search_space: SearchSpace)-> tuple[npt.NDArray, tuple, tuple[int]]:
     """
     Create and return an ND search grid, based on the specified center of the search space, extent, and grid spacing.
 

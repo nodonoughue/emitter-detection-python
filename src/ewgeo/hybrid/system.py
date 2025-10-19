@@ -13,9 +13,9 @@ from ewgeo.utils.system import DifferencePSS
 
 class HybridPassiveSurveillanceSystem(DifferencePSS):
     bias = None
-    aoa: DirectionFinder or None = None
-    tdoa: TDOAPassiveSurveillanceSystem or None = None
-    fdoa: FDOAPassiveSurveillanceSystem or None = None
+    aoa: DirectionFinder | None = None
+    tdoa: TDOAPassiveSurveillanceSystem | None = None
+    fdoa: FDOAPassiveSurveillanceSystem | None = None
 
     aoa_sensor_idx = None
     tdoa_sensor_idx = None
@@ -25,10 +25,10 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     tdoa_measurement_idx = None
     fdoa_measurement_idx = None
 
-    def __init__(self, cov: CovarianceMatrix or npt.ArrayLike or None=None,
-                 aoa: DirectionFinder or None=None, tdoa: TDOAPassiveSurveillanceSystem or None=None,
-                 fdoa: FDOAPassiveSurveillanceSystem or None=None,
-                 ref_idx: str or npt.ArrayLike or None=None, **kwargs):
+    def __init__(self, cov: CovarianceMatrix | npt.ArrayLike | None=None,
+                 aoa: DirectionFinder | None=None, tdoa: TDOAPassiveSurveillanceSystem | None=None,
+                 fdoa: FDOAPassiveSurveillanceSystem | None=None,
+                 ref_idx: str | npt.ArrayLike | None=None, **kwargs):
 
         assert aoa is not None or tdoa is not None or fdoa is not None, \
             'Error initializing HybridPSS system; at least one type of subordinate PSS system must be supplied.'
@@ -238,10 +238,10 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     ## functions defined in model.py
     ## ============================================================================================================== ##
     def measurement(self, x_source: npt.ArrayLike,
-                    x_sensor: npt.ArrayLike or None=None,
-                    bias: npt.ArrayLike or None=None,
-                    v_sensor: npt.ArrayLike or None=None,
-                    v_source: npt.ArrayLike or None=None)-> npt.NDArray:
+                    x_sensor: npt.ArrayLike | None=None,
+                    bias: npt.ArrayLike | None=None,
+                    v_sensor: npt.ArrayLike | None=None,
+                    v_source: npt.ArrayLike | None=None)-> npt.NDArray:
         # Call the three measurement models and concatenate the results along the first axis
 
         # Break apart the sensor position, velocity, and bias measurement inputs into their AOA, TDOA, and FDOA
@@ -272,9 +272,9 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         return np.concatenate(measurements, axis=0)
 
     def jacobian(self, x_source: npt.ArrayLike,
-                 v_source: npt.ArrayLike or None=None,
-                 x_sensor: npt.ArrayLike or None=None,
-                 v_sensor: npt.ArrayLike or None=None)-> npt.NDArray:
+                 v_source: npt.ArrayLike | None=None,
+                 x_sensor: npt.ArrayLike | None=None,
+                 v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
         # Parse sensor pos/vel overrides
         if x_sensor is None:
             x_aoa = self.aoa.pos if self.aoa is not None else None
@@ -312,7 +312,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         return np.concatenate(to_concat, axis=1)
 
     def jacobian_uncertainty(self, x_source: npt.ArrayLike,
-                             v_source: npt.ArrayLike or None=None, **kwargs)-> npt.NDArray:
+                             v_source: npt.ArrayLike | None=None, **kwargs)-> npt.NDArray:
         # Parse source position and velocity
         if v_source is None:
             # It might be passed as a single input under x_source with 2*num_dim rows
@@ -331,10 +331,10 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         return np.concatenate(to_concat, axis=1)
 
     def log_likelihood(self, x_source: npt.ArrayLike, zeta: npt.ArrayLike,
-                       x_sensor: npt.ArrayLike or None=None,
-                       bias: npt.ArrayLike or None=None,
-                       v_sensor: npt.ArrayLike or None=None,
-                       v_source: npt.ArrayLike or None=None, **kwargs)-> npt.NDArray:
+                       x_sensor: npt.ArrayLike | None=None,
+                       bias: npt.ArrayLike | None=None,
+                       v_sensor: npt.ArrayLike | None=None,
+                       v_source: npt.ArrayLike | None=None, **kwargs)-> npt.NDArray:
         # Break apart the sensor position, velocity, and bias measurement inputs into their AOA, TDOA, and FDOA
         # components
         x_aoa, x_tdoa, x_fdoa = self.parse_sensor_data(x_sensor)
@@ -433,7 +433,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     ## ============================================================================================================== ##
     def max_likelihood_uncertainty(self, zeta: npt.ArrayLike, search_space:SearchSpace,
                                    do_sensor_bias: bool=False, do_sensor_pos: bool=False, do_sensor_vel: bool=False,
-                                   **kwargs)-> (npt.NDArray, npt.NDArray, dict):
+                                   **kwargs)-> tuple[npt.NDArray, npt.NDArray, dict]:
 
         # Call the super class to do the search, then reparse the results
         x_est, likelihood, th_grid, th_est = super().max_likelihood_uncertainty(zeta, search_space, do_sensor_bias,
@@ -507,23 +507,6 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
-    def compute_crlb(self, x_source: npt.ArrayLike, v_source: npt.ArrayLike or None=None, **kwargs)-> npt.NDArray:
-        """
-        If x_source has 2*self.num_dim rows (position and velocity), then the CRLB will be computed across both sets of
-        unknowns.
-
-        If x_source has self.num_dim rows, then it is just position, and the CRLB will be computed across only those
-        uncertainties.
-        """
-        def this_jacobian(pos_vel: npt.ArrayLike):
-            this_pos, this_vel = self.parse_source_pos_vel(pos_vel, default_vel=v_source)
-            n_dim, _ = safe_2d_shape(pos_vel) # record the number of output dimensions called for
-            j = self.jacobian(x_source=this_pos, v_source=this_vel, x_sensor=self.pos, v_sensor=self.vel)
-            # Jacobian returns 2*n_dim rows; first the jacobian w.r.t. position, then velocity. Optionally
-            # excise just the position portion
-            return j[:n_dim]
-
-        return compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov, **kwargs)
 
     ## ============================================================================================================== ##
     ## Helper Methods
@@ -587,7 +570,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         return new_cov
 
-    def update_covariance_matrix(self, cov: CovarianceMatrix or npt.ArrayLike or None=None, do_resample: bool=True):
+    def update_covariance_matrix(self, cov: CovarianceMatrix | npt.ArrayLike | None=None, do_resample: bool=True):
         if cov is None:
             # No covariance matrix specified, we'll parse the subordinate methods to make one
             super().update_covariance_matrix(cov=self.parse_covariance_matrix(), do_resample=False)

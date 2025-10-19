@@ -12,7 +12,7 @@ def compute_crlb(x_sensor: npt.ArrayLike,
                  v_sensor: npt.ArrayLike,
                  x_source: npt.ArrayLike,
                  cov: CovarianceMatrix,
-                 v_source: npt.ArrayLike or None=None,
+                 v_source: npt.ArrayLike | None=None,
                  ref_idx=None,
                  do_resample: bool=True,
                  print_progress: bool=False, **kwargs):
