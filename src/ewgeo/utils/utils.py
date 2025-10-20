@@ -192,7 +192,7 @@ def resample_covariance_matrix(cov: npt.ArrayLike,
     n_sensor = np.size(cov, axis=0)
 
     # Determine output size
-    n_pair_out = parse_ref_vec_output_size(test_idx, ref_idx)
+    n_test, n_ref, n_pair_out = parse_ref_vec_output_size(test_idx, ref_idx, n_sensor)
 
     # Parse sensor weights
     shp_test_wt = 1
@@ -293,7 +293,7 @@ def resample_noise(noise: npt.NDArray[np.float64],
         ref_idx_vec = np.array(ref_idx, dtype=int)
 
     # Determine output size
-    n_pair_out = parse_ref_vec_output_size(test_idx_vec, ref_idx_vec)
+    n_test, n_ref, n_pair_out = parse_ref_vec_output_size(test_idx_vec, ref_idx_vec, n_sensor)
 
     # Parse sensor weights
     shp_test_wt = 1
@@ -341,7 +341,9 @@ def resample_noise(noise: npt.NDArray[np.float64],
     return noise_out
 
 
-def parse_ref_vec_output_size(test_idx_vec: npt.NDArray[np.int64], ref_idx_vec: npt.NDArray[np.int64])-> int:
+def parse_ref_vec_output_size(test_idx_vec: npt.NDArray[np.int64],
+                              ref_idx_vec: npt.NDArray[np.int64],
+                              n_sensor: int)-> tuple[int, int, int]:
     n_test = np.size(test_idx_vec)
     n_ref = np.size(ref_idx_vec)
     n_pair_out = np.fmax(n_test, n_ref)
@@ -355,7 +357,7 @@ def parse_ref_vec_output_size(test_idx_vec: npt.NDArray[np.int64], ref_idx_vec: 
         raise TypeError("Error calling covariance matrix resample.  "
                         "Indices exceed the dimensions of the covariance matrix.")
 
-    return n_pair_out
+    return n_test, n_ref, n_pair_out
 
 def ensure_invertible(covariance: npt.ArrayLike, epsilon: float=1e-20)-> npt.NDArray:
     """
