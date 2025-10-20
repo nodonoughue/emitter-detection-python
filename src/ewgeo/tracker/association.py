@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy import typing as npt
-from prettytable import PrettyTable
+# from prettytable import PrettyTable
 from scipy.stats import chi2, multivariate_normal
 from scipy.optimize import linear_sum_assignment
 
@@ -396,9 +396,10 @@ class NNAssociator(Associator):
         unassociated_measurements = measurements[:]
 
         if print_table:
-            table = PrettyTable()
-            table.field_names = ['Track'] + [f"Msmt {i}" for i in range(len(measurements))]
-            table.float_format = ".2"
+            pass
+            # table = PrettyTable()
+            # table.field_names = ['Track'] + [f"Msmt {i}" for i in range(len(measurements))]
+            # table.float_format = ".2"
 
         for track in tracks:
             # Generate a hypothesis for each track; we'll start with the null hypothesis
@@ -414,7 +415,8 @@ class NNAssociator(Associator):
             # print('Generating hypotheses for track ', track.track_id, '...')
             # [print(h) for h in this_hypotheses]
             if print_table:
-                table.add_row([track.__str__()] + [h.distance for h in this_hypotheses])
+                pass
+                # table.add_row([track.__str__()] + [h.distance for h in this_hypotheses])
 
             [h.apply_distance_gate(self.gate_probability) for h in this_hypotheses]
             already_associated = [h.measurement for h in hypotheses.values()]
@@ -440,8 +442,9 @@ class NNAssociator(Associator):
 
         total_cost = np.sum([h.distance for h in hypotheses.values()])
         if print_table:
-            print(f"Nearest Neighbor Association Distances (total distance={total_cost:.2f})")
-            print(table)
+            pass
+            # print(f"Nearest Neighbor Association Distances (total distance={total_cost:.2f})")
+            # print(table)
 
         # Convert to an Association object and return
         return hypotheses, unassociated_measurements
@@ -454,9 +457,10 @@ class GNNAssociator(Associator):
         # TODO: Test
 
         if print_table:
-            table = PrettyTable()
-            table.field_names = ['Track'] + [f"Msmt {i}" for i in range(len(measurements))]
-            table.float_format = ".2"
+            pass
+            # table = PrettyTable()
+            # table.field_names = ['Track'] + [f"Msmt {i}" for i in range(len(measurements))]
+            # table.float_format = ".2"
 
         # Generate the full set of hypotheses and record their distances
         hypotheses = []
@@ -465,7 +469,8 @@ class GNNAssociator(Associator):
             this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=self.motion_model) for m in measurements]
 
             if print_table:
-                table.add_row([track.__str__()] + [h.distance for h in this_hypotheses])
+                pass
+                # table.add_row([track.__str__()] + [h.distance for h in this_hypotheses])
             [h.apply_distance_gate(self.gate_probability) for h in this_hypotheses]
             this_distance = [h.distance for h in this_hypotheses]
 
@@ -489,8 +494,9 @@ class GNNAssociator(Associator):
             unassociated_measurements.remove(hypotheses[r][c].measurement)
 
         if print_table:
-            print(f"Global Nearest Neighbor Association Distances (total distance={total_cost:.2f})")
-            print(table)
+            pass
+            # print(f"Global Nearest Neighbor Association Distances (total distance={total_cost:.2f})")
+            # print(table)
 
         return good_hypotheses, unassociated_measurements
 
@@ -507,9 +513,10 @@ class PDAAssociator(Associator):
                   print_table: bool=False)-> tuple[dict[Track, GMMHypothesis], list[Measurement]]:
 
         if print_table:
-            table = PrettyTable()
-            table.field_names = ['Track', 'Miss'] + [f"Msmt {i}" for i in range(len(measurements))]
-            table.float_format = ".2"
+            pass
+            # table = PrettyTable()
+            # table.field_names = ['Track', 'Miss'] + [f"Msmt {i}" for i in range(len(measurements))]
+            # table.float_format = ".2"
 
         hypotheses = {}
         unassociated_measurements = measurements[:]
@@ -544,10 +551,12 @@ class PDAAssociator(Associator):
             hypotheses[track] = this_hypothesis
 
             if print_table:
-                table.add_row([track.__str__(), null_hypothesis.likelihood] + init_likelihoods)
+                pass
+                # table.add_row([track.__str__(), null_hypothesis.likelihood] + init_likelihoods)
 
         if print_table:
-            print('PDA Associator Table of Likelihoods')
-            print(table)
+            pass
+            # print('PDA Associator Table of Likelihoods')
+            # print(table)
 
         return hypotheses, unassociated_measurements

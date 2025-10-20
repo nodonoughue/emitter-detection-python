@@ -1,5 +1,8 @@
 from matplotlib import pyplot as plt
 import numpy as np
+from matplotlib.collections import PathCollection
+from matplotlib.lines import Line2D
+from matplotlib.quiver import Quiver
 
 from .states import State, StateSpace
 
@@ -11,9 +14,9 @@ class Track:
     # Parameters
     initial_state: State
     states: list[State]
-    num_dims: int
     track_id: str = ""
     num_missed_detections: int = 0
+    num_updates: int = 0
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -33,6 +36,10 @@ class Track:
         return self.curr_state.state_space
 
     @property
+    def num_dims(self)->int:
+        return self.state_space.num_dims
+
+    @property
     def curr_time(self)->float:
         return self.curr_state.time
 
@@ -40,12 +47,13 @@ class Track:
     def curr_state(self)->State:
         return self.states[-1]
 
-    def append(self, state=State, missed_detection: bool=False) -> None:
+    def append(self, state:State, missed_detection: bool=False) -> None:
         self.states.append(state)
         if missed_detection:
             self.num_missed_detections += 1
         else:
             self.num_missed_detections = 0
+            self.num_updates += 1
 
     def copy(self, **kwargs):
         # Initialize a new track using all the current track's properties
@@ -61,7 +69,7 @@ class Track:
              predicted_state: State=None,
              do_vel: bool=False, do_cov: bool=True,
              scale: float=1, cov_ellipse_confidence: float=.75,
-             **kwargs):
+             **kwargs)-> tuple[Line2D or None, Line2D or None, Line2D or None, Quiver or None]:
         """
         Plot the states on the provided axis, with an optional scale factor (for converting from m to km, etc.).
 
@@ -83,7 +91,7 @@ class Track:
         if 'label' not in kwargs.keys():
             plot_args['label'] = f"Track {self.track_id}"
         # Line plot
-        hdl=ax.plot(*coords, **kwargs, **plot_args)
+        trk_hdl=ax.plot(*coords, **kwargs, **plot_args)[0]
 
         if predicted_state is not None:
             # Predicted state
@@ -96,15 +104,68 @@ class Track:
             else:
                 this_label = "Predicted State"
 
-            ax.plot(*pred_coords, linestyle='--', color=hdl[0].get_color(), label=this_label)
+            trk_pred_hdl = ax.plot(*pred_coords, linestyle='--', color=trk_hdl.get_color(), label=this_label)
 
             # Velocity and Covariance of predicted state
-            predicted_state.plot(ax=ax, plot_dims=plot_dims, do_pos=True, do_vel=do_vel, do_cov=do_cov,
-                                 color=hdl[0].get_color(), cov_ellipse_confidence=cov_ellipse_confidence, scale=scale,
-                                 linestyle='--')
+            _, trk_err_hdl, trk_vel_hdl =  predicted_state.plot(ax=ax, plot_dims=plot_dims,
+                                                                do_pos=False, do_vel=do_vel, do_cov=do_cov,
+                                                                color=trk_hdl.get_color(),
+                                                                cov_ellipse_confidence=cov_ellipse_confidence,
+                                                                scale=scale,
+                                                                linestyle='--')
         else:
-            # Velocity and Covariance of final state
-            self.curr_state.plot(ax=ax, plot_dims=plot_dims, do_pos=False, do_vel=do_vel, do_cov=do_cov,
-                                 color=hdl[0].get_color(), cov_ellipse_confidence=cov_ellipse_confidence, scale=scale)
+            trk_pred_hdl = None
 
-        return hdl
+            # Velocity and Covariance of final state
+            _, trk_err_hdl, trk_vel_hdl = self.curr_state.plot(ax=ax, plot_dims=plot_dims,
+                                                               do_pos=False, do_vel=do_vel, do_cov=do_cov,
+                                                               color=trk_hdl.get_color(),
+                                                               cov_ellipse_confidence=cov_ellipse_confidence,
+                                                               scale=scale,
+                                                               linestyle='-')
+
+        return trk_hdl, trk_pred_hdl, trk_err_hdl, trk_vel_hdl
+
+    def update_plot(self,
+                    trk_hdl: Line2D or None, trk_pred_hdl: Line2D or None, trk_err_hdl: Line2D or None,
+                    trk_vel_hdl: Quiver or None,
+                    plot_dims: slice= np.s_[:],
+                    predicted_state: State=None,
+                    do_vel: bool=False, do_cov: bool=True,
+                    scale: float=1, cov_ellipse_confidence: float=.75):
+        """
+        Plot the states on the provided axis, with an optional scale factor (for converting from m to km, etc.).
+
+        :param plot_dims: Slice representing which spatial axes to plot (optional)
+        :param predicted_state: Optional predicted state to append to the track plot.
+        :param do_vel: (default=False) If true, then a velocity arrow will be appended to the final (or predicted) state
+        :param do_cov: (default=False) If true, then a covariance ellipse will be plotted around the final (or
+        predicted) state
+        :param scale: (default=1) Scale the track plot by this factor
+        :param cov_ellipse_confidence: (default=0.75) Confidence interval for covariance ellipse visualization
+        """
+
+        # Pull the appropriate state dimensions from each state
+        # in the track's history and update trk_hdl
+        coords = list(zip(*[s.position[plot_dims] / scale for s in self.states]))
+        trk_hdl.set_data(*coords)
+
+        if predicted_state is not None:
+            pred_coords = [[c[-1], p/scale] for c, p in zip(coords, predicted_state.position[plot_dims])]
+            trk_pred_hdl.set_data(*pred_coords)
+
+            # Velocity and Covariance of predicted state
+            predicted_state.update_plot(trk_hdl=None, trk_err_hdl=trk_err_hdl, trk_vel_hdl=trk_vel_hdl,
+                                        plot_dims=plot_dims, do_pos=False, do_vel=do_vel, do_cov=do_cov,
+                                        cov_ellipse_confidence=cov_ellipse_confidence, scale=scale)
+        else:
+            if trk_pred_hdl is not None:
+                # Clear the data if there's no predicted state
+                trk_pred_hdl.set_data([], [])
+
+            # Velocity and Covariance of final state
+            self.curr_state.update_plot(trk_hdl=None, trk_err_hdl=trk_err_hdl, trk_vel_hdl=trk_vel_hdl,
+                                        plot_dims=plot_dims, do_pos=False, do_vel=do_vel, do_cov=do_cov,
+                                        cov_ellipse_confidence=cov_ellipse_confidence, scale=scale)
+
+        return

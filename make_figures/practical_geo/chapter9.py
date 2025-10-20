@@ -48,6 +48,7 @@ def make_all_figures(close_figs=False):
     figs.extend(make_figure_6(prefix))
     figs.extend(make_figure_7(prefix))
     figs.extend(make_figure_8(prefix))
+    figs.extend(make_figure_9(prefix))
 
     if close_figs:
         [plt.close(fig) for fig in figs]
@@ -427,6 +428,30 @@ def make_figure_8(prefix=None):
         labels = ['fig8']
         if len(labels) != len(figs):
             print('**Error saving figure 9.8; unexpected number of figures generated.')
+        else:
+            for fig, label in zip(figs, labels):
+                fig.savefig(prefix + label + '.svg')
+                fig.savefig(prefix + label + '.png')
+
+    return figs
+
+def make_figure_9(prefix=None):
+    """
+    Figure 9.9, from Example 9.4
+
+    :param prefix: output directory to place generated figure
+    :return: handle
+    """
+
+    print('Generating Figure 9.9...')
+
+    figs = chapter9.example4()
+
+    # Output to file
+    if prefix is not None:
+        labels = ['fig9a', 'fig9b']
+        if len(labels) != len(figs):
+            print('**Error saving figure 9.9; unexpected number of figures generated.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')

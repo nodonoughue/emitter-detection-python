@@ -303,3 +303,49 @@ class ConstantJerkMotionModel(MotionModel):
 # class ManeuveringReentryMotionModel(MotionModel):
 # class AeroMotionModel(MotionModel):
 # class BallisticMotionModel(MotionModel):
+
+# =============== Elementary Kalman Filter and Extended Kalman Filter Prediction Functions ================
+def kf_predict(x_est, p_est, q, f):
+    """
+    Conduct a Kalman Filter prediction, given the current estimated state and covariance, a transition matrix, and
+    the process noise covariance.
+
+    :param x_est: Current state estimate, shape: (n_states, )
+    :param p_est: Current state error covariance, shape: (n_states, n_states)
+    :param q: Process noise covariance, shape: (n_states, n_states)
+    :param f: Transition matrix, shape: (n_states, n_states)
+    :return x_pred: Predicted state estimate, shape: (n_states, )
+    :return p_pred: Predicted state error covariance, shape: (n_states, n_states)
+    """
+
+    # Predict the next state
+    x_pred = f @ x_est
+
+    # Predict the next state error covariance
+    p_pred = f @ p_est @ f.T + q
+
+    return x_pred, p_pred
+
+
+def ekf_predict(x_est, p_est, q, f_fun, g_fun):
+    """
+    Conduct an Extended Kalman Filter prediction, given the current estimated state and covariance, a function handle
+    to generate the predicted state, and a function handle to generate the transition matrix.
+
+    :param x_est: Current state estimate, shape: (n_states, )
+    :param p_est: Current state error covariance, shape: (n_states, n_states)
+    :param q: Process noise covariance, shape: (n_states, n_states)
+    :param f_fun: Transition function handle, returns an array of shape: (n_states, )
+    :param g_fun: Transition matrix function handle, returns a matrix of shape: (n_states, n_states)
+    :return x_pred: Predicted state estimate, shape: (n_states, )
+    :return p_pred: Predicted state error covariance, shape: (n_states, n_states)
+    """
+
+    # Forward prediction of state
+    x_pred = f_fun(x_est)
+
+    # Forward prediction of state error covariance
+    f = g_fun(x_est)
+    p_pred = f @ p_est @ np.transpose(f) + q
+
+    return x_pred, p_pred
