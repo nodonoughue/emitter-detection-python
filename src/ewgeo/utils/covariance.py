@@ -116,6 +116,10 @@ class CovarianceMatrix:
             self._inv = None
             self._do_parse = True  # Clear the do_parse flag, to make sure it gets recomputed
 
+    @property
+    def size(self)-> int:
+        return np.shape(self._cov)[0]
+
     """
     =========================================================
     Administrative Functions
@@ -325,8 +329,11 @@ class CovarianceMatrix:
 
         return CovarianceMatrix(new_cov)
 
-    def resample_hybrid(self, x_aoa=None, x_tdoa=None, x_fdoa=None, do_2d_aoa=False,
-                        tdoa_ref_idx=None, fdoa_ref_idx=None) -> 'CovarianceMatrix':
+    def resample_hybrid(self,
+                        num_aoa: int=0, num_tdoa: int=None, num_fdoa: int=None,
+                        do_2d_aoa: bool=False,
+                        tdoa_ref_idx=None,
+                        fdoa_ref_idx=None) -> 'CovarianceMatrix':
         """
         Resample a block-diagonal covariance matrix representing AOA, TDOA, and FDOA measurements errors. Original
         matrix size is square with (num_aoa*aoa_dim + num_tdoa + num_fdoa) rows/columns. Output matrix size will be
@@ -349,9 +356,6 @@ class CovarianceMatrix:
         """
 
         # Parse sensor counts
-        _, num_aoa = safe_2d_shape(x_aoa)
-        _, num_tdoa = safe_2d_shape(x_tdoa)
-        _, num_fdoa = safe_2d_shape(x_fdoa)
         if do_2d_aoa:
             num_aoa = 2 * num_aoa
 

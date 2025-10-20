@@ -253,8 +253,8 @@ def log_likelihood(x_source: npt.ArrayLike,
     # Pre-compute covariance matrix inverses
     if do_resample:
         # Use the hybrid-specific covariance matrix resampler, which handles the assumed structure.
-        cov = cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
-                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+        cov = cov.resample_hybrid(num_aoa=x_aoa.shape[1], num_tdoa=x_tdoa.shape[1], num_fdoa=x_fdoa.shape[1],
+                                  do_2d_aoa=do_2d_aoa, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     if print_progress:
         t_start = time.perf_counter()
@@ -352,8 +352,8 @@ def error(x_source: npt.ArrayLike,
 
     # Pre-process the covariance matrix
     if do_resample:
-        cov = cov.resample_hybrid(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, do_2d_aoa=do_2d_aoa,
-                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+        cov = cov.resample_hybrid(num_aoa=x_aoa.shape[1], num_tdoa=x_tdoa.shape[1], num_fdoa=x_fdoa.shape[1],
+                                  do_2d_aoa=do_2d_aoa, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Set up test points
     grid_res = 2*x_max / (num_pts-1)
