@@ -62,14 +62,29 @@ class DirectionFinder(PassiveSurveillanceSystem):
         return model.log_likelihood(x_sensor=x_sensor, zeta=zeta, x_source=x_source, cov=self.cov,
                                     bias=bias, **kwargs)
 
-    def grad_x(self, x_source: npt.ArrayLike):
-        return model.grad_x(x_sensor=self.pos, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
+    def grad_x(self,
+               x_source: npt.ArrayLike,
+               v_source: npt.ArrayLike | None=None,
+               x_sensor: npt.ArrayLike | None=None,
+               v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
+        if x_sensor is None: x_sensor = self.pos
+        return model.grad_x(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
 
-    def grad_bias(self, x_source: npt.ArrayLike):
-        return model.grad_bias(x_sensor=self.pos, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
+    def grad_bias(self,
+                  x_source: npt.ArrayLike,
+                  v_source: npt.ArrayLike | None=None,
+                  x_sensor: npt.ArrayLike | None=None,
+                  v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
+        if x_sensor is None: x_sensor = self.pos
+        return model.grad_bias(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
 
-    def grad_sensor_pos(self, x_source: npt.ArrayLike):
-        return model.grad_sensor_pos(x_sensor=self.pos, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
+    def grad_sensor_pos(self,
+                        x_source: npt.ArrayLike,
+                        v_source: npt.ArrayLike | None=None,
+                        x_sensor: npt.ArrayLike | None=None,
+                        v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
+        if x_sensor is None: x_sensor = self.pos
+        return model.grad_sensor_pos(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
 
     ## ============================================================================================================== ##
     ## Solver Methods

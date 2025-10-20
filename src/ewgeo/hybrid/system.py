@@ -372,36 +372,75 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         return result
 
-    def grad_x(self, x_source: npt.ArrayLike)-> npt.NDArray:
-        to_concat = []
-        if self.aoa is not None:
-            to_concat.append(self.aoa.grad_x(x_source=x_source))
-        if self.tdoa is not None:
-            to_concat.append(self.tdoa.grad_x(x_source=x_source))
-        if self.fdoa is not None:
-            # Replicate the AOA and TDOA gradients to reflect gradients w.r.t. pos and vel
-            to_concat = [np.concatenate((g, np.zeros_like(g)), axis=0) for g in to_concat]
-            to_concat.append(self.fdoa.grad_x(x_source=x_source))
+    def grad_x(self,
+               x_source: npt.ArrayLike,
+               v_source: npt.ArrayLike | None=None,
+               x_sensor: npt.ArrayLike | None=None,
+               v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
 
-        return np.concatenate(to_concat, axis=1)
+        # Break apart the sensor position, velocity, and bias measurement inputs into their AOA, TDOA, and FDOA
+        # components
+        x_aoa, x_tdoa, x_fdoa = self.parse_sensor_data(x_sensor)
+        _, _, v_fdoa = self.parse_sensor_data(v_sensor, vel_input=True)
 
-    def grad_bias(self, x_source: npt.ArrayLike)-> npt.NDArray:
-        to_concat = []
-        if self.aoa is not None:
-            to_concat.append(self.aoa.grad_bias(x_source=x_source))
-        if self.tdoa is not None:
-            to_concat.append(self.tdoa.grad_bias(x_source=x_source))
-        if self.fdoa is not None:
-            to_concat.append(self.fdoa.grad_bias(x_source=x_source))
+        # Parse source position and velocity
+        if v_source is None:
+            # It might be passed as a single input under x_source with 2*num_dim rows
+            x_source, v_source = self.parse_source_pos_vel(pos_vel=x_source,
+                                                           default_vel=np.zeros_like(x_source))
+
+        # Call each subordinate PSS and compute its gradient (w.r.t source position)
+        grads = [
+            pss.grad_x(x_source=x_source, x_sensor=sensor,
+                       v_sensor=v_fdoa if pss is self.fdoa else None,
+                       v_source=v_source if pss is self.fdoa else None)
+            for pss, sensor in [
+                (self.aoa, x_aoa),
+                (self.tdoa, x_tdoa),
+                (self.fdoa, x_fdoa)
+            ]
+            if pss is not None
+        ]
+
+        return np.concatenate(grads, axis=1)
+
+    def grad_bias(self,
+                  x_source: npt.ArrayLike,
+                  v_source: npt.ArrayLike | None=None,
+                  x_sensor: npt.ArrayLike | None=None,
+                  v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
+        # Break apart the sensor position, velocity, and bias measurement inputs into their AOA, TDOA, and FDOA
+        # components
+        x_aoa, x_tdoa, x_fdoa = self.parse_sensor_data(x_sensor)
+        _, _, v_fdoa = self.parse_sensor_data(v_sensor, vel_input=True)
+
+        # Parse source position and velocity
+        if v_source is None:
+            # It might be passed as a single input under x_source with 2*num_dim rows
+            x_source, v_source = self.parse_source_pos_vel(pos_vel=x_source,
+                                                           default_vel=np.zeros_like(x_source))
+
+        # Call each subordinate PSS and compute its gradient (w.r.t source position)
+        grads = [
+            pss.grad_bias(x_source=x_source, x_sensor=sensor,
+                          v_sensor=v_fdoa if pss is self.fdoa else None,
+                          v_source=v_source if pss is self.fdoa else None)
+            for pss, sensor in [
+                (self.aoa, x_aoa),
+                (self.tdoa, x_tdoa),
+                (self.fdoa, x_fdoa)
+            ]
+            if pss is not None
+        ]
 
         _, n_source = safe_2d_shape(x_source)
         if n_source <= 1:
             # There is only one source, combine the gradients with a block diagonal across axes 0 and 1
-            grad = block_diag(to_concat)
+            grad = block_diag(grads)
         else:
             # The individual gradients are 3D, but block_diag only works on 2D, let's do some reshaping.
             # We need to move the third axis to the front
-            gradients_reshape = [np.moveaxis(x, -1, 0) for x in to_concat]
+            gradients_reshape = [np.moveaxis(x, -1, 0) for x in grads]
 
             # Now we can use list comprehension to call block_diag on each in turn
             res = [block_diag(*arrays) for arrays in zip(*gradients_reshape)]
@@ -412,17 +451,54 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         return grad
 
-    def grad_sensor_pos(self, x_source: npt.ArrayLike)-> npt.NDArray:
+    def grad_sensor_pos(self,
+                        x_source: npt.ArrayLike,
+                        v_source: npt.ArrayLike | None=None,
+                        x_sensor: npt.ArrayLike | None=None,
+                        v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
+        # Break apart the sensor position, velocity, and bias measurement inputs into their AOA, TDOA, and FDOA
+        # components
+        x_aoa, x_tdoa, x_fdoa = self.parse_sensor_data(x_sensor)
+        _, _, v_fdoa = self.parse_sensor_data(v_sensor, vel_input=True)
+
+        # Parse source position and velocity
+        if v_source is None:
+            # It might be passed as a single input under x_source with 2*num_dim rows
+            x_source, v_source = self.parse_source_pos_vel(pos_vel=x_source,
+                                                           default_vel=np.zeros_like(x_source))
+
         to_concat = []
+        _, num_sources = safe_2d_shape(x_source)
         if self.aoa is not None:
-            to_concat.append(self.aoa.grad_sensor_pos(x_source=x_source))
+            # Response is (num_dim * num_aoa_sensors, num_aoa_measurements, num_sources)
+            # Expand vertically to account for *all* sensors
+            j_aoa = self.aoa.grad_sensor_pos(x_source=x_source, x_sensor=x_aoa)
+            j_aoa_full = np.zeros((self.num_dim, self.num_sensors, self.num_aoa_measurements, num_sources))
+            j_aoa_full[:, self.aoa_sensor_idx, :, :] = np.reshape(j_aoa, (self.num_dim,
+                                                                          self.num_aoa_sensors,
+                                                                          self.num_aoa_measurements, -1))
+            to_concat.append(j_aoa_full.reshape(self.num_dim*self.num_sensors,
+                                                self.num_aoa_measurements, num_sources))
         if self.tdoa is not None:
-            to_concat.append(self.tdoa.grad_sensor_pos(x_source=x_source))
+            # Response is (num_dim * num_tdoa_sensors, num_tdoa_measurements, num_sources)
+            # Expand vertically to account for
+            j_tdoa = self.tdoa.grad_sensor_pos(x_source=x_source, x_sensor=x_tdoa)
+            j_tdoa_full = np.zeros((self.num_dim, self.num_sensors, self.num_tdoa_measurements, num_sources))
+            j_tdoa_full[:, self.tdoa_sensor_idx, :, :] = np.reshape(j_tdoa, (self.num_dim, self.num_tdoa_sensors,
+                                                                          self.num_tdoa_measurements, -1))
+            to_concat.append(j_tdoa_full.reshape(self.num_dim * self.num_sensors,
+                                                 self.num_tdoa_measurements, num_sources))
         if self.fdoa is not None:
             # First, manipulate all the existing gradients to add in the gradient w.r.t. velocity (zeros)
             to_concat = [np.concatenate((g, np.zeros_like(g)), axis=0) for g in to_concat]
 
-            to_concat.append(self.fdoa.grad_sensor_pos(x_source=x_source))
+            j_fdoa = self.fdoa.grad_sensor_pos(x_source=x_source, v_source=v_source, x_sensor=x_fdoa, v_sensor=v_fdoa)
+            j_fdoa_full = np.zeros((self.num_dim, self.num_sensors, 2, self.num_fdoa_measurements, num_sources))
+            j_fdoa_full[:, self.fdoa_sensor_idx, :, :, :] = np.reshape(j_fdoa, (self.num_dim,
+                                                                             self.num_fdoa_sensors, 2,
+                                                                             self.num_fdoa_measurements, -1))
+            to_concat.append(j_fdoa_full.reshape(self.num_dim * self.num_sensors * 2,
+                                                 self.num_fdoa_measurements, num_sources))
 
         return np.concatenate(to_concat, axis=1)
 

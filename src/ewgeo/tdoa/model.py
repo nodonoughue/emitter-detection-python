@@ -525,13 +525,13 @@ def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     num_measurements = np.size(test_idx_vec)
     grad = np.zeros((num_sensors, num_measurements))
     for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
-        grad[i, test] = 1
-        grad[i, ref] = -1
+        grad[test, i] = 1
+        grad[ref, i] = -1
 
     # Repeat for each source position
     _, num_sources = safe_2d_shape(x_source)
     if num_sources > 1:
-        grad = np.repeat(grad, num_sources, axis=2)
+        grad = np.repeat(grad[:, :, np.newaxis], num_sources, axis=2)
 
     return grad
 
@@ -558,7 +558,7 @@ def grad_sensor_pos(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=No
     _, n_source = safe_2d_shape(x_source)
 
     # Compute pointing vectors and projection matrix
-    dx = x_sensor - np.reshape(x_source, shape=(n_dim, 1, n_source))
+    dx = x_sensor[:, :, np.newaxis] - np.reshape(x_source, shape=(n_dim, 1, n_source))
     rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # (1, n_sensor, n_source)
     dx_norm = dx / rn
 

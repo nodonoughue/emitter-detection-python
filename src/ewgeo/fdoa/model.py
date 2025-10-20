@@ -517,13 +517,13 @@ def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     num_measurements = np.size(test_idx_vec)
     grad = np.zeros((num_sensors, num_measurements))
     for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
-        grad[i, test] = 1
-        grad[i, ref] = -1
+        grad[test, i] = 1
+        grad[ref, i] = -1
 
     # Repeat for each source position
     _, num_sources = safe_2d_shape(x_source)
     if num_sources > 1:
-        grad = np.repeat(grad, num_sources, axis=2)
+        grad = np.repeat(grad[:, :, np.newaxis], num_sources, axis=2)
 
     return grad
 
@@ -554,17 +554,18 @@ def grad_sensor_pos(x_sensor: npt.ArrayLike,
     n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
 
     # Compute pointing vectors and projection matrix
-    dx = x_sensor - np.reshape(x_source, shape=(n_dim, 1, n_source))
-    dv = v_sensor - np.reshape(v_source, shape=(n_dim, 1, n_source))
+    dx = x_sensor[:, :, np.newaxis] - np.reshape(x_source, shape=(n_dim, 1, n_source))
+    dv = v_sensor[:, :, np.newaxis] - np.reshape(v_source, shape=(n_dim, 1, n_source))
     rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # (1, n_sensor, n_source)
     dx_norm = dx / rn
     dv_norm = dv / rn
 
     proj_x = (np.reshape(dx_norm, shape=(n_dim, 1, n_sensor, n_source)) *
               np.reshape(np.conjugate(dx_norm), shape=(1, n_dim, n_sensor, n_source)))
+    # (n_dim, n_dim, n_sensor, n_source)
 
     # Compute the gradient of R_n
-    nabla_rn = np.squeeze(np.sum((np.eye(n_dim) - proj_x) *
+    nabla_rn = np.squeeze(np.sum((np.eye(n_dim)[:,:,np.newaxis,np.newaxis] - proj_x) *
                                  np.reshape(dv_norm, shape=(1, n_dim, n_sensor, n_source)), axis=1))
     # (n_dim, n_sensor, n_source)
 
@@ -591,7 +592,7 @@ def grad_sensor_pos(x_sensor: npt.ArrayLike,
 
     # Combine the gradient w.r.t. sensor pos and sensor vel
     # eq 6.36
-    grad = np.concatenate((grad_pos, grad_vel), axis=1)
+    grad = np.concatenate((grad_pos, grad_vel), axis=0)
 
     return grad
 

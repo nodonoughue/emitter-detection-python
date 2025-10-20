@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import typing as npt
+from scipy.stats import multivariate_normal as mvn
 
 from . import ensure_iterable, make_nd_grid, safe_2d_shape, SearchSpace
 from .constraints import constrain_likelihood, snap_to_equality_constraints, snap_to_inequality_constraints
@@ -355,9 +356,9 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
     likelihood = ell(x_set, print_progress=print_progress, **kwargs)
 
     if prior is not None and prior_wt > 0:
-        pdf_prior = np.reshape(prior(x_set), shape=likelihood.shape)
+        pdf_prior = np.reshape(prior(x_set), shape=np.shape(likelihood))
 
-        likelihood = (1 - prior_wt) * likelihood + prior_wt * np.log10(pdf_prior)
+        likelihood = (1 - prior_wt) * np.array(likelihood) + prior_wt * np.log10(pdf_prior)
 
     # Find the peak
     idx_pk = np.argmax(likelihood)
@@ -407,7 +408,10 @@ def sensor_calibration(ell,
                        pos_search: SearchSpace,
                        vel_search: SearchSpace,
                        bias_search: SearchSpace,
-                       num_iterations=1):
+                       num_iterations=1,
+                       pos_prior=None,
+                       vel_prior=None,
+                       bias_prior=None):
     """
     This function attempts to calibrate sensor uncertainties given a series of measurements (AOA, TDOA, and/or FDOA)
     against a set of calibration emitters. Sensor uncertainties can take the form of unknown measurement bias or
@@ -433,12 +437,18 @@ def sensor_calibration(ell,
     :return bias_est: Estimated measurement biases
     """
 
+    # Make a default prior for sensor calibration that assumes a Gaussian distribution
+    def default_prior(x: npt.ArrayLike, search_space: SearchSpace):
+        return mvn.pdf(x.T,  # transpose -- our inputs are (n_dim, n_sample), but mvn expects the opposite
+                       mean=search_space.x_ctr.ravel(),
+                       cov=np.diag(search_space.max_offset.ravel()))
+
     # Initialize Outputs
     bias_est = bias_search.x_ctr if bias_search is not None else None
     x_sensor_est = pos_search.x_ctr if pos_search is not None else None
     v_sensor_est = vel_search.x_ctr if vel_search is not None else None
 
-    for _ in np.arange(num_iterations):
+    for _ in range(num_iterations):
 
         # ================= Estimate Measurement Bias ========================
         if bias_search is not None and np.any(bias_search.points_per_dim > 1):
@@ -448,27 +458,39 @@ def sensor_calibration(ell,
                 # Input is num_parameters x num_test_points; iterate over test points
                 return [ell(this_bias, x_sensor_vec, v_sensor_vec, **ell_kwargs) for this_bias in bias.T]
 
-            result = ml_solver(ell=ell_bias, search_space=bias_search)
+            if bias_prior is None:
+                this_bias_prior = lambda bias: default_prior(bias, bias_search)
+            else:
+                this_bias_prior = bias_prior
+
+            result = ml_solver(ell=ell_bias, search_space=bias_search, prior=this_bias_prior, prior_wt=0.3)
             bias_est = result[0]
             bias_search.x_ctr = bias_est # store result as center for next iteration
 
         # =================== Estimate Sensor Position =========================
         if pos_search is not None and np.any(pos_search.points_per_dim > 1):
             v_sensor_vec = vel_search.x_ctr
+
             def ell_pos(x, **ell_kwargs):
                 # Input is num_parameters x num_test_points; iterate over test points
                 return [ell(bias_est, this_x, v_sensor_vec, **ell_kwargs) for this_x in x.T]
 
+            if pos_prior is None:
+                this_pos_prior = lambda pos: default_prior(pos, pos_search)
+            else:
+                this_pos_prior = pos_prior
+
             # Do them one at a time; set the points_per_dim to 1 on the others
             points_per_dim = pos_search.points_per_dim
             _, num_sensors = safe_2d_shape(points_per_dim)
+
 
             for idx in np.arange(num_sensors):
                 # Only search the current sensor's position error
                 this_ppd = np.ones_like(points_per_dim)
                 this_ppd[:,idx] = points_per_dim[:, idx]
                 pos_search.points_per_dim = this_ppd
-                result = ml_solver(ell=ell_pos, search_space=pos_search)
+                result = ml_solver(ell=ell_pos, search_space=pos_search, prior=this_pos_prior, prior_wt=0.3)
                 x_sensor_est = result[0]
                 # store result as center for next iteration
                 pos_search.x_ctr = np.reshape(x_sensor_est, shape=np.shape(points_per_dim))
@@ -479,6 +501,12 @@ def sensor_calibration(ell,
                 # Input is num_parameters x num_test_points; iterate over test points
                 return [ell(bias_est, x_sensor_est, this_v, **ell_kwargs) for this_v in v.T]
 
+            if vel_prior is None:
+                if vel_prior is None:
+                    this_vel_prior = lambda vel: default_prior(vel, vel_search)
+                else:
+                    this_vel_prior = vel_prior
+
             # Do them one at a time; set the points_per_dim to 1 on the others
             points_per_dim = vel_search.points_per_dim
             _, num_sensors = safe_2d_shape(points_per_dim)
@@ -488,7 +516,7 @@ def sensor_calibration(ell,
                 this_ppd = np.ones_like(points_per_dim)
                 this_ppd[:,idx] = points_per_dim[:, idx]
                 vel_search.points_per_dim = this_ppd
-                result = ml_solver(ell=ell_vel, search_space=vel_search)
+                result = ml_solver(ell=ell_vel, search_space=vel_search, prior=this_vel_prior, prior_wt=0.3)
                 v_sensor_est = result[0]
                 # store result as center for next iteration
                 vel_search.x_ctr = np.reshape(v_sensor_est, shape=np.shape(points_per_dim))
