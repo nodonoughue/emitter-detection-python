@@ -443,10 +443,6 @@ def example5(do_vel_only_cal=False):
     cov_foa = CovarianceMatrix(err_freq**2 * np.eye(n_fdoa))
     cov_rroa = cov_foa.multiply(lam**2, overwrite=False)
 
-    cov_rdoa = cov_roa.resample()
-    cov_rrdoa = cov_rroa.resample()
-    cov_tf = CovarianceMatrix.block_diagonal(cov_rdoa, cov_rrdoa)
-
     # Construct PSS Object
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, variance_is_toa=False, ref_idx=None)
     fdoa = FDOAPassiveSurveillanceSystem(x=x_fdoa, vel=v_fdoa, cov=cov_rroa, ref_idx=None)
@@ -458,14 +454,8 @@ def example5(do_vel_only_cal=False):
                       [-5, -5, -5, -5, -5]]) * 1e3
     _, num_cal = safe_2d_shape(x_cal)
 
-    z = hybrid.measurement(x_source=x_source, v_sensor=v_fdoa_actual)
-    z_cal = hybrid.measurement(x_source=x_cal, v_sensor=v_fdoa_actual)
-
-    # Generate Noise
-    noise = cov_tf.sample(num_samples=None)  # providing 'None' ensured a 1d vector response
-    noise_cal = cov_tf.sample(num_samples=num_cal)
-    zeta = z + noise
-    zeta_cal = z_cal + noise_cal
+    zeta = hybrid.noisy_measurement(x_source=x_source, v_sensor=v_fdoa_actual)
+    zeta_cal = hybrid.noisy_measurement(x_source=x_cal, v_sensor=v_fdoa_actual)
 
     # Estimate Position
     x_init = np.array([0, 5])*1e3
