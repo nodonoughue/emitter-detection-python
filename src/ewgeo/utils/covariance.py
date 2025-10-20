@@ -24,6 +24,9 @@ class CovarianceMatrix:
             self._do_cholesky = do_cholesky
             self._do_inverse = do_inverse
 
+    def __str__(self):
+        return f"CovarianceMatrix: {self.cov}"
+
     """
     =========================================================
     Properties
