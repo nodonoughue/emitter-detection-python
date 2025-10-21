@@ -306,15 +306,16 @@ def resample_noise(noise: npt.NDArray[np.float64],
 
     # Function to execute at each entry of output covariance matrix
     def element_func(idx_row: int):
-        a_i = test_idx_vec[idx_row % n_test]
-        b_i = ref_idx_vec[idx_row % n_ref]
+        row_int = np.astype(idx_row, int)
+        a_i = test_idx_vec[row_int % n_test]
+        b_i = ref_idx_vec[row_int % n_ref]
 
         if test_weights:
-            a_i_wt = test_weights[idx_row % shp_test_wt]
+            a_i_wt = test_weights[row_int % shp_test_wt]
         else:
             a_i_wt = 1.
         if ref_weights:
-            b_i_wt = ref_weights[idx_row % shp_ref_wt]
+            b_i_wt = ref_weights[row_int % shp_ref_wt]
         else:
             b_i_wt = 1.
 
