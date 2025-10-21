@@ -67,7 +67,7 @@ def make_figure_1(prefix=None):
     """
 
     print('Generating Figure 2.1...')
-    fig1 = chapter10.make_figure_2(prefix=None)
+    fig1 = chapter10.make_figure_2(prefix=None)[0]
 
     # Display the plot
     plt.draw()
@@ -112,7 +112,7 @@ def make_figure_3(prefix=None):
     """
 
     print('Generating Figure 2.3...')
-    fig3 = chapter12.make_figure_1(prefix=None)
+    fig3 = chapter12.make_figure_1(prefix=None)[0]
 
     # Display the plot
     plt.draw()
@@ -134,7 +134,7 @@ def make_figure_4(prefix=None):
     """
 
     print('Generating Figure 2.4...')
-    fig4 = chapter13.make_figure_1(prefix=None)
+    fig4 = chapter13.make_figure_1(prefix=None)[0]
 
     # Display the plot
     plt.draw()

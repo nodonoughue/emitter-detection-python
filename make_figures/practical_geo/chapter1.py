@@ -58,7 +58,7 @@ def make_figure_2a(prefix=None):
 
     print('Generating Figure 1.2a...')
 
-    fig2a = chapter10.make_figure_1(prefix=None)  # use prefix=None to suppress the figure export command
+    fig2a = chapter10.make_figure_1(prefix=None)[0]  # use prefix=None to suppress the figure export command
 
     # Display the plot
     plt.draw()
@@ -104,7 +104,7 @@ def make_figure_2c(prefix=None):
 
     print('Generating Figure 1.2c...')
 
-    fig2c = chapter12.make_figure_1(prefix=None, do_uncertainty=True)
+    fig2c = chapter12.make_figure_1(prefix=None, do_uncertainty=True)[0]
 
     # Display the plot
     plt.draw()
