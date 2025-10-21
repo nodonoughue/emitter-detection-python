@@ -114,7 +114,7 @@ class MeasurementModel:
 
         # Use the PSS object's least square estimator to come up with an estimated position
         init_pos_vel = np.zeros((2*self.state_space.num_dims, ))
-        pos_vel_est, _ = self.pss.least_square(zeta=m.zeta, x_init=init_pos_vel)
+        pos_vel_est, _ = self.pss.least_square(zeta=m.zeta, x_init=init_pos_vel, max_num_iterations=100)
 
         # Convert to a state vector
         init_state_vec = np.zeros((self.state_space.num_states, ))

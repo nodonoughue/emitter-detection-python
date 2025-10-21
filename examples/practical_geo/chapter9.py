@@ -388,7 +388,7 @@ def example4():
                       associator=NNAssociator(motion_model=transition, gate_probability=.9),
                       deleter=MissedDetectionDeleter(num_missed_detections=3),
                       promoter=MofNPromoter(num_hits=3, num_chances=5),
-                      do_plotting=False, keep_all_tracks=True)
+                      do_plotting=False, keep_all_tracks=True, print_status=True)
 
     # Make truth state objects; we'll update their states over time
     truth_states = [State(state_space=transition.state_space, state=None, time=0, covar=None) for _ in tgts]
@@ -397,7 +397,7 @@ def example4():
     time_vec = tgts[0][0]
     truth_label = 'Noisy Truth Measurements'
     fa_label = 'False Alarm Measurements'
-    num_fa_per_step = 15
+    num_fa_per_step = 0
 
     # Print progress
     iterations_per_marker = 1
@@ -411,9 +411,10 @@ def example4():
 
         # Update the truth position of each target
         [setattr(s, 'position', x[1][:, idx]) for s, x in zip(truth_states, tgts)]
+        [setattr(s, 'time', time_vec[idx]) for s in truth_states]
 
         # Generate Noisy Measurements
-        truth_msmts = [msmt_model.measurement(s, noise=True) for s in truth_states]
+        truth_msmts = [msmt_model.measurement(s, noise=False) for s in truth_states]
 
         # Add the truth measurements to the plots
         axs[0, 1].scatter(time_vec[idx]*np.ones(len(truth_msmts)), [m.zeta[0]/scale for m in truth_msmts],
@@ -444,13 +445,13 @@ def example4():
 
     # Print all the tracks, including tentative ones
     trk_label = 'Firm Tracks'
-    for t in tracker.all_tracks():
-        axs[0,0].plot(t, do_cov=False, do_vel=False, linestyle='--', label=trk_label)
+    for t in tracker.all_tracks:
+        t.plot(axs[0,0], do_cov=False, do_vel=False, linestyle='--', label=trk_label, scale=scale)
         trk_label = None
 
     trk_label = 'Tentative Tracks'
-    for t in tracker.all_tentative_tracks():
-        axs[0,0].plot(t, do_cov=False, do_vel=False, linestyle=':', linewidth=0.25, label=trk_label)
+    for t in tracker.all_tentative_tracks:
+        t.plot(axs[0,0], do_cov=False, do_vel=False, linestyle=':', linewidth=0.25, label=trk_label, scale=scale)
         trk_label = None
 
     print('done.')

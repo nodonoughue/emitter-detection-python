@@ -12,6 +12,7 @@ from .measurement import Measurement, MeasurementModel
 from .track import Track
 from .transition import MotionModel
 from ..utils.covariance import CovarianceMatrix
+from ..utils.system import PassiveSurveillanceSystem
 
 # Cell colors for use with prettytable
 pt_red = "\033[0;31;40m"
@@ -122,7 +123,7 @@ class Hypothesis:
                 return np.inf
             else:
                 # Mahalanobis Distance
-                self._distance = self.innovation_covar.solve_aca(self.innovation.T)
+                self._distance = self.innovation_covar.solve_aca(self.innovation.T)/self.measurement.size
         return self._distance
 
     @property
@@ -218,15 +219,54 @@ class Hypothesis:
         return f'Hypothesis({self.track}, {self.measurement}), distance = {self.distance}, likelihood = {self.likelihood}'
 
 class MissedDetectionHypothesis(Hypothesis):
-    def __init__(self, track: Track, motion_model: MotionModel, likelihood: float, time: float):
-        dummy_measurement = Measurement(sensor=None, time=time, zeta=0.0)
+    def __init__(self, track: Track, motion_model: MotionModel, sensor: PassiveSurveillanceSystem | None,
+                 distance: float, time: float):
+        dummy_measurement = Measurement(sensor=sensor, time=time, zeta=0.0)
         super().__init__(track, dummy_measurement, motion_model)
 
         # The innovation of a missed detection is zero, set some dummy values for likelihood, as well
-        self._likelihood = likelihood
-        self._log_likelihood = np.log(likelihood)
+        self._distance = distance
+        self._likelihood = distance  # also use it as the likelihood
+        self._log_likelihood = np.log(distance)
         self._innov = None
         self._innov_covar = None
+
+    @property
+    def innovation(self) -> npt.NDArray:
+        """
+        By definition, the innovation of a missed detection hypothesis is zero
+        """
+        return np.zeros_like(self.measurement_prediction.zeta)
+
+    @property
+    def innovation_covar(self) -> CovarianceMatrix | None:
+        """
+        By definition, the innovation covariance of a missed detection hypothesis is the
+        same as the predicted state measurement covariance, there is no additional measurement covariance.
+        """
+        if self._innov_covar is None and self._measurement is not None:
+            # Innovation covariance is computed from the measurement matrix, predicted state covariance, and
+            # measurement covariance
+            h_mat = self.measurement_model.jacobian(self.predicted_state)
+            pred_cov = self.predicted_state.covar.cov
+            self._innov_covar = CovarianceMatrix(h_mat @ pred_cov @ h_mat.T)
+        return self._innov_covar
+
+    @property
+    def distance(self) -> float:
+        """
+        By definition, the distance is 0.0, but that doesn't make sense.
+        One was supplied on instantiation (typically 1 minus the gate probability), so we'll use that.
+        """
+        return self._distance
+
+    @property
+    def likelihood(self) -> float:
+        return self._likelihood
+
+    @property
+    def log_likelihood(self) -> float:
+        return self._log_likelihood
 
     def update_track(self, spawn_new_track: bool = False, ax: plt.Axes = None, plot_dims: slice = np.s_[:])->Track:
         """
@@ -394,6 +434,7 @@ class NNAssociator(Associator):
         # TODO: Test
         hypotheses = {}
         unassociated_measurements = measurements[:]
+        curr_time = measurements[0].time
 
         if print_table:
             pass
@@ -403,7 +444,11 @@ class NNAssociator(Associator):
 
         for track in tracks:
             # Generate a hypothesis for each track; we'll start with the null hypothesis
-            null_hypothesis = Hypothesis(track=track, measurement=None)
+            null_hypothesis = MissedDetectionHypothesis(track=track,
+                                                        motion_model=self.motion_model,
+                                                        sensor=measurements[0].sensor,
+                                                        distance=1.0 - self.gate_probability,
+                                                        time=curr_time)
 
             # There are no more measurements to associate; we need to use the missed detection hypothesis
             if not measurements:
@@ -455,6 +500,7 @@ class GNNAssociator(Associator):
     def associate(self, measurements: list[Measurement],
                   tracks: list[Track], print_table: bool=False) -> tuple[dict[Track, Hypothesis], list[Measurement]]:
         # TODO: Test
+        curr_time = measurements[0].time
 
         if print_table:
             pass
@@ -475,7 +521,11 @@ class GNNAssociator(Associator):
             this_distance = [h.distance for h in this_hypotheses]
 
             # Add a null hypothesis, set its distance to 1 more than the max (finite) value in the array
-            this_hypotheses.append(Hypothesis(track=track, measurement=None))
+            this_hypotheses.append(MissedDetectionHypothesis(track=track,
+                                                             motion_model=self.motion_model,
+                                                             sensor=measurements[0].sensor,
+                                                             distance=1.0 - self.gate_probability,
+                                                             time=curr_time))
             this_distance.append(1+np.max(this_distance, initial=0.0, where=np.isfinite(this_distance)))
 
             # Add to the nested list and distance array
@@ -524,7 +574,8 @@ class PDAAssociator(Associator):
             # Initialize a Null Hypothesis
             p_miss = 1 - self.detection_probability*self.gate_probability
             null_hypothesis = MissedDetectionHypothesis(track=track,
-                                                        likelihood=p_miss,
+                                                        distance=p_miss,
+                                                        sensor=measurements[0].sensor,
                                                         motion_model=self.motion_model,
                                                         time=measurements[0].time)
             # Generate the full set of hypotheses and apply the acceptance gate

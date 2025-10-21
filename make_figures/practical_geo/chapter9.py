@@ -410,7 +410,8 @@ def make_figure_8(prefix=None):
     cov_label='State Error Covariance'
     for idx in range(num_missed_detections):
         h = MissedDetectionHypothesis(track=track,
-                                      likelihood=1.0,
+                                      distance=1.0,
+                                      sensor=None,
                                       motion_model=transition,
                                       time = track.curr_time + time_step)
         h.update_track()

@@ -103,6 +103,10 @@ class Tracker:
         self.delete()
 
     def update_existing_tracks(self, measurements: list[Measurement]) -> list[Measurement]:
+        if len(self.tracks) == 0:
+            # Nothing to do
+            return measurements
+
         # Generate hypotheses
         hypothesis_dict, unassoc_msmts = self.associator.associate(tracks=self.tracks, measurements=measurements)
 
@@ -120,6 +124,10 @@ class Tracker:
         return unassoc_msmts
 
     def promote(self, measurements: list[Measurement]) -> list[Measurement]:
+        if len(self._tentative_tracks) == 0:
+            # Nothing to do
+            return measurements
+
         # Generate hypotheses to match measurements to the tentative tracks
         hypothesis_dict, unassoc_msmt = self.associator.associate(tracks=self._tentative_tracks,
                                                                   measurements=measurements)
@@ -127,10 +135,11 @@ class Tracker:
         # Update the tracks associated with these hypotheses
         tentative_hypotheses = hypothesis_dict.values()
         [h.update_track() for h in tentative_hypotheses]
+        num_updated_tracks = len([h for h in tentative_hypotheses if not isinstance(h, MissedDetectionHypothesis)])
 
         # Any hypotheses that are not a MissedDetectionHypothesis can be passed to
         # the promoter for evaluation
-        tracks_to_test = [h.track for h in tentative_hypotheses if not isinstance(h, MissedDetectionHypothesis)]
+        tracks_to_test = [h.track for h in tentative_hypotheses]
         tracks_to_promote, tracks_to_remove = self.promoter.promote(tracks=tracks_to_test)
 
         # Add the promoted tracks to the track list and remove them from the tentative tracks list
@@ -143,12 +152,17 @@ class Tracker:
             self._failed_tracks.append(t)
 
         if self.print_status:
+            print(f"...{num_updated_tracks} tentative tracks updated...")
             print(f"...{len(tracks_to_promote)} tentative tracks promoted...")
             print(f"...{len(tracks_to_remove)} tentative tracks dropped...")
 
         return unassoc_msmt
 
     def initiate(self, measurements: list[Measurement]):
+        if len(measurements) == 0:
+            # Nothing to do
+            return
+
         new_tracks = self.initiator.initiate(measurements=measurements)
         self._tentative_tracks.extend(new_tracks)
         if self.print_status:
@@ -167,16 +181,16 @@ class Tracker:
             self.deleted_tracks.extend(tracks_to_delete)
 
         # Repeat with the tentative tracks
-        tracks_to_delete = self.deleter.delete(tracks=self._tentative_tracks)
+        tentative_tracks_to_delete = self.deleter.delete(tracks=self._tentative_tracks)
 
         # Remove the tracks by creating a new list that excludes them
-        self._tentative_tracks = [t for t in self._tentative_tracks if t not in tracks_to_delete]
+        self._tentative_tracks = [t for t in self._tentative_tracks if t not in tentative_tracks_to_delete]
 
         if self.keep_all_tracks:
-            self.deleted_tracks.extend(tracks_to_delete)
+            self.deleted_tracks.extend(tentative_tracks_to_delete)
 
         if self.print_status:
-            print(f"...{len(tracks_to_delete)} tracks dropped...")
+            print(f"...{len(tracks_to_delete)+len(tentative_tracks_to_delete)} tracks dropped...")
 
         return
 

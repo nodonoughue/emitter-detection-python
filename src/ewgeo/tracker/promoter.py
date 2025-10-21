@@ -21,7 +21,7 @@ class MofNPromoter(Promoter):
         to_delete = []
 
         for t in tracks:
-            if t.num_hits >= self.num_hits:
+            if t.num_updates >= self.num_hits:
                 # The track has the required number of hits; promote it
                 to_promote.append(t)
             elif len(t.states) >= self.num_chances:
