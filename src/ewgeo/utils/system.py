@@ -156,8 +156,16 @@ class PassiveSurveillanceSystem(ABC):
         In the latter, the jacobian is returned with respect to position and velocity (and the second half of pos_vel
         is used as source velocity)
         """
-        pos, vel = self.parse_source_pos_vel(pos_vel, default_vel=np.zeros_like(pos_vel))
-        j = self.jacobian(x_source=pos, v_source=vel, **kwargs)
+        if 'v_source' in kwargs:
+            default_vel = kwargs['v_source']
+        else:
+            default_vel = np.zeros_like(pos_vel)
+
+        pos, vel = self.parse_source_pos_vel(pos_vel, default_vel=default_vel)
+        kwargs['v_source'] = vel
+        kwargs['x_source'] = pos
+
+        j = self.jacobian(**kwargs)
         n_dim = np.shape(pos_vel)[0]
         n_dim2 = np.shape(j)[0]
         if n_dim == 2*n_dim2:
