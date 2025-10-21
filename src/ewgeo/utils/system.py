@@ -878,9 +878,15 @@ class PassiveSurveillanceSystem(ABC):
     #             'num_vel_idx': num_vel_indices}
 
     # ==================== Performance Methods ================
-    # These methods define basic performance predictions, and must be implemented
-    def compute_crlb(self, x_source, **kwargs):
-        return compute_crlb_gaussian(x_source=x_source, jacobian=self.jacobian_from_posvel, cov=self.cov,
+    # These methods define basic performance predictions
+    def compute_crlb(self, x_source,
+                     x_sensor: npt.ArrayLike | None=None,
+                     v_source: npt.ArrayLike | None=None,
+                     v_sensor: npt.ArrayLike | None=None, **kwargs):
+        def this_jacobian(pos_vel):
+            return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_source=v_source, v_sensor=v_sensor)
+
+        return compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov,
                                      **kwargs)
 
     # ==================== Helper Methods =====================
