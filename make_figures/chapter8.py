@@ -8,10 +8,10 @@ Ported from MATLAB Code
 Nicholas O'Donoughue
 6 May 2021
 """
-
 import matplotlib.pyplot as plt
 import numpy as np
 import time
+import warnings
 
 import ewgeo.array_df as array_df
 from ewgeo.utils import init_output_dir, init_plot_style, make_taper, print_elapsed, print_progress
@@ -339,8 +339,11 @@ def make_figure_7b(prefix=None):
         # Take fourier transform, and normalize peak response
         window_spatial_freq = np.fft.fftshift(np.fft.fft(w, n=osf*num_elements))
         window_spatial_freq = window_spatial_freq / np.max(np.abs(window_spatial_freq))
-    
-        plt.plot(spatial_freq_vec, 2*lin_to_db(np.abs(window_spatial_freq)), label=taper)
+
+        # This will generate some runtime warnings; we don't care
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore','divide by zero encountered in log10')
+            plt.plot(spatial_freq_vec, 2*lin_to_db(np.abs(window_spatial_freq)), label=taper)
 
     plt.xlim([0, 1])
     plt.ylim([-80, 0])
