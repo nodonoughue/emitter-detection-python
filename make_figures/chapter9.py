@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import draw_cep50, draw_error_ellipse
 
 from examples import chapter9
@@ -73,7 +74,7 @@ def make_figure_1(prefix=None):
     sy2 = 3
     rho = .8
     sxy = rho*np.sqrt(sx2*sy2)  # cross-covariance
-    cov_mtx = np.array([[sx2, sxy], [sxy, sy2]])
+    cov_mtx = CovarianceMatrix(np.array([[sx2, sxy], [sxy, sy2]]))
     
     # Compute Ellipses
     x_ell1, y_ell1 = draw_error_ellipse(x2, cov_mtx, num_pts=361, conf_interval=1)    # 1 sigma
@@ -148,7 +149,7 @@ def make_figure_3(prefix=None):
     sy2 = 3
     rho = .8
     sxy = rho*np.sqrt(sx2*sy2)
-    cov_mtx = np.array([[sx2, sxy], [sxy, sy2]])
+    cov_mtx = CovarianceMatrix(np.array([[sx2, sxy], [sxy, sy2]]))
     
     # Compute Error Ellipses
     x_ellipse, y_ellipse = draw_error_ellipse(x2, cov_mtx, num_pts=361, conf_interval=50)

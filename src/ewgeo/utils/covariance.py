@@ -9,6 +9,18 @@ from . import ensure_invertible, parse_reference_sensor, resample_covariance_mat
 
 
 class CovarianceMatrix:
+    # Covariance Matrix and it's Decompositions
+    _cov: npt.ArrayLike | None = None
+    _inv: npt.ArrayLike | None = None
+    _lower: npt.ArrayLike | None = None
+    _eigenvalues: npt.ArrayLike | None = None
+    _eigenvectors: npt.ArrayLike | None = None
+
+    # Flags
+    _do_parse: bool = True          # A parse is needed
+    _do_cholesky: bool = True       # Control whether _lower will be filled
+    _do_inverse: bool = True        # Control whether _inv will be filled
+
     def __init__(self, cov: npt.ArrayLike, do_cholesky: bool=True, do_inverse: bool=True):
         if isinstance(cov, CovarianceMatrix):
             # Copy it instead (this is a deepcopy), then set all the
@@ -118,7 +130,20 @@ class CovarianceMatrix:
 
     @property
     def size(self)-> int:
-        return np.shape(self._cov)[0]
+        if self._cov is None:
+            return 0
+        else:
+            return np.shape(self._cov)[0]
+
+    @property
+    def eigenvalues(self)-> npt.NDArray:
+        self._parse_eig()
+        return self._eigenvalues
+
+    @property
+    def eigenvectors(self)-> npt.NDArray:
+        self._parse_eig()
+        return self._eigenvectors
 
     """
     =========================================================
@@ -177,9 +202,35 @@ class CovarianceMatrix:
         else:
             self._inv = None
 
+        # Clear the eigenvectors and eigenvalues
+        self._eigenvalues = None
+        self._eigenvectors = None
+
         # Clear the do_parse flag
         self._do_parse = False
 
+        return
+
+    def _parse_eig(self):
+        """
+        Compute the eigenvectors and eigenvalues of the covariance matrix; store them to speed up repeated calls.
+        """
+        self._parse() # If a change happened to ._cov, ._inv, or ._lower, then this flag is set. Let's resolve it
+
+        if self._eigenvalues is not None and self._eigenvectors is not None:
+            # They were already computed
+            return
+
+        if self._cov is None:
+            # There is no covariance matrix; it can't have eigenvectors/eigenvalues
+            self._eigenvalues = None
+            self._eigenvectors = None
+            return
+
+        # Parse the covariance matrix
+        lam, v = np.linalg.eigh(self.cov)
+        self._eigenvalues = lam
+        self._eigenvectors = v
         return
 
     def solve_aca(self, a: npt.ArrayLike):
@@ -329,11 +380,8 @@ class CovarianceMatrix:
 
         return CovarianceMatrix(new_cov)
 
-    def resample_hybrid(self,
-                        num_aoa: int=0, num_tdoa: int=None, num_fdoa: int=None,
-                        do_2d_aoa: bool=False,
-                        tdoa_ref_idx=None,
-                        fdoa_ref_idx=None) -> 'CovarianceMatrix':
+    def resample_hybrid(self, num_aoa: int=0, num_tdoa: int=None, num_fdoa: int=None,
+                        tdoa_ref_idx=None, fdoa_ref_idx=None) -> 'CovarianceMatrix':
         """
         Resample a block-diagonal covariance matrix representing AOA, TDOA, and FDOA measurements errors. Original
         matrix size is square with (num_aoa*aoa_dim + num_tdoa + num_fdoa) rows/columns. Output matrix size will be
@@ -346,18 +394,13 @@ class CovarianceMatrix:
         Nicholas O'Donoughue
         21 January 2021
 
-        :param x_aoa: AOA sensor positions
-        :param x_tdoa: TDOA sensor positions
-        :param x_fdoa: FDOA sensor positions
-        :param do_2d_aoa: Boolean flag; if true the number of AOA sensors is doubled (for elevation measurements)
+        :param num_aoa: Number of AOA measurements
+        :param num_tdoa: Number of TDOA sensors
+        :param num_fdoa: Number of FDOA sensors
         :param tdoa_ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings for TDOA
         :param fdoa_ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings for FDOA
         :return cov_out:
         """
-
-        # Parse sensor counts
-        if do_2d_aoa:
-            num_aoa = 2 * num_aoa
 
         # First, we generate the test and reference index vectors
         test_idx_vec_aoa = np.arange(num_aoa)

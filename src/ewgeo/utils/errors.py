@@ -1,8 +1,13 @@
 import numpy as np
+from numpy import typing as npt
 from scipy import stats
+import warnings
+
+from ewgeo.utils.covariance import CovarianceMatrix
 
 
-def compute_cep50(covariance):
+def compute_cep50(covariance: CovarianceMatrix | list[CovarianceMatrix],
+                  print_warnings: bool=True) -> np.float64 | npt.NDArray[np.float64]:
     """
     Computes the radius for a CEP_50 circle from a given error covariance
     matrix C.  The CEP_50 circle is a circle that contains half of the random
@@ -26,46 +31,33 @@ def compute_cep50(covariance):
     Nicholas O'Donoughue
     16 January 2021
 
-    :param covariance: 2x2 error covariance matrix (additional dimensions are assumed to correspond to independent
-                       cases, and are computed in turn)
-    :return cep: Radius of the corresponding CEP_50 circle
+    :param covariance: CovarianceMatrix object or list of CovarianceMatrix objects
+    :param print_warnings: Optional bool (default=True). If true, warnings will be printed when NaN or INF values
+                           are encountered.
+    :return cep: Radius of the corresponding CEP_50 circle or list of radii
     """
 
-    # print('Computing CEP50...')
-
-    # Parse input dimensions
-    in_shape = np.shape(covariance)
-    if np.size(in_shape) < 2:
-        raise TypeError('Covariance matrix must have at least two dimensions.')
-    elif (in_shape[0] != 2 or in_shape[1] != 2) and (in_shape[0] != 3 or in_shape[1] != 3):
-        raise TypeError('First two dimensions of input covariance matrix must have size 2 or 3.')
-    elif np.size(in_shape) > 2:
-        # Multiple 2x2 matrices, keep track of the input size, and then reshape for easier looping
-        out_shape = in_shape[2:]
-        num_matrices = np.prod(out_shape)
-        covariance = np.reshape(covariance, shape=(in_shape[0], in_shape[1], num_matrices))
+    if isinstance(covariance, list):
+        return np.array([compute_cep50(cov, print_warnings) for cov in covariance])
     else:
-        # Only one input matrix
-        out_shape = (1,)
-        num_matrices = 1
+        # print('Computing CEP50...')
 
-        # Add a third dimension to covariance, so that the for loop has a (singleton) dimension to loop across
-        covariance = np.expand_dims(covariance, axis=2)
-
-    cep = np.zeros(shape=out_shape)
-    for idx_matrix in np.arange(num_matrices):
-        this_covariance = covariance[:, :, idx_matrix]
-
-        # print('cov: {}'.format(this_covariance))
+        # Parse input dimensions
+        if covariance.size < 2:
+            raise TypeError('Covariance matrix must have at least two dimensions.')
+        if covariance.size > 3:
+            raise TypeError('Covariance matrix cannot have more than three dimensions if computing CEP50.')
 
         # If any of the CEP elements are NaN or INF, then mark the CEP as INF
-        if not np.all(np.isfinite(this_covariance)):
-            cep[idx_matrix] = np.inf
-            print('\tpoorly formed (NaN or INF values encountered), skipping...')
-            continue
+        if not np.all(np.isfinite(covariance.cov)):
+            if print_warnings:
+                warnings.warn("Poorly formed (NaN or INF values encountered) in CEP50 calculation.")
+            return np.inf
 
         # Eigenvector analysis to identify independent components of error
-        lam, _ = np.linalg.eigh(this_covariance)
+        # lam[0] will be the smallest, and lam[-1] will be the largest
+        lam = np.sort(covariance.eigenvalues, axis=None)
+
         # print('\tEigenvalues: {}'.format(lam))
         lam_max = lam[-1]  # eigenvalues are returned in ascending order; max is the last entry
         lam_min = lam[-2]  # use the second-largest as lam_min (ignores smallest eigenvalue in 3D problems)
@@ -75,18 +67,15 @@ def compute_cep50(covariance):
 
         # Depending on the eigenvalue ratio, use the appropriate approximation
         if lam_min > .25*lam_max:
-            cep[idx_matrix] = .59*(np.sqrt(lam_min)+np.sqrt(lam_max))
+            cep = .59*(np.sqrt(lam_min)+np.sqrt(lam_max))
         else:
             # ToDo: suppress runtime warning (invalid value encountered in scalar divide....inf? nan?) while generating Fig 13.8a
-            cep[idx_matrix] = np.sqrt(lam_max)*(.67+.8*lam_min/lam_max)
+            cep = np.sqrt(lam_max)*(.67+.8*lam_min/lam_max)
 
-    if num_matrices == 1:
-        return cep[0]  # convert to a scalar
-    else:
-        return np.reshape(cep, shape=out_shape)  # reshape to match dimensions 2:end of input size
+        return cep
 
 
-def compute_rmse_scaling(conf_interval):
+def compute_rmse_scaling(conf_interval: float)-> float:
     """
     Computes the RMSE scaling factor for the specified confidence
     interval (between 0 and 1).  Defined as the integral limits (-gamma to
@@ -116,7 +105,7 @@ def compute_rmse_scaling(conf_interval):
     return stats.norm.ppf(.5 + conf_interval / 2)
 
 
-def compute_rmse_confidence_interval(gamma):
+def compute_rmse_confidence_interval(gamma: float)-> float:
     """
     Determines the confidence interval for a given scale factor gamma, which
     is defined as the percentage of a standard normal distribution that falls
@@ -137,7 +126,19 @@ def compute_rmse_confidence_interval(gamma):
     return stats.norm.cdf(gamma) - stats.norm.cdf(-gamma)
 
 
-def draw_cep50(x, covariance, num_pts=100):
+def compute_rmse(covariance: CovarianceMatrix | list[CovarianceMatrix])-> np.float64 | npt.NDArray[np.float64]:
+    """
+    Compute the RMSE for a covariance matrix or a list of covariance matrices; defined as the square root of the
+    trace of each covariance matrix.
+    """
+    if isinstance(covariance, list):
+        return np.array([compute_rmse(c) for c in covariance])
+
+    return np.sqrt(np.trace(covariance.cov))
+
+def draw_cep50(x: npt.ArrayLike,
+               covariance: CovarianceMatrix | list[CovarianceMatrix],
+               num_pts: int=100)-> tuple[npt.NDArray, npt.NDArray] | list[tuple[npt.NDArray, npt.NDArray]]:
     """
     Return the (x,y) coordinates of a circle with radius given by the CEP50
     of the covariance matrix C, centered on the point x, with numPts points
@@ -149,27 +150,33 @@ def draw_cep50(x, covariance, num_pts=100):
     16 January 2021
 
     :param x: Center position for CEP circle (2-dimensional)
-    :param covariance: Covariance matrix (2x2)
+    :param covariance: CovarianceMatrix object or list of CovarianceMatrix objects
     :param num_pts: Number of points to use to draw circle [Default=100]
     :return x: array of x-coordinates for CEP drawing
     :return y: array of y-coordinates for CEP drawing
     """
 
-    # Find the CEP; the radius of the circle to draw
-    cep = compute_cep50(covariance)
+    if isinstance(covariance, list):
+        return [draw_cep50(x, cov, num_pts) for cov in covariance]
+    else:
+        # Find the CEP; the radius of the circle to draw
+        cep = compute_cep50(covariance)
 
-    # Initialize the angular indices of the circle
-    th = np.linspace(start=0, stop=2*np.pi, num=num_pts)
+        # Initialize the angular indices of the circle
+        th = np.linspace(start=0, stop=2*np.pi, num=num_pts)
 
-    # Convert from r,th to cartesian coordinates
-    xx = cep*np.cos(th)
-    yy = cep*np.sin(th)
+        # Convert from r,th to cartesian coordinates
+        xx = cep*np.cos(th)
+        yy = cep*np.sin(th)
 
-    # Offset the cartesian coordinates
-    return xx + x[0], yy + x[1]
+        # Offset the cartesian coordinates
+        return xx + x[0], yy + x[1]
 
 
-def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
+def draw_error_ellipse(x: npt.ArrayLike,
+                       covariance: CovarianceMatrix,
+                       num_pts: int=100,
+                       conf_interval: float=50)-> tuple[npt.NDArray, npt.NDArray]:
     """
     # Compute and return the error ellipse coordinates with numPts
     # samples around the ellipse, for an error centered at the location x and
@@ -196,7 +203,8 @@ def draw_error_ellipse(x, covariance, num_pts=100, conf_interval=50):
     """
 
     # Eigenvector analysis to identify major/minor axes rotation and length
-    lam, v = np.linalg.eigh(covariance)
+    lam = covariance.eigenvalues
+    v = covariance.eigenvectors
 
     # Sort the eigenvalues
     idx_sort = np.argsort(lam)  # Sorted in ascending order by default

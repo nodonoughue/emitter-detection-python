@@ -8,7 +8,7 @@ from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
-from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
+from ewgeo.utils.errors import compute_cep50, draw_error_ellipse, compute_rmse
 from ewgeo.utils import make_nd_grid, print_elapsed, print_progress, resample_noise, safe_2d_shape, SearchSpace
 
 _rad2deg = 180.0/np.pi
@@ -149,7 +149,7 @@ def example2(colors=None, do_video_example=False):
         # Compute CEP50
         this_cep = compute_cep50(this_crlb)
         # To compute the RMSE instead of CEP50 uncomment the following
-        # this_cep = np.sqrt(np.trace(this_crlb, axis0=0, axis1=1))  # Compute the trace along the spatial axes
+        # this_cep = compute_rmse(this_crlb)  # Compute the trace along the spatial axes
 
         # Plot this Result
         this_fig = _plot_contourf(x_grid, extent, grid_shape_2d, this_cep/1e3, x_sensors, None, levels, colors)
@@ -280,7 +280,7 @@ def example3(colors=None):
         # Use the same sensors and reference indices for both TDOA and FDOA; set AOA to none
         this_crlb = hybrid.compute_crlb(x_source=x_source, print_progress=True)
 
-        this_rmse = np.sqrt(np.trace(this_crlb, axis1=0, axis2=1))
+        this_rmse = compute_rmse(this_crlb)
 
         this_fig = _plot_contourf(x_grid, extent, grid_shape_2d, this_rmse/1e3, x_sensors, v_sensors, levels, colors)
         figs.append(this_fig)
@@ -412,16 +412,16 @@ def example4(rng=np.random.default_rng(), mc_params=None):
 
     # ---- Estimate Error Bounds ----
     # CRLB
-    crlb_common = np.squeeze(pss_common.compute_crlb(x_source=x_source_ctr))
-    crlb_full = np.squeeze(pss_full.compute_crlb(x_source=x_source_ctr))
+    crlb_common = pss_common.compute_crlb(x_source=x_source_ctr)
+    crlb_full = pss_full.compute_crlb(x_source=x_source_ctr)
 
     print('CRLB (using common sensor:')
-    print('{} m^2'.format(np.matrix(crlb_common)))
+    print('{} m^2'.format(crlb_common))
     print('CRLB (using full sensor:')
-    print('{} m^2'.format(np.matrix(crlb_full)))
+    print('{} m^2'.format(crlb_full))
 
-    rmse_crlb = np.sqrt(np.trace(crlb_common))
-    rmse_crlb_full = np.sqrt(np.trace(crlb_full))
+    rmse_crlb = compute_rmse(crlb_common)
+    rmse_crlb_full = compute_rmse(crlb_full)
 
     plt.plot(x_arr, rmse_crlb * np.ones_like(x_arr), '--', color='k', label='CRLB')
     plt.plot(x_arr, rmse_crlb_full * np.ones_like(x_arr), '-.', color='k', label='CRLB (full)')

@@ -411,7 +411,7 @@ def make_figure_7(prefix):
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb, print_warnings=False), shape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
     # Set up contours

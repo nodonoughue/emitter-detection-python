@@ -6,7 +6,8 @@ from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.perf import compute_crlb_gaussian
 
 
-def compute_crlb(x_sensor, x_source, cov: CovarianceMatrix, do_2d_aoa=False, print_progress=False, **kwargs):
+def compute_crlb(x_sensor, x_source, cov: CovarianceMatrix, do_2d_aoa=False,
+                 print_progress=False, **kwargs)-> CovarianceMatrix | list[CovarianceMatrix]:
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_aoa (Ndim x N).  C is an NxN matrix of TOA

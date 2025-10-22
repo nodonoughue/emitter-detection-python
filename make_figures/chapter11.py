@@ -195,8 +195,8 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
 
     # Manual Isochrone Labels
     plt.text(float(np.mean([x_sensor1[0], x_sensor2[0]])),
-             float(np.mean([x_sensor1[1], x_sensor2[1]]) - .2), r'$TDOA_{1,2}$')
-    plt.text(float(np.mean([x_sensor2[0], x_sensor3[0]]) + .3),
+             float(np.mean([x_sensor1[1], x_sensor2[1]])) - .2, r'$TDOA_{1,2}$')
+    plt.text(float(np.mean([x_sensor2[0], x_sensor3[0]])) + .3,
              float(np.mean([x_sensor2[1], x_sensor3[1]])), r'$TDOA_{2,3}$')
     
     # Position Markers

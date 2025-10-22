@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import time
+import warnings
 
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils import print_elapsed, print_progress, make_nd_grid, safe_2d_shape, SearchSpace
@@ -155,7 +156,7 @@ def example1(mc_params=None):
     err_crlb = triang.compute_crlb(x_source)
     crlb_cep50 = compute_cep50(err_crlb)  # [km]
     crlb_ellipse = draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
-    plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linewidth=.5, label='90% Error Ellipse')
+    plt.plot(crlb_ellipse[0], crlb_ellipse[1], linewidth=.5, label='90% Error Ellipse')
     plt.xlim([-50, 50])
     plt.ylim([-10, 70])
     plt.legend(loc='upper left')
@@ -172,10 +173,10 @@ def example1(mc_params=None):
     bias_bf = np.mean(err_bf, axis=1)
     bias_cnt = np.mean(err_cnt, axis=1)
     bias_inc = np.mean(err_inc, axis=1)
-    cov_ml = np.cov(err_ml) + bias_ml.dot(bias_ml.T)
-    cov_bf = np.cov(err_bf) + bias_bf.dot(bias_bf.T)
-    cov_cnt = np.cov(err_cnt) + bias_cnt.dot(bias_cnt.T)
-    cov_inc = np.cov(err_inc) + bias_inc.dot(bias_inc.T)
+    cov_ml = CovarianceMatrix(np.cov(err_ml) + bias_ml.dot(bias_ml.T))
+    cov_bf = CovarianceMatrix(np.cov(err_bf) + bias_bf.dot(bias_bf.T))
+    cov_cnt = CovarianceMatrix(np.cov(err_cnt) + bias_cnt.dot(bias_cnt.T))
+    cov_inc = CovarianceMatrix(np.cov(err_inc) + bias_inc.dot(bias_inc.T))
     cep50_ml = compute_cep50(cov_ml)
     cep50_bf = compute_cep50(cov_bf)
     cep50_cnt = compute_cep50(cov_cnt)
@@ -185,20 +186,18 @@ def example1(mc_params=None):
     out_cov_shp = (2, 2, num_iterations)
     bias_ls = np.zeros(shape=out_shp)
     bias_grad = np.zeros(shape=out_shp)
-    cov_ls = np.zeros(shape=out_cov_shp)
-    cov_grad = np.zeros(shape=out_cov_shp)
-    cep50_ls = np.zeros(shape=(num_iterations,))
-    cep50_grad = np.zeros(shape=(num_iterations,))
+    cov_ls = []
+    cov_grad = []
 
     for ii in np.arange(num_iterations):
         bias_ls[:, ii] = np.mean(np.squeeze(err_ls[:, ii, :]), axis=1)
         bias_grad[:, ii] = np.mean(np.squeeze(err_grad[:, ii, :]), axis=1)
 
-        cov_ls[:, :, ii] = np.cov(np.squeeze(err_ls[:, ii, :])) + bias_ls[:, ii].dot(bias_ls[:, ii].T)
-        cov_grad[:, :, ii] = np.cov(np.squeeze(err_grad[:, ii, :])) + bias_grad[:, ii].dot(bias_grad[:, ii].T)
+        cov_ls.append(CovarianceMatrix(np.cov(np.squeeze(err_ls[:, ii, :])) + bias_ls[:, ii].dot(bias_ls[:, ii].T)))
+        cov_grad.append(CovarianceMatrix(np.cov(np.squeeze(err_grad[:, ii, :])) + bias_grad[:, ii].dot(bias_grad[:, ii].T)))
 
-        cep50_ls[ii] = compute_cep50(cov_ls[:, :, ii])  # [km]
-        cep50_grad[ii] = compute_cep50(cov_grad[:, :, ii])  # [km]
+    cep50_ls = compute_cep50(cov_ls)
+    cep50_grad = compute_cep50(cov_grad)
 
     # Second subfigure
     iter_ax = np.arange(num_iterations)
@@ -258,7 +257,10 @@ def _mc_iteration(pss: DirectionFinder, ml_search: SearchSpace, args: dict):
 
     # Generate solutions
     res_ml, _, _ = pss.max_likelihood(zeta=psi, search_space=ml_search, print_progress=False)
-    res_bf, _, _ = pss.bestfix(zeta=psi, search_space=ml_search)
+    # Sometimes we get an underflow error; we don't really care
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore','underflow encountered in exp')
+        res_bf, _, _ = pss.bestfix(zeta=psi, search_space=ml_search)
     res_centroid = pss.centroid(zeta=psi)
     res_incenter = pss.angle_bisector(zeta=psi)
     _, res_ls = pss.least_square(zeta=psi, **args['gd_ls_args'])
@@ -315,7 +317,7 @@ def example2():
 
     # Compute CRLB
     crlb = triang.compute_crlb(x_source=x_source*1e3, print_progress=True)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape_2d)
+    cep50 = np.reshape(compute_cep50(crlb, print_warnings=False), shape=grid_shape_2d)
 
     # Blank out y=0
     nan_mask = np.abs(x_grid[1]) < 1e-6  # x_grid is a list of meshgrid outputs; search the y-dimension

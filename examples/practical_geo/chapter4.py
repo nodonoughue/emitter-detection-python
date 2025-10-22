@@ -10,7 +10,7 @@ from ewgeo.utils import print_elapsed, print_progress, make_nd_grid, safe_2d_sha
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.coordinates import lla_to_enu
 from ewgeo.utils.covariance import CovarianceMatrix
-from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
+from ewgeo.utils.errors import compute_cep50, draw_error_ellipse, compute_rmse
 from ewgeo.utils.unit_conversions import convert, kph_to_mps
 
 _rad2deg = convert(1, "rad", "deg")
@@ -149,7 +149,7 @@ def example1(mc_params=None):
     crlb = hybrid.compute_crlb(x_source=x_source_enu)
 
     # Compute and display the RMSE
-    rmse_crlb = np.sqrt(np.trace(crlb, axis1=0, axis2=1))
+    rmse_crlb = compute_rmse(crlb)
 
     plt.plot([0, max_num_iterations-1], [rmse_crlb, rmse_crlb], 'k', label='CRLB')
     plt.xlabel('Iteration Number')
@@ -272,7 +272,7 @@ def example2(colors=None):
     crlb = hybrid.compute_crlb(v_source= v_source_enu, x_source=x_source_enu, print_progress=True)
 
     # Compute and display the RMSE
-    rmse_crlb = np.sqrt(np.trace(crlb, axis1=0, axis2=1))
+    rmse_crlb = compute_rmse(crlb)
     levels = np.arange(15)
     color_lims = [5, 10]
 

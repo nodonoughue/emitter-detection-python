@@ -8,7 +8,7 @@ from ewgeo.utils.perf import compute_crlb_gaussian
 
 def compute_crlb(x_source, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdoa=None, v_fdoa=None,
                  do_2d_aoa=False, tdoa_ref_idx=None, fdoa_ref_idx=None, do_resample=False,
-                 print_progress=False, **kwargs):
+                 print_progress=False, **kwargs)-> CovarianceMatrix | list[CovarianceMatrix]:
     """
     Computes the CRLB on position accuracy for source at location xs and
     a combined set of AOA, TDOA, and FDOA measurements.  The covariance
@@ -42,8 +42,12 @@ def compute_crlb(x_source, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdo
         x_source = x_source[:, np.newaxis]
 
     if do_resample:
-        cov = cov.resample_hybrid(num_aoa=x_aoa.shape[1], num_tdoa=x_tdoa.shape[1], num_fdoa=x_fdoa.shape[1],
-                                  do_2d_aoa=do_2d_aoa, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
+        _, num_aoa = safe_2d_shape(x_aoa)
+        _, num_tdoa = safe_2d_shape(x_tdoa)
+        _, num_fdoa = safe_2d_shape(x_fdoa)
+        if do_2d_aoa: num_aoa *= 2
+        cov = cov.resample_hybrid(num_aoa=num_aoa, num_tdoa=num_tdoa, num_fdoa=num_fdoa,
+                                  tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
     # Define a wrapper for the jacobian matrix that accepts only the position 'x'
     def jacobian(x):

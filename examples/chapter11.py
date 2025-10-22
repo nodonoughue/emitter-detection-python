@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import time
+import warnings
 
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.utils import print_elapsed, print_progress, SearchSpace
@@ -155,7 +156,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     err_crlb = tdoa.compute_crlb(x_source)
     crlb_cep50 = compute_cep50(err_crlb)/1e3  # [km]
     crlb_ellipse = draw_error_ellipse(x=x_source, covariance=err_crlb, num_pts=100, conf_interval=90)
-    plt.plot(crlb_ellipse[0, :]/1e3, crlb_ellipse[1, :]/1e3, linewidth=.5, label='90% Error Ellipse')
+    plt.plot(crlb_ellipse[0]/1e3, crlb_ellipse[1]/1e3, linewidth=.5, label='90% Error Ellipse')
 
     plt.xlabel('Cross-range [km]')
     plt.ylabel('Down-range [km]')
@@ -179,9 +180,9 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     plt.scatter(x_bf[0, 0] / 1e3, x_bf[1, 0] / 1e3, marker='o', label='BestFix')
     plt.scatter(x_ml[0, 0] / 1e3, x_ml[1, 0] / 1e3, marker='v', label='Maximum Likelihood')
 
-    plt.plot(crlb_ellipse[0, :] / 1e3, crlb_ellipse[1, :] / 1e3, color='k', linewidth=.5, label='90% Error Ellipse')
+    plt.plot(crlb_ellipse[0] / 1e3, crlb_ellipse[1] / 1e3, color='k', linewidth=.5, label='90% Error Ellipse')
 
-    wd = 1.4 * np.max(np.abs(crlb_ellipse[0, :] - x_source[0]))
+    wd = 1.4 * np.max(np.abs(crlb_ellipse[0] - x_source[0]))
     ht = wd * 7 / 8
     plt.ylim(np.array([-1, 1]) * ht / 1e3 + x_source[1] / 1e3)
     plt.xlim(np.array([-1, 1]) * wd / 1e3 + x_source[0] / 1e3)
@@ -199,9 +200,9 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     bias_ml = np.mean(err_ml, axis=1)
     bias_bf = np.mean(err_bf, axis=1)
     bias_chan_ho = np.mean(err_chan_ho, axis=1)
-    cov_ml = np.cov(err_ml) + bias_ml.dot(bias_ml.T)
-    cov_bf = np.cov(err_bf) + bias_bf.dot(bias_bf.T)
-    cov_chan_ho = np.cov(err_chan_ho) + bias_chan_ho.dot(bias_chan_ho.T)
+    cov_ml = CovarianceMatrix(np.cov(err_ml) + bias_ml.dot(bias_ml.T))
+    cov_bf = CovarianceMatrix(np.cov(err_bf) + bias_bf.dot(bias_bf.T))
+    cov_chan_ho = CovarianceMatrix(np.cov(err_chan_ho) + bias_chan_ho.dot(bias_chan_ho.T))
     cep50_ml = compute_cep50(cov_ml)/1e3
     cep50_bf = compute_cep50(cov_bf)/1e3
     cep50_chan_ho = compute_cep50(cov_chan_ho)/1e3
@@ -210,10 +211,8 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     out_cov_shp = (2, 2, num_iterations)
     bias_ls = np.zeros(shape=out_shp)
     bias_grad = np.zeros(shape=out_shp)
-    cov_ls = np.zeros(shape=out_cov_shp)
-    cov_grad = np.zeros(shape=out_cov_shp)
-    cep50_ls = np.zeros(shape=(num_iterations,))
-    cep50_grad = np.zeros(shape=(num_iterations,))
+    cov_ls = []
+    cov_grad = []
 
     for ii in np.arange(num_iterations):
         this_err_ls = err_ls[:, ii, :]
@@ -224,11 +223,11 @@ def example1(rng=np.random.default_rng(), mc_params=None):
         bias_ls[:, ii] = np.mean(this_err_ls, axis=1)
         bias_grad[:, ii] = np.mean(this_err_grad, axis=1)
 
-        cov_ls[:, :, ii] = np.cov(this_err_ls) + this_bias_ls[:,np.newaxis] @ this_bias_ls[np.newaxis,:]
-        cov_grad[:, :, ii] = np.cov(this_err_grad) + this_bias_grad[:,np.newaxis] @ this_bias_grad[np.newaxis,:]
+        cov_ls.append(CovarianceMatrix(np.cov(this_err_ls) + this_bias_ls[:,np.newaxis] @ this_bias_ls[np.newaxis,:]))
+        cov_grad.append(CovarianceMatrix(np.cov(this_err_grad) + this_bias_grad[:,np.newaxis] @ this_bias_grad[np.newaxis,:]))
 
-        cep50_ls[ii] = compute_cep50(cov_ls[:, :, ii])/1e3  # [km]
-        cep50_grad[ii] = compute_cep50(cov_grad[:, :, ii])/1e3  # [km]
+    cep50_ls = compute_cep50(cov_ls)/1e3  # [km]
+    cep50_grad = compute_cep50(cov_grad)/1e3  # [km]
 
     # Error plot
     iter_ax = np.arange(num_iterations)
@@ -273,7 +272,12 @@ def _mc_iteration(pss: TDOAPassiveSurveillanceSystem, ml_search: SearchSpace, ls
 
     # Generate solutions
     res_ml, _, _ = pss.max_likelihood(zeta=rho, search_space=ml_search)
-    res_bf, _, _ = pss.bestfix(zeta=rho, search_space=ml_search)
+
+    # Sometimes we get an underflow error; we don't really care
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', 'underflow encountered in exp')
+        res_bf, _, _ = pss.bestfix(zeta=rho, search_space=ml_search)
+
     _, res_ls = pss.least_square(zeta=rho, **ls_args)
     _, res_gd = pss.gradient_descent(zeta=rho, **gd_args)
     res_chan_ho = pss.chan_ho(zeta=rho)

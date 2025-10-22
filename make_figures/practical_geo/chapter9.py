@@ -100,7 +100,7 @@ def make_figure_2(prefix=None):
     h_mat = msmt_model.jacobian(prediction)
     pred_cov = prediction.covar.cov
     msmt_cov = pss.cov.cov
-    innov_covar = h_mat @ pred_cov @ h_mat.T + msmt_cov
+    innov_covar = CovarianceMatrix(h_mat @ pred_cov @ h_mat.T + msmt_cov)
     pred_gate = draw_error_ellipse(x=prediction_msmt.zeta, covariance=innov_covar, conf_interval=gate_probability)
 
     # Generate some random measurements
@@ -277,7 +277,7 @@ def make_figure_3(prefix=None):
         plt.scatter(z[0], z[1], marker='o', color=hdl[0].get_color(), label=trk_label)
         trk_label = None
         pred_gate = draw_error_ellipse(x=h.measurement_prediction.zeta,
-                                       covariance=h.innovation_covar.cov,
+                                       covariance=h.innovation_covar,
                                        conf_interval=gate_probability)
         plt.plot(pred_gate[0], pred_gate[1], color=hdl[0].get_color(), linestyle='--',
                  label=gate_label)

@@ -15,7 +15,7 @@ def compute_crlb(x_sensor: npt.ArrayLike,
                  v_source: npt.ArrayLike | None=None,
                  ref_idx=None,
                  do_resample: bool=True,
-                 print_progress: bool=False, **kwargs):
+                 print_progress: bool=False, **kwargs)-> CovarianceMatrix | list[CovarianceMatrix]:
     """
     Computes the CRLB on position accuracy for source at location xs and
     sensors at locations in x_fdoa (Ndim x N) with velocity v_fdoa.

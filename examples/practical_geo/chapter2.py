@@ -10,7 +10,7 @@ from ewgeo.triang import DirectionFinder
 from ewgeo.utils import print_elapsed, print_progress, safe_2d_shape, SearchSpace
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
-from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
+from ewgeo.utils.errors import compute_cep50, draw_error_ellipse, compute_rmse
 
 _rad2deg = 180.0/np.pi
 _deg2rad = np.pi/180.0
@@ -117,7 +117,7 @@ def _make_plot(pss: HybridPassiveSurveillanceSystem, x_ml, x_ls, x_gd, x_init, c
 
     # Overlay Error Ellipse
     if crlb_ellipse is not None:
-        plt.plot(crlb_ellipse[0, :], crlb_ellipse[1, :], linestyle='--', color='k',
+        plt.plot(crlb_ellipse[0], crlb_ellipse[1], linestyle='--', color='k',
                  label='{:d}% Error Ellipse'.format(conf_interval))
 
     plt.legend(loc='best')
@@ -365,7 +365,7 @@ def example3(colors=None):
     print('CRLB: {}'.format(crlb))
 
     # RMSE
-    rmse_crlb = np.sqrt(np.trace(crlb))
+    rmse_crlb = compute_rmse(crlb)
     print('RMSE: {:.2f} km'.format(rmse_crlb/1e3))
 
     # CEP50
@@ -489,7 +489,7 @@ def example3_mc(colors=None, mc_params=None):
     # ---- Estimate Error Bounds ----
     # CRLB
     crlb = pss.compute_crlb(x_source=x_source)
-    rmse_crlb = np.sqrt(np.trace(crlb))
+    rmse_crlb = compute_rmse(crlb)
     plt.plot(x_arr, rmse_crlb*np.ones_like(x_arr), '--', color='k', label='CRLB')
 
     # CEP50

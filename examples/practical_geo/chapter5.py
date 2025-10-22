@@ -10,7 +10,7 @@ from ewgeo.utils.coordinates import correct_enu, ecef_to_enu, ecef_to_lla, enu_t
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.constraints import bounded_alt, fixed_alt, fixed_cartesian
 from ewgeo.utils.covariance import CovarianceMatrix
-from ewgeo.utils.errors import draw_error_ellipse
+from ewgeo.utils.errors import draw_error_ellipse, compute_rmse
 from ewgeo.utils.unit_conversions import convert
 
 _rad2deg = convert(1, "rad", "deg")
@@ -288,8 +288,8 @@ def example3():
     crlb_fix_grid = hybrid.compute_crlb(x_source=x_set, print_progress=True, eq_constraints_grad=[a_grad])
 
     # Compute RMSE of each grid point
-    rmse_raw = np.reshape(np.sqrt(np.trace(crlb_raw_grid, axis1=0, axis2=1)), shape=out_shape)
-    rmse_fix = np.reshape(np.sqrt(np.trace(crlb_fix_grid, axis1=0, axis2=1)), shape=out_shape)
+    rmse_raw = np.reshape(compute_rmse(crlb_raw_grid), shape=out_shape)
+    rmse_fix = np.reshape(compute_rmse(crlb_fix_grid), shape=out_shape)
 
     # Plot RMSE
     fig, axes = plt.subplots(ncols=2)
@@ -462,7 +462,8 @@ def example5():
 
     # External Prior
     x_prior = np.array(correct_enu(e_ground=95e3, n_ground=10e3, u_ground=10e3))
-    cov_prior = np.array([[5., 1., 0.], [1., 50., 0.], [0., 0., 10.]])*1e6
+    cov_prior = CovarianceMatrix(np.array([[5., 1., 0.], [1., 50., 0.], [0., 0., 10.]])*1e6)
+    cov_prior_2d = CovarianceMatrix(cov_prior.cov[:2, :2])
 
     def prior(x):
         # x is (n_dim x n_position) array of potential source positions; compute the probability for each, but don't
@@ -501,7 +502,7 @@ def example5():
         plt.scatter(x_ml[0]/1e3, x_ml[1]/1e3, marker='s', label='Estimate')
 
         if do_prior:
-            ell_prior = draw_error_ellipse(x_prior[:2], cov_prior[:2, :2], num_pts=100, conf_interval=90)
+            ell_prior = draw_error_ellipse(x_prior[:2], cov_prior_2d, num_pts=100, conf_interval=90)
             plt.scatter(x_prior[0]/1e3, x_prior[1]/1e3, marker='v', label='Prior')
             plt.plot(ell_prior[0]/1e3, ell_prior[1]/1e3, 'w-.', label='Prior Confidence (90%)')
             plt.scatter(x_ml_prior[0]/1e3, x_ml_prior[1]/1e3, marker='d', label='Estimate (w/prior)')

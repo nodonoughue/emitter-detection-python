@@ -7,7 +7,7 @@ from .covariance import CovarianceMatrix
 
 
 def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progress=False,
-                          eq_constraints_grad:list = None):
+                          eq_constraints_grad:list = None)-> CovarianceMatrix | list[CovarianceMatrix]:
     """
     Computes the CRLB for a Gaussian problem at one or more source positions. The CRLB for Gaussian problems takes the
     general form:
@@ -40,7 +40,7 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
         constraint_grad = np.asarray([eq(x_source) for eq in eq_constraints_grad])
 
     # Initialize output variable
-    crlb = np.zeros((n_dim, n_dim, n_source))
+    crlb = []
 
     # Print CRLB calculation progress, if desired
     markers_per_row = 40
@@ -81,7 +81,10 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
         if np.any(np.isnan(fisher_matrix)) or np.any(np.isinf(fisher_matrix)):
             # Problem is ill-defined, Fisher Information Matrix cannot be
             # inverted
-            crlb[:, :, idx] = np.nan
+            # We'll use a matrix with NaN on the diagonal to represent this case.
+            dummy = np.zeros((n_dim, n_dim))
+            np.fill_diagonal(dummy, np.nan)
+            crlb.append(CovarianceMatrix(dummy))
         else:
             fisher_inv = np.real(pinvh(fisher_matrix))
             if do_eq_constraints:
@@ -99,7 +102,7 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
                 # constrained Fisher inverse
                 fisher_inv = fisher_inv - fisher_const_inv
 
-            crlb[:, :, idx] = fisher_inv
+            crlb.append(CovarianceMatrix(fisher_inv))
 
     if print_progress:
         print('done')
@@ -107,7 +110,7 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
         utils.print_elapsed(t_elapsed)
 
     if n_source == 1:
-        # There's only one source, trim the third dimension
-        crlb = crlb[:, :, 0]
+        # There's only one source, pull the CovarianceMatrix object out of the list it's in
+        crlb = crlb[0]
 
     return crlb

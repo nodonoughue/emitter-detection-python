@@ -37,7 +37,6 @@ def lin_to_db(lin_value, eps=1e-99):
 
     # Use the optional eps argument as a minimum allowable precision, to prevent divide by zero errors if we take the
     # logarithm of 0.
-    # ToDo: suppress runtime warning (divide by zero) while generating Fig 8.7b, 12.3a
     return np.where(lin_value>=eps, 10 * np.log10(lin_value), -np.inf)
 
 

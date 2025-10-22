@@ -8,6 +8,7 @@ Ported from MATLAB Code
 Nicholas O'Donoughue
 28 October 2022
 """
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -322,7 +323,9 @@ def _make_figure3_subfigure(eps: npt.ArrayLike,
     fig, ax = plt.subplots()
 
     # Make the background image using the difference between each pixel's FDOA and the true source's FDOA
-    ax.imshow(lin_to_db(np.flipud(eps)), extent=(x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]), aspect='auto')
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore','divide by zero encountered in log10')
+        ax.imshow(lin_to_db(np.flipud(eps)), extent=(x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]), aspect='auto')
 
     # Add the sensors and source markers
     handle_sensors = plt.scatter(x_sensor[sensors_to_plot, 0], x_sensor[sensors_to_plot, 1],

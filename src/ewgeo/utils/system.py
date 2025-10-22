@@ -882,7 +882,7 @@ class PassiveSurveillanceSystem(ABC):
     def compute_crlb(self, x_source,
                      x_sensor: npt.ArrayLike | None=None,
                      v_source: npt.ArrayLike | None=None,
-                     v_sensor: npt.ArrayLike | None=None, **kwargs):
+                     v_sensor: npt.ArrayLike | None=None, **kwargs)-> CovarianceMatrix | list[CovarianceMatrix]:
         def this_jacobian(pos_vel):
             return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_source=v_source, v_sensor=v_sensor)
 

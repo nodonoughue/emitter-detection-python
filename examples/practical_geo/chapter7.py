@@ -251,8 +251,8 @@ def example2():
     plt.grid(True)
 
     # Overlay error ellipse
-    ell = draw_error_ellipse(x_tgt, crlb_single_sample,num_pts=101)
-    ell_full = draw_error_ellipse(x_tgt, crlb_sample_mean,num_pts=101)
+    ell = draw_error_ellipse(x_tgt, crlb_single_sample, num_pts=101)
+    ell_full = draw_error_ellipse(x_tgt, crlb_sample_mean, num_pts=101)
     
     plt.plot(ell[0], ell[1], label='Error Ellipse (single sample)')
     plt.plot(ell_full[0], ell_full[1], label='Error Ellipse (sample mean)')
@@ -336,7 +336,7 @@ def example3():
 
         # Store the results and update the variables
         x_est[:, idx] = this_x
-        cep[idx] = compute_cep50(this_p)
+        cep[idx] = compute_cep50(CovarianceMatrix(this_p))
 
         prev_x = this_x
         prev_p = this_p
@@ -351,7 +351,8 @@ def example3():
     ell = draw_error_ellipse(x_tgt, crlb, num_pts=101)
     plt.plot(ell[0], ell[1],'-.', label='Error Ellipse (single msmt.)')
 
-    ell_1s = draw_error_ellipse(x_tgt, crlb/np.sqrt(num_pulses), num_pts=101)
+    crlb_adjust = crlb.multiply(1/np.sqrt(num_pulses), overwrite=False)
+    ell_1s = draw_error_ellipse(x_tgt, crlb_adjust, num_pts=101)
     plt.plot(ell_1s[0], ell_1s[1],'-.', label='Error Ellipse (full observation)')
 
     offset = np.amax(np.amax(ell, axis=1)-np.amin(ell,axis=1), axis=0)
@@ -446,7 +447,7 @@ def example4():
 
         # Store the results and update the variables
         x_est[:, idx] = this_x
-        cep[idx] = compute_cep50(this_p)
+        cep[idx] = compute_cep50(CovarianceMatrix(this_p))
     
         prev_x = this_x
         prev_p = this_p

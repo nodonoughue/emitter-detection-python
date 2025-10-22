@@ -168,7 +168,7 @@ def example1(mc_params=None):
         x_est_xyz = x_est[pos_slice]
         p_est_xyz = p_est[pos_slice, pos_slice]
         x_est_xy = x_est_xyz[:2]
-        p_est_xy = p_est_xyz[:2, :2]
+        p_est_xy = CovarianceMatrix(p_est_xyz[:2, :2])
         x_ell_est[:, :, idx] = draw_error_ellipse(x_est_xy, p_est_xy, num_ell_pts)
 
     print('done')
@@ -497,8 +497,9 @@ def example2(rng=np.random.default_rng()):
         rmse_cov_pred[idx]= np.sqrt(np.linalg.trace(p_pred[pos_slice, pos_slice]))
 
         # Draw an error ellipse
+        p_pos_xy = CovarianceMatrix(p_pos_est[:2, :2])
         x_ell_est[:, :, idx] = draw_error_ellipse(x=pos_est[:2],
-                                                  covariance=p_pos_est[:2, :2],
+                                                  covariance=p_pos_xy,
                                                   num_pts=num_ell_pts)
 
     print('done')

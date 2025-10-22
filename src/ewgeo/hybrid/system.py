@@ -7,7 +7,6 @@ from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils import parse_reference_sensor, safe_2d_shape, SearchSpace
 from ewgeo.utils.covariance import CovarianceMatrix
-from ewgeo.utils.perf import compute_crlb_gaussian
 from ewgeo.utils.system import DifferencePSS
 
 

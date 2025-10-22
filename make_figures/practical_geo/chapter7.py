@@ -339,7 +339,7 @@ def make_figure_10(prefix=None):
         this_psi = aoa.noisy_measurement(x_tgt)
 
         this_x, this_p = tracker.ekf_update(x_prev, p_prev, this_psi, aoa.cov.cov, z_fun, h_fun)
-        cep_vec[idx] = compute_cep50(this_p)
+        cep_vec[idx] = compute_cep50(CovarianceMatrix(this_p))
 
         x_prev = this_x
         p_prev = this_p

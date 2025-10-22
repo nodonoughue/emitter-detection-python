@@ -176,7 +176,7 @@ class State:
         # Current State Covariance
         if do_cov and self.covar is not None:
             xy_ellipse = draw_error_ellipse(x=coords,
-                                            covariance=self.position_covar.cov,
+                                            covariance=self.position_covar,
                                             conf_interval=cov_ellipse_confidence)
             trk_err_hdl = plt.plot(*xy_ellipse, **kwargs)[0]
         else:
@@ -208,7 +208,7 @@ class State:
         # Current State Covariance
         if do_cov and self.covar is not None and trk_err_hdl is not None:
             xy_ellipse = draw_error_ellipse(x=coords,
-                                            covariance=self.position_covar.cov,
+                                            covariance=self.position_covar,
                                             conf_interval=cov_ellipse_confidence)
             trk_err_hdl.set_data(*xy_ellipse)
 

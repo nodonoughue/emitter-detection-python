@@ -4,7 +4,6 @@ import numpy.typing as npt
 from . import model
 from ewgeo.utils import parse_reference_sensor, safe_2d_shape
 from ewgeo.utils.covariance import CovarianceMatrix
-from ewgeo.utils.perf import compute_crlb_gaussian
 from ewgeo.utils.system import DifferencePSS
 
 
