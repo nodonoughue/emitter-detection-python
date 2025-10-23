@@ -1,6 +1,6 @@
 import numpy.typing as npt
 
-from . import model, perf, solvers
+from . import model, solvers
 from ewgeo.utils import parse_reference_sensor
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix

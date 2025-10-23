@@ -2,7 +2,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from numpy import typing as npt
 
-from . import model, perf, solvers
+from . import model, solvers
 from ewgeo.utils import safe_2d_shape, SearchSpace
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import PassiveSurveillanceSystem

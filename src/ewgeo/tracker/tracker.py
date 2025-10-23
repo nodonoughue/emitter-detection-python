@@ -1,5 +1,3 @@
-from abc import ABC, abstractmethod
-
 from matplotlib.animation import Animation
 from matplotlib.axes import Axes
 from matplotlib.collections import PathCollection

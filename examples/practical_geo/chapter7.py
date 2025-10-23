@@ -213,7 +213,7 @@ def example2():
         print('{:.2f} s required to achieve {:.2f} m CEP50.'.format(time_vec[good_index], desired_cep))
 
     int_time = time_vec[good_index]
-    num_pulses = np.floor(int_time/pri).astype(int)+1
+    num_pulses = np.astype(np.floor(int_time/pri)+1, int).item()
     
     # Compute CRLB
     cov = cov_roa.multiply(1/num_pulses, overwrite=False)
