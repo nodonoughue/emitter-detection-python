@@ -4,6 +4,7 @@ import seaborn as sns
 import time
 
 from ewgeo.utils.unit_conversions import db_to_lin
+from ewgeo.utils import print_elapsed, print_progress
 
 
 def crlb(snr, num_samples):
@@ -106,8 +107,8 @@ def run_example(mc_params=None):
         iter_per_row = min(iter_per_marker * 40,num_snr)
         t_start = time.perf_counter()
         for idx_snr, this_snr_db in enumerate(snr_db_vec.tolist()):
-            utils.print_progress(num_total=num_snr, curr_idx=idx_snr, iterations_per_marker=iter_per_marker,
-                                 iterations_per_row=iter_per_row, t_start=t_start)
+            print_progress(num_total=num_snr, curr_idx=idx_snr, iterations_per_marker=iter_per_marker,
+                           iterations_per_row=iter_per_row, t_start=t_start)
 
             # Compute noise power, scale base noise
             noise_amp = np.sqrt(db_to_lin(-this_snr_db))
