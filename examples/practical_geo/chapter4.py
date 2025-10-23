@@ -239,8 +239,10 @@ def example2(colors=None):
                                max_offset=search_size,
                                epsilon=grid_res)
     x_source_enu, x_grid, grid_shape = make_nd_grid(search_space)  # make the grid
-    extent = tuple(np.array([x_ctr[0] - max_offset, x_ctr[0] + max_offset,
-                             x_ctr[1] - max_offset, x_ctr[1] + max_offset])/1e3)
+    extent = (x_ctr[0].item()/1e3 - max_offset/1e3,
+              x_ctr[0].item()/1e3 + max_offset/1e3,
+              x_ctr[1].item()/1e3 - max_offset/1e3,
+              x_ctr[1].item()/1e3 + max_offset/1e3)
 
     # Use a squeeze operation to ensure that the individual dimension
     # indices in x_grid are 2D

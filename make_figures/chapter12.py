@@ -313,7 +313,7 @@ def make_figure_3(prefix):
 
 def _make_figure3_subfigure(eps: npt.ArrayLike,
                             x_vec: npt.NDArray[np.float64],
-                            y_vec: npt.ArrayLike,
+                            y_vec: npt.NDArray[np.float64],
                             x_sensor: npt.ArrayLike,
                             v_sensor: npt.ArrayLike,
                             x_source: npt.ArrayLike,
@@ -325,7 +325,8 @@ def _make_figure3_subfigure(eps: npt.ArrayLike,
     # Make the background image using the difference between each pixel's FDOA and the true source's FDOA
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore','divide by zero encountered in log10')
-        ax.imshow(lin_to_db(np.flipud(eps)), extent=(x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]), aspect='auto')
+        ax.imshow(lin_to_db(np.flipud(eps)), extent=(x_vec[0].item(), x_vec[-1].item(),
+                                                     y_vec[0].item(), y_vec[-1].item()), aspect='auto')
 
     # Add the sensors and source markers
     handle_sensors = plt.scatter(x_sensor[sensors_to_plot, 0], x_sensor[sensors_to_plot, 1],

@@ -105,10 +105,10 @@ def example1(colors=None):
                                max_offset=offset,
                                epsilon=grid_res)
     x_set, x_grid, grid_shape = make_nd_grid(search_space)
-    extent = ((x_ctr[0] - offset[0])/1e3,
-              (x_ctr[0] + offset[0])/1e3,
-              (x_ctr[1] - offset[1])/1e3,
-              (x_ctr[1] + offset[1])/1e3)
+    extent = ((x_ctr[0].item() - offset[0])/1e3,
+              (x_ctr[0].item() + offset[0])/1e3,
+              (x_ctr[1].item() - offset[1])/1e3,
+              (x_ctr[1].item() + offset[1])/1e3)
 
     # Use a squeeze operation to ensure that the individual dimension indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]

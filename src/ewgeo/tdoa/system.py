@@ -129,7 +129,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
 
         test_idx_vec, ref_idx_vec = parse_reference_sensor(self.ref_idx, self.num_sensors)
 
-        isochrones = [model.draw_isochrone(x_ref=x_sensor[:,ref_idx], x_test=x_sensor[:,test_idx],
+        isochrones = [model.draw_isochrone(x_ref=x_sensor[:, ref_idx], x_test=x_sensor[:, test_idx],
                                            range_diff=this_range_diff, num_pts=num_pts, max_ortho=max_ortho) for
                       (test_idx, ref_idx, this_range_diff) in zip(test_idx_vec, ref_idx_vec, range_diff)]
         return isochrones

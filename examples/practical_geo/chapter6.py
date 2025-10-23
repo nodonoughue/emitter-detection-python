@@ -241,7 +241,7 @@ def example3():
 
     label_nominal = 'Isochrone (nominal positions w/bias)'
     # label_true = 'Isochrone (true positions w/bias)'
-    xy_isos = tdoa.draw_isochrones(range_diff=zeta_unc_bias[aoa.num_measurements:], num_pts=101, max_ortho=8)
+    xy_isos = tdoa.draw_isochrones(range_diff=zeta_unc_bias[hybrid.tdoa_measurement_idx], num_pts=101, max_ortho=8)
     for xy_iso in xy_isos:
         plt.plot(xy_iso[0], xy_iso[1], color=hdl_nominal_t.get_facecolor(), label=label_nominal)
         label_nominal = None
@@ -296,8 +296,10 @@ def example4(do_iterative=False):
                                max_offset=search_size,
                                epsilon=grid_res)
     x_set, x_grid, out_shape = make_nd_grid(search_space)
-    extent = ((x_ctr[0]-search_size)/1e3, (x_ctr[0]+search_size)/1e3,
-              (x_ctr[1]-search_size)/1e3, (x_ctr[1]+search_size)/1e3)
+    extent = (x_ctr[0].item()/1e3 - search_size/1e3,
+              x_ctr[0].item()/1e3 + search_size/1e3,
+              x_ctr[1].item()/1e3 - search_size/1e3,
+              x_ctr[1].item()/1e3 + search_size/1e3)
 
     ell = tdoa.log_likelihood(zeta=zeta, x_source=x_set)
     ell_true = tdoa.log_likelihood(zeta=zeta_true, x_source=x_set)
@@ -351,7 +353,7 @@ def example4(do_iterative=False):
     x_est, _, _ = tdoa.max_likelihood(zeta=zeta, search_space=ml_search, print_progress=True)
 
     print('True ML Est.: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_true[0]/1e3, x_est_true[1]/1e3,
-                                                                      np.linalg.norm(x_est_true-x_tgt)/1000.))
+                                                                      np.linalg.norm(x_est_true-x_tgt)/1000))
     print('Biased ML Est.: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est[0]/1e3, x_est[1]/1e3,
                                                                          np.linalg.norm(x_est-x_tgt)/1000))
 

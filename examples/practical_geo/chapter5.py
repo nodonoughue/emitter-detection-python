@@ -294,10 +294,10 @@ def example3():
     # Plot RMSE
     fig, axes = plt.subplots(ncols=2)
     contour_levels = np.arange(20)
-    extent = ((x_tgt[0] - max_offset)/1e3,
-              (x_tgt[0] + max_offset)/1e3,
-              (x_tgt[1] - max_offset)/1e3,
-              (x_tgt[1] + max_offset)/1e3)
+    extent = ((x_tgt[0].item() - max_offset)/1e3,
+              (x_tgt[0].item() + max_offset)/1e3,
+              (x_tgt[1].item() - max_offset)/1e3,
+              (x_tgt[1].item() + max_offset)/1e3)
 
     # Unconstrained on axes[0] and Constrained on axes[1]
     for this_ax, this_z, this_title in zip(axes, [rmse_raw, rmse_fix], ['Unconstrained', 'Constrained']):
@@ -477,10 +477,10 @@ def example5():
     x_center = x_tgt
     grid_size = np.array([50e3, 50e3, 0])
     epsilon = 250
-    extent = (float(x_tgt[0] - grid_size[0]) / 1e3,
-              float(x_tgt[0] + grid_size[0]) / 1e3,
-              float(x_tgt[1] - grid_size[1]) / 1e3,
-              float(x_tgt[1] + grid_size[1]) / 1e3)  # cast each entry to a float to avoid a PyCharm type warning later
+    extent = ((x_tgt[0].item() - grid_size[0]) / 1e3,
+              (x_tgt[0].item() + grid_size[0]) / 1e3,
+              (x_tgt[1].item() - grid_size[1]) / 1e3,
+              (x_tgt[1].item() + grid_size[1]) / 1e3)
 
     ml_search = SearchSpace(x_ctr=x_center, max_offset=grid_size, epsilon=epsilon)
     x_ml, score, x_grid = tdoa.max_likelihood(zeta=zeta, search_space=ml_search)

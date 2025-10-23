@@ -121,7 +121,7 @@ def make_figure_1(prefix=None, colors=None):
         this_lob_label = None
 
     # Draw isochrone
-    xy_isochrone = tdoa.model.draw_isochrone(x_sensor[0, :], x_sensor[1, :], range_diff=range_diff,
+    xy_isochrone = tdoa.model.draw_isochrone(x_ref=x_sensor[0], x_test=x_sensor[1], range_diff=range_diff,
                                              num_pts=1000, max_ortho=5)
     plt.plot(xy_isochrone[0], xy_isochrone[1], color=colors(3), linestyle=':', label='Isochrone')
 

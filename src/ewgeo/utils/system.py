@@ -1,3 +1,4 @@
+import math
 from abc import ABC, abstractmethod
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
@@ -68,9 +69,7 @@ class PassiveSurveillanceSystem(ABC):
 
     @property
     def num_measurements(self)-> int:
-        if self.cov is None:
-            raise ValueError("The covariance matrix is not defined; unable to compute the number of measurements that will be generated.")
-        return self.cov.cov.shape[0]
+        return self.num_sensors # default is one measurement per sensor; subclasses should override this
 
     @property
     def cov(self)-> CovarianceMatrix:
@@ -587,7 +586,7 @@ class PassiveSurveillanceSystem(ABC):
         # TODO
         if do_bias_cal:
             num_bias = self.num_measurements
-            bias_slice = np.s_[:self.num_bias]  # one for each measurement
+            bias_slice = np.s_[:num_bias]  # one for each measurement
         else:
             num_bias = 0
             bias_slice = None
@@ -961,6 +960,23 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
         (super().__init__(x, cov, **kwargs))
         self.ref_idx = ref_idx
         self.update_covariance_matrix(cov, do_resample)
+
+    @property
+    def num_measurements(self)-> int:
+        # Check the reference index; it determines how many measurements there will be
+        if self.ref_idx is None or np.isscalar(self.ref_idx):
+            # common reference sensor
+            return self.num_sensors - 1
+        elif isinstance(self.ref_idx, str):
+            if self.ref_idx.lower() == 'full':
+                # all possible cominations
+                return math.comb(self.num_sensors, 2)
+            else:
+                raise ValueError(f"Unrecognized reference index setting, {self.ref_idx}.")
+        else:
+            # Pair of vectors; first row is test sensors, second is reference
+            _, num_pairs = safe_2d_shape(self.ref_idx)
+            return num_pairs
 
     @property
     def cov_raw(self):

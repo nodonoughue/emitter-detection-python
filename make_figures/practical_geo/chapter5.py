@@ -246,7 +246,7 @@ def make_figure_15(prefix=None):
     y_axis = np.linspace(start=0, stop=10, num=101)
     x_axis = np.linspace(start=-10, stop=10, num=1001)
     # Define the corners of the grid, for imshow. Cast as float types to avoid type warning
-    extent = (float(x_axis[0]), float(x_axis[-1]), float(y_axis[0]), float(y_axis[-1]))
+    extent = (x_axis[0].item(), x_axis[-1].item(), y_axis[0].item(), y_axis[-1].item())
 
     xx, yy = np.meshgrid(x_axis, y_axis)
 

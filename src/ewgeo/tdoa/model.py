@@ -405,7 +405,7 @@ def draw_isochrone(x_ref: npt.ArrayLike,
 
     :param x_ref: Position of first sensor (Ndim x 1) [m]
     :param x_test: Position of second sensor (Ndim x 1) [m]
-    :param range_diff: Desired range difference [m]
+    :param range_diff: Desired range difference [m] (range to x_test minus range to x_ref)
     :param num_pts: Number of points to compute
     :param max_ortho: Maximum offset from line of sight between x1 and x2 [m]
     :return x_iso: First dimension of isochrone [m]
@@ -417,7 +417,7 @@ def draw_isochrone(x_ref: npt.ArrayLike,
     x_test = x_test[:2]
 
     # Generate pointing vectors u and v in rotated coordinate space
-    #  u = unit vector from x1 to x2
+    #  u = unit vector from x_test to x_ref
     #  v = unit vector orthogonal to u
     rot_mat = np.array(((0, 1), (-1, 0)))
     r = calc_range(x_ref, x_test)
@@ -426,8 +426,8 @@ def draw_isochrone(x_ref: npt.ArrayLike,
     x_proj = np.array([u, v])
 
     # Position of reference points in uv-space
-    x1uv = np.zeros(shape=(2, 1))
-    x2uv = np.array((r, 0))
+    x_ref_uv = np.zeros(shape=(2, 1))  # test sensor position
+    x_test_uv = np.array((r, 0))         # ref sensor position
     
     # Initialize isochrone positions in uv-space
     vv = np.linspace(0, max_ortho, num_pts)
@@ -453,14 +453,14 @@ def draw_isochrone(x_ref: npt.ArrayLike,
             num_iter += 1
 
             # Compute the current range difference
-            this_rng_diff = calc_range_diff(xuv[:, i], x2uv, x1uv)
+            this_rng_diff = calc_range_diff(x0=xuv[:, i], x1=x_ref_uv, x2=x_test_uv)
 
             # Offset is the difference between the current and desired
             # range difference
             offset = range_diff - this_rng_diff
 
             # Apply the offset directly to the u-dimension and repeat
-            xuv[0, i] = xuv[0, i] - offset/2
+            xuv[0, i] = xuv[0, i] - offset*.9
 
     # Isochrone is symmetric about u axis
     # Flip the u axis, flip and negate v

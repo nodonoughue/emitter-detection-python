@@ -208,7 +208,7 @@ def example1(colors=None):
     y_grid = np.arange(0, 4, 0.02) * 1e3
     xx, yy = np.meshgrid(x_grid, y_grid)
     x_test_pos = np.vstack((xx.ravel(), yy.ravel()))
-    grid_extent = (float(x_grid[0]), float(x_grid[-1]), float(y_grid[0]), float(y_grid[-1]))
+    grid_extent = (x_grid[0].item(), x_grid[-1].item(), y_grid[0].item(), y_grid[-1].item())
 
     # Log-Likelihood Figure Generator
     def _make_subfigure(ell, do_aoa=False, do_tdoa=False, do_fdoa=False):

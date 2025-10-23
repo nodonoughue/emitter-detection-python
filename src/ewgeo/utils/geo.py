@@ -66,7 +66,7 @@ def calc_range_diff(x0, x1, x2):
     r2 = calc_range(x0, x2)  # 1xM2
 
     # Take the difference, with appropriate dimension reshaping
-    return r1 - r2.T
+    return r2.T - r1
 
 
 def calc_doppler(x1, v1, x2, v2, f):

@@ -127,7 +127,10 @@ def example2(colors=None, do_video_example=False):
                                max_offset=search_size,
                                epsilon=grid_res)
     x_source, x_grid, grid_shape = make_nd_grid(search_space)
-    extent = (x_ctr[0] - max_offset, x_ctr[0] + max_offset, x_ctr[1] - max_offset, x_ctr[1] + max_offset)
+    extent = (x_ctr[0].item() - max_offset,
+              x_ctr[0].item() + max_offset,
+              x_ctr[1].item() - max_offset,
+              x_ctr[1].item() + max_offset)
 
     # Use a squeeze operation to ensure that the individual dimension indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
@@ -257,7 +260,10 @@ def example3(colors=None):
                                max_offset=search_size,
                                epsilon=grid_res)
     x_source, x_grid, grid_shape = make_nd_grid(search_space)
-    extent = (x_ctr[0] - max_offset, x_ctr[0] + max_offset, x_ctr[1] - max_offset, x_ctr[1] + max_offset)
+    extent = (x_ctr[0].item() - max_offset,
+              x_ctr[0].item() + max_offset,
+              x_ctr[1].item() - max_offset,
+              x_ctr[1].item() + max_offset)
 
     # Use a squeeze operation to ensure that the individual dimension
     # indices in x_grid are 2D
