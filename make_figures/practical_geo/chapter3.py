@@ -83,8 +83,6 @@ def make_figure_1(prefix=None):
     for test_idx in np.arange(start=ref_idx+1, stop=4):
         x_test = x_sensor[:, test_idx]
 
-        # TODO: Make sure test/ref indices are used consistently. Should be test-ref for TDOA and FDOA
-
         rdiff = calc_range_diff(x0=x_source, x1=x_ref, x2=x_test)  # range_diff is R(x0,x2) - R(x0,x1)
         # draw_isochrone operates on an assumption that rdiff is R(x0,x_test)-R(x0-x_ref)
         xy_iso = tdoa.model.draw_isochrone(x_ref=x_ref, x_test=x_test,
