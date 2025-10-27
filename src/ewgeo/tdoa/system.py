@@ -1,4 +1,5 @@
 import numpy.typing as npt
+import warnings
 
 from . import model, solvers
 from ewgeo.utils import parse_reference_sensor
@@ -103,7 +104,8 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         else:
             x_sensor, _, bias = self.pos, None, self.bias
 
-        # ToDo: Get chan_ho to accept a bias term
+        if bias is not None:
+            warnings.warn("Chan-Ho TDOA solver does not accept bias. Ignoring bias.")
         return solvers.chan_ho(x_sensor=x_sensor, zeta=zeta, cov=self.cov, ref_idx=self.ref_idx, do_resample=False,
                                variance_is_toa=False)
 
