@@ -354,8 +354,6 @@ def enu_to_ecef(east, north, up, lat_ref, lon_ref, alt_ref, angle_units='deg', d
     :return z: ECEF z-coordinates
     """
 
-    # TODO: Verify that converting an ENU velocity to ECEF and back to ENU is the same
-
     # Rotate the ENU vector to XYZ, assuming it starts at the origin
     dx, dy, dz = enu_to_ecef_vel(east, north, up, lat_ref, lon_ref, angle_units)
     # # Precompute Trig Functions of Reference Lat/Lon

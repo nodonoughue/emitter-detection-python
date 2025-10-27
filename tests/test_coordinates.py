@@ -180,7 +180,96 @@ def test_homogeneous_transforms():
     assert equal_to_tolerance(lla_init, lla_out), 'Error testing LLA->ENU->LLA transform'
 
 
-# TODO: Unit tests for all converters
+def global_unit_coversion():
+    """
+    Test all global coordinate conversions for a few key points
+    """
+    zero_point = {'lla': [0., 0., 0.],
+                  'ecef': [6378137.0, 0., 0.]}
+    north_pole = {'lla': [90., 0., 0.],
+                  'ecef': [0., 0., 6356752.3]}
+    paris = {'lla': [48.8562, 2.3508, 67.4],
+             'ecef': [4200996.8, 172460.3, 4780102.8]}
+    death_valley = {'lla': [36.4594, -116.8291, -86.0],
+                    'ecef': [-2317945.4, -4582966.8, 3769260.9]}
+
+    for coord in [zero_point, north_pole, paris, death_valley]:
+        ecef_out = coordinates.lla_to_ecef(coord['lla'][0], coord['lla'][1], coord['lla'][2])
+        assert equal_to_tolerance(coord['ecef'], ecef_out, tol=1), 'Error testing LLA->ECEF transform'
+
+        lla_out = coordinates.ecef_to_lla(coord['ecef'][0], coord['ecef'][1], coord['ecef'][2])
+        assert equal_to_tolerance(coord['lla'], lla_out, tol=1e-4), 'Error testing ECEF->LLA transform'
+
+
+def test_local_unit_conversion():
+    """
+    Test AER/ENU unit conversions.
+    """
+    east = {'enu': [100, 0, 0],
+            'aer': [90, 0, 100]}
+    north = {'enu': [0, 100, 0],
+             'aer': [0, 0, 100]}
+    up = {'enu': [0, 0, 100],
+          'aer': [0, 90, 100]}
+    nonzero = {'enu': [100, 100, 100],
+               'aer': [45, 35.2644, 173.2051]}
+
+    for coord in [east, north, up, nonzero]:
+        aer_out = coordinates.enu_to_aer(coord['enu'][0], coord['enu'][1], coord['enu'][2])
+        # print('ENU->AER Output...')
+        # print(aer_out)
+        # print(coord['aer'])
+        assert equal_to_tolerance(coord['aer'], aer_out, tol=1e-2), 'Error testing ENU->AER transform'
+
+        enu_out = coordinates.aer_to_enu(coord['aer'][0], coord['aer'][1], coord['aer'][2])
+        # print('AER->ENU Output...')
+        # print(enu_out)
+        # print(coord['enu'])
+        assert equal_to_tolerance(coord['enu'], enu_out, tol=1e-1), 'Error testing AER->ENU transform'
+
+    return
+
+
+def test_relative_unit_conversion():
+    """
+    Test ECEF/ENU unit conversions, using local reference points. Each test point for conversion has a
+    Lat/Lon/Alt reference point, an ENU offset, and an ECEF coordinate for the destination of that offset.
+
+    """
+    origin_1 = {'lla': [0., 0., 0.],
+                'enu': [0., 0., 0.],
+                'ecef': [6378137.0, 0., 0.]}
+    north_pole_1 = {'lla': [90., 0., 0.],
+                    'enu': [0., 0., 0.],
+                    'ecef': [0., 0., 6356752.3142]}
+    paris_1 = {'lla': [48.8562, 2.3508, 67.4],
+               'enu': [10., 0., 0.],
+               'ecef': [4200996.4, 172470.3, 4780102.8]}
+    paris_2 = {'lla': [48.8562, 2.3508, 67.4],
+               'enu': [0., 100., 0.],
+               'ecef': [4200921.5, 172457.2, 4780168.6]}
+    paris_3  = {'lla': [48.8562, 2.3508, 67.4],
+               'enu': [0., 0., 1000.],
+               'ecef': [4201654.2, 172487.3, 4780855.9]}
+    death_valley_1 = {'lla': [36.4594, -116.8291, -86.0],
+                      'enu': [0., 0., 0.],
+                      'ecef': [-2317945.4, -4582966.8, 3769260.9]}
+
+    for coord in [origin_1, north_pole_1, paris_1, paris_2, paris_3, death_valley_1]:
+        enu_out = coordinates.ecef_to_enu(x=coord['ecef'][0], y=coord['ecef'][1], z=coord['ecef'][2],
+                                         lat_ref=coord['lla'][0], lon_ref=coord['lla'][1], alt_ref=coord['lla'][2])
+        # print('ECEF->ENU Output...')
+        # print(enu_out)
+        # print(coord['enu'])
+        assert equal_to_tolerance(coord['enu'], enu_out, tol=1e-1), 'Error testing ECEF->ENU transform'
+
+        ecef_out = coordinates.enu_to_ecef(east=coord['enu'][0], north=coord['enu'][1], up=coord['enu'][2],
+                                          lat_ref=coord['lla'][0], lon_ref=coord['lla'][1], alt_ref=coord['lla'][2])
+        # print('ENU->ECEF Output...')
+        # print(ecef_out)
+        # print(coord['ecef'])
+        assert equal_to_tolerance(coord['ecef'], ecef_out, tol=1e-1), 'Error testing ENU->ECEF transform'
+
 # TODO: Unit test for correct_enu
 # TODO: Unit test for reckon_sphere_enu
 

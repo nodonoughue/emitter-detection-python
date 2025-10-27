@@ -1,15 +1,16 @@
 import numpy as np
 
 from ewgeo.utils import errors
+from ewgeo.utils.covariance import CovarianceMatrix
 
 def test_cep50():
 
-    res = errors.compute_cep50(np.array([[1, 0],[0, 1]]))
+    res = errors.compute_cep50(CovarianceMatrix(np.array([[1, 0],[0, 1]])))
     assert res == 1.18
 
 def test_cep50_3d():
 
-    res = errors.compute_cep50(np.array([[1, 0, 0],[0, 1, 0],[0, 0, 1]]))
+    res = errors.compute_cep50(CovarianceMatrix(np.array([[1, 0, 0],[0, 1, 0],[0, 0, 1]])))
     assert res == 1.18
 
 def test_rmse_scaling():
