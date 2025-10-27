@@ -164,9 +164,6 @@ def make_figures_5_6(prefix=None, mc_params=None):
 
     figs = chapter2.example1()
 
-    # Display the plot
-    plt.draw()
-
     # Output to file
     if prefix is not None:
         labels = ['fig5', 'fig6a', 'fig6b', 'fig6c', 'fig6d']

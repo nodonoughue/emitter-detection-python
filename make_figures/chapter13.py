@@ -91,8 +91,8 @@ def make_figure_1(prefix=None, colors=None):
 
     # Draw Geometry
     fig1 = plt.figure()
-    plt.scatter(x_source[0], x_source[1], marker='^', color=colors(0), label='Transmitter')
-    plt.scatter(x_sensor[:, 0], x_sensor[:, 1], marker='o', color=colors(1), label='Sensors', clip_on=False)
+    plt.scatter(x_source[0], x_source[1], marker='^', color=colors(0), label='Transmitter', zorder=3)
+    plt.scatter(x_sensor[:, 0], x_sensor[:, 1], marker='o', color=colors(1), label='Sensors', clip_on=False, zorder=3)
     for this_x, this_v in zip(x_sensor, v_sensor):
         plt.arrow(x=this_x[0], y=this_x[1],
                   dx=this_v[0], dy=this_v[1],

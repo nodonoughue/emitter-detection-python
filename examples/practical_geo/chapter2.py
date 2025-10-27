@@ -43,13 +43,13 @@ def _plt_markers(pss, do_source=True, do_aoa=False, do_tdoa=False, do_fdoa=False
     :param colors: 4-element Tuple of colors to use for markers (source, aoa, tdoa, fdoa). Default=('w', 'k', 'k', 'k')
     """
     if do_source:
-        plt.scatter(x_source[0], x_source[1], marker='x', color=colors[0], label='Target', clip_on=False)
+        plt.scatter(x_source[0], x_source[1], marker='x', color=colors[0], label='Target', clip_on=False, zorder=3)
     if do_aoa:
-        pss.aoa.plot_sensors(marker='o', color=colors[1], label='AOA Sensors', clip_on=False)
+        pss.aoa.plot_sensors(marker='o', color=colors[1], label='AOA Sensors', clip_on=False, zorder=3)
     if do_tdoa:
-        pss.tdoa.plot_sensors(marker='s', color=colors[2], label='TDOA Sensors', clip_on=False)
+        pss.tdoa.plot_sensors(marker='s', color=colors[2], label='TDOA Sensors', clip_on=False, zorder=3)
     if do_fdoa:
-        pss.fdoa.plot_sensors(marker='^', color=colors[3], label='FDOA Sensors', clip_on=False)
+        pss.fdoa.plot_sensors(marker='^', color=colors[3], label='FDOA Sensors', clip_on=False, zorder=3)
         for this_x, this_v in zip(x_fdoa.T, v_fdoa.T):  # transpose so the loop steps over sensors, not dimensions
             plt.arrow(x=this_x[0], y=this_x[1],
                       dx=this_v[0], dy=this_v[1],
@@ -290,7 +290,7 @@ def example2(colors=None):
     }
     # ---- Apply Various Solvers ----
     # ML Solution
-    x_ml, _, _ = pss.max_likelihood(zeta=zeta, search_space=search_space)
+    x_ml, _, _ = pss.max_likelihood(zeta=zeta, search_space=search_space, print_progress=True)
 
     # GD Solution
     x_gd, x_gd_full = pss.gradient_descent(zeta=zeta, **gd_ls_args)

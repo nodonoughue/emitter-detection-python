@@ -235,7 +235,7 @@ def example3(colors=None):
 
     # Plot geometry
     fig = plt.figure()
-    hdl = plt.scatter(x_sensors[0, :], x_sensors[1, :], marker='o', label='Sensors', clip_on=False)
+    hdl = plt.scatter(x_sensors[0, :], x_sensors[1, :], marker='o', label='Sensors', clip_on=False, zorder=3)
     for this_x, this_v in zip(x_sensors.T, v_sensors.T):  # transpose so the loop steps over sensors, not dimensions
         plt.arrow(x=this_x[0], y=this_x[1],
                   dx=this_v[0] * 10, dy=this_v[1] * 10,
@@ -517,7 +517,8 @@ def _plot_contourf(x_grid, extent, grid_shape_2d, z, x_sensors, v_sensors, level
                        origin='lower', colors='k')
     plt.clabel(hdl2, fontsize=10, colors='w')
 
-    hdl3 = plt.scatter(x_sensors[0, :], x_sensors[1, :], color='w', facecolors='none', marker='o', label='Sensors')
+    hdl3 = plt.scatter(x_sensors[0, :], x_sensors[1, :], color='w', facecolors='none', marker='o', label='Sensors',
+                       zorder=3)
     if v_sensors is not None:
         for this_x, this_v in zip(x_sensors.T, v_sensors.T):  # transpose so the loop steps over sensors, not dimensions
             plt.arrow(x=this_x[0], y=this_x[1],

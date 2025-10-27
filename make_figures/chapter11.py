@@ -139,8 +139,8 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     
     # Position Markers (with legend)
     plt.scatter([x_sensor1[0], x_sensor2[0], x_sensor3[0]],
-                [x_sensor1[1], x_sensor2[1], x_sensor3[1]], marker='o', label='Sensors')
-    plt.scatter(x_source[0], x_source[1], marker='^', color='black', label='Transmitter')
+                [x_sensor1[1], x_sensor2[1], x_sensor3[1]], marker='o', label='Sensors', zorder=3)
+    plt.scatter(x_source[0], x_source[1], marker='^', color='black', label='Transmitter', zorder=3)
     
     # Adjust Axes
     plt.xlim([-2, 3])

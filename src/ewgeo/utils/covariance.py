@@ -37,6 +37,7 @@ class CovarianceMatrix:
             self._do_inverse = do_inverse
 
     def __str__(self):
+        np.set_printoptions(precision=4, suppress=False)
         return f"CovarianceMatrix: {self.cov}"
 
     """
