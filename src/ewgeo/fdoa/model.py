@@ -3,7 +3,7 @@ import numpy as np
 import numpy.typing as npt
 import time
 
-from ewgeo.utils import is_broadcastable, make_nd_grid, parse_reference_sensor, print_elapsed, safe_2d_shape, SearchSpace
+from ewgeo.utils import is_broadcastable, parse_reference_sensor, print_elapsed, safe_2d_shape, SearchSpace
 from ewgeo.utils import print_progress as print_progress_inner
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
@@ -332,7 +332,7 @@ def error(x_sensor: npt.ArrayLike,
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=x_max,
                                epsilon=grid_res)
-    x_set, x_grid, grid_shape = make_nd_grid(search_space)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
     x_vec = x_grid[0][0, :]
     y_vec = x_grid[1][:, 0]
 
@@ -344,7 +344,7 @@ def error(x_sensor: npt.ArrayLike,
 
     epsilon_list = [cov.solve_aca(this_err) for this_err in err.T]
 
-    return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
+    return np.reshape(epsilon_list, search_space.grid_shape), x_vec, y_vec
 
 
 def draw_isodoppler(x_ref: npt.ArrayLike,
@@ -387,7 +387,7 @@ def draw_isodoppler(x_ref: npt.ArrayLike,
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=max_ortho,
                                epsilon=grid_spacing)
-    x_set, x_grid, grid_shape = make_nd_grid(search_space)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
 
     if v_source is None:
         v_source = np.zeros_like(x_set)
@@ -420,7 +420,7 @@ def draw_isodoppler(x_ref: npt.ArrayLike,
 
     # Compute contour
     fig00 = plt.figure()
-    contour_set = plt.contour(x_grid[0], x_grid[1], np.reshape(df_plot, grid_shape), levels=level_set)
+    contour_set = plt.contour(x_grid[0], x_grid[1], np.reshape(df_plot, search_space.grid_shape), levels=level_set)
 
     # Close the figure generated
     plt.close(fig00)

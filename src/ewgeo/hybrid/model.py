@@ -6,7 +6,7 @@ import time
 import ewgeo.fdoa as fdoa
 import ewgeo.tdoa as tdoa
 import ewgeo.triang as triang
-from ewgeo.utils import make_nd_grid, modulo2pi, print_elapsed, safe_2d_shape, SearchSpace
+from ewgeo.utils import modulo2pi, print_elapsed, safe_2d_shape, SearchSpace
 from ewgeo.utils import print_progress as print_progress_inner
 from ewgeo.utils.covariance import CovarianceMatrix
 
@@ -368,7 +368,7 @@ def error(x_source: npt.ArrayLike,
     search_space = SearchSpace(x_ctr=x_source,
                                max_offset=x_max,
                                epsilon=grid_res)
-    x_set, x_grid, grid_shape = make_nd_grid(search_space)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
     x_vec = x_grid[0][0, :]
     y_vec = x_grid[1][:, 0]
 
@@ -384,7 +384,7 @@ def error(x_source: npt.ArrayLike,
 
     epsilon_list = [cov.solve_aca(this_err) for this_err in err.T]
 
-    return np.reshape(epsilon_list, grid_shape), x_vec, y_vec
+    return np.reshape(epsilon_list, search_space.grid_shape), x_vec, y_vec
 
 
 def grad_x(x_source: npt.ArrayLike,

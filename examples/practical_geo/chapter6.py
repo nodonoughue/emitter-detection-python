@@ -6,7 +6,7 @@ from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import make_nd_grid, safe_2d_shape, SearchSpace
+from ewgeo.utils import safe_2d_shape, SearchSpace
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.geo import calc_range
@@ -114,7 +114,7 @@ def example2():
     zeta = tdoa.measurement(x_source=x_tgt)
     zeta_unc = tdoa.measurement(x_sensor=x_tdoa_actual, x_source=x_tgt)  # manually specify actual sensor pos.
 
-    print('Measurements from sensors 1-3 (w.r.t sensor 0):')
+    print('Measurements from sensors 1-2 (w.r.t sensor 0):')
     print('Nominal Positions: {:.2f} m, {:.2f} m'.format(zeta[0], zeta[1]))
     print('Random Positions:  {:.2f} m, {:.2f} m'.format(zeta_unc[0], zeta_unc[1]))
 
@@ -295,7 +295,8 @@ def example4(do_iterative=False):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=search_size,
                                epsilon=grid_res)
-    x_set, x_grid, out_shape = make_nd_grid(search_space)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
+
     extent = (x_ctr[0].item()/1e3 - search_size/1e3,
               x_ctr[0].item()/1e3 + search_size/1e3,
               x_ctr[1].item()/1e3 - search_size/1e3,
@@ -336,15 +337,15 @@ def example4(do_iterative=False):
 
         return this_fig
 
-    ell_true_plot = np.reshape(ell_true, out_shape) - np.max(ell_true)
-    ell_plot = np.reshape(ell, out_shape) - np.max(ell)
+    ell_true_plot = np.reshape(ell_true, search_space.grid_shape) - np.max(ell_true)
+    ell_plot = np.reshape(ell, search_space.grid_shape) - np.max(ell)
     figs= [_make_plot(ell_true_plot, [x_tdoa, x_tgt], ['Sensors', 'Target']),
            _make_plot(ell_plot, [x_tdoa, x_tgt], ['Sensors', 'Target'])]
 
     # ML Solver (baseline)
     x_ctr = np.array([5, 5])*1e3
     search_size = 5e3
-    grid_res = .1e3
+    grid_res = .5e3
 
     ml_search = SearchSpace(x_ctr=x_ctr,
                             max_offset=search_size,
@@ -382,7 +383,7 @@ def example4(do_iterative=False):
         print(*th_est['bias'][:n_tdoa], sep=', ', end=') m\n')
 
     # Plot Solutions
-    figs.append(_make_plot(ell_plot, [x_tdoa, x_tgt, x_est_true],
+    figs.append(_make_plot(ell_true_plot, [x_tdoa, x_tgt, x_est_true],
                            ['Sensors', 'Target', 'ML Est.']))
     figs.append(_make_plot(ell_plot, [x_tdoa, x_tgt, x_est, x_est_bias],
                            ['Sensors', 'Target', 'ML Est.', 'ML Est. w/uncertainty']))
@@ -495,5 +496,6 @@ def example5(do_vel_only_cal=False):
 
 
 if __name__ == '__main__':
+    example4()
     run_all_examples()
     plt.show()

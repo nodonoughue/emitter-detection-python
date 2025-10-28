@@ -3,7 +3,7 @@ import numpy as np
 from numpy import typing as npt
 from scipy.stats import multivariate_normal as mvn
 
-from . import ensure_iterable, make_nd_grid, safe_2d_shape, SearchSpace
+from . import ensure_iterable, safe_2d_shape, SearchSpace
 from .constraints import constrain_likelihood, snap_to_equality_constraints, snap_to_inequality_constraints
 from .covariance import CovarianceMatrix
 
@@ -343,7 +343,7 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
     """
 
     # Set up the search space
-    x_set, x_grid, out_shape = make_nd_grid(search_space)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
 
     # Constrain the likelihood, if needed
     if ineq_constraints is not None or eq_constraints is not None:
@@ -390,13 +390,13 @@ def bestfix_solver(pdfs, search_space: SearchSpace):
     """
 
     # Set up the search space
-    x_set, x_grid, out_shape = make_nd_grid(search_space)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
 
     # Apply each PDF to all input coordinates and then multiply across PDFs
     result = np.asarray([np.prod(np.asarray([this_pdf(this_x) for this_pdf in pdfs])) for this_x in x_set.T])
 
     # Reshape
-    result = np.reshape(result, out_shape)
+    result = np.reshape(result, search_space.grid_shape)
 
     # Find the highest scoring position
     idx_pk = result.argmax()

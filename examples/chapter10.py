@@ -4,7 +4,7 @@ import time
 import warnings
 
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import print_elapsed, print_progress, make_nd_grid, safe_2d_shape, SearchSpace
+from ewgeo.utils import print_elapsed, print_progress, safe_2d_shape, SearchSpace
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
 from ewgeo.utils.geo import calc_range
@@ -311,13 +311,11 @@ def example2():
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=x_max,
                                epsilon=grid_res)
-    x_source, x_grid, grid_shape = make_nd_grid(search_space)
-    # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
-    grid_shape_2d = [i for i in grid_shape if i > 1]
+    x_source, x_grid = search_space.x_set, search_space.x_grid
 
     # Compute CRLB
     crlb = triang.compute_crlb(x_source=x_source*1e3, print_progress=True)
-    cep50 = np.reshape(compute_cep50(crlb, print_warnings=False), shape=grid_shape_2d)
+    cep50 = np.reshape(compute_cep50(crlb, print_warnings=False), shape=search_space.grid_shape)
 
     # Blank out y=0
     nan_mask = np.abs(x_grid[1]) < 1e-6  # x_grid is a list of meshgrid outputs; search the y-dimension
@@ -363,11 +361,8 @@ def example3():
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=x_max,
                                epsilon=grid_res)
-    x_source, x_grid, grid_shape = make_nd_grid(search_space)
-    # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
-    grid_shape_2d = [i for i in grid_shape if i > 1]
+    x_source, x_grid = search_space.x_set, search_space.x_grid
 
-    
     # Define measurement accuracy
     sigma_psi = 2.5*np.pi/180
     covar_psi = CovarianceMatrix(sigma_psi**2 * np.eye(num_sensors))  # N x N identity matrix
@@ -376,7 +371,7 @@ def example3():
 
     # Compute CRLB
     crlb = triang.compute_crlb(x_source*1e3, print_progress=True)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape_2d)  # m
+    cep50 = np.reshape(compute_cep50(crlb), shape=search_space.grid_shape)  # m
     
     good_point = cep50 <= 25e3
     rng_val = np.sqrt(np.sum(np.abs(x_source)**2, axis=0))  # km

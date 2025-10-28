@@ -253,7 +253,7 @@ def log_likelihood(x_sensor: npt.ArrayLike,
         rho = measurement(x_sensor=x_sensor_i, x_source=x_i, ref_idx=ref_idx, bias=bias_i)
 
         # Evaluate the measurement error
-        err = zeta - rho
+        err = rho - zeta
 
         # Compute the scaled log likelihood
         ell[idx_source] = - cov.solve_aca(err)

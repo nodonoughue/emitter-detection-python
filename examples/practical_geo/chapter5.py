@@ -6,7 +6,7 @@ from scipy.stats import multivariate_normal as mvn
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
-from ewgeo.utils import make_nd_grid, safe_2d_shape, SearchSpace
+from ewgeo.utils import safe_2d_shape, SearchSpace
 from ewgeo.utils.coordinates import correct_enu, ecef_to_enu, ecef_to_lla, enu_to_ecef, lla_to_ecef
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.constraints import bounded_alt, fixed_alt, fixed_cartesian
@@ -289,15 +289,15 @@ def example3():
     search_space = SearchSpace(x_ctr=x_tgt,
                                max_offset=max_offset,
                                points_per_dim=num_pts)
-    x_set, x_grid, out_shape = make_nd_grid(search_space)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
 
     # Compute CRLB across grid
     crlb_raw_grid = hybrid.compute_crlb(x_source=x_set, print_progress=True)
     crlb_fix_grid = hybrid.compute_crlb(x_source=x_set, print_progress=True, eq_constraints_grad=[a_grad])
 
     # Compute RMSE of each grid point
-    rmse_raw = np.reshape(compute_rmse(crlb_raw_grid), shape=out_shape)
-    rmse_fix = np.reshape(compute_rmse(crlb_fix_grid), shape=out_shape)
+    rmse_raw = np.reshape(compute_rmse(crlb_raw_grid), shape=search_space.grid_shape)
+    rmse_fix = np.reshape(compute_rmse(crlb_fix_grid), shape=search_space.grid_shape)
 
     # Plot RMSE
     fig, axes = plt.subplots(ncols=2)
