@@ -574,50 +574,45 @@ def safe_2d_shape(x: npt.ArrayLike)-> tuple[int, int]:
 
 
 class SearchSpace:
-    _num_parameters: int
-    _x_ctr: npt.ArrayLike
-    _epsilon: npt.ArrayLike
-    _points_per_dim: npt.NDArray[np.int64]
-    _max_offset: npt.ArrayLike
+    _x_ctr: npt.ArrayLike or None = None
+    _epsilon: npt.ArrayLike or None = None
+    _points_per_dim: npt.NDArray[np.int64] or None = None
+    _max_offset: npt.ArrayLike or None = None
 
     # Inferred grid
-    _x_set: npt.NDArray[np.int64] or None
-    _x_grid: tuple[*npt.NDArray[np.int64]] or None
+    _x_set: npt.NDArray[np.int64] or None = None
+    _x_grid: tuple[*npt.NDArray[np.int64]] or None = None
 
     def __init__(self,
                  x_ctr:npt.ArrayLike,
                  epsilon:npt.ArrayLike=None,
                  points_per_dim:npt.NDArray[np.int64]=None,
                  max_offset:npt.ArrayLike=None):
-        self.x_ctr = x_ctr
+        self._x_ctr = x_ctr
+        self._epsilon = epsilon
+        self._points_per_dim = points_per_dim
+        self._max_offset = max_offset
 
-
-
-        # Verify sizes and broadcast
-        attrs = ['x_ctr', 'epsilon', 'points_per_dim', 'max_offset']
-        b = np.broadcast(*[getattr(self, attr) for attr in attrs])
-        self.num_parameters = np.prod(b.shape)
-        for attr in attrs:
-            setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=b.shape))
+        # Verify sizing and consistency
+        self.check_consistency()
 
     @property
     def num_parameters(self):
-        if self._num_parameters == 0:
-            self.verify_broadcast()
-
-        return self._num_parameters
+        self.broadcast()
+        return np.prod(np.shape(self.x_ctr))
 
     @property
     def x_ctr(self):
+        self.broadcast()
         return self._x_ctr
 
     @x_ctr.setter
     def x_ctr(self, x_ctr: npt.ArrayLike):
         self._x_ctr = x_ctr
-        self.verify_broadcast()
 
     @property
     def epsilon(self):
+        self.broadcast()
         if self._epsilon is None:
             # Build epsilon from max_offset and points_per_dim
             out_shape = np.amax(np.shape(self.points_per_dim), np.shape(self.max_offset))
@@ -633,6 +628,7 @@ class SearchSpace:
 
     @property
     def max_offset(self):
+        self.broadcast()
         if self._max_offset is None:
             # Build max_offset from epsilon and points_per_dim
             self._max_offset = self.epsilon * (self.points_per_dim - 1) / 2
@@ -661,7 +657,7 @@ class SearchSpace:
     def x_set(self):
         if self._x_set is None:
             self.make_nd_grid()
-        return self._x_s
+        return self._x_set
 
     @property
     def x_grid(self):
@@ -671,6 +667,7 @@ class SearchSpace:
 
     @property
     def grid_shape(self):
+        self.broadcast()
         return [i for i in self.points_per_dim if i > 1]
 
     def check_consistency(self):
@@ -679,11 +676,8 @@ class SearchSpace:
         """
         if self._points_per_dim is None or self._epsilon is None or self._max_offset is None:
             # Nothing to do; they're consistent because one is missing
-            return
+            return True
         else:
-            # Make sure they're broadcastable
-            self.verify_broadcast()
-
             # Compute epsilon from max_offset and points_per_dim
             out_shape = np.amax(np.shape(self.points_per_dim), np.shape(self.max_offset))
             epsilon_local = np.divide(self.max_offset, self.points_per_dim - 1,
@@ -691,17 +685,18 @@ class SearchSpace:
 
             # Compare to epsilon and throw an assertion error if it's more than 0.1% off
             err = self.epsilon - epsilon_local
-            assert np.sqrt(np.sum(np.abs(err)**2, axis=None)) < .001 * np.sqrt(np.sum(np.abs(self.epsilon)**2, axis=None))
+            return np.sqrt(np.sum(np.abs(err)**2, axis=None)) < .001 * np.sqrt(np.sum(np.abs(self.epsilon)**2, axis=None))
 
-    def verify_broadcast(self):
+    def broadcast(self)-> bool:
         # Verify that all variable sizes are compatible
-        attrs = ['x_ctr', 'epsilon', 'points_per_dim', 'max_offset']
+        attrs = ['_x_ctr', '_epsilon', '_points_per_dim', '_max_offset']
         try:
             b = np.broadcast(*[getattr(self, attr) for attr in attrs if getattr(self, attr) is not None])
-            self._num_parameters = np.prod(b.shape)
+            for attr in attrs:
+                if getattr(self, attr) is not None:
+                    setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=b.shape))
             return True
         except ValueError:
-            self._num_parameters = 0
             return False
 
     def make_nd_grid(self):
