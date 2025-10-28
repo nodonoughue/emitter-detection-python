@@ -8,7 +8,6 @@ Ported from MATLAB Code
 Nicholas O'Donoughue
 4 December 2022
 """
-
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
@@ -447,7 +446,7 @@ def make_figure_7(prefix):
     # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb, print_warnings=False), shape=grid_shape)
     # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
 
     # Draw Figure
@@ -531,11 +530,9 @@ def make_figure_8(prefix):
     print('Generating Figure 13.8a...')
 
     # Compute CRLB
-    # warning('off','MATLAB:nearlySingularMatrix'); % We know the problem is ill-defined, deactivate the warning
     crlb = hybrid.perf.compute_crlb(x_aoa=None, x_tdoa=x_sensor.T, x_fdoa=x_sensor.T, v_fdoa=v_sensor.T,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
-    # warning('on','MATLAB:nearlySingularMatrix'); % Reactivate the singular matrix warning
+    cep50 = np.reshape(compute_cep50(crlb, print_warnings=False), shape=grid_shape)
 
     # Set up contours
     contour_levels = [.1, 1, 5, 10, 50, 100]
@@ -645,7 +642,7 @@ def make_figure_9(prefix):
     # Compute CRLB
     crlb = hybrid.perf.compute_crlb(x_aoa=x_sensor.T, x_tdoa=x_sensor.T, x_fdoa=None, v_fdoa=None,
                                     x_source=x_set, cov=covar_rho, do_resample=False)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb, print_warnings=False), shape=grid_shape)
 
     # Set up contours
     contour_levels = [.1, 1, 5, 10, 50, 100]
