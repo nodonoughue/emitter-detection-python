@@ -599,7 +599,7 @@ def make_figure_6(prefix):
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=search_space.grid_shape)
 
     # Draw Figure
     fig6d, ax = plt.subplots()

@@ -371,7 +371,7 @@ def example3():
 
     # Compute CRLB
     crlb = triang.compute_crlb(x_source*1e3, print_progress=True)
-    cep50 = np.reshape(compute_cep50(crlb), shape=search_space.grid_shape)  # m
+    cep50 = np.reshape(compute_cep50(crlb, print_warnings=False), shape=search_space.grid_shape)  # m
     
     good_point = cep50 <= 25e3
     rng_val = np.sqrt(np.sum(np.abs(x_source)**2, axis=0))  # km
