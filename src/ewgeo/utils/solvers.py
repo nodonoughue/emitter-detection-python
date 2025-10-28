@@ -441,7 +441,7 @@ def sensor_calibration(ell,
     def default_prior(x: npt.ArrayLike, search_space: SearchSpace):
         return mvn.pdf(x.T,  # transpose -- our inputs are (n_dim, n_sample), but mvn expects the opposite
                        mean=search_space.x_ctr.ravel(),
-                       cov=np.diag(search_space.max_offset.ravel()))
+                       cov=np.diag(search_space.max_offset.ravel()+1e-6))
 
     # Initialize Outputs
     bias_est = bias_search.x_ctr if bias_search is not None else None
