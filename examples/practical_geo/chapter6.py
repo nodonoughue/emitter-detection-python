@@ -496,6 +496,5 @@ def example5(do_vel_only_cal=False):
 
 
 if __name__ == '__main__':
-    example4()
     run_all_examples()
     plt.show()
