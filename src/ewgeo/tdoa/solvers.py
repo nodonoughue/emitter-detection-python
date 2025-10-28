@@ -34,8 +34,6 @@ def chan_ho(x_sensor: npt.ArrayLike,
     :return: estimated source position [m]
     """
 
-    # TODO: Debug
-
     # Resample the covariance matrix, if needed
     cov = preprocess_cov(cov=cov, do_resample=do_resample, variance_is_toa=variance_is_toa, ref_idx=ref_idx)
 

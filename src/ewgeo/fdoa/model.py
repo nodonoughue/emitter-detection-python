@@ -484,7 +484,6 @@ def grad_x(x_sensor: npt.ArrayLike,
     :param ref_idx:     Reference index (optional)
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
 
     # Sensor uncertainties don't impact the gradient with respect to target position; this is the same as the previously
     # defined function fdoa.model.jacobian.

@@ -655,7 +655,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_par
                 psi_est[idx_mc] = aoa.doppler.compute_df(r[:, idx_mc], x[:, idx_mc], ts, f, ant_radius, fr, psi_res,
                                                          -np.pi, np.pi)
             
-            rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute((psi_est-psi_true))**2, axis=None)
+            rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.sum(np.absolute(psi_est-psi_true)**2, axis=None)
                                                          / num_monte_carlo)
 
             # CRLB

@@ -77,20 +77,18 @@ def compute_df(s, psi_samples, g, psi_res=0.1, min_psi=-np.pi, max_psi=np.pi):
         psi_diff = psi_samples[:, np.newaxis] - psi_vec[np.newaxis, :]
 
         # Compute the expected gain pattern for each candidate AoA value
-        # ToDo: Vectorize g, or wrap it with np.vectorize
-        g_vec = np.reshape(np.asarray([g(psi) for psi in psi_diff]), shape=psi_diff.shape)
+        g_vec = g(psi_diff)
     
         # Find the candidate AoA value that minimizes the MSE between the
         # expected and received gain patterns.
-
-        sse = np.sum((s[:, :, np.newaxis]-g_vec[:, np.newaxis, :])**2, axis=(0, 1))
+        sse = np.sum(np.absolute(s[:, :, np.newaxis]-g_vec[:, np.newaxis, :])**2, axis=(0, 1))
         idx_opt = np.argmin(sse)
         psi = psi_vec[idx_opt]
         
         # Set up the bounds and resolution for the next iteration
         this_psi_res /= 10
-        idx_min = max(0, idx_opt-2)
-        idx_max = min(len(psi_vec)-1, idx_opt+2)
+        idx_min = max(0, idx_opt-4)
+        idx_max = min(len(psi_vec)-1, idx_opt+4)
         min_psi = psi_vec[idx_min]
         max_psi = psi_vec[idx_max]
 

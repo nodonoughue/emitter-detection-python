@@ -115,7 +115,7 @@ def example1(do_mod_cov: bool=False):
     return figs
 
 
-def example2():
+def example2(do_video_version: bool=False):
     """
     Executes Example 5.2.
 
@@ -124,6 +124,8 @@ def example2():
     Nicholas O'Donoughue
     7 February 2025
 
+    :param do_video_version: if True, generates a version of the example from the video discussing example 5.2, in
+                             addition to the one called for in example 5.2's prompt.
     :return: figure handle for the generated graphic
     """
 
@@ -161,40 +163,41 @@ def example2():
 
         # Initialize the plot
         this_fig, this_ax = plt.subplots(subplot_kw=dict(projection='3d'))
-        this_ax.stem(this_x_tdoa[0], this_x_tdoa[1], this_x_tdoa[2], basefmt='grey', linefmt='grey',
+        this_ax.stem(this_x_tdoa[0]/1e3, this_x_tdoa[1]/1e3, this_x_tdoa[2], basefmt='grey', linefmt='grey',
                      markerfmt='+', label='Sensors')
-        this_ax.stem([x_tgt[0]], [x_tgt[1]], [x_tgt[2]], basefmt='grey', linefmt='grey', markerfmt='^',
-                     label='Target')
+        this_ax.stem([x_tgt[0]/1e3], [x_tgt[1]/1e3], [x_tgt[2]], basefmt='grey', linefmt='grey',
+                     markerfmt='^', label='Target')
 
         # Add isochrones
         iso_label = 'Isochrones'
         isos = tdoa.draw_isochrones(range_diff=zeta, num_pts=101, max_ortho=40e3)
         for this_iso in isos:
-            plt.plot(this_iso[0], this_iso[1], '--k', linewidth=0.5, label=iso_label)
+            plt.plot(this_iso[0]/1e3, this_iso[1]/1e3, '--k', linewidth=0.5, label=iso_label)
             iso_label = None
 
         # Plot GD solution
-        this_ax.plot(x_gd_full[0], x_gd_full[1], x_gd_full[2], '-.s', markevery=[-1], label='GD (Unconstrained)')
-        this_ax.plot(x_gd_full_alt[0], x_gd_full_alt[1], x_gd_full_alt[2], '-.o', markevery=[-1],
+        this_ax.plot(x_gd_full[0]/1e3, x_gd_full[1]/1e3, x_gd_full[2], '-.s', markevery=[-1],
+                     label='GD (Unconstrained)')
+        this_ax.plot(x_gd_full_alt[0]/1e3, x_gd_full_alt[1]/1e3, x_gd_full_alt[2], '-.o', markevery=[-1],
                      label='GD (Constrained)')
 
-        this_ax.set_xlim([-20e3, 20e3])
-        this_ax.set_ylim([0e3, 50e3])
+        this_ax.set_xlim([-20, 20])
+        this_ax.set_ylim([0, 50])
         this_ax.set_zlim([0e3, 2.1e3])
         this_ax.set_clip_on(True)
 
         if title is not None:
             plt.title(title)
         plt.legend()
-        this_ax.set_xlabel('x [m]')
-        this_ax.set_ylabel('y [m]')
+        this_ax.set_xlabel('x [km]')
+        this_ax.set_ylabel('y [km]')
         this_ax.set_zlabel('z [m]')
 
         # Set the view angle
-        this_ax.azim = -45
+        this_ax.azim = -135
         this_ax.elev = 10
 
-        return this_fig
+        return this_fig, this_ax
 
     # Set up sensors
     alt1 = 1e3
@@ -203,18 +206,22 @@ def example2():
                        [0., 0., 0., 0.],
                        [alt1, alt1, alt1, alt1]])
 
-    figs = [_ex2_inner(x_tdoa, x_init, title='Example 5.2')]
 
-    # Try again with better elevation support
-    alt2 = 2*alt1
-    x_tdoa[2] = [alt1, alt2, alt1, alt2]
-    figs.append(_ex2_inner(x_tdoa, x_init, title='Better Altitude Support'))
+    fig_a, ax_a = _ex2_inner(x_tdoa, x_init, title='Example 5.2')
+    figs = [fig_a]
+    ax_a.set_zlim([0,1000]) # set the z-axis limits
 
-    # Video 5.2 modified altitude again
-    alt2 = 0.5*alt1
-    alt3 = 0*alt1
-    x_tdoa[2] = [alt2, alt1, alt3, alt2]
-    figs.append(_ex2_inner(x_tdoa, x_init, title='Video 5.2 Version'))
+    if do_video_version:
+        # Try again with better elevation support
+        alt2 = 2*alt1
+        x_tdoa[2] = [alt1, alt2, alt1, alt2]
+        figs.append(_ex2_inner(x_tdoa, x_init, title='Better Altitude Support')[0])
+
+        # Video 5.2 modified altitude again
+        alt2 = 0.5*alt1
+        alt3 = 0*alt1
+        x_tdoa[2] = [alt2, alt1, alt3, alt2]
+        figs.append(_ex2_inner(x_tdoa, x_init, title='Video 5.2 Version')[0])
 
     return figs
 
