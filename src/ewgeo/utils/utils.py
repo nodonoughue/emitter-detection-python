@@ -679,7 +679,7 @@ class SearchSpace:
             return True
         else:
             # Compute epsilon from max_offset and points_per_dim
-            out_shape = np.amax(np.shape(self.points_per_dim), np.shape(self.max_offset))
+            out_shape = np.maximum(np.shape(self.points_per_dim), np.shape(self.max_offset))
             epsilon_local = np.divide(self.max_offset, self.points_per_dim - 1,
                                       out=np.ones(out_shape), where=self.points_per_dim>1)
 
