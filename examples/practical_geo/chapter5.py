@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
+from scipy.stats import multivariate_normal as mvn
 
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
@@ -275,10 +276,10 @@ def example3():
     crlb_fix = hybrid.compute_crlb(x_source=x_tgt, eq_constraints_grad=[a_grad])
 
     print('CRLB (unconstrained):')
-    with np.printoptions(precision=0):
+    with np.printoptions(precision=4, suppress=True):
         print(crlb_raw)
     print('CRLB (constrained):')
-    with np.printoptions(precision=0, suppress=True):
+    with np.printoptions(precision=4, suppress=True):
         print(crlb_fix)
 
     # Plot for x/y grid
@@ -427,7 +428,7 @@ def example4():
     ax.set_zlabel('z [km]')
 
     # Set the view angle
-    ax.azim = -45
+    ax.azim = -135
     ax.elev = 10
 
     return [fig]
@@ -475,7 +476,7 @@ def example5():
     def prior(x):
         # x is (n_dim x n_position) array of potential source positions; compute the probability for each, but don't
         # bother with cross-terms
-        return np.array([scipy.stats.multivariate_normal.pdf(this_x, mean=x_prior, cov=cov_prior) for this_x in x.T])
+        return np.array([mvn.pdf(this_x, mean=x_prior, cov=cov_prior.cov) for this_x in x.T])
 
     # Measurement
     zeta = tdoa.noisy_measurement(x_source=x_tgt)
