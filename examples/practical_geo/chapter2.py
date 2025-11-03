@@ -193,15 +193,13 @@ def example1(colors=None):
 
     # --- Compute Variances and Print ---
     print('AOA Measurement: {:.2f} deg'.format(psi_act[0] * _rad2deg))
-    print('AOA Covariance: {} rad^2'.format(pss.aoa.cov.cov))
+    print('AOA Covariance: {} rad^2'.format(pss.aoa.cov))
 
     print('TDOA Measurement: {:.2f} m'.format(range_diff[0]))
-    print('TDOA Covariance:')
-    print('{} m^2'.format(np.matrix(pss.tdoa.cov_raw.cov)))
+    print('TDOA {} m^2'.format(pss.tdoa.cov_raw))
 
     print('FDOA Measurement: {:.2f} m/s'.format(velocity_diff[0]))
-    print('FDOA Covariance:')
-    print('{} m^2/s^2'.format(np.matrix(pss.fdoa.cov_raw.cov)))
+    print('FDOA {} m^2/s^2'.format(pss.fdoa.cov_raw))
 
     # Set Up Search Grid
     x_grid = np.arange(-0.5, 5.5, 0.02) * 1e3
