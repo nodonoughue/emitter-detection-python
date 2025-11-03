@@ -963,11 +963,11 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
         self.update_covariance_matrix(cov, do_resample)
 
     @property
-    def cov_raw(self):
+    def cov_raw(self)-> CovarianceMatrix:
         return self._cov_raw
 
     @property
-    def cov(self):
+    def cov(self)-> CovarianceMatrix:
         # Check if the covariance matrix needs to be re-sampled.
         # This occurs if a new reference index is provided.
         if self._do_resample:
