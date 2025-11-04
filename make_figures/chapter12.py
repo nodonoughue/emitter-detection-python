@@ -509,12 +509,9 @@ def make_figure_6(prefix):
     cov_rrdoa = cov_rroa.resample(ref_idx=ref_idx)
 
     # Define source positions
-    num_grid_points = 501
-    grid_extent = 100e3
-    grid_spacing = 2*grid_extent/(num_grid_points-1)
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
-                               max_offset=grid_extent,
-                               epsilon=grid_spacing)
+                               max_offset=100e3,
+                               points_per_dim=501)
     x_source = search_space.x_set
     x_grid = search_space.x_grid
 
@@ -544,6 +541,7 @@ def make_figure_6(prefix):
 
     # Figure 6b
     print('Generating Figure 12.6b...')
+    # TODO: Debug error in 12.6b; performance gets worse at top/bottom (there's an odd discontinuity)
 
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
@@ -595,6 +593,7 @@ def make_figure_6(prefix):
 
     # Figure 6d
     print('Generating Figure 12.6d...')
+    # TODO: Debug error in 12.6d; performance gets worse at top/bottom (there's an odd discontinuity)
 
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
