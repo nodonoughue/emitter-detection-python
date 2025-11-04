@@ -4,9 +4,10 @@ from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import safe_2d_shape
+from ewgeo.utils import safe_2d_shape, SearchSpace
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.errors import compute_cep50, compute_rmse
 
 _rad2deg = 180.0/np.pi
 _deg2rad = np.pi/180.0
@@ -63,38 +64,33 @@ def _make_pss_systems(err_aoa=None, err_time=None, err_freq=None, f0=1.0, tdoa_r
     pss = HybridPassiveSurveillanceSystem(aoa=aoa_pss, tdoa=tdoa_pss, fdoa=fdoa_pss)
     return pss
 
-
-def test_example_2p1():
+def test_example_2p3():
+    # Generate Error Covariance
     err_aoa = 3  # deg
     err_time = 1e-7  # 100 ns timing error
     err_freq = 10  # Hz
     f0 = 1e9  # Hz
-    pss = _make_pss_systems(err_aoa=err_aoa, err_time=err_time, err_freq=err_freq, f0=f0)  # result stored in _pss
+    tdoa_ref_idx = 1
+    fdoa_ref_idx = 1
+    pss = _make_pss_systems(err_aoa=err_aoa, err_time=err_time, err_freq=err_freq, f0=f0,
+                            tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
-    # True Measurements
-    psi_act = pss.aoa.measurement(x_source=x_source)
-    range_diff = pss.tdoa.measurement(x_source=x_source)
-    velocity_diff = pss.fdoa.measurement(x_source=x_source, v_source=None)
-    z = pss.measurement(x_source=x_source)
+    # ---- Estimate Error Bounds ----
+    # CRLB
+    crlb = pss.compute_crlb(x_source=x_source)
+    assert equal_to_tolerance(crlb.cov, np.array([[.5124, .5082],[.5082, 4.0515]])*1e4, tol=1e0)
 
-    # First Assertion -- does pss.measurement line up with components?
-    z_test = np.concatenate((psi_act, range_diff, velocity_diff), axis=0)
-    assert equal_to_tolerance(z,z_test, tol=1e-10)
+    # RMSE
+    rmse_crlb = compute_rmse(crlb)
+    assert equal_to_tolerance(rmse_crlb, 210, tol=1e1)
 
-    # Check Individual Components
-    assert equal_to_tolerance(psi_act*_rad2deg, 108.43, tol=1e-2)
-    assert equal_to_tolerance(range_diff, 1105.55, tol=1e-2)
-    assert equal_to_tolerance(velocity_diff, -75.33, tol=1e-2)
+    # CEP50
+    cep50_crlb = compute_cep50(crlb)
+    assert equal_to_tolerance(cep50_crlb, 150, tol=1e1)
 
-    # Check Covariance
-    assert equal_to_tolerance(pss.aoa.cov.cov, .0027, tol=1e-3)
-    assert equal_to_tolerance(pss.tdoa.cov.cov, 1797.5, tol=1e-1)
-    assert equal_to_tolerance(pss.fdoa.cov.cov, 17.98, tol=1e-2)
-
-
-def equal_to_tolerance(x, y, tol=1e-6) -> bool:
+def equal_to_tolerance(x, y, tol=1e-6)->bool:
     """
     Shorthand to compare two lists and ensure each entry has an error less than the specified tolerance
     """
-    if np.size(x) != np.size(y): return False
-    return np.all(np.fabs(x - y) < tol)
+    if np.any(np.shape(x) != np.shape(y)): return False
+    return all([abs(xx-yy)<tol for xx, yy in zip(np.ravel(x),np.ravel(y))])
