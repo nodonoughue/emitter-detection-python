@@ -214,24 +214,23 @@ def gd_solver(y,
         # Evaluate Residual and Jacobian Matrix
         y_i = y(x_prev)
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use squeeze to remove third dimension (n_source=1)
-        
-        # Compute Gradient and Cost function
-        grad = -2 * cov.solve_acb(jacobian_i, y_i)
-        # if cov_is_inverted:
-        #     grad = -2 * jacobian_i @ covariance_inverse @ y_i
-        # else:
-        #     a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
-        #     b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
-        #     grad = -2 * a.T @ b
-        
-        # Descent direction is the negative of the gradient
-        del_x = -np.squeeze(grad/np.linalg.norm(grad))
-        
-        # Compute the step size
-        t = backtracking_line_search(cost_fxn, x_prev, grad, del_x, alpha, beta)
-        
-        # Update x position
-        x_update = x_prev + t*del_x
+
+        # If y_i is zero, gradient descent will fail because we're at the bottom. Skip to the next iteration without
+        # changing anything
+        if np.sum(np.abs(y_i)) < 1e-20:
+            x_update = x_prev
+        else:
+            # Compute Gradient and Cost function
+            grad = -2 * cov.solve_acb(jacobian_i, y_i)
+
+            # Descent direction is the negative of the gradient
+            del_x = -np.squeeze(grad/np.linalg.norm(grad))
+
+            # Compute the step size
+            t = backtracking_line_search(cost_fxn, x_prev, grad, del_x, alpha, beta)
+
+            # Update x position
+            x_update = x_prev + t*del_x
 
         # Apply Equality Constraints
         if eq_constraints is not None:
