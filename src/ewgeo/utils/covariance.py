@@ -243,6 +243,40 @@ class CovarianceMatrix:
 
         """
 
+        # Valid Sizes
+        #  1D array of length self.size
+        #  2D array, of which the second dimension matches self.size -- will be treated as 2D
+        #  NDArray, of which the first dimension matches self.size (and the second dimension does not) will be treated
+        #       as a collection of 1D arrays processed separately.
+
+        # Check for multi-dimensional inputs
+        if np.ndim(a) > 2 or (np.ndim(a)==2 and np.shape(a)[1] != self.size):
+            # Either there are 3+ dimensions, or it's 2D but the second dimension does not match the expected size
+            out_shp = np.shape(a)[1:]
+            if np.prod(out_shp) == 1: out_shp = []
+
+            a = np.reshape(a, (self.size, -1)).T
+
+            # Assume the first dimension follows the size of self, and any remaining dimensions are
+            # parallel cases
+            val = np.array([self.solve_aca(aa) for aa in a]).reshape(out_shp)
+            return val
+
+        # Make sure we trim any dimensions after the second; we're doing matrix math here.
+        if np.ndim(a) > 2:
+            a = np.squeeze(a, axis=tuple(range(2, np.ndim(a))))
+
+        # Check the size of a
+        if np.size(a)==self.size and (np.shape(a)[0]==self.size or np.shape(a)[-1]==self.size):
+            # It's a 1D array, but may be stored as a 2D array. Let's squeeze it, for convenience
+            a = np.squeeze(a)
+        elif np.ndim(a)==1:
+            # Make sure a is a vector of the right size
+            assert np.shape(a)[0] == self.size, f"Input vector a must be the same size as the covariance matrix."
+        else:
+            # Make sure the second dimension of a matches
+            assert np.shape(a)[1] == self.size, f"Input matrix a must have second dimension the same size as the covariance matrix."
+
         # Make sure we've parsed the covariance
         self._parse()
 
