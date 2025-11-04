@@ -37,23 +37,10 @@ def compute_cep50(covariance: CovarianceMatrix | list[CovarianceMatrix],
     :return cep: Radius of the corresponding CEP_50 circle or list of radii
     """
 
-    if isinstance(covariance, list):
-        return np.array([compute_cep50(cov, print_warnings) for cov in covariance])
+    # Check if it's a list or tuple, and use the batch mode
+    if isinstance(covariance, (list, tuple)):
+        return compute_cep50_fast(covariance, print_warnings)
     else:
-        # print('Computing CEP50...')
-
-        # Parse input dimensions
-        if covariance.size < 2:
-            raise TypeError('Covariance matrix must have at least two dimensions.')
-        if covariance.size > 3:
-            raise TypeError('Covariance matrix cannot have more than three dimensions if computing CEP50.')
-
-        # If any of the CEP elements are NaN or INF, then mark the CEP as INF
-        if not np.all(np.isfinite(covariance.cov)):
-            if print_warnings:
-                warnings.warn("Poorly formed (NaN or INF values encountered) in CEP50 calculation.")
-            return np.inf
-
         # Eigenvector analysis to identify independent components of error
         # lam[0] will be the smallest, and lam[-1] will be the largest
         lam = np.sort(covariance.eigenvalues, axis=None)
@@ -72,8 +59,57 @@ def compute_cep50(covariance: CovarianceMatrix | list[CovarianceMatrix],
             # ToDo: suppress runtime warning (invalid value encountered in scalar divide....inf? nan?) while generating Fig 13.8a
             cep = np.sqrt(lam_max)*(.67+.8*lam_min/lam_max)
 
-        return cep
+    return cep
 
+def compute_cep50_fast(covariance: list[CovarianceMatrix], print_warnings: bool=True)-> npt.NDArray[np.float64]:
+    """
+    Fast version of compute_cep50 that operates quickly over a list of CovarianceMatrices.
+
+    Uses a single call to numpy that leverages numpy.linalg.eigh's batch processing mode to offload most of the work
+    to efficient LAPACK code.
+
+    :param covariance: list of CovarianceMatrix objects
+    :param print_warnings: Optional bool (default=True). If true, warnings will be printed when NaN or INF values
+                           are encountered.
+    :return cep: numpy array of CEP50 calculations for each input covariance matrix
+    """
+
+    # Error check
+    if len(set([c.size for c in covariance])) != 1:
+        # Not all covariance matrices have the same size
+        raise ValueError("Unable to compute CEP50 in parallel for covariance matrices of different sizes.")
+
+    if covariance[0].size > 3:
+        raise ValueError("Unable to compute CEP50 in parallel for covariance matrices of dimension > 3.")
+    if covariance[0].size < 2:
+        raise ValueError("Unable to compute CEP50 in parallel for covariance matrices of dimension < 2.")
+
+    # Batch mode; stack all the raw covariances
+    covs = np.stack([c.cov for c in covariance], axis=0)  # shape: (N, M, M) where M is the number of spatial dimensions
+
+    # Compute eigenvalues
+    lam = np.linalg.eigh(covs)[0]  # shape (N, M)
+
+    # Pull the two largest eigenvalues; this ignores the smallest eigenvalue in 3D scenarios
+    lam_max = lam[:, -1]
+    lam_min = lam[:, -2]
+
+    # Compute the CEP50 using one of two methods
+    cep = np.empty_like(lam_max) # shape (N, )
+    mask = lam_min > .25 * lam_max or np.isnan(lam_min) or np.isnan(lam_max)  # use the circular approximation when the
+                                                                              # eigenvalues are approximately equal, or
+                                                                              # when one or both are NaN (avoid dividing
+                                                                              # by nan)
+    cep[mask] = .59 * np.sqrt(lam_min[mask]) + np.sqrt(lam_max[mask])
+    cep[~mask] = np.sqrt(lam_max[~mask]) * (0.67 + 0.8 * lam_min[~mask] / lam_max[~mask])
+
+    # Replace invalid with inf if desired
+    bad_mask = ~np.isfinite(covs).all(axis=(1, 2))
+    if np.any(bad_mask) and print_warnings:
+        warnings.warn("Poorly formed (NaN or INF values encountered) in CEP50 calculation.")
+    cep[bad_mask] = np.inf
+
+    return cep
 
 def compute_rmse_scaling(conf_interval: float)-> float:
     """
