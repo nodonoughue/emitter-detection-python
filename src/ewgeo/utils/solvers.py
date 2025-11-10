@@ -8,7 +8,7 @@ from .constraints import constrain_likelihood, snap_to_equality_constraints, sna
 from .covariance import CovarianceMatrix
 
 
-def ls_solver(zeta,
+def ls_solver(y,
               jacobian,
               cov: CovarianceMatrix,
               x_init: npt.ArrayLike,
@@ -18,7 +18,7 @@ def ls_solver(zeta,
               plot_progress:bool=False,
               eq_constraints:list=None,
               ineq_constraints:list=None,
-              constraint_tolerance:float=1e-6):
+              constraint_tolerance:float=1e-6)-> tuple[npt.NDArray, npt.NDArray]:
     """
     Computes the least square solution for geolocation processing.
     
@@ -27,7 +27,7 @@ def ls_solver(zeta,
     Nicholas O'Donoughue
     14 January 2021
     
-    :param zeta: Measurement vector function handle (accepts n_dim vector of source position estimate, responds with
+    :param y: Measurement error vector function handle (accepts n_dim vector of source position estimate, responds with
                  error between received and modeled data vector)
     :param jacobian: Jacobian matrix function handle (accepts n_dim vector of source position estimate, and responds 
                      with n_dim x n_sensor Jacobian matrix)
@@ -78,14 +78,17 @@ def ls_solver(zeta,
         current_iteration += 1
 
         # Evaluate Residual and Jacobian Matrix
-        y_i = zeta(x_prev)
+        y_i = y(x_prev)
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use the squeeze command to drop the third dim (n_source = 1)
 
         # Compute delta_x^(i), according to 10.20
         delta_x = cov.solve_lstsq(y_i, jacobian_i)
+        if np.ndim(delta_x) > 1:
+            # There's a second dimension; take the average step across them
+            delta_x = np.mean(delta_x, axis=1)
 
         # Update predicted location
-        x_update = x_prev + np.squeeze(delta_x)
+        x_update = x_prev + delta_x
 
         # Apply Equality Constraints
         if eq_constraints is not None:
@@ -139,7 +142,7 @@ def gd_solver(y,
               plot_progress:bool=False,
               eq_constraints:list=None,
               ineq_constraints:list=None,
-              constraint_tolerance:float=1e-6):
+              constraint_tolerance:float=1e-6)-> tuple[npt.NDArray, npt.NDArray]:
     """
     Computes the gradient descent solution for localization given the provided measurement and Jacobian function 
     handles, and measurement error covariance.
@@ -187,7 +190,7 @@ def gd_solver(y,
     # Cost Function for Gradient Descent
     def cost_fxn(z):
         this_y = y(z)
-        return cov.solve_aca(this_y.T)
+        return np.mean(cov.solve_aca(this_y.T))
 
     # Initialize Plotting
     if plot_progress:
@@ -219,9 +222,13 @@ def gd_solver(y,
         # changing anything
         if np.sum(np.abs(y_i)) < 1e-20:
             x_update = x_prev
+            t = 0.
         else:
             # Compute Gradient and Cost function
             grad = -2 * cov.solve_acb(jacobian_i, y_i)
+            if np.ndim(grad) > 1:
+                # There's a second dimension; take the average gradient across them
+                grad = np.mean(grad, axis=1)
 
             # Descent direction is the negative of the gradient
             del_x = -np.squeeze(grad/np.linalg.norm(grad))
@@ -293,7 +300,7 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
     """
 
     # Initialize the search parameters and direction
-    t = 1
+    t = 100
     starting_val = np.squeeze(f(x))
     slope = np.squeeze(np.conjugate(grad.T) @ del_x)
 
@@ -312,7 +319,8 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
 
 
 def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
-              prior=None, prior_wt: float = 0., print_progress=False, **kwargs):
+              prior=None, prior_wt: float = 0., print_progress=False, num_levels: int=1, zoom_per_level: float=2,
+              **kwargs):
     """
     Execute ML estimation through brute force computational methods.
 
@@ -340,6 +348,13 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
     :return A: Likelihood computed at each x position in the search space
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
     """
+
+    if num_levels > 1:
+        # Call the solver with one less level to get the coarse estimate
+        x_est, _, _ = ml_solver(ell, search_space, eq_constraints, ineq_constraints, constraint_tolerance,
+                                prior, prior_wt, print_progress, num_levels-1, zoom_per_level, **kwargs)
+        # Zoom in and run as normal
+        search_space = search_space.zoom_in(new_ctr=x_est, zoom=zoom_per_level**(num_levels-1), overwrite=False)
 
     # Set up the search space
     x_set, x_grid = search_space.x_set, search_space.x_grid
@@ -435,12 +450,6 @@ def sensor_calibration(ell,
     :return x_sensor_est: Estimated sensor positions
     :return bias_est: Estimated measurement biases
     """
-
-    # Make a default prior for sensor calibration that assumes a Gaussian distribution
-    def default_prior(x: npt.ArrayLike, search_space: SearchSpace):
-        return mvn.pdf(x.T,  # transpose -- our inputs are (n_dim, n_sample), but mvn expects the opposite
-                       mean=search_space.x_ctr.ravel(),
-                       cov=np.diag(search_space.max_offset.ravel()+1e-6))
 
     # Initialize Outputs
     bias_est = bias_search.x_ctr if bias_search is not None else None

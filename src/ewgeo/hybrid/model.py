@@ -260,50 +260,18 @@ def log_likelihood(x_source: npt.ArrayLike,
         cov = cov.resample_hybrid(num_aoa=num_aoa, num_tdoa=num_tdoa, num_fdoa=num_fdoa,
                                   tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
 
-    if print_progress:
-        t_start = time.perf_counter()
-        max_num_rows = 20
-        desired_iter_per_row = np.ceil(n_source_pos / max_num_rows).astype(int)
-        markers_per_row = 40
-        desired_iter_per_marker = np.ceil(desired_iter_per_row / markers_per_row).astype(int)
+    # Generate the ideal measurement matrix for this position
+    zeta_dot = measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa, x_source=x_source,
+                           v_source=v_source, do_2d_aoa=do_2d_aoa, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
+                            angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
+    while zeta_dot.ndim < zeta.ndim: zeta_dot = np.expand_dims(zeta_dot, -1)
+    while zeta.ndim < zeta_dot.ndim: zeta = np.expand_dims(zeta, -1)
 
-        # Make sure we don't exceed the min/max iter per marker
-        min_iter_per_marker = 10
-        max_iter_per_marker = 1e6
-        iter_per_marker = np.maximum(min_iter_per_marker, np.minimum(max_iter_per_marker, desired_iter_per_marker))
-        iter_per_row = iter_per_marker * markers_per_row
+    # Evaluate the measurement error
+    err = (zeta_dot - zeta)
 
-        print('Computing Log Likelihood...')
-
-    # Loop across source positions
-    for idx_source in range(n_source_pos):
-        if print_progress:
-            print_progress_inner(num_total=n_source_pos, curr_idx=idx_source,
-                                 iterations_per_marker=iter_per_marker,
-                                 iterations_per_row=iter_per_row,
-                                 t_start=t_start)
-
-        x_i = x_source[:, idx_source]
-        if v_source is None:
-            v_i = None
-        else:
-            v_i = v_source[:, idx_source]
-
-        # Generate the ideal measurement matrix for this position
-        zeta_dot = measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa, x_source=x_i,
-                               v_source=v_i, do_2d_aoa=do_2d_aoa, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
-                                angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
-
-        # Evaluate the measurement error
-        err = (zeta_dot - zeta)
-
-        # Compute the scaled log likelihood
-        ell[idx_source] = - cov.solve_aca(err)
-
-    if print_progress:
-        print('done')
-        t_elapsed = time.perf_counter() - t_start
-        print_elapsed(t_elapsed)
+    # Compute the scaled log likelihood
+    ell = - cov.solve_aca(np.moveaxis(err, source=0, destination=-1))
 
     return ell
 
@@ -382,7 +350,8 @@ def error(x_source: npt.ArrayLike,
         for idx_aoa in np.arange(safe_2d_shape(x_aoa)[1]):
             err[idx_aoa, :] = modulo2pi(err[idx_aoa, :])
 
-    epsilon_list = [cov.solve_aca(this_err) for this_err in err.T]
+    # epsilon_list = [cov.solve_aca(this_err) for this_err in err.T]
+    epsilon_list = cov.solve_aca(err.T)
 
     return np.reshape(epsilon_list, search_space.grid_shape), x_vec, y_vec
 

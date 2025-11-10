@@ -131,6 +131,12 @@ def test_solve_aca():
     res2 = np.sum(sp.linalg.solve_triangular(cov.lower, a, lower=True)**2)
     assert equal_to_tolerance(res1, res2)
 
+    # Multidimensional inputs
+    a = np.tile(np.reshape(a, (1, 1, 1, 3)), (2, 3, 4, 1))
+    res1 = cov.solve_aca(a)
+    assert equal_to_tolerance(res1, res2*np.ones_like(res1))
+    assert res1.shape == (2, 3, 4)
+
 def test_solve_acb():
     """
     Solve the matrix problem res = A @ C^{-1} @ B

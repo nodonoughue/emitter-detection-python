@@ -50,10 +50,11 @@ def measurement(x_sensor: npt.ArrayLike,
 
     # Add bias
     if bias is not None:
-        if len(r.shape) > 1:
-            r = r + bias[:, np.newaxis]
-        else:
-            r = r + bias
+        if bias.shape != r.shape:
+            while bias.ndim < r.ndim:
+                bias = np.expand_dims(bias, axis=-1)
+
+        r = r + bias
 
     # Compute range difference for each pair of sensors
     rdoa = r[test_idx_vec] - r[ref_idx_vec]  # (n_pair, n_source)
@@ -201,11 +202,6 @@ def log_likelihood(x_sensor: npt.ArrayLike,
     """
 
     n_dim, n_source_pos = safe_2d_shape(x_source)
-    ell = np.zeros((n_source_pos, ))
-
-    # Make sure the source pos is a matrix, rather than simply a vector
-    if n_source_pos == 1:
-        x_source = x_source[:, np.newaxis]
 
     # Parse the TDOA sensor pairs
     _, n_tdoa = safe_2d_shape(x_sensor)
@@ -217,51 +213,15 @@ def log_likelihood(x_sensor: npt.ArrayLike,
     if do_resample:
         cov = cov.resample(ref_idx=ref_idx)
 
-    if print_progress:
-        t_start = time.perf_counter()
-        max_num_rows = 20
-        desired_iter_per_row = np.ceil(n_source_pos / max_num_rows).astype(int)
-        markers_per_row = 40
-        desired_iter_per_marker = np.ceil(desired_iter_per_row / markers_per_row).astype(int)
+    rho = measurement(x_sensor=x_sensor, x_source=x_source, ref_idx=ref_idx, bias=bias)
+    while rho.ndim < zeta.ndim: rho = np.expand_dims(rho, -1)
+    while zeta.ndim < rho.ndim: zeta = np.expand_dims(zeta, -1)
 
-        # Make sure we don't exceed the min/max iter per marker
-        min_iter_per_marker = 10
-        max_iter_per_marker = 1e6
-        iter_per_marker = np.maximum(min_iter_per_marker, np.minimum(max_iter_per_marker, desired_iter_per_marker))
-        iter_per_row = iter_per_marker * markers_per_row
+    err = rho - zeta
 
-        print('Computing Log Likelihood...')
-
-    for idx_source, x_i in enumerate(x_source.T):
-        if print_progress:
-            print_progress_inner(num_total=n_source_pos, curr_idx=idx_source,
-                                 iterations_per_marker=iter_per_marker,
-                                 iterations_per_row=iter_per_row,
-                                 t_start=t_start)
-
-        # Generate the ideal measurement matrix for this position
-        if len(np.shape(bias)) > 1:  # there's more than one bias term
-            bias_i = bias[:, idx_source]
-        else:
-            bias_i = bias
-
-        if len(np.shape(x_sensor)) > 2: # there are multiple sets of sensor positions
-            x_sensor_i = x_sensor[:, :, idx_source]
-        else:
-            x_sensor_i = x_sensor
-
-        rho = measurement(x_sensor=x_sensor_i, x_source=x_i, ref_idx=ref_idx, bias=bias_i)
-
-        # Evaluate the measurement error
-        err = rho - zeta
-
-        # Compute the scaled log likelihood
-        ell[idx_source] = - cov.solve_aca(err)
-
-    if print_progress:
-        print('done')
-        t_elapsed = time.perf_counter() - t_start
-        print_elapsed(t_elapsed)
+    # Compute the scaled log likelihood
+    # cov.solve_aca wants the measurement axis at the end; we've got it at the start. move it
+    ell = - cov.solve_aca(np.moveaxis(err, source=0, destination=-1))
 
     return ell
 
@@ -320,18 +280,22 @@ def error(x_sensor: npt.ArrayLike,
     xx, yy = np.meshgrid(x_vec, y_vec)
     x_plot = np.vstack((xx.flatten(), yy.flatten())).T  # 2 x numPts^2
 
-    epsilon = np.zeros_like(xx)
-    for idx_pt in np.arange(np.size(xx)):
-        x_i = x_plot[:, idx_pt]
-
-        # Evaluate the measurement at x_i
-        rr_i = measurement(x_sensor, x_i, ref_idx)
-
-        # Compute the measurement error
-        err = r - rr_i
-
-        # Evaluate the scaled log likelihood
-        epsilon[idx_pt] = cov.solve_aca(err)
+    # TODO: debug
+    rr = measurement(x_sensor, x_plot, ref_idx)
+    err = r[:, np.newaxis] - rr
+    epsilon = cov.solve_aca(err.T)
+    # epsilon = np.zeros_like(xx)
+    # for idx_pt in np.arange(np.size(xx)):
+    #     x_i = x_plot[:, idx_pt]
+    #
+    #     # Evaluate the measurement at x_i
+    #     rr_i = measurement(x_sensor, x_i, ref_idx)
+    #
+    #     # Compute the measurement error
+    #     err = r - rr_i
+    #
+    #     # Evaluate the scaled log likelihood
+    #     epsilon[idx_pt] = cov.solve_aca(err)
 
     return epsilon
 

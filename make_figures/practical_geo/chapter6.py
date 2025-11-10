@@ -145,7 +145,7 @@ def make_figure_6(prefix=None):
 
     # Generate the lobs, dimensions are num_dim x num_tx x 2 (datapoints)
     # num_dim x num_sensor x 2
-    r_vec = np.concatenate((np.zeros((num_sensor, 1)), 3*r[:, np.newaxis]), axis=1)  # num_sensor x 2
+    r_vec = np.concatenate((np.zeros((num_sensor, 1)), 3*r), axis=1)  # num_sensor x 2
     lob_zero = np.array([np.cos(psi[:, np.newaxis]), np.sin(psi[:, np.newaxis])]) * r_vec[np.newaxis, :]
 
     lob_true = x_aoa[:, :, np.newaxis] + lob_zero

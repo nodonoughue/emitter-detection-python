@@ -3,7 +3,8 @@ import numpy as np
 import numpy.typing as npt
 import time
 
-from ewgeo.utils import is_broadcastable, parse_reference_sensor, print_elapsed, safe_2d_shape, SearchSpace
+from ewgeo.utils import is_broadcastable, parse_reference_sensor, print_elapsed, safe_2d_shape, SearchSpace, \
+    broadcast_backwards
 from ewgeo.utils import print_progress as print_progress_inner
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
@@ -25,7 +26,7 @@ def measurement(x_sensor: npt.ArrayLike,
     Nicholas O'Donoughue
     21 January 2021
 
-    :param x_sensor: nDim x n_sensor array of sensor positions.
+    :param x_sensor: (nDim, n_sensor, *out_shp) array of sensor positions.
     :param x_source: nDim x n_source array of source positions.
     :param v_sensor: nDim x nSensor array of sensor velocities.
     :param v_source: nDim x n_source array of source velocities.
@@ -35,14 +36,15 @@ def measurement(x_sensor: npt.ArrayLike,
     """
 
     # Parse inputs
-    n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
+    n_dim, n_source, n_sensor, out_shp, x_source, v_source, x_sensor, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
     test_idx_vec, ref_idx_vec = parse_reference_sensor(ref_idx, n_sensor)
 
-    # Make sure that x_source is 2D
-    if len(x_source.shape) == 1:
-        x_source = x_source[:, np.newaxis]
-    if len(v_source.shape) == 1:
-        v_source = v_source[:, np.newaxis]
+    #
+    # # Manually extend the dimensions
+    # x1 = x1[:, :, np.newaxis]
+    # while len(x1.shape) < len(out_shp) + 1: x1 = np.expand_dims(x1, axis=-1)
+    # x2 = x2[:, np.newaxis, :]
+    # while len(x2.shape) < len(out_shp) + 1: x2 = np.expand_dims(x2, axis=-1)
 
     # Compute distance from each source position to each sensor
     dx = x_source[:, np.newaxis, :] - x_sensor[:, :, np.newaxis]  # (n_dim, n_sensor, n_source)
@@ -50,16 +52,16 @@ def measurement(x_sensor: npt.ArrayLike,
 
     # Compute range rate from range and velocity
     dv = v_sensor[:, :, np.newaxis] - v_source[:, np.newaxis, :] # (n_dim, n_sensor, n_source)
-    rr = np.divide(np.sum(dv*dx, axis=0), r, out=np.zeros((n_sensor, n_source)), where=r!=0)  # (n_sensor, n_source)
+    rr = np.divide(np.sum(dv*dx, axis=0), r, out=np.zeros(out_shp), where=r!=0)  # (n_sensor, n_source)
 
     # Add bias, if provided
     if bias is not None:
-        if len(rr.shape)>1:
-            rr = rr + bias[:, np.newaxis]  # (n_sensor, n_source)
-        else:
-            rr = rr + bias
+        if bias.shape != r.shape:
+            while bias.ndim < r.ndim:
+                bias = np.expand_dims(bias, axis=-1)
+        rr = rr + bias
 
-    # Apply reference sensors to compute range rate difference for each sensor
+    # Apply reference sensors to compute range-rate difference for each sensor
     # pair
     rrdoa = rr[test_idx_vec, :] - rr[ref_idx_vec, :]  # (nPair, n_source)
 
@@ -90,39 +92,35 @@ def jacobian(x_sensor: npt.ArrayLike,
     # ToDo: Think about refactoring as a two-element response (j_pos, j_vel) for easier parsing at the output
 
     # Parse inputs
-    n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
+    n_dim, n_source, n_sensor, out_shp, x_source, v_source, x_sensor, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
     test_idx_vec, ref_idx_vec = parse_reference_sensor(ref_idx, n_sensor)
 
     # Compute the Offset Vectors
-    dx = x_sensor[:, :, np.newaxis] - np.reshape(x_source, (n_dim, 1, n_source))  # n_dim x n_sensor x n_source
-    rn = np.reshape(np.sqrt(np.sum(dx**2, axis=0)), (1, n_sensor, n_source))  # Euclidean norm for each offset vector
-    dx_norm = np.divide(dx, rn, out=np.zeros((n_dim, n_sensor, n_source)), where=rn!=0)  # n_dim x n_sensor x n_source
-    px = np.reshape(dx_norm, (n_dim, 1, n_sensor, n_source)) * np.reshape(dx_norm, (1, n_dim, n_sensor, n_source))
-    # n_dim x n_dim x n_sensor x n_source
+    dx = x_sensor[:, :, np.newaxis] - x_source[:, np.newaxis, :]  # shape: (1, *out_shp)
+    rn = np.sqrt(np.sum(dx**2, axis=0))  # Euclidean norm for each offset vector, shape: out_shp
+    dx_norm = np.divide(dx, rn, out=np.zeros((n_dim, *out_shp)), where=rn!=0)  # shape: (n_dim, *out_shp)
+    px = dx_norm[:, np.newaxis, :] * dx_norm[np.newaxis, :]  # shape: (n_dim, n_dim, *out_shp)
     
     # Compute the gradient of R_n
-    dv = (np.reshape(v_sensor, (n_dim, n_sensor, 1))
-          - np.reshape(v_source, (n_dim, 1, n_source)))  # n_dim x n_sensor x n_source
-    dv_norm = np.divide(dv, rn, out=np.zeros((n_dim, n_sensor, n_source)), where=rn!=0)  # n_dim x n_sensor x n_source
+    dv = v_sensor[:, :, np.newaxis] - v_source[:, np.newaxis, :]  # shape: (n_dim, *out_shp)
+    dv_norm = np.divide(dv, rn, out=np.zeros((n_dim, *out_shp)), where=rn!=0)  # shape: (n_dim, *out_shp)
     # Iterate the matmul over the number of sensors and sources
-    nabla_rn = np.asarray([[np.dot(np.eye(n_dim) - px[:, :, idx_sen, idx_src],
-                                   dv_norm[:, idx_sen, idx_src])
-                            for idx_src in np.arange(n_source)] for idx_sen in np.arange(n_sensor)])
-
-    # Rearrange the axes to match expectation (n_dim x n_sensor x n_source)
-    nabla_rn = np.moveaxis(nabla_rn, source=2, destination=0)
+    this_eye = np.eye(n_dim)
+    while len(np.shape(this_eye)) < len(np.shape(px)): this_eye = np.expand_dims(this_eye, axis=-1)
+    nabla_rn = np.sum((this_eye - px) * dv_norm[np.newaxis, :, :], axis=1)  # shape: (n_dim, *out_shp)
 
     # Compute test/reference differences and reshape output
     num_measurements = test_idx_vec.size
-    if n_source > 1:
-        out_dims = (n_dim, num_measurements, n_source)
-    else:
-        out_dims = (n_dim, num_measurements)
+    out_dims = [n_dim, num_measurements]
+    if len(out_shp) > 1: out_dims.extend(out_shp[1:])
 
     result_pos = np.reshape(nabla_rn[:, test_idx_vec, :] - nabla_rn[:, ref_idx_vec, :], shape=out_dims)
     result_vel = np.reshape(dx_norm[:, test_idx_vec, :] - dx_norm[:, ref_idx_vec, :], shape=out_dims)
 
-    return np.concatenate((result_pos, result_vel), axis=0)  # 2*n_dim x nPair x n_source
+    result = np.concatenate((result_pos, result_vel), axis=0)  # 2*n_dim x nPair x n_source
+
+    # strip any singleton dimensions off the end
+    return np.squeeze(result, axis=tuple(range(2,np.ndim(result))))
 
 
 def jacobian_uncertainty(x_sensor: npt.ArrayLike,
@@ -219,66 +217,22 @@ def log_likelihood(x_sensor: npt.ArrayLike,
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
-    # Parse inputs
-    n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source=x_source, v_source=v_source,
-                                                                  x_sensor=x_sensor, v_sensor=v_sensor)
-
-    # x_source and v_source might be vectors; 2D indexing below will fail.
-    # Let's add a new axis
-    if len(np.shape(x_source))==1:
-        x_source = x_source[:, np.newaxis]
-    if len(np.shape(v_source))==1:
-        v_source = v_source[:, np.newaxis]
-
-    # Make sure v_source and x_source have the same shape
-    v_source = np.broadcast_to(array=v_source, shape=x_source.shape)
-
     if do_resample:
         cov = cov.resample(ref_idx=ref_idx)
 
-    # Initialize output
-    ell = np.zeros((n_source, ))
+    # Generate the ideal measurement matrix for this position
+    r_dot = measurement(x_sensor=x_sensor, x_source=x_source,
+                        v_sensor=v_sensor, v_source=v_source,
+                        ref_idx=ref_idx, bias=bias)
 
-    if print_progress:
-        t_start = time.perf_counter()
-        max_num_rows = 20
-        desired_iter_per_row = np.ceil(n_source / max_num_rows).astype(int)
-        markers_per_row = 40
-        desired_iter_per_marker = np.ceil(desired_iter_per_row / markers_per_row).astype(int)
+    while r_dot.ndim < rho_dot.ndim: r_dot = np.expand_dims(r_dot, -1)
+    while rho_dot.ndim < r_dot.ndim: rho_dot = np.expand_dims(rho_dot, -1)
 
-        # Make sure we don't exceed the min/max iter per marker
-        min_iter_per_marker = 10
-        max_iter_per_marker = 1e6
-        iter_per_marker = np.maximum(min_iter_per_marker, np.minimum(max_iter_per_marker, desired_iter_per_marker))
-        iter_per_row = iter_per_marker * markers_per_row
+    # Evaluate the measurement error
+    err = (rho_dot - r_dot)
 
-        print('Computing Log Likelihood...')
-
-    for idx_source in range(n_source):
-        if print_progress:
-            print_progress_inner(num_total=n_source, curr_idx=idx_source,
-                                 iterations_per_marker=iter_per_marker,
-                                 iterations_per_row=iter_per_row,
-                                 t_start=t_start)
-
-        x_i = x_source[:, idx_source]
-        v_i = v_source[:, idx_source]
-
-        # Generate the ideal measurement matrix for this position
-        r_dot = measurement(x_sensor=x_sensor, x_source=x_i,
-                            v_sensor=v_sensor, v_source=v_i,
-                            ref_idx=ref_idx, bias=bias)
-        
-        # Evaluate the measurement error
-        err = (rho_dot - r_dot)
-
-        # Compute the scaled log likelihood
-        ell[idx_source] = - cov.solve_aca(err)
-
-    if print_progress:
-        print('done')
-        t_elapsed = time.perf_counter() - t_start
-        print_elapsed(t_elapsed)
+    # Compute the scaled log likelihood
+    ell = - cov.solve_aca(np.moveaxis(err, source=0, destination=-1))
 
     return ell
 
@@ -342,8 +296,8 @@ def error(x_sensor: npt.ArrayLike,
 
     err = rr[:, np.newaxis] - rr_list
 
-    epsilon_list = [cov.solve_aca(this_err) for this_err in err.T]
-
+    # epsilon_list = [cov.solve_aca(this_err) for this_err in err.T]
+    epsilon_list = cov.solve_aca(err.T)  # transpose it; solve_aca operates over the last dimension
     return np.reshape(epsilon_list, search_space.grid_shape), x_vec, y_vec
 
 
@@ -547,34 +501,30 @@ def grad_sensor_pos(x_sensor: npt.ArrayLike,
     :param ref_idx:     Reference index (optional)
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
 
     # Parse inputs
-    n_dim, n_source, n_sensor, v_source, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
+    n_dim, n_source, n_sensor, out_shp, x_source, v_source, x_sensor, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
 
     # Compute pointing vectors and projection matrix
-    dx = x_sensor[:, :, np.newaxis] - np.reshape(x_source, shape=(n_dim, 1, n_source))
-    dv = v_sensor[:, :, np.newaxis] - np.reshape(v_source, shape=(n_dim, 1, n_source))
-    rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # (1, n_sensor, n_source)
-    dx_norm = dx / rn
-    dv_norm = dv / rn
+    dx = x_sensor[:, :, np.newaxis] - x_source[:, np.newaxis, :]  # shape: (n_dim, *out_shp)
+    dv = v_sensor[:, :, np.newaxis] - v_source[:, np.newaxis, :]  # shape: (n_dim, *out_shp)
+    rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # (1, *out_shp)
+    dx_norm = dx / rn  # shape: (n_dim, *out_shp)
+    dv_norm = dv / rn  # shape: (n_dim, *out_shp)
 
-    proj_x = (np.reshape(dx_norm, shape=(n_dim, 1, n_sensor, n_source)) *
-              np.reshape(np.conjugate(dx_norm), shape=(1, n_dim, n_sensor, n_source)))
-    # (n_dim, n_dim, n_sensor, n_source)
+    proj_x = dx_norm[:, np.newaxis, :] * np.conjugate(dx_norm[np.newaxis, :])  # shape: (n_dim, n_dim, *out_shp)
 
     # Compute the gradient of R_n
-    nabla_rn = np.squeeze(np.sum((np.eye(n_dim)[:,:,np.newaxis,np.newaxis] - proj_x) *
-                                 np.reshape(dv_norm, shape=(1, n_dim, n_sensor, n_source)), axis=1))
-    # (n_dim, n_sensor, n_source)
+    this_eye = np.eye(n_dim)  # shape: (n_dim, n_dim)
+    while len(np.shape(this_eye)) < len(np.shape(proj_x)): this_eye = np.expand_dims(this_eye, axis=-1)
+    nabla_rn = np.sum((this_eye - proj_x) * dv_norm[np.newaxis, :], axis=1)  # shape: (n_dim, *out_shp)
 
     # Parse the reference index
     test_idx_vec, ref_idx_vec = parse_reference_sensor(ref_idx, n_sensor)
 
     # Build the Gradient
     n_measurement = np.size(test_idx_vec)
-    grad_pos = np.zeros((n_dim * n_sensor, n_measurement, n_source))
-    grad_vel = np.zeros((n_dim * n_sensor, n_measurement, n_source))
+    grad_pos = np.zeros((n_dim * n_sensor, n_measurement, *out_shp[1:]))
     for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
         # Gradient w.r.t. sensor pos, eq 6.38
         start_test = n_dim * test
@@ -585,18 +535,77 @@ def grad_sensor_pos(x_sensor: npt.ArrayLike,
         end_ref = start_ref + n_dim
         grad_pos[start_ref:end_ref, i, :] = -nabla_rn[:, ref, :]
 
+    return grad_pos
+
+
+def grad_sensor_vel(x_sensor: npt.ArrayLike,
+                    x_source: npt.ArrayLike,
+                    v_sensor: npt.ArrayLike | None=None,
+                    v_source: npt.ArrayLike | None=None,
+                    ref_idx=None):
+    """
+    Compute the gradient of FDOA measurements, with sensor uncertainties, with respect to sensor position and velocity.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 April 2025
+
+    :param x_sensor:    FDOA sensor positions
+    :param x_source:    Source positions
+    :param v_sensor:    Optional FDOA sensor velocities (0 if not defined)
+    :param v_source:    Optional FDOA source velocities (0 if not defined)
+    :param ref_idx:     Reference index (optional)
+    :return jacobian:   Jacobian matrix representing the desired gradient
+    """
+
+    # Parse inputs
+    n_dim, n_source, n_sensor, out_shp, x_source, v_source, x_sensor, v_sensor = _check_inputs(x_source, v_source, x_sensor, v_sensor)
+
+    # Compute pointing vectors and projection matrix
+    dx = x_sensor[:, :, np.newaxis] - x_source[:, np.newaxis, :]  # shape: (1, *out_shp)
+    rn = np.sqrt(np.sum(np.fabs(dx)**2, axis=0))  # shape: out_shp
+    dx_norm = dx / rn  # shape: (1, *out_shp)
+
+    # Parse the reference index
+    test_idx_vec, ref_idx_vec = parse_reference_sensor(ref_idx, n_sensor)
+
+    # Build the Gradient
+    n_measurement = np.size(test_idx_vec)
+    grad_vel = np.zeros((n_dim * n_sensor, n_measurement, *out_shp[1:]))
+    for i, (test, ref) in enumerate(zip(test_idx_vec, ref_idx_vec)):
+        # Gradient w.r.t. sensor pos, eq 6.38
+        start_test = n_dim * test
+        end_test = start_test + n_dim  # add +1 because of the way python indexing works
+
+        start_ref = n_dim * ref
+        end_ref = start_ref + n_dim
+
         # Gradient w.r.t. sensor vel, eq 6.40
-        grad_vel[start_test:end_test, i, :] = dx_norm[:, test, :]
-        grad_vel[start_ref:end_ref, i, :] = -dx_norm[:, ref, :]
+        grad_vel[start_test:end_test, i, :] = -dx_norm[:, test, :]
+        grad_vel[start_ref:end_ref, i, :] = dx_norm[:, ref, :]
 
-    # Combine the gradient w.r.t. sensor pos and sensor vel
-    # eq 6.36
-    grad = np.concatenate((grad_pos, grad_vel), axis=0)
+    return grad_vel
 
-    return grad
+def _check_inputs(x_source: npt.ArrayLike, v_source: npt.ArrayLike, x_sensor: npt.ArrayLike,
+                  v_sensor: npt.ArrayLike)-> tuple[int, int, int, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
+    """
+    Check the position and velocity inputs for source and sensors, enforce consistency in the number of sources/sensors
+    and spatial dimensions, extend array dimensions to ensure proper broadcasting.
 
+    :param x_source:    Source positions (n_dim, n_source, *out_shp)
+    :param v_source:    Source velocities (n_dim, n_source, *out_shp)
+    :param x_sensor:    Sensor positions (n_dim, n_sensor, *out_shp)
+    :param v_sensor:    Sensor velocities (n_dim, n_sensor, *out_shp)
+    :return n_dim:       Number of spatial dimensions
+    :return n_source:    Number of sources
+    :return n_sensor:    Number of sensors
+    :return x_source:    Extended source positions (n_dim, n_source, *out_shp)
+    :return v_source:    Extended source velocities (n_dim, n_source, *out_shp)
+    :return x_sensor:    Extended sensor positions (n_dim, n_sensor, *out_shp)
+    :return v_sensor:    Extended sensor velocities (n_dim, n_sensor, *out_shp)
+    """
 
-def _check_inputs(x_source: npt.ArrayLike, v_source: npt.ArrayLike, x_sensor: npt.ArrayLike, v_sensor: npt.ArrayLike):
     if v_sensor is None and v_source is None:
         raise ValueError('At least one of either v_sensor or v_source must be defined to use FDOA.')
     elif v_sensor is None:
@@ -604,21 +613,45 @@ def _check_inputs(x_source: npt.ArrayLike, v_source: npt.ArrayLike, x_sensor: np
     elif v_source is None:
         v_source = np.zeros_like(x_source)
 
-    n_dim1, n_sensor1 = safe_2d_shape(x_sensor)
-    n_dim2, n_sensor2 = safe_2d_shape(v_sensor)
-    n_dim3, n_source1 = safe_2d_shape(x_source)
-    n_dim4, n_source2 = safe_2d_shape(v_source)
+    # Broadcast -- first the source/sensor position and velocity starting at axis 0
+    arrs, _ = broadcast_backwards([x_source, v_source], start_dim=0)
+    x_source, v_source = arrs
 
-    if n_dim1 != n_dim2 or n_dim1 != n_dim3 or n_dim1 != n_dim4:
-        raise TypeError('First dimension of all inputs must match')
+    arrs, _ = broadcast_backwards([x_sensor, v_sensor], start_dim=0)
+    x_sensor, v_sensor = arrs
 
-    if not is_broadcastable(x_sensor, v_sensor):
-        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
+    # Broadcast between them for any axes after the second
+    arrs, in_shp = broadcast_backwards([x_source, v_source, x_sensor, v_sensor], start_dim=2)
+    x_source, v_source, x_sensor, v_sensor = arrs
 
-    if not is_broadcastable(x_source, v_source):
-        raise TypeError('Sensor position and velocity inputs must have matching shapes.')
+    # # Ensure that they're at least 2D, but do it manually because numpy.atleast_2d will add new axes to the front, not
+    # # the back
+    # if len(np.shape(x_source)) < 2: x_source = x_source[:, np.newaxis]
+    # if len(np.shape(v_source)) < 2: v_source = v_source[:, np.newaxis]
+    # if len(np.shape(x_sensor)) < 2: x_ref = x_sensor[:, np.newaxis]
+    # if len(np.shape(v_sensor)) < 2: v_ref = v_sensor[:, np.newaxis]
+    #
+    # Find the dimensions
+    num_dims, num_sources, *out_shp_1 = np.shape(x_source)
+    # num_dims2, num_sources2, *out_shp_2 = np.shape(v_source)
+    _, num_sensors, *_ = np.shape(x_sensor)
+    # num_dims4, num_sensors2, *out_shp_4 = np.shape(v_sensor)
+    #
+    # if num_dims != num_dims2 or num_dims != num_dims3 or num_dims != num_dims4:
+    #     raise ValueError('All inputs must have the same number of spatial dimensions.')
+    #
+    # if num_sensors2 != num_sensors and num_sensors != 1 and num_sensors2 != 1:
+    #     raise ValueError('Number of sensors must be the same for both x_sensor and v_sensor.')
+    #
+    # if num_sources2 != num_sources and num_sources != 1 and num_sources2 != 1:
+    #     raise ValueError('Number of source must be the same for both x_source and v_source.')
 
-    n_sensor = np.amax((n_sensor1, n_sensor2))
-    n_source = np.amax((n_source1, n_source2))
+    # num_sensor = np.amax((num_sensors, num_sensors2))
+    # num_source = np.amax((num_sources, num_sources2))
 
-    return n_dim1, n_source, n_sensor, v_source, v_sensor
+    # Find the output shape
+    # in_shp = np.broadcast_shapes(out_shp_1, out_shp_2, out_shp_3, out_shp_4)
+    out_shp = [num_sensors, num_sources]
+    out_shp.extend(in_shp)
+
+    return num_dims, num_sources, num_sensors, out_shp, x_source, v_source, x_sensor, v_sensor

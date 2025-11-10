@@ -392,7 +392,6 @@ def _plot_mc_iteration_result(pss: HybridPassiveSurveillanceSystem, args, result
     cep50_bf = compute_cep50(cov_bf) / 1e3
 
     out_shp = (2, args['num_iterations'])
-    out_cov_shp = (2, 2, args['num_iterations'])
     bias_ls = np.zeros(shape=out_shp)
     bias_grad = np.zeros(shape=out_shp)
     cov_ls = []

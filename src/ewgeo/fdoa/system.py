@@ -92,6 +92,19 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
                                      v_source=v_source,
                                      ref_idx=self.ref_idx)
 
+    def grad_sensor_vel(self,
+                        x_source: npt.ArrayLike,
+                        v_source: npt.ArrayLike | None=None,
+                        x_sensor: npt.ArrayLike | None=None,
+                        v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
+        if x_sensor is None: x_sensor = self.pos
+        if v_sensor is None: v_sensor = self.vel
+        return model.grad_sensor_vel(x_sensor=x_sensor,
+                                     v_sensor=v_sensor,
+                                     x_source=x_source,
+                                     v_source=v_source,
+                                     ref_idx=self.ref_idx)
+
     ## ============================================================================================================== ##
     ## Solver Methods
     ##
