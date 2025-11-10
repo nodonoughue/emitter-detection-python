@@ -608,6 +608,7 @@ class SearchSpace:
 
     @x_ctr.setter
     def x_ctr(self, x_ctr: npt.ArrayLike):
+        self.reset()  # clear the dependent fields
         self._x_ctr = x_ctr
 
     @property
@@ -622,6 +623,7 @@ class SearchSpace:
 
     @epsilon.setter
     def epsilon(self, epsilon: npt.ArrayLike):
+        self.reset()  # clear the dependent fields
         self._epsilon = epsilon
         if self._epsilon is not None:
             self.check_consistency()
@@ -636,6 +638,7 @@ class SearchSpace:
 
     @max_offset.setter
     def max_offset(self, max_offset: npt.ArrayLike):
+        self.reset()  # clear the dependent fields
         self._max_offset = max_offset
         if self._max_offset is not None:
             self.check_consistency()
@@ -644,11 +647,12 @@ class SearchSpace:
     def points_per_dim(self):
         if self._points_per_dim is None:
             # Build points_per_dim from max_offset and epsilon
-            self._points_per_dim = np.floor(1 + 2 * self.max_offset / self.epsilon).astype(int)
+            self._points_per_dim = np.where(self.epsilon != 0, np.floor(1 + 2 * self.max_offset / self.epsilon), 1).astype(int)
         return self._points_per_dim
 
     @points_per_dim.setter
     def points_per_dim(self, points_per_dim: npt.ArrayLike):
+        self.reset()  # clear the dependent fields
         self._points_per_dim = points_per_dim
         if self._points_per_dim is not None:
             self.check_consistency()
@@ -669,6 +673,13 @@ class SearchSpace:
     def grid_shape(self):
         self.broadcast()
         return [i for i in self.points_per_dim if i > 1]
+
+    def reset(self):
+        """
+        Clear dependent fields
+        """
+        self._x_set = None
+        self._x_grid = None
 
     def check_consistency(self):
         """
@@ -751,10 +762,24 @@ class SearchSpace:
         self._x_set = x_set
         self._x_grid = x_grid
 
+    def zoom_in(self, new_ctr: npt.ArrayLike, zoom: float=2.0, overwrite: bool=False):
+        if np.shape(new_ctr) != np.shape(self.x_ctr):
+            raise ValueError('New center must have the same dimensionality as the existing center.')
+
+        # Keep the number of grid points the same, but cut the grid resolution by the zoom factor
+        if overwrite:
+            self.epsilon = self.epsilon/zoom
+            self.max_offset = None
+            return
+        else:
+            return SearchSpace(x_ctr=new_ctr,
+                               epsilon=self.epsilon/zoom,
+                               points_per_dim=self.points_per_dim)
+
 
 def is_broadcastable(a: npt.ArrayLike, b: npt.ArrayLike)-> bool:
     """
-    Determine if two inputs are broadcastable. In other words, check all common dimensions, and
+    Determine if two inputs are broadcastable. In other words, check all common dimensions and
     ensure that they are either equal or of length 1.
 
     14 November 2022
@@ -776,6 +801,34 @@ def is_broadcastable(a: npt.ArrayLike, b: npt.ArrayLike)-> bool:
         return True
     except ValueError:
         return False
+
+
+def broadcast_backwards(arrs: list[npt.NDArray, ], start_dim: int=0)\
+        -> tuple[list[npt.NDArray, ], npt.NDArray]:
+    """
+    Ensure all inputs are broadcastable, with an optional starting dimension. Return extended arrays that have the same
+    number of dimensions so that numpy broadcasting works correctly.
+
+    In this utility, new dimensions are added to the end of the array, not the beginning, to align with the behavior
+    in MATLAB.
+    """
+
+    # Make sure they're long enough
+    max_len = max([len(np.shape(arr)) for arr in arrs])
+    if max_len < start_dim: max_len = start_dim
+    output_arrs = []
+    for arr in arrs:
+        while len(np.shape(arr)) < max_len:
+            arr = np.expand_dims(arr, axis=-1)
+        output_arrs.append(arr)
+
+    if max_len <= start_dim:
+        out_shp = []
+    else:
+        out_shp = np.broadcast_shapes(*[np.shape(arr)[start_dim:] for arr in output_arrs])
+
+    # Return
+    return output_arrs, out_shp
 
 
 def modulo2pi(x: npt.ArrayLike)-> npt.NDArray:

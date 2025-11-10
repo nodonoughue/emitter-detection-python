@@ -1,8 +1,9 @@
+import numpy as np
 import numpy.typing as npt
 import warnings
 
 from . import model, solvers
-from ewgeo.utils import parse_reference_sensor
+from ewgeo.utils import parse_reference_sensor, safe_2d_shape
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import DifferencePSS
@@ -91,6 +92,12 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         if x_sensor is None: x_sensor = self.pos
 
         return model.grad_sensor_pos(x_sensor=x_sensor, x_source=x_source, ref_idx=self.ref_idx)
+
+    def grad_sensor_vel(self, x_source: npt.ArrayLike, **kwargs)-> npt.NDArray:
+        out_shape = [self.num_dim * self.num_sensors, self.num_measurements]
+        _, num_source = safe_2d_shape(x_source)
+        if num_source > 1: out_shape.append(num_source)
+        return np.zeros(shape=out_shape)
 
     ## ============================================================================================================== ##
     ## Solver Methods
