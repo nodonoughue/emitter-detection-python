@@ -65,9 +65,9 @@ def example1(mc_params=None):
     f_source_hz = 1e9
 
     # Convert positions and velocity to ENU
-    [e_source, n_source, u_source] = lla_to_enu(x_source_lla[0], x_source_lla[1], x_source_lla[2],
-                                                ref_lat, ref_lon, ref_alt,
-                                                angle_units='deg', dist_units='m')
+    e_source, n_source, u_source = lla_to_enu(x_source_lla[0], x_source_lla[1], x_source_lla[2],
+                                              ref_lat, ref_lon, ref_alt,
+                                              angle_units='deg', dist_units='m')
     x_source_enu = np.array([e_source, n_source, u_source])
 
     # Sensor Selection
@@ -121,7 +121,7 @@ def example1(mc_params=None):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
 
-    for idx in np.arange(num_monte_carlo):
+    for idx in range(num_monte_carlo):
         print_progress(num_total=num_monte_carlo, curr_idx=idx, iterations_per_marker=iterations_per_marker,
                              iterations_per_row=iterations_per_row, t_start=t_start)
 
@@ -196,73 +196,54 @@ def example2(colors=None):
         colors = plt.get_cmap("viridis_r")
 
     # Set up sensors
+    num_sensors=4
     sensor_lat = np.array([26 + 52/60, 27 + 52/60, 23 + 19/60, 24 + 19/60])
     sensor_lon = np.array([-(68 + 47/60), -(72 + 36/60), -(69 + 47/60), -(74 + 36/60)])
-    sensor_alt = 500e3 * np.ones((4,))
-    x_sensor_lla = np.concatenate((sensor_lat[np.newaxis, :],
-                                   sensor_lon[np.newaxis, :],
-                                   sensor_alt[np.newaxis, :]), axis=0)
-
-    # Define sensor velocity in ENU
-    v_abs = 7.61*1e3  # m/s, based on 500 km orbital height above Earth
-    heading_deg = 60  # deg N from E
-    heading_rad = heading_deg * _deg2rad
-    v_sensor_enu = (v_abs * np.array([[np.sin(heading_rad)], [np.cos(heading_rad)], [0]])
-                    * np.ones((1, np.size(x_sensor_lla, 1))))
+    sensor_alt = 500e3 * np.ones((num_sensors,))
 
     # Center of observation area
     ref_lat = 26  # deg Lat (N)
     ref_lon = -71  # deg Lon (E)
     ref_alt = 0  # alt (m)
 
-    [e_sensor, n_sensor, u_sensor] = lla_to_enu(x_sensor_lla[0], x_sensor_lla[1], x_sensor_lla[2],
-                                                ref_lat, ref_lon, ref_alt,
-                                                angle_units="deg", dist_units="m")
-    x_sensor_enu = np.concatenate((e_sensor[np.newaxis, :],
-                                   n_sensor[np.newaxis, :],
-                                   u_sensor[np.newaxis, :]), axis=0)
+    e_sensor, n_sensor, u_sensor = lla_to_enu(sensor_lat, sensor_lon, sensor_alt,
+                                              ref_lat, ref_lon, ref_alt,
+                                              angle_units="deg", dist_units="m")
+    x_sensor_enu = np.array([e_sensor, n_sensor, u_sensor]) # shape: (3, n_sensor)
 
-    err_aoa_deg = 3
-    err_tdoa_s = 1e-5
-    err_fdoa_hz = 100
-    f_source_hz = 1e9
+    # Define sensor velocity in ENU
+    v_abs = 7.61*1e3  # m/s, based on 500 km orbital height above Earth
+    heading_deg = 60  # deg N from E
+    heading_rad = heading_deg * _deg2rad
+    v0 = v_abs * np.array([np.sin(heading_rad), np.cos(heading_rad), 0]) # shape: (3, )
+    v_sensor_enu = np.repeat(v0[:, np.newaxis], num_sensors, axis=1)
 
     # Build grid of positions within 500 km of source position (ENU origin)
     v_source_enu = np.zeros(shape=(3, ))  # source is stationary
-
-    x_ctr = np.zeros(shape=(3, ))
-    max_offset = 500e3  # +/- distance from the center of each axis to the edges
-    search_size = np.array([1., 1., 0.]) * max_offset  # only search East-North dimensions, not Up
-    num_points_per_axis = 201  # MATLAB code uses 1,001, but the image appears properly resolved with just 201
-    grid_res = 2*max_offset/num_points_per_axis
-    search_space = SearchSpace(x_ctr=x_ctr,
-                               max_offset=search_size,
-                               epsilon=grid_res)
+    search_space = SearchSpace(x_ctr=np.zeros((3, )),
+                               max_offset=500e3 * np.array([1., 1., 0.]),
+                               points_per_dim=201)
     x_source_enu, x_grid = search_space.x_set, search_space.x_grid
-
-    extent = (x_ctr[0].item()/1e3 - max_offset/1e3,
-              x_ctr[0].item()/1e3 + max_offset/1e3,
-              x_ctr[1].item()/1e3 - max_offset/1e3,
-              x_ctr[1].item()/1e3 + max_offset/1e3)
+    extent = search_space.get_extent(axes=(0, 1), multiplier=1/1e3)
 
     # Use a squeeze operation to ensure that the individual dimension
     # indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
 
-    # Sensor Selection
-    _, n_tdoa = safe_2d_shape(x_sensor_lla)
-    n_aoa = n_tdoa
-    n_fdoa = n_aoa
-    ref_tdoa = n_tdoa - 1
-    ref_fdoa = n_fdoa - 1
+    # Measurement Error
+    err_aoa_rad = 3 * _deg2rad           # rad
+    err_r = 1e-5 * speed_of_light        # meters
+    err_rr = 100 * speed_of_light / 1e9  # meters/second
 
     # Error Covariance Matrix
-    cov_psi = CovarianceMatrix((err_aoa_deg * _deg2rad)**2 * np.eye(2*n_aoa))  # rad^2
-    cov_r = CovarianceMatrix((err_tdoa_s*speed_of_light)**2 * np.eye(n_tdoa))  # m^2
-    cov_rr = CovarianceMatrix((err_fdoa_hz*speed_of_light/f_source_hz)**2 * np.eye(n_fdoa))  # m^2/s^2
-    # cov_x = CovarianceMatrix.block_diagonal(cov_psi, cov_r, cov_rr)
+    _eye = np.eye(num_sensors)
+    _eye2 = np.eye(2*num_sensors)
+    cov_psi = CovarianceMatrix(err_aoa_rad**2 * _eye2)  # rad^2
+    cov_r = CovarianceMatrix(err_r**2 * _eye)           # m^2
+    cov_rr = CovarianceMatrix(err_rr**2 * _eye)         # m^2/s^2
 
     # Make the PSS objects
+    ref_fdoa = ref_tdoa = num_sensors - 1
     aoa = DirectionFinder(x=x_sensor_enu, do_2d_aoa=True, cov=cov_psi)
     tdoa = TDOAPassiveSurveillanceSystem(x=x_sensor_enu, cov=cov_r, ref_idx=ref_tdoa, variance_is_toa=False)
     fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor_enu, vel=v_sensor_enu, cov=cov_rr, ref_idx=ref_fdoa)

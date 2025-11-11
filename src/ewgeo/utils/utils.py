@@ -582,12 +582,13 @@ class SearchSpace:
     # Inferred grid
     _x_set: npt.NDArray[np.int64] or None = None
     _x_grid: tuple[*npt.NDArray[np.int64]] or None = None
+    _extent: tuple[float, ...] or None = None
 
     def __init__(self,
                  x_ctr:npt.ArrayLike,
-                 epsilon:npt.ArrayLike=None,
-                 points_per_dim:npt.NDArray[np.int64]=None,
-                 max_offset:npt.ArrayLike=None):
+                 epsilon:npt.ArrayLike or float or None=None,
+                 points_per_dim:npt.NDArray[np.int64] or int or None=None,
+                 max_offset:npt.ArrayLike or float or None=None):
         self._x_ctr = x_ctr
         self._epsilon = epsilon
         self._points_per_dim = points_per_dim
@@ -742,7 +743,6 @@ class SearchSpace:
         assert n_dim == np.size(max_offset) and n_dim == np.size(points_per_dim), \
                'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
 
-
         # Check Search Size
         max_elements = 1e8  # Set a conservative limit
         assert np.prod(points_per_dim) < max_elements, \
@@ -759,8 +759,32 @@ class SearchSpace:
         # Rearrange to a single 2D array of grid locations (n_dim x N)
         x_set = np.asarray([x.flatten() for x in x_grid])
 
+        # Generate a tuple with the grid's extent, for use with plotting commands
+        extent = tuple(ctr.item() - offset.item() for ctr, offset in zip(x_ctr, max_offset))
+
         self._x_set = x_set
         self._x_grid = x_grid
+
+    def get_extent(self, axes: npt.ArrayLike[int] or None=None, multiplier: float=1)-> tuple[float, ...]:
+        """
+        For the specified axes, generate and return a tuple to be used with plotting commands.
+        Optionally accepts a multiplier to scale the extent (e.g., from meters to kilometers).
+
+        :param axes: list[int], list of axes indices over which to generate an extent. If empty, all axes are returned.
+        :param multiplier: float, multiplier to scale the extent (e.g., .001 for scale from meters to kilometers).
+        :return extent: tuple[float, ...] grid extent suitable for use with matplotlib plotting commands
+        """
+        if self._x_set is None:
+            self.make_nd_grid()
+
+        if axes is None:
+            this_ctr = self.x_ctr
+            this_off = self.max_offset
+        else:
+            this_ctr = self.x_ctr[axes]
+            this_off = self.max_offset[axes]
+
+        return tuple((ctr - offset) * multiplier for ctr, offset in zip(this_ctr, this_off))
 
     def zoom_in(self, new_ctr: npt.ArrayLike, zoom: float=2.0, overwrite: bool=False):
         if np.shape(new_ctr) != np.shape(self.x_ctr):
