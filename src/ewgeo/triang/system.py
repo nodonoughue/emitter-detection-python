@@ -30,6 +30,22 @@ class DirectionFinder(PassiveSurveillanceSystem):
     def num_measurements(self):
         return safe_2d_shape(self.pos)[1] * (2 if self.do_2d_aoa else 1)
 
+    # For DF, if we're doing 2D AOA, then there are two bias terms per sensor, not 1.
+    @property
+    def cov_bias(self) -> CovarianceMatrix | None:
+        if self._cov_bias is None:
+            # Make it an identity matrix with one row for each sensor
+            self._cov_bias = CovarianceMatrix(np.eye(self.num_sensors * (2 if self.do_2d_aoa else 1)))
+        return self._cov_bias
+
+    @cov_bias.setter
+    def cov_bias(self, value: CovarianceMatrix | npt.ArrayLike | None):
+        if isinstance(value, CovarianceMatrix) or value is None:
+            self._cov_bias = value
+        else:
+            self._cov_bias = CovarianceMatrix(value)
+        return
+
     ## ============================================================================================================== ##
     ## Model Methods
     ##
@@ -85,6 +101,12 @@ class DirectionFinder(PassiveSurveillanceSystem):
                         v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
         if x_sensor is None: x_sensor = self.pos
         return model.grad_sensor_pos(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
+
+    def grad_sensor_vel(self, x_source: npt.ArrayLike, **kwargs)-> npt.NDArray:
+        out_shape = [self.num_dim * self.num_sensors, self.num_measurements]
+        _, num_source = safe_2d_shape(x_source)
+        if num_source > 1: out_shape.append(num_source)
+        return np.zeros(shape=out_shape)
 
     ## ============================================================================================================== ##
     ## Solver Methods

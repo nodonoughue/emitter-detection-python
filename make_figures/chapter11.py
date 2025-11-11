@@ -139,8 +139,8 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     
     # Position Markers (with legend)
     plt.scatter([x_sensor1[0], x_sensor2[0], x_sensor3[0]],
-                [x_sensor1[1], x_sensor2[1], x_sensor3[1]], marker='o', label='Sensors')
-    plt.scatter(x_source[0], x_source[1], marker='^', color='black', label='Transmitter')
+                [x_sensor1[1], x_sensor2[1], x_sensor3[1]], marker='o', label='Sensors', zorder=3)
+    plt.scatter(x_source[0], x_source[1], marker='^', color='black', label='Transmitter', zorder=3)
     
     # Adjust Axes
     plt.xlim([-2, 3])
@@ -164,22 +164,24 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
 
     this_uc_label = 'Uncertainty Interval'
     this_iso_label = 'Isochrone'
-    for i, (x_test, x_ref) in enumerate(zip((x_sensor1, x_sensor2), (x_sensor2, x_sensor3))):
+    for i, (x_ref, x_test) in enumerate(zip((x_sensor1, x_sensor2), (x_sensor2, x_sensor3))):
         this_color = cmap.colors[i]
 
         r_test = calc_range(x_test, x_source)
         r_ref = calc_range(x_ref, x_source)
-        r_diff = r_ref - r_test
+        r_diff = r_test - r_ref
 
         # True isochrone
-        xy_isochrone = tdoa.model.draw_isochrone(x_test, x_ref, range_diff=r_diff, num_pts=1000, max_ortho=3)
+        xy_isochrone = tdoa.model.draw_isochrone(x_ref=x_ref, x_test=x_test,
+                                                 range_diff=r_diff, num_pts=1000, max_ortho=3)
 
         if do_uncertainty:
             # Uncertainty Interval
             eps_rdoa = 0.1
-            x_isochrone_err1, y_isochrone_err1 = tdoa.model.draw_isochrone(x_test, x_ref, range_diff=r_diff + eps_rdoa,
+            x_isochrone_err1, y_isochrone_err1 = tdoa.model.draw_isochrone(x_ref=x_ref, x_test=x_test,
+                                                                           range_diff=r_diff + eps_rdoa,
                                                                            num_pts=1000, max_ortho=3)
-            x_isochrone_err2, y_isochrone_err2 = tdoa.model.draw_isochrone(x_test, x_ref, range_diff=r_diff - eps_rdoa,
+            x_isochrone_err2, y_isochrone_err2 = tdoa.model.draw_isochrone(x_ref=x_ref, x_test=x_test, range_diff=r_diff - eps_rdoa,
                                                                            num_pts=1000, max_ortho=3)
             unc_x = np.concatenate((x_isochrone_err1, np.flipud(x_isochrone_err2), [x_isochrone_err1[0]]))
             unc_y = np.concatenate((y_isochrone_err1, np.flipud(y_isochrone_err2), [y_isochrone_err1[0]]))
@@ -255,8 +257,8 @@ def make_figure_2(prefix=None):
 
     # Plot isochrones
     for range_diff in range_diff_vec:
-        xy_isochrone = tdoa.model.draw_isochrone(x_sensor1, x_sensor2, range_diff=range_diff, num_pts=num_points,
-                                                 max_ortho=3)
+        xy_isochrone = tdoa.model.draw_isochrone(x_ref=x_sensor1, x_test=x_sensor2, range_diff=range_diff,
+                                                 num_pts=num_points, max_ortho=3)
         plt.plot(xy_isochrone[0], xy_isochrone[1], label=None)
 
     # Plot Markers
@@ -644,10 +646,13 @@ def make_figure_9(prefix=None):
 
     # Compute Isochrones
     num_points = 1000
-    xy_isochrone1 = tdoa.model.draw_isochrone(x_sensor1, x_sensor2, r12-r11, num_points, 3)
-    xy_isochrone2 = tdoa.model.draw_isochrone(x_sensor1, x_sensor2, r22-r21, num_points, 3)
+    xy_isochrone1 = tdoa.model.draw_isochrone(x_ref=x_sensor1, x_test=x_sensor2, range_diff=r12 - r11,
+                                              num_pts=num_points, max_ortho=3)
+    xy_isochrone2 = tdoa.model.draw_isochrone(x_ref=x_sensor1, x_test=x_sensor2, range_diff=r22 - r21,
+                                              num_pts=num_points, max_ortho=3)
     # This isochrone is a result of erroneous TDOA comparison
-    xy_isochrone_error = tdoa.model.draw_isochrone(x_sensor1, x_sensor2, r22-r11, num_points, 3)
+    xy_isochrone_error = tdoa.model.draw_isochrone(x_ref=x_sensor1, x_test=x_sensor2, range_diff=r22 - r11,
+                                                   num_pts=num_points, max_ortho=3)
 
     # Draw Figure
     fig9, ax = plt.subplots()
@@ -724,15 +729,17 @@ def make_figure_10(prefix=None):
 
     # False Isochrones
     num_points = 1000
-    x_isochrone1, y_isochrone1 = tdoa.model.draw_isochrone(x_sensor1, x_sensor2, r12-r11, num_points, 3)
-    x_isochrone2, y_isochrone2 = tdoa.model.draw_isochrone(x_sensor2, x_sensor3, r23-r22, num_points, 3)
+    x_isochrone1, y_isochrone1 = tdoa.model.draw_isochrone(x_ref=x_sensor1, x_test=x_sensor2, range_diff=r12 - r11,
+                                                           num_pts=num_points, max_ortho=3)
+    x_isochrone2, y_isochrone2 = tdoa.model.draw_isochrone(x_ref=x_sensor2, x_test=x_sensor3, range_diff=r23 - r22,
+                                                           num_pts=num_points, max_ortho=3)
 
     # Find False Solution
     isochrone_distance = np.sqrt((x_isochrone1[:, np.newaxis] - x_isochrone2[np.newaxis, :])**2
                                  + (y_isochrone1[:, np.newaxis] - y_isochrone2[np.newaxis, :])**2)
     crossing_index = isochrone_distance.argmin()
-    row = int(crossing_index / num_points)
-    col = crossing_index % num_points
+    row = int(crossing_index / len(x_isochrone1))
+    col = crossing_index % len(x_isochrone1)
     x_false_solution = .5*np.array([x_isochrone1[row] + x_isochrone2[col],
                                     y_isochrone1[row] + y_isochrone2[col]])
 
@@ -754,8 +761,8 @@ def make_figure_10(prefix=None):
     plt.text(float(x_source2[0]+.1), float(x_source2[1]), r'$T_b$')
 
     # False Isochrones
-    plt.plot(x_isochrone1, y_isochrone1, '--', label=None)
-    plt.plot(x_isochrone2, y_isochrone2, '--', label=None)
+    plt.plot(x_isochrone1, y_isochrone1, '--', label=None, zorder=0)
+    plt.plot(x_isochrone2, y_isochrone2, '--', label=None, zorder=0)
 
     # Isochrone Labels
     label_x_location = 2
@@ -788,4 +795,4 @@ def make_figure_10(prefix=None):
 
 
 if __name__ == "__main__":
-    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1, 'min_num_monte_carlo': 10})
+    make_all_figures(close_figs=False, mc_params={'force_recalc': True, 'monte_carlo_decimation': 1000, 'min_num_monte_carlo': 10})

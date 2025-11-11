@@ -1,3 +1,4 @@
+import math
 from abc import ABC, abstractmethod
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
@@ -7,7 +8,7 @@ import numpy.typing as npt
 from . import make_pdfs, safe_2d_shape, SearchSpace
 from .covariance import CovarianceMatrix
 from .perf import compute_crlb_gaussian
-from .solvers import ml_solver, gd_solver, ls_solver, bestfix_solver, sensor_calibration
+from .solvers import ml_solver, gd_solver, ls_solver, bestfix_solver
 
 class PassiveSurveillanceSystem(ABC):
     _cov: CovarianceMatrix | None = None
@@ -20,6 +21,8 @@ class PassiveSurveillanceSystem(ABC):
     bias: npt.ArrayLike | None = None              # User-defined sensor measurement biases
     _vel: npt.ArrayLike | None = None               # Sensor velocity; ignored if not defined
     _cov_pos: CovarianceMatrix | None = None    # Assumed sensor position error covariance
+    _cov_vel: CovarianceMatrix | None = None    # Assumed sensor velocity error covariance
+    _cov_bias: CovarianceMatrix | None = None   # Assumed bias covariance
 
     # Default Values
     # --- No default sensor bias search resolution; let each PSS type overwrite this
@@ -58,6 +61,10 @@ class PassiveSurveillanceSystem(ABC):
         else:
             self._vel = np.zeros_like(self.pos)
 
+    @vel.deleter
+    def vel(self):
+        self._vel = None
+
     @property
     def num_sensors(self)-> int:
         return self.pos.shape[1]
@@ -68,9 +75,7 @@ class PassiveSurveillanceSystem(ABC):
 
     @property
     def num_measurements(self)-> int:
-        if self.cov is None:
-            raise ValueError("The covariance matrix is not defined; unable to compute the number of measurements that will be generated.")
-        return self.cov.cov.shape[0]
+        return self.num_sensors # default is one measurement per sensor; subclasses should override this
 
     @property
     def cov(self)-> CovarianceMatrix:
@@ -86,7 +91,11 @@ class PassiveSurveillanceSystem(ABC):
         return
 
     @property
-    def cov_pos(self)-> CovarianceMatrix | None:
+    def cov_pos(self)-> CovarianceMatrix:
+        if self._cov_pos is None:
+            # Make it an identity with one row for each element in self.pos
+            self._cov_pos = CovarianceMatrix(np.eye(np.size(self.pos)))
+
         return self._cov_pos
 
     @cov_pos.setter
@@ -95,6 +104,33 @@ class PassiveSurveillanceSystem(ABC):
             self._cov_pos = value
         else:
             self._cov_pos = CovarianceMatrix(value)
+        return
+
+    @property
+    def cov_vel(self)-> CovarianceMatrix | None:
+        if self._cov_vel is None:
+            # Make it an identity with one row for each element in self.vel
+            self._cov_vel = CovarianceMatrix(np.eye(np.size(self.vel)))
+        return self._cov_vel
+
+    @cov_vel.setter
+    def cov_vel(self, value: CovarianceMatrix | npt.ArrayLike | None):
+        if isinstance(value, CovarianceMatrix) or value is None:
+            self._cov_vel = value
+        else:
+            self._cov_vel = CovarianceMatrix(value)
+        return
+
+    @property
+    def cov_bias(self)-> CovarianceMatrix | None:
+        return self._cov_bias
+
+    @cov_bias.setter
+    def cov_bias(self, value: CovarianceMatrix | npt.ArrayLike | None):
+        if isinstance(value, CovarianceMatrix) or value is None:
+            self._cov_bias = value
+        else:
+            self._cov_bias = CovarianceMatrix(value)
         return
 
     # ==================== Model Methods ===================
@@ -108,10 +144,18 @@ class PassiveSurveillanceSystem(ABC):
         pass
 
     def measurement_from_pos_vel(self, pos_vel: npt.ArrayLike, **kwargs)-> npt.NDArray:
-        pos, vel = self.parse_source_pos_vel(pos_vel, default_vel=np.zeros_like(pos_vel))
-        return self.measurement(x_source=pos, v_source=vel, **kwargs)
+        if 'v_source' in kwargs:
+            default_vel = kwargs['v_source']
+        else:
+            default_vel = np.zeros_like(pos_vel)
 
-    def noisy_measurement(self, x_source: npt.ArrayLike, num_samples:int = 1, **kwargs)-> npt.NDArray:
+        pos, vel = self.parse_source_pos_vel(pos_vel, default_vel=default_vel)
+        kwargs['v_source'] = vel
+        kwargs['x_source'] = pos
+        return self.measurement(**kwargs)
+
+    def noisy_measurement(self, x_source: npt.ArrayLike, num_samples:int = 1,
+                          cov: CovarianceMatrix | None=None, **kwargs)-> npt.NDArray:
         """
         Generate a set of noisy measurements. Will return a 3D matrix of shape (num_measurements, num_sources, num_samples),
         except that the latter two dimensions will be removed is their size is equal to 1.
@@ -127,8 +171,10 @@ class PassiveSurveillanceSystem(ABC):
         z = np.reshape(self.measurement(x_source, **kwargs), (self.num_measurements, num_sources))
 
         # Generate noise
-        noise = np.reshape(self.cov.sample(num_samples=num_samples*num_sources),
-                           (self.num_measurements, num_sources, num_samples))
+        if cov is None:
+            cov = self.cov
+        noise = np.reshape(cov.sample(num_samples=num_samples*num_sources),
+                           shape=(self.num_measurements, num_sources, num_samples))
 
         # Add the noise
         zeta = z[:, :, np.newaxis] + noise
@@ -197,62 +243,94 @@ class PassiveSurveillanceSystem(ABC):
         pass
 
     def log_likelihood_from_posvel(self, pos_vel: npt.ArrayLike, **kwargs):
-        pos, vel = self.parse_source_pos_vel(pos_vel, default_vel=np.zeros_like(pos_vel))
-        return self.log_likelihood(x_source=pos, v_source=vel, **kwargs)
+        if 'v_source' in kwargs:
+            default_vel = kwargs['v_source']
+        else:
+            default_vel = np.zeros_like(pos_vel)
+        pos, vel = self.parse_source_pos_vel(pos_vel, default_vel=default_vel)
+        kwargs['v_source'] = vel
+        kwargs['x_source'] = pos
+        return self.log_likelihood(**kwargs)
 
-    def log_likelihood_uncertainty(self, zeta: npt.ArrayLike,
-                                   theta: npt.ArrayLike,
-                                   do_source_vel: bool=False,
+    def log_likelihood_uncertainty(self, x_source: npt.ArrayLike,
+                                   zeta: npt.ArrayLike,
+                                   v_source: npt.ArrayLike | None=None,
+                                   x_sensor: npt.ArrayLike | None=None,
+                                   v_sensor: npt.ArrayLike | None=None,
+                                   bias: npt.ArrayLike | None=None,
                                    do_sensor_bias: bool=False,
                                    do_sensor_pos: bool=False,
-                                   do_sensor_vel: bool=False, **kwargs):
+                                   do_sensor_vel: bool=False,
+                                   cov_pos: CovarianceMatrix or None=None,
+                                   cov_vel: CovarianceMatrix or None=None,
+                                   cov_bias: CovarianceMatrix or None=None,
+                                   **kwargs):
+
         if not do_sensor_bias and not do_sensor_pos and not do_sensor_vel:
-            # None of the uncertainty parameters are being called for; theta is just x_source
-            return self.log_likelihood(theta, zeta, **kwargs)
+            # None of the uncertainty parameters are being called for
+            return self.log_likelihood(x_source=x_source, v_source=v_source, zeta=zeta,
+                                       x_sensor=x_sensor, v_sensor=v_sensor, bias=bias, **kwargs)
 
-        # Parse the uncertainty vector
-        indices = self.parse_uncertainty_indices(theta, do_bias=do_sensor_bias, do_sensor_pos=do_sensor_pos,
-                                                 do_sensor_vel=do_sensor_vel)
+        if cov_pos is None:
+            cov_pos = self.cov_pos
+        if cov_vel is None:
+            cov_vel = self.cov_vel
+        if cov_bias is None:
+            cov_bias = self.cov_bias
 
-        # Write a parsing function
-        def _parse_uncertainty_vector(th: npt.ArrayLike):
-            x = th[indices['source_pos_indices']]
-            v = th[indices['source_vel_indices']] if do_source_vel else np.zeros_like(x)
-            b = th[indices['bias_indices']] if do_sensor_bias else self.bias
-            xs = np.reshape(th[indices['pos_indices']], self.pos.shape) if do_sensor_pos else self.pos
-            vs = np.reshape(th[indices['vel_indices']], self.pos.shape) if do_sensor_vel else self.vel
-            return x, v, b, xs, vs
+        # Generate the ideal measurements
+        z = self.measurement(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_source, v_source=v_source, bias=bias)
 
-        num_parameters, num_source_pos = safe_2d_shape(theta)
-        ell = np.zeros((num_source_pos, ))
+        # Check dimensions to ensure error is computed correctly
+        while len(np.shape(zeta)) < len(np.shape(z)):
+            zeta = np.expand_dims(zeta, -1) # add a new axis on the end
 
-        # Make sure the source pos is a matrix, rather than simply a vector
-        if num_source_pos == 1:
-            theta = theta[:, np.newaxis]
+        # Evaluate the measurement error and scaled log likelihood
+        err = zeta - z
+        ell_x = - self.cov.solve_aca(err.T)
 
-        # ToDo: add a beta term for sensor velocity; and an accompanying cov_vel param.
-        beta = np.ravel(self.pos) if do_sensor_pos else np.array([])
+        if do_sensor_pos:
+            x_0 = self.pos
+            while len(np.shape(x_0)) < len(np.shape(x_sensor)): x_0 = np.expand_dims(x_0,-1)
+            err_pos = x_0 - x_sensor
 
-        for idx_source, th_i in enumerate(theta.T):
-            x_i, v_i, b_i, xs_i, vs_i = _parse_uncertainty_vector(th_i)
+            # Make sure err_pos is reshaped to have the first dimension be the same size as self.cov_pos
+            aa, bb, *cc = np.shape(err_pos)
+            # out_shp = [aa*bb]
+            # out_shp.extend(cc)
+            ell_pos = - np.reshape(cov_pos.solve_aca(np.reshape(err_pos, shape=(aa*bb, -1)).T), shape=cc)
+        else:
+            ell_pos = 0.
 
-            # Generate the ideal measurement matrix for this position
-            zeta_i = self.measurement(x_sensor=xs_i, v_sensor=vs_i, x_source=x_i, v_source=v_i,
-                                      bias=b_i)
+        if do_sensor_vel and (self.vel is not None or v_sensor is not None):
+            # Use order=F on ravel to ensure that they are done in Fortran-style; as that's the
+            # way the covariance matrices are assembled.
+            vel_ref = self.vel if self.vel is not None else 0.
+            vel_test = v_sensor if v_sensor is not None else 0.
+            while len(np.shape(vel_ref)) < len(np.shape(vel_test)): vel_ref = np.expand_dims(vel_ref, -1)
+            err_vel = vel_ref - vel_test
+            aa, bb, *cc = np.shape(err_vel)
+            # out_shp = [aa * bb]
+            # out_shp.extend(cc)
+            ell_vel = - np.reshape(cov_vel.solve_aca(np.reshape(err_vel, shape=(aa*bb, -1)).T), shape=cc)
+        else:
+            ell_vel = 0.
 
-            # Evaluate the measurement error
-            err = zeta - zeta_i
-            if do_sensor_pos:
-                err_pos = beta - np.ravel(xs_i)
+        if do_sensor_bias and (self.bias is not None or bias is not None) and cov_bias is not None:
+            # Use order=F on ravel to ensure that they are done in Fortran-style; as that's the
+            # way the covariance matrices are assembled.
+            bias_ref = self.bias if self.bias is not None else 0.
+            bias_test = bias if bias is not None else 0.
+            while len(np.shape(bias_ref)) < len(np.shape(bias_test)): bias_ref = np.expand_dims(bias_ref, -1)
+            err_bias = bias_ref - bias_test
+            aa, *bb = np.shape(err_bias)
 
-            # Compute the scaled log likelihood
-            ell_x = - self.cov.solve_aca(err)
-            if do_sensor_pos:
-                ell_pos = - self.cov_pos.solve_aca(err_pos)
-            else:
-                ell_pos = 0
+            ell_bias = - np.reshape(cov_bias.solve_aca(np.reshape(err_bias, shape=(aa, -1)).T), shape=bb)
+        else:
+            ell_bias = 0.
 
-            ell[idx_source] = ell_x + ell_pos
+        # Add the likelihood components
+        ell = ell_x + ell_pos + ell_vel + ell_bias
 
         return ell
 
@@ -280,6 +358,14 @@ class PassiveSurveillanceSystem(ABC):
                         v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
         pass
 
+    @abstractmethod
+    def grad_sensor_vel(self,
+                        x_source: npt.ArrayLike,
+                        v_source: npt.ArrayLike | None=None,
+                        x_sensor: npt.ArrayLike | None=None,
+                        v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
+        pass
+
     # ==================== Solver Methods ===================
     # These methods define the basic solver methods, and associated utilities, and must be implemented.
     def max_likelihood(self, zeta: npt.ArrayLike,
@@ -289,6 +375,7 @@ class PassiveSurveillanceSystem(ABC):
                        **kwargs):
 
         if cal_data is not None:
+            if 'solver_type' not in cal_data: cal_data['solver_type'] = 'ml'
             x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, self.vel, self.bias
@@ -353,7 +440,8 @@ class PassiveSurveillanceSystem(ABC):
                                                               do_bias_search=do_sensor_bias,
                                                               do_pos_search=do_sensor_pos,
                                                               do_vel_search=do_sensor_vel,
-                                                              bias_search=bias_search, pos_search=pos_search,
+                                                              bias_search=bias_search,
+                                                              pos_search=pos_search,
                                                               vel_search=vel_search)
 
         search_space = unc_search_space['combined_search']
@@ -367,14 +455,16 @@ class PassiveSurveillanceSystem(ABC):
         def ell(th: npt.ArrayLike, **ell_kwargs):
             # Parse the parameter vector theta
             pos_vel = th[indices['source_indices']]
-            x_source, v_source = self.parse_source_pos_vel(pos_vel, default_vel=self.vel)
+            x_source, v_source = self.parse_source_pos_vel(pos_vel, default_vel=np.zeros_like(pos_vel))
             bias = th[indices['bias_indices']] if do_sensor_bias else self.bias
             x_sensor = np.reshape(th[indices['pos_indices']], self.pos.shape) if do_sensor_pos else self.pos
             v_sensor = np.reshape(th[indices['vel_indices']], self.vel.shape) if do_sensor_vel else self.vel
 
-            return self.log_likelihood(zeta=zeta, x_source=x_source, v_source=v_source,
-                                       x_sensor=x_sensor, v_sensor=v_sensor,
-                                       bias=bias, **ell_kwargs)
+            return self.log_likelihood_uncertainty(zeta=zeta, x_source=x_source, v_source=v_source,
+                                                   x_sensor=x_sensor, v_sensor=v_sensor,
+                                                   bias=bias, do_sensor_bias=do_sensor_bias,
+                                                   do_sensor_pos=do_sensor_pos, do_sensor_vel=do_sensor_vel,
+                                                   **ell_kwargs)
 
         th_est, likelihood, th_grid = ml_solver(ell=ell, search_space=search_space,
                                                 print_progress=True, **kwargs)
@@ -388,12 +478,12 @@ class PassiveSurveillanceSystem(ABC):
         return x_est, likelihood, th_grid, th_est
 
 
-    def gradient_descent(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs):
-        """
+    def gradient_descent(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs)->\
+        tuple[npt.NDArray, npt.NDArray] | tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
 
-        """
         # Perform sensor calibration
         if cal_data is not None:
+            if 'solver_type' not in cal_data: cal_data['solver_type'] = 'gd'
             x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, None, self.bias
@@ -406,13 +496,99 @@ class PassiveSurveillanceSystem(ABC):
         def jacobian(pos_vel: npt.ArrayLike):
             return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_sensor=v_sensor)
 
-        return gd_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+        result = gd_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+        if cal_data is not None:
+            return result + (x_sensor, v_sensor, bias)
+        else:
+            return result
 
+    def gradient_descent_uncertainty(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike,
+                                     do_sensor_pos: bool=False, x_sensor: npt.ArrayLike=None,
+                                     do_sensor_vel: bool=False, v_sensor: npt.ArrayLike=None,
+                                     do_sensor_bias: bool=False, bias: npt.ArrayLike=None, **kwargs):
+
+        num_source = len(x_init)
+        source_slice = np.s_[:num_source]
+        th_init = x_init[:]
+
+        if do_sensor_bias:
+            if bias is None:
+                bias = self.bias if self.bias is not None else np.zeros(self.num_measurements, )
+            th_init = np.append(th_init, bias)
+            num_bias = np.size(bias)
+            bias_slice = np.s_[num_source:num_source+num_bias]  # one for each measurement
+
+        else:
+            num_bias = 0
+            bias_slice = None
+
+        if do_sensor_pos:
+            num_pos = self.num_dim*self.num_sensors
+            pos_slice = np.s_[num_bias:num_bias+num_pos]
+            if x_sensor is None: x_sensor = self.pos.ravel()
+            th_init = np.append(th_init, x_sensor)
+        else:
+            num_pos = 0
+            pos_slice = None
+
+        if do_sensor_vel:
+            num_vel = self.num_dim*self.num_sensors
+            vel_slice = np.s_[num_bias+num_pos:num_bias+num_pos+num_vel]
+            if v_sensor is None: v_sensor = self.vel.ravel()
+            th_init = np.append(th_init, v_sensor)
+        else:
+            num_vel = 0
+            vel_slice = None
+
+        # ==================== Measurement Wrapper Function ================
+        def y(th: npt.ArrayLike):
+            # The theta vector contains both measurement biases and sensor position/velocity errors
+            x_source, v_source = self.parse_source_pos_vel(th[source_slice], default_vel=np.zeros_like(x_init))
+            bias = th[bias_slice] if bias_slice is not None else None
+            x_sensor = np.reshape(th[pos_slice], shape=(self.num_dim, self.num_sensors)) if pos_slice is not None else None
+            v_sensor = np.reshape(th[vel_slice], shape=(self.num_dim, self.num_sensors)) if vel_slice is not None else None
+            return np.ravel(zeta - self.measurement(x_sensor=x_sensor, v_sensor=v_sensor, bias=bias,
+                                                    x_source=x_source, v_source=v_source))
+
+        def jacobian(th: npt.ArrayLike):
+            pos_vel = th[source_slice]
+            x_source, v_source = self.parse_source_pos_vel(pos_vel, default_vel=np.zeros_like(pos_vel))
+            bias = th[bias_slice] if bias_slice is not None else self.bias
+            x_sensor = np.reshape(th[pos_slice], shape=(self.num_dim, self.num_sensors)) if pos_slice is not None else None
+            v_sensor = np.reshape(th[vel_slice], shape=(self.num_dim, self.num_sensors)) if vel_slice is not None else None
+
+            j_source = self.jacobian(x_source=x_source, v_source=v_source, x_sensor=x_sensor, v_sensor=v_sensor)
+            arrs = [j_source]
+            if do_sensor_bias:
+                j_a = self.grad_bias(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_source, v_source=v_source)
+                arrs.append(j_a)
+            if do_sensor_pos:
+                j_b = self.grad_sensor_pos(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_source, v_source=v_source)
+                arrs.append(j_b)
+            if do_sensor_vel:
+                j_c = self.grad_sensor_vel(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_source, v_source=v_source)
+                arrs.append(j_c)
+
+            return np.concatenate(arrs, axis=0)
+
+        result = gd_solver(x_init=th_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+        th_est = result[0]
+        th_est_full = result[1]
+
+        # Parse the estimates
+        x_est = th_est[source_slice]
+        th_est = {'bias': th_est[bias_slice] if do_sensor_bias else None,
+                  'pos': th_est[pos_slice] if do_sensor_pos else None,
+                  'vel': th_est[vel_slice] if do_sensor_vel else None}
+
+        return x_est, th_est, th_est_full
 
     def least_square(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike=None, cal_data: dict=None, **kwargs):
+        # TODO: Make an uncertainty version -- see max_likelihood_uncertainty for inspiration
 
         # Perform sensor calibration
         if cal_data is not None:
+            if 'solver_type' not in cal_data: cal_data['solver_type'] = 'ls' # default to least-squares-based cal
             x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, None, self.bias
@@ -430,7 +606,14 @@ class PassiveSurveillanceSystem(ABC):
         def jacobian(pos_vel: npt.ArrayLike):
             return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_sensor=v_sensor)
 
-        return ls_solver(x_init=x_init, zeta=y, jacobian=jacobian, cov=self.cov, **kwargs)
+        return ls_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+
+    def least_square_uncertainty(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike,
+                                     do_sensor_pos: bool=False, x_sensor: npt.ArrayLike=None,
+                                     do_sensor_vel: bool=False, v_sensor: npt.ArrayLike=None,
+                                     do_sensor_bias: bool=False, bias: npt.ArrayLike=None, **kwargs):
+        pass
+        #TODO: Implement
 
     def bestfix(self, zeta: npt.ArrayLike, search_space: SearchSpace, pdf_type=None, cal_data: dict=None):
         # Perform sensor calibration
@@ -447,15 +630,71 @@ class PassiveSurveillanceSystem(ABC):
         return bestfix_solver(pdfs, search_space)
 
     def sensor_calibration(self,
-                           zeta_cal: npt.ArrayLike,
-                           x_cal: npt.ArrayLike,
-                           v_cal: npt.ArrayLike | None=None,
-                           pos_search: SearchSpace=None,
-                           vel_search: SearchSpace=None,
-                           bias_search: SearchSpace=None,
-                           do_pos_cal: bool=True,
-                           do_vel_cal: bool=False,
-                           do_bias_cal: bool=False):
+                           solver_type: str='ml',
+                           do_pos_cal: bool = False,
+                           do_vel_cal: bool = False,
+                           do_bias_cal: bool = False,
+                           **cal_data):
+        """
+        This function attempts to calibrate sensor uncertainties given a series of measurements (zeta_cal)
+        against a set of calibration emitters. Relies on the method log_likelihood to compute a Maximum Likelihood
+        estimate for bias and sensor positions.
+
+        If pos_search is defined, then a search will be done over sensor positions (centered on the nominal positions
+        in self.pos).
+
+        If bias_search is defined, then a search will be done over sensor measurement biases (centered on zero bias).
+
+        Either pos_search or bias_search (or both) must be defined.
+
+        :param zeta_cal: 2D array of calibration measurements (n_msmt, n_cal)
+        :param x_cal: 2D array of calibration emitter locations (n_dim, n_cal)
+        :param solver_type: String indicating which solver type to use. Options are: 'ml', 'gd', 'ls'.
+        :param cal_data: Dictionary containing solver-specific calibration fields.
+        :return x_sensor_est: Estimated sensor positions (None if ignored)
+        :return bias_est: Estimated measurement biases (None if ignored)
+        """
+
+        # TODO: Test and debug
+
+        # ==== Parse Inputs ====
+        if not do_pos_cal and not do_vel_cal and not do_bias_cal:
+            # No calibration called for
+            return self.pos, self.vel, self.bias
+
+
+        # ==== Call the Desired Calibration Approach ====
+        if solver_type.lower() == 'ml':
+            # Remove any gd/ls-specific cal parameters
+            gd_ls_fields = ['x_sensor', 'v_sensor', 'bias', 'epsilon']
+            [cal_data.pop(f, None) for f in gd_ls_fields]
+            return self.sensor_calibration_ml(do_bias_cal=do_bias_cal, do_pos_cal=do_pos_cal, do_vel_cal=do_vel_cal,
+                                              **cal_data)
+        elif solver_type.lower() in ['gd', 'ls']:
+            # Remove any ml-specific cal parameters
+            ml_fields = ['pos_search', 'vel_search', 'bias_search', 'cov_pos', 'cov_bias', 'cov_vel', 'source_search']
+            [cal_data.pop(f, None) for f in ml_fields if f]
+            do_gd = solver_type.lower() == 'gd'
+            return self.sensor_calibration_gd_ls(do_gd=do_gd,
+                                                 do_bias_cal=do_bias_cal, do_pos_cal=do_pos_cal, do_vel_cal=do_vel_cal,
+                                                 **cal_data)
+        else:
+            raise ValueError(f"Sensor calibration type '{solver_type}' is not supported. ")
+
+    def sensor_calibration_ml(self,
+                              zeta_cal: npt.ArrayLike,
+                              x_cal: npt.ArrayLike,
+                              v_cal: npt.ArrayLike | None=None,
+                              pos_search: SearchSpace | None = None,
+                              vel_search: SearchSpace | None = None,
+                              bias_search: SearchSpace | None = None,
+                              cov_pos: CovarianceMatrix | None = None,
+                              cov_vel: CovarianceMatrix | None = None,
+                              cov_bias: CovarianceMatrix | None = None,
+                              do_pos_cal: bool = True,
+                              do_vel_cal: bool = False,
+                              do_bias_cal: bool = False,
+                              **kwargs):
         """
         This function attempts to calibrate sensor uncertainties given a series of measurements (zeta_cal)
         against a set of calibration emitters. Relies on the method log_likelihood to compute a Maximum Likelihood
@@ -484,14 +723,11 @@ class PassiveSurveillanceSystem(ABC):
         :return bias_est: Estimated measurement biases (None if ignored)
         """
 
-        # TODO: Test
         # ================ Parse inputs =========================
-        if not do_pos_cal and not do_vel_cal and not do_bias_cal:
-            # No calibration called for
-            return self.pos, self.vel, self.bias
+
 
         num_dim_cal, num_cal = safe_2d_shape(x_cal)
-        num_msmt, num_cal2 = safe_2d_shape(zeta_cal)
+        num_msmt, num_cal2, *cal_batch_shape = np.shape(zeta_cal)
         num_cov, _ = safe_2d_shape(self.cov.cov)
 
         # Check dimension agreement
@@ -504,40 +740,88 @@ class PassiveSurveillanceSystem(ABC):
         else:
             v_cal = np.zeros_like(x_cal)  # assume zero velocity; simplified code later on
 
-        # ==================== Initialize Search Space ========================
+        # ==================== Initialize Search Spaces =====================
+        bias_search = self.initialize_bias_search(bias_search, do_bias_search=do_bias_cal)
         pos_search = self.initialize_sensor_pos_search(pos_search, do_pos_search=do_pos_cal)
         vel_search = self.initialize_sensor_vel_search(vel_search, do_vel_search=do_vel_cal)
-        bias_search = self.initialize_bias_search(bias_search, do_bias_search=do_bias_cal)
 
-        # ==================== Log-Likelihood Wrapper Function ================
-        # Accepts a 1D vector of measurement biases and a 1D vector of sensor positions
+        # ==================== Determine Initial Sensor Pos/Vel Assumption ===================================
+        if do_pos_cal and pos_search is not None:
+            x_sensor = np.reshape(pos_search.x_ctr, shape=np.shape(self.pos))
+        else:
+            # Don't search for new sensor positions, just use what we have
+            x_sensor = self.pos
 
-        def ell(b: npt.ArrayLike, x: npt.ArrayLike, v: npt.ArrayLike, **ell_kwargs):
-            # Reshape the sensor position and velocity
-            this_x_sensor = np.reshape(x, shape=self.pos.shape)
-            this_v_sensor = np.reshape(v, newshape=[self.num_dim, -1]) if v is not None else None
-            res = 0
-            for this_zeta, this_x, this_v in zip(zeta_cal.T, x_cal.T, v_cal.T):
-                this_ell = self.log_likelihood(x_sensor=this_x_sensor, v_sensor=this_v_sensor, zeta=this_zeta,
-                                               x_source=this_x, v_source=this_v, bias=b, **ell_kwargs)
-                res = res + this_ell
-            return res
+        if do_vel_cal and vel_search is not None:
+            v_sensor = np.reshape(vel_search.x_ctr, shape=np.shape(self.vel))
+        else:
+            v_sensor = np.zeros_like(x_sensor)
 
-        x_sensor_est, v_sensor_est, bias_est = sensor_calibration(ell, pos_search, vel_search, bias_search)
+        bias = self.bias
+        # ==================== Measurement Bias Search ========================
+        if do_bias_cal:
+            if bias_search is None:
+                raise ValueError("Sensor calibration error. If do_bias_cal is True, then bias_search must be defined as a SearchSpace object.")
 
-        # Handle response shapes
-        x_sensor_est = np.reshape(x_sensor_est, shape=(self.num_dim, -1)) if x_sensor_est is not None else None
-        v_sensor_est = np.reshape(v_sensor_est, shape=(self.num_dim, -1)) if v_sensor_est is not None else None
+            def ell_bias(b: npt.ArrayLike, **ell_kwargs)-> npt.NDArray:
+                # shape ( num_cal, num_search_positions)
+                ell = self.log_likelihood_uncertainty(x_sensor=x_sensor, v_sensor=v_sensor, bias=b,
+                                                       x_source=x_cal, v_source=v_cal, zeta=zeta_cal,
+                                                       cov_pos=cov_pos, cov_vel=cov_vel, cov_bias=cov_bias,
+                                                       **ell_kwargs)
+                return np.sum(ell, axis=0)
 
-        return x_sensor_est, v_sensor_est, bias_est
+            bias_est, _, _ = ml_solver(ell=ell_bias, search_space=bias_search, **kwargs)
+            bias = bias_est
 
-    def sensor_calibration_gd(self,
-                              zeta_cal: npt.ArrayLike,
-                              x_cal: npt.ArrayLike,
-                              v_cal: npt.ArrayLike | None=None,
-                              do_pos_cal: bool=True,
-                              do_vel_cal: bool=False,
-                              do_bias_cal: bool=False):
+        if do_pos_cal:
+            if pos_search is None:
+                raise ValueError("Sensor calibration error. If do_pos_cal is True, then pos_search must be defined as a SearchSpace object.")
+
+            x_shp = np.shape(x_sensor)
+            num_pos = np.size(x_sensor)
+
+            def ell_pos(x: npt.ArrayLike, **ell_kwargs)-> npt.NDArray:
+                xx = np.reshape(x, list(x_shp).append(-1))
+                ell = self.log_likelihood_uncertainty(x_sensor=xx, v_sensor=v_sensor, bias=bias,
+                                                       x_source=x_cal, v_source=v_cal, zeta=zeta_cal,
+                                                       cov_pos=cov_pos, cov_vel=cov_vel, cov_bias=cov_bias,
+                                                       **ell_kwargs)
+                return np.sum(ell, axis=0)
+
+            x_sensor_est, _, _ = ml_solver(ell=ell_pos, search_space=pos_search, **kwargs)
+            x_sensor = np.reshape(x_sensor_est, shape=x_shp)
+
+        if do_vel_cal:
+            if vel_search is None:
+                raise ValueError("Sensor calibration error. If do_vel_cal is True, then vel_search must be defined as a SearchSpace object.")
+
+            num_search_pts = np.prod(vel_search.points_per_dim)
+            v_shp = list(np.shape(v_sensor))
+            v_shp_3d = v_shp+[-1]+[1]*len(cal_batch_shape)
+            num_vel = np.size(v_sensor)
+            ell_shp = [num_cal, num_search_pts] + cal_batch_shape
+            def ell_vel(v: npt.ArrayLike, **ell_kwargs) -> npt.NDArray:
+                vv = np.reshape(v, v_shp_3d)
+                ell = self.log_likelihood_uncertainty(x_sensor=x_sensor, v_sensor=vv, bias=bias,
+                                                       x_source=x_cal, v_source=v_cal, zeta=zeta_cal[:, :, np.newaxis],
+                                                       cov_pos=cov_pos, cov_vel=cov_vel, cov_bias=cov_bias,
+                                                       **ell_kwargs)
+                # shape: (num_cal, num_search_pts, *cal_batch_shape)
+                return np.sum(np.reshape(np.moveaxis(ell, source=1, destination=0), (num_search_pts, -1)), axis=1)
+
+            v_sensor_est, _, _ = ml_solver(ell=ell_vel, search_space=vel_search, **kwargs)
+            v_sensor = np.reshape(v_sensor_est, shape=v_shp)
+
+        return x_sensor, v_sensor, bias
+
+    def sensor_calibration_gd_ls(self,
+                                 zeta_cal: npt.ArrayLike, x_cal: npt.ArrayLike, v_cal: npt.ArrayLike | None=None,
+                                 x_sensor: npt.ArrayLike = None, v_sensor: npt.ArrayLike = None,
+                                 bias: npt.ArrayLike = None,
+                                 do_pos_cal: bool=True, do_vel_cal: bool=False, do_bias_cal: bool=False,
+                                 do_gd: bool=True,
+                                 **gd_kwargs)-> tuple[npt.NDArray, npt.NDArray, npt.NDArray]:
         """
         This function attempts to calibrate sensor uncertainties given a series of measurements (zeta_cal)
         against a set of calibration emitters. Relies on the method log_likelihood to compute a Maximum Likelihood
@@ -565,9 +849,13 @@ class PassiveSurveillanceSystem(ABC):
 
         # TODO: Test
         # ================ Parse inputs =========================
+        if bias is None: bias = self.bias
+        if x_sensor is None: x_sensor = self.pos
+        if v_sensor is None: v_sensor = self.vel
+
         if not do_pos_cal and not do_vel_cal and not do_bias_cal:
             # No calibration called for
-            return self.pos, self.vel, self.bias
+            return x_sensor, v_sensor, bias
 
         num_dim_cal, num_cal = safe_2d_shape(x_cal)
         num_msmt, num_cal2 = safe_2d_shape(zeta_cal)
@@ -583,70 +871,82 @@ class PassiveSurveillanceSystem(ABC):
         else:
             v_cal = np.zeros_like(x_cal)  # assume zero velocity; simplified code later on
 
-        # ==================== Initialize Search Arguments ========================
-        # TODO
-        if do_bias_cal:
-            num_bias = self.num_measurements
-            bias_slice = np.s_[:self.num_bias]  # one for each measurement
-        else:
-            num_bias = 0
-            bias_slice = None
-
-        if do_pos_cal:
-            num_pos = self.num_dim*self.num_sensors
-            pos_slice = np.s_[num_bias:num_bias+num_pos]
-        else:
-            num_pos = 0
-            pos_slice = None
-
-        if do_vel_cal:
-            num_vel = self.num_dim*self.num_sensors
-            vel_slice = np.s_[num_bias+num_pos:num_bias+num_pos+num_vel]
-        else:
-            num_vel = 0
-            vel_slice = None
-
-        th_init = np.zeros(num_bias + num_pos + num_vel)
-        if bias_slice is not None: th_init[bias_slice] = self.bias
-        if pos_slice is not None: th_init[pos_slice] = self.pos.ravel()
-        if vel_slice is not None and self.vel is not None: th_init[vel_slice] = self.vel.ravel()
-
-        # ==================== Measurement Wrapper Function ================
-        def y(th: npt.ArrayLike):
-            # The theta vector contains both measurement biases and sensor position/velocity errors
-            bias = th[bias_slice] if bias_slice is not None else None
-            x_sensor = np.reshape(th[pos_slice], shape=(self.num_dim, self.num_sensors)) if pos_slice is not None else None
-            v_sensor = np.reshape(th[vel_slice], shape=(self.num_dim, self.num_sensors)) if vel_slice is not None else None
-            return np.ravel(zeta_cal - self.measurement(x_sensor=x_sensor, v_sensor=v_sensor, bias=bias, x_source=x_cal, v_source=v_cal))
-
-        def jacobian(th: npt.ArrayLike):
-            x_sensor = np.reshape(th[pos_slice], shape=(self.num_dim, self.num_sensors)) if pos_slice is not None else None
-            v_sensor = np.reshape(th[vel_slice], shape=(self.num_dim, self.num_sensors)) if vel_slice is not None else None
-
-            arrs = []
-            if do_bias_cal:
-                j_a = np.reshape(self.grad_bias(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_cal, v_source=v_cal),
-                                 shape=(self.num_measurements, self.num_measurements*num_cal))
-                arrs.append(j_a)
-            if do_pos_cal:
-                j_b = np.reshape(self.grad_sensor_pos(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_cal, v_source=v_cal),
-                                 shape=(num_pos+num_vel, self.num_measurements*num_cal))
-                arrs.append(j_b)
-            return np.concatenate(arrs, axis=0)
-
         # Make a calibration measurement covariance matrix
         cov_cal = CovarianceMatrix.block_diagonal(*[self.cov for _ in range(num_cal)])
 
-        th_est, _ = ls_solver(zeta=y, jacobian=jacobian, x_init=th_init, cov=cov_cal)
+        # ==================== Solver Wrapper =================================
+        # Both GD and LS take the same arguments, so we'll just make a wrapper that calls the desired one.
+        def solver(**solver_kwargs)-> tuple[npt.NDArray, npt.NDArray]:
+            if do_gd:
+                return gd_solver(**solver_kwargs)
+            else:
+                return ls_solver(**solver_kwargs)
 
-        # Handle response shapes
-        bias_est = th_est[bias_slice] if bias_slice is not None else self.bias
-        x_sensor_est = np.reshape(th_est[pos_slice],
-                                  shape=(self.num_dim, self.num_sensors)) if pos_slice is not None else self.pos
-        v_sensor_est = np.reshape(th_est[vel_slice],
-                                  shape=(self.num_dim, -1)) if pos_slice is not None else self.pos
+        # ==================== Measurement Bias Search ========================
+        if do_bias_cal:
+            def y_bias(b: npt.ArrayLike)-> npt.NDArray:
+                return np.ravel(zeta_cal - self.measurement(x_sensor=x_sensor, v_sensor=v_sensor, bias=b,
+                                                            x_source=x_cal, v_source=v_cal), order='F')
 
-        return x_sensor_est, v_sensor_est, bias_est
+            def jacobian_bias(_)-> npt.NDArray:
+                return np.reshape(self.grad_bias(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_cal, v_source=v_cal),
+                                  shape=(self.num_measurements, self.num_measurements*num_cal))
+
+
+            bias_est, _ = solver(y=y_bias, jacobian=jacobian_bias, x_init=bias, cov=cov_cal, **gd_kwargs)
+            bias = bias_est
+
+        # ==================== Sensor Position and Velocity Search ========================
+        if do_pos_cal or do_vel_cal:
+            x_shp = np.shape(x_sensor)
+            v_shp = np.shape(v_sensor)
+            num_pos = np.size(x_sensor)
+            num_vel = np.size(v_sensor)
+
+            def y_posvel(pos_vel: npt.ArrayLike)-> npt.NDArray:
+                xx = np.reshape(pos_vel[:num_pos], shape=x_shp)
+                vv = np.reshape(pos_vel[num_pos:], shape=v_shp)
+
+                # shape: (self.num_measurements, num_cal)
+                z = self.measurement(x_sensor=xx, v_sensor=vv, bias=bias, x_source=x_cal, v_source=v_cal)
+                while np.ndim(zeta_cal) > np.ndim(z): z = np.expand_dims(z, axis=-1)
+
+                # shape: (self.num_measurements * num_cal, num_cal_repetitions)
+                return np.reshape(zeta_cal - z, shape=(num_cal*num_msmt, -1), order='F')
+
+            def jacobian_posvel(pos_vel: npt.ArrayLike)-> npt.NDArray:
+                """
+                Return the jacobian (gradient with respect to sensor position and velocity) of each measurement.
+                If do_pos_cal is False, then we set those rows to zero to ensure no change in sensor position is made.
+                If do_vel_cal is False, then we set those columns to zero to ensure no change in sensor velocity is made.
+                """
+                xx = np.reshape(pos_vel[:num_pos], shape=x_shp)
+                vv = np.reshape(pos_vel[num_pos:], shape=v_shp)
+
+                j = np.zeros((num_pos + num_vel, self.num_measurements*num_cal))
+
+                if do_pos_cal:
+                    j_p = np.reshape(self.grad_sensor_pos(x_sensor=xx, v_sensor=vv,
+                                                          x_source=x_cal, v_source=v_cal),
+                                     shape=(num_pos, self.num_measurements*num_cal), order='F')
+                    j[:num_pos] = j_p
+                if do_vel_cal:
+                    j_v = np.reshape(self.grad_sensor_vel(x_sensor=xx, v_sensor=vv,
+                                                          x_source=x_cal, v_source=v_cal),
+                                     shape=(num_vel, self.num_measurements * num_cal), order='F')
+                    j[num_pos:] = j_v
+
+                return j
+
+            posvel_est, _ = solver(y=y_posvel, jacobian=jacobian_posvel,
+                                     x_init=np.concatenate((x_sensor.ravel(), v_sensor.ravel()), axis=0),
+                                     cov=cov_cal, **gd_kwargs)
+            if do_pos_cal:
+                x_sensor = np.reshape(posvel_est[:num_pos], x_shp)
+            if do_vel_cal:
+                v_sensor = np.reshape(posvel_est[num_pos:], v_shp)
+
+        return x_sensor, v_sensor, bias
 
 
     def make_uncertainty_search_space(self,
@@ -693,27 +993,19 @@ class PassiveSurveillanceSystem(ABC):
         pos_search = self.initialize_sensor_pos_search(pos_search, do_pos_search=do_pos_search)
         vel_search = self.initialize_sensor_vel_search(vel_search, do_vel_search=do_vel_search)
 
-        # === Make sure the Search Space is Broadcasted to common size (no scalars)
-        # todo: implement as a SearchSpace method
-        num_params = source_search.num_parameters
-        default_arr = np.ones((num_params, ))
-        if np.size(source_search.x_ctr) != num_params:
-            source_search.x_ctr = source_search.x_ctr * default_arr
-        if np.size(source_search.epsilon) != num_params:
-            source_search.epsilon = source_search.epsilon * default_arr
-        if np.size(source_search.points_per_dim) != num_params:
-            source_search.points_per_dim = source_search.points_per_dim * default_arr
-
-        # === Parse the components for a combined search space =========
-        field_names = ['x_ctr', 'epsilon', 'points_per_dim']
-        combined_search = {}
-        for field_name in field_names:
-            components = [np.broadcast_to(getattr(x, field_name), x.num_parameters) for x in (source_search, bias_search, pos_search, vel_search) if x is not None]
-            if len(components) > 1:
-                combined_search[field_name] = np.concatenate(components, axis=None)
-            else:
-                combined_search[field_name] = components[0]
-        search_space = SearchSpace(**combined_search)  # pass combined search terms to constructor as kwargs
+        # List of all SearchSpace objects to concatenate
+        search_arr = [x for x in [source_search, bias_search, pos_search, vel_search] if x is not None]
+        if len(search_arr) > 1:
+            # === Parse the components for a combined search space =========
+            field_names = ['x_ctr', 'epsilon', 'points_per_dim']
+            combined_search = {}
+            for field_name in field_names:
+                components = np.concatenate([np.ravel(getattr(x, field_name)) for x in search_arr], axis=None)
+                combined_search[field_name] = components
+            search_space = SearchSpace(**combined_search)  # pass combined search terms to constructor as kwargs
+        else:
+            # the combined search space is simply the only defined one
+            search_space = search_arr[0]
 
         # === Compute indices =========================================
         num_source = source_search.num_parameters
@@ -741,7 +1033,7 @@ class PassiveSurveillanceSystem(ABC):
                 'vel_search': vel_search,
                 'indices': indices}
 
-    def initialize_bias_search(self, bias_search: SearchSpace=None, do_bias_search: bool=False):
+    def initialize_bias_search(self, bias_search: SearchSpace=None, do_bias_search: bool=False)-> SearchSpace | None:
         if not do_bias_search: return None
 
         if bias_search.x_ctr is None:
@@ -763,7 +1055,7 @@ class PassiveSurveillanceSystem(ABC):
 
         return SearchSpace(x_ctr=x_ctr, epsilon=epsilon, points_per_dim=points_per_dim)
 
-    def initialize_sensor_pos_search(self, pos_search: SearchSpace=None, do_pos_search: bool=True):
+    def initialize_sensor_pos_search(self, pos_search: SearchSpace=None, do_pos_search: bool=True)-> SearchSpace | None:
         if not do_pos_search: return None
 
         if pos_search is None or pos_search.x_ctr is None:
@@ -783,7 +1075,7 @@ class PassiveSurveillanceSystem(ABC):
 
         return SearchSpace(x_ctr=x_ctr, epsilon=epsilon, points_per_dim=points_per_dim)
 
-    def initialize_sensor_vel_search(self, vel_search: SearchSpace=None, do_vel_search: bool=False):
+    def initialize_sensor_vel_search(self, vel_search: SearchSpace=None, do_vel_search: bool=False)->SearchSpace | None:
         if not do_vel_search: return None
 
         if vel_search is None or vel_search.x_ctr is None:
@@ -802,80 +1094,6 @@ class PassiveSurveillanceSystem(ABC):
             points_per_dim = vel_search.points_per_dim
 
         return SearchSpace(x_ctr=x_ctr, epsilon=epsilon, points_per_dim=points_per_dim)
-
-    def parse_uncertainty_indices(self, do_source_vel: bool=False, do_bias: bool=False, do_sensor_pos: bool=False,
-                                  do_sensor_vel: bool=False):
-        """
-        Uncertainty parameters take the form:
-           [x_source, v_source, bias, x_sensor.ravel(), v_sensor.ravel()]
-
-        This function computes the indices for each term.
-        """
-
-        # First, compute the number of each component and determine is source velocity is included
-        num_source_pos = self.num_dim
-        num_source_vel = self.num_dim if do_source_vel else 0
-        num_source = num_source_pos + num_source_vel
-        num_bias = self.num_measurements if do_bias else 0
-        num_pos = np.size(self.pos) if do_sensor_pos else 0
-        num_vel = np.size(self.pos) if do_sensor_vel else 0
-
-        source_pos_ind = np.arange(num_source_pos)
-        source_vel_ind = np.arange(num_source_vel)
-        bias_ind = num_source + np.arange(num_bias)
-        pos_ind = num_source + num_bias + np.arange(num_pos)
-        vel_ind = num_source + num_bias + num_pos + np.arange(num_vel)
-
-        indices = {'num_source_pos': num_source_pos,
-                   'num_source_vel': num_source_vel,
-                   'num_bias': num_bias,
-                   'num_pos': num_pos,
-                   'num_vel': num_vel,
-                   'source_pos_indices': source_pos_ind,
-                   'source_vel_indices': source_vel_ind,
-                   'bias_indices': bias_ind,
-                   'pos_indices': pos_ind,
-                   'vel_indices': vel_ind}
-        return indices
-
-    # def get_uncertainty_search_space(self, do_source_vel=False, do_sensor_bias=False, do_sensor_pos=False,
-    #                                  do_sensor_vel=False):
-    #     """
-    #     Define and return a dict describing the uncertainty search vector
-    #     """
-    #
-    #     # Source Position Search
-    #     if do_source_vel:
-    #         # The search calls for both position and velocity estimates for the source
-    #         num_source_indices = 2*self.num_dim
-    #     else:
-    #         # The search calls for just position estimates
-    #         num_source_indices = self.num_dim
-    #
-    #     # Sensor Bias Search
-    #     num_bias_indices = self.num_measurements if do_sensor_bias else 0
-    #
-    #     # Sensor Position Search
-    #     num_pos_indices = np.size(self.pos) if do_sensor_pos else 0
-    #
-    #     # Velocity doesn't matter for DirectionFinding
-    #     num_vel_indices = np.size(self.vel) if do_sensor_vel and self.vel is not None else 0
-    #
-    #     # Build the indices
-    #     source_indices = np.arange(num_source_indices)
-    #     bias_indices = num_source_indices + np.arange(num_bias_indices)
-    #     pos_indices = num_source_indices + num_bias_indices + np.arange(num_pos_indices)
-    #     vel_indices = num_source_indices + num_bias_indices + num_pos_indices + np.arange(num_vel_indices)
-    #
-    #     # Assemble the dict and return
-    #     return {'source_idx': source_indices,
-    #             'bias_idx': bias_indices,
-    #             'sensor_pos_idx': pos_indices,
-    #             'sensor_vel_idx': vel_indices,
-    #             'num_source_idx': num_source_indices,
-    #             'num_bias_idx': num_bias_indices,
-    #             'num_pos_idx': num_pos_indices,
-    #             'num_vel_idx': num_vel_indices}
 
     # ==================== Performance Methods ================
     # These methods define basic performance predictions
@@ -961,6 +1179,23 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
         (super().__init__(x, cov, **kwargs))
         self.ref_idx = ref_idx
         self.update_covariance_matrix(cov, do_resample)
+
+    @property
+    def num_measurements(self)-> int:
+        # Check the reference index; it determines how many measurements there will be
+        if self.ref_idx is None or np.isscalar(self.ref_idx):
+            # common reference sensor
+            return self.num_sensors - 1
+        elif isinstance(self.ref_idx, str):
+            if self.ref_idx.lower() == 'full':
+                # all possible cominations
+                return math.comb(self.num_sensors, 2)
+            else:
+                raise ValueError(f"Unrecognized reference index setting, {self.ref_idx}.")
+        else:
+            # Pair of vectors; first row is test sensors, second is reference
+            _, num_pairs = safe_2d_shape(self.ref_idx)
+            return num_pairs
 
     @property
     def cov_raw(self)-> CovarianceMatrix:

@@ -239,46 +239,16 @@ def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=Fa
     if n_source_pos == 1:
         x_source = np.expand_dims(x_source, axis=1)
 
-    # Initialize Output
-    ell = np.zeros(shape=(n_source_pos, ))
+    # Generate the ideal measurement matrix for this position
+    psi = measurement(x_sensor, x_source, do_2d_aoa, bias=bias)
+    while psi.ndim < zeta.ndim: psi = np.expand_dims(psi, -1)
+    while zeta.ndim < psi.ndim: zeta = np.expand_dims(zeta, -1)
 
-    if print_progress:
-        t_start = time.perf_counter()
-        max_num_rows = 20
-        desired_iter_per_row = np.ceil(n_source_pos / max_num_rows).astype(int)
-        markers_per_row = 40
-        desired_iter_per_marker = np.ceil(desired_iter_per_row / markers_per_row).astype(int)
+    # Evaluate the measurement error
+    err = utils.modulo2pi(zeta - psi)
 
-        # Make sure we don't exceed the min/max iter per marker
-        min_iter_per_marker = 10
-        max_iter_per_marker = 1e6
-        iter_per_marker = np.maximum(min_iter_per_marker, np.minimum(max_iter_per_marker, desired_iter_per_marker))
-        iter_per_row = iter_per_marker * markers_per_row
-
-        print('Computing Log Likelihood...')
-
-    for idx_source in range(n_source_pos):
-        if print_progress:
-            utils.print_progress(num_total=n_source_pos, curr_idx=idx_source,
-                                 iterations_per_marker=iter_per_marker,
-                                 iterations_per_row=iter_per_row,
-                                 t_start=t_start)
-
-        x_i = x_source[:, idx_source]
-
-        # Generate the ideal measurement matrix for this position
-        this_psi = measurement(x_sensor, x_i, do_2d_aoa, bias=bias)
-
-        # Evaluate the measurement error
-        err = utils.modulo2pi(zeta - this_psi)
-
-        # Compute the scaled log likelihood
-        ell[idx_source] = - cov.solve_aca(err)
-
-    if print_progress:
-        print('done')
-        t_elapsed = time.perf_counter() - t_start
-        utils.print_elapsed(t_elapsed)
+    # Compute the scaled log likelihood
+    ell = - cov.solve_aca(np.moveaxis(err, source=0, destination=-1))
 
     return ell
 

@@ -10,10 +10,10 @@ def compute_cep50(covariance: CovarianceMatrix | list[CovarianceMatrix],
                   print_warnings: bool=True) -> np.float64 | npt.NDArray[np.float64]:
     """
     Computes the radius for a CEP_50 circle from a given error covariance
-    matrix C.  The CEP_50 circle is a circle that contains half of the random
+    matrix C. The CEP_50 circle is a circle that contains half of the random
     samples defined by the error covariance matrix.
 
-    Calculation is extremely complex, and requires numerical integration, so
+    Calculation is extremely complex and requires numerical integration, so
     the equation used herein is an approximation, depending on the ratio of
     the dominant to secondary eigenvalues.  If the ratio is less than 2,
     meaning that both eigenvectors contribute roughly the same amount of
@@ -31,36 +31,23 @@ def compute_cep50(covariance: CovarianceMatrix | list[CovarianceMatrix],
     Nicholas O'Donoughue
     16 January 2021
 
-    :param covariance: CovarianceMatrix object or list of CovarianceMatrix objects
+    :param covariance: CovarianceMatrix object or list of CovarianceMatrix objects.
     :param print_warnings: Optional bool (default=True). If true, warnings will be printed when NaN or INF values
                            are encountered.
-    :return cep: Radius of the corresponding CEP_50 circle or list of radii
+    :return cep: Radius of the corresponding CEP_50 circle or list of radii.
     """
 
-    if isinstance(covariance, list):
-        return np.array([compute_cep50(cov, print_warnings) for cov in covariance])
+    # Check if it's a list or tuple, and use the batch mode
+    if isinstance(covariance, (list, tuple)):
+        return compute_cep50_fast(covariance, print_warnings)
     else:
-        # print('Computing CEP50...')
-
-        # Parse input dimensions
-        if covariance.size < 2:
-            raise TypeError('Covariance matrix must have at least two dimensions.')
-        if covariance.size > 3:
-            raise TypeError('Covariance matrix cannot have more than three dimensions if computing CEP50.')
-
-        # If any of the CEP elements are NaN or INF, then mark the CEP as INF
-        if not np.all(np.isfinite(covariance.cov)):
-            if print_warnings:
-                warnings.warn("Poorly formed (NaN or INF values encountered) in CEP50 calculation.")
-            return np.inf
-
         # Eigenvector analysis to identify independent components of error
         # lam[0] will be the smallest, and lam[-1] will be the largest
         lam = np.sort(covariance.eigenvalues, axis=None)
 
         # print('\tEigenvalues: {}'.format(lam))
         lam_max = lam[-1]  # eigenvalues are returned in ascending order; max is the last entry
-        lam_min = lam[-2]  # use the second-largest as lam_min (ignores smallest eigenvalue in 3D problems)
+        lam_min = lam[-2]  # use the second-largest as lam_min (ignores the smallest eigenvalue in 3D problems)
 
         # Check the eigenvalues; they should not be complex or negative
         assert not (np.iscomplex(lam_max) or np.iscomplex(lam_min)), 'Complex eigenvalue encountered; check for errors.'
@@ -72,8 +59,58 @@ def compute_cep50(covariance: CovarianceMatrix | list[CovarianceMatrix],
             # ToDo: suppress runtime warning (invalid value encountered in scalar divide....inf? nan?) while generating Fig 13.8a
             cep = np.sqrt(lam_max)*(.67+.8*lam_min/lam_max)
 
-        return cep
+    return cep
 
+
+def compute_cep50_fast(covariance: list[CovarianceMatrix], print_warnings: bool=True)-> npt.NDArray[np.float64]:
+    """
+    Fast version of compute_cep50 that operates quickly over a list of CovarianceMatrices.
+
+    Uses a single call to numpy that leverages numpy.linalg.eigh batch processing mode to offload most of the work
+    to efficient LAPACK code.
+
+    :param covariance: list of CovarianceMatrix objects
+    :param print_warnings: Optional bool (default=True). If true, warnings will be printed when NaN or INF values
+                           are encountered.
+    :return cep: numpy array of CEP50 calculations for each input covariance matrix
+    """
+
+    # Error check
+    if len(set([c.size for c in covariance])) != 1:
+        # Not all covariance matrices have the same size
+        raise ValueError("Unable to compute CEP50 in parallel for covariance matrices of different sizes.")
+
+    if covariance[0].size > 3:
+        raise ValueError("Unable to compute CEP50 in parallel for covariance matrices of dimension > 3.")
+    if covariance[0].size < 2:
+        raise ValueError("Unable to compute CEP50 in parallel for covariance matrices of dimension < 2.")
+
+    # Batch mode; stack all the raw covariances
+    covs = np.stack([c.cov for c in covariance], axis=0)  # shape: (N, M, M) where M is the number of spatial dimensions
+
+    # Compute eigenvalues
+    lam = np.linalg.eigh(covs)[0]  # shape (N, M)
+
+    # Pull the two largest eigenvalues; this ignores the smallest eigenvalue in 3D scenarios
+    lam_max = lam[:, -1]
+    lam_min = lam[:, -2]
+
+    # Compute the CEP50 using one of two methods
+    cep = np.empty_like(lam_max) # shape (N, )
+
+    # use the circular approximation when eigenvalues are approximately equal,
+    # or when one or both are NaN (avoid dividing by nan)
+    mask = np.logical_or(lam_min > .25 * lam_max, np.logical_or(np.isnan(lam_min), np.isnan(lam_max)))
+    cep[mask] = .59 * np.sqrt(lam_min[mask]) + np.sqrt(lam_max[mask])
+    cep[~mask] = np.sqrt(lam_max[~mask]) * (0.67 + 0.8 * lam_min[~mask] / lam_max[~mask])
+
+    # Replace invalid with inf if desired
+    bad_mask = ~np.isfinite(covs).all(axis=(1, 2))
+    if np.any(bad_mask) and print_warnings:
+        warnings.warn("Poorly formed (NaN or INF values encountered) in CEP50 calculation.")
+    cep[bad_mask] = np.inf
+
+    return cep
 
 def compute_rmse_scaling(conf_interval: float)-> float:
     """
@@ -109,7 +146,7 @@ def compute_rmse_confidence_interval(gamma: float)-> float:
     """
     Determines the confidence interval for a given scale factor gamma, which
     is defined as the percentage of a standard normal distribution that falls
-    within the bounds -gamma to gamma.
+    within the bounds (-gamma, gamma).
 
     Computed simply with:
        confInterval = norm_cdf(gamma) - norm_cdf(-gamma)
@@ -120,21 +157,36 @@ def compute_rmse_confidence_interval(gamma: float)-> float:
     16 January 2021
 
     :param gamma: Scale factor
-    :return: Confidence interval on scale (0-1)
+    :return: Confidence interval between 0 and 1
     """
 
     return stats.norm.cdf(gamma) - stats.norm.cdf(-gamma)
 
 
-def compute_rmse(covariance: CovarianceMatrix | list[CovarianceMatrix])-> np.float64 | npt.NDArray[np.float64]:
+def compute_rmse(covariance: CovarianceMatrix | list[CovarianceMatrix] | npt.ArrayLike)\
+        -> np.float64 | npt.NDArray[np.float64]:
     """
-    Compute the RMSE for a covariance matrix or a list of covariance matrices; defined as the square root of the
+    Compute the RMSE for a covariance matrix or a list of covariance matrices. Defined as the square root of the
     trace of each covariance matrix.
     """
-    if isinstance(covariance, list):
-        return np.array([compute_rmse(c) for c in covariance])
+    # Scalar result; straightforward
+    if isinstance(covariance, CovarianceMatrix):
+        return np.sqrt(np.trace(covariance.cov))
 
-    return np.sqrt(np.trace(covariance.cov))
+    # Batch processing
+    if isinstance(covariance, (list, tuple)):
+        # Grab raw covariance matrices
+        covs = np.stack([c.cov for c in covariance], axis=0)
+    elif isinstance(covariance, np.ndarray):
+        # Already stacked
+        covs = covariance
+    else:
+        raise TypeError("Input must be a CovarianceMatrix, list of CovarianceMatrices, or numpy array.")
+
+    # Vectorized computation
+    trace = np.trace(covs, axis1=-1, axis2=-2) # trace over the last two dimensions
+    return np.sqrt(trace)
+
 
 def draw_cep50(x: npt.ArrayLike,
                covariance: CovarianceMatrix | list[CovarianceMatrix],
@@ -180,7 +232,7 @@ def draw_error_ellipse(x: npt.ArrayLike,
     """
     # Compute and return the error ellipse coordinates with numPts
     # samples around the ellipse, for an error centered at the location x and
-    # with covariance matrix C.  The confidence interval specifies what
+    # with covariance matrix C. The confidence interval specifies what
     # percentage of random errors will fall within the error ellipse.
 
     Ported from MATLAB Code
@@ -242,7 +294,7 @@ def draw_error_ellipse(x: npt.ArrayLike,
     ellipse_x = a * np.cos(th)         # Major axis coordinates
     ellipse_y = b * np.sin(th)         # Minor axis coordinates
 
-    # Rotate the ellipse to standard reference frame
+    # Rotate the ellipse to the standard reference frame
     rot_matrix = np.array([[np.cos(rot_angle), -np.sin(rot_angle)], [np.sin(rot_angle), np.cos(rot_angle)]])
     xx = np.matmul(rot_matrix, np.vstack((ellipse_x, ellipse_y)))  # Store as a 2 x N matrix of positions
 

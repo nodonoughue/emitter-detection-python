@@ -4,7 +4,7 @@ import numpy as np
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo import tracker
-from ewgeo.utils import make_nd_grid, safe_2d_shape, SearchSpace
+from ewgeo.utils import safe_2d_shape, SearchSpace
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
@@ -104,17 +104,15 @@ def example1(colors=None):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=offset,
                                epsilon=grid_res)
-    x_set, x_grid, grid_shape = make_nd_grid(search_space)
-    extent = ((x_ctr[0] - offset[0])/1e3,
-              (x_ctr[0] + offset[0])/1e3,
-              (x_ctr[1] - offset[1])/1e3,
-              (x_ctr[1] + offset[1])/1e3)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
+
+    extent = ((x_ctr[0].item() - offset[0])/1e3,
+              (x_ctr[0].item() + offset[0])/1e3,
+              (x_ctr[1].item() - offset[1])/1e3,
+              (x_ctr[1].item() + offset[1])/1e3)
 
     # Use a squeeze operation to ensure that the individual dimension indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
-
-    # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
-    grid_shape_2d = [i for i in grid_shape if i > 1]
 
     k_vec = [10, 100]
     cmap_lim = [0, 5]
@@ -123,7 +121,7 @@ def example1(colors=None):
     for this_k in k_vec:
         aoa.cov = cov_psi.multiply(1/this_k, overwrite=False)
         this_crlb = aoa.compute_crlb(x_source=x_set)
-        cep = np.reshape(compute_cep50(this_crlb), shape=grid_shape_2d)
+        cep = np.reshape(compute_cep50(this_crlb), shape=search_space.grid_shape)
 
         # Start with the image plot
         this_fig = plt.figure()

@@ -27,11 +27,11 @@ def make_gain_functions(aperture_type, d_lam, psi_0):
     #   psi_0 = central angle
 
     # Define all the possible functions
-    def g_omni(_):
-        return 1.
+    def g_omni(psi):
+        return np.ones_like(psi)
 
-    def g_dot_omni(_):
-        return 0.
+    def g_dot_omni(psi):
+        return np.zeros_like(psi)
 
     def g_adcock(psi):
         return 2*np.sin(np.pi * d_lam * np.cos(psi-psi_0))
@@ -40,7 +40,9 @@ def make_gain_functions(aperture_type, d_lam, psi_0):
         return -2*np.pi*d_lam*np.sin(psi-psi_0)*np.cos(np.pi*d_lam*np.cos(psi-psi_0))
 
     def g_rect(psi):
-        return np.abs(np.sinc((psi-psi_0)*d_lam/np.pi))  # sinc includes implicit pi
+        # In the text, the function is sinc((psi-psi_0)*d/2*lam), but the sinc function is defined sin(x)/x
+        # In numpy, the sinc function is sin(pi*x)/(pi*x), thus we should divide the argument to numpy.sinc by pi
+        return np.abs(np.sinc((psi-psi_0)*d_lam/(np.pi)))  # sinc includes implicit pi
 
     def g_dot_rect(psi):
         return sinc_derivative((psi - psi_0) * d_lam) * d_lam

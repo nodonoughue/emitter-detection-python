@@ -71,7 +71,7 @@ def beamscan_mvdr(x, v, psi_max=np.pi/2, num_points=101):
         this_v = v(psi_vec[idx_psi])/np.sqrt(num_array_elements)  # N x 1
 
         # p[idx_psi] = 1/np.abs(np.conj(this_v).T @ covariance.inv @ this_v)
-        p[idx_psi] = 1/np.abs(covariance.solve_aca(np.conj(this_v).T)[0])
+        p[idx_psi] = 1/np.abs(covariance.solve_aca(np.conj(this_v.T)))
 
     return p, psi_vec
 

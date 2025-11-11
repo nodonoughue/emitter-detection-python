@@ -9,7 +9,7 @@ from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse, compute_rmse
-from ewgeo.utils import make_nd_grid, print_elapsed, print_progress, resample_noise, safe_2d_shape, SearchSpace
+from ewgeo.utils import print_elapsed, print_progress, resample_noise, safe_2d_shape, SearchSpace
 
 _rad2deg = 180.0/np.pi
 _deg2rad = np.pi/180.0
@@ -126,14 +126,15 @@ def example2(colors=None, do_video_example=False):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=search_size,
                                epsilon=grid_res)
-    x_source, x_grid, grid_shape = make_nd_grid(search_space)
-    extent = (x_ctr[0] - max_offset, x_ctr[0] + max_offset, x_ctr[1] - max_offset, x_ctr[1] + max_offset)
+    x_source, x_grid = search_space.x_set, search_space.x_grid
+
+    extent = (x_ctr[0].item() - max_offset,
+              x_ctr[0].item() + max_offset,
+              x_ctr[1].item() - max_offset,
+              x_ctr[1].item() + max_offset)
 
     # Use a squeeze operation to ensure that the individual dimension indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
-
-    # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
-    grid_shape_2d = [i for i in grid_shape if i > 1]
 
     # Pre-define contour-levels, for consistency
     levels = [.01, 1, 5, 10, 25, 50, 100, 200]
@@ -152,7 +153,7 @@ def example2(colors=None, do_video_example=False):
         # this_cep = compute_rmse(this_crlb)  # Compute the trace along the spatial axes
 
         # Plot this Result
-        this_fig = _plot_contourf(x_grid, extent, grid_shape_2d, this_cep/1e3, x_sensors, None, levels, colors)
+        this_fig = _plot_contourf(x_grid, extent, search_space.grid_shape, this_cep/1e3, x_sensors, None, levels, colors)
         figs.append(this_fig)
 
     if do_video_example:
@@ -175,7 +176,7 @@ def example2(colors=None, do_video_example=False):
             this_cep = compute_cep50(this_crlb)
 
             # Plot this Result
-            this_fig = _plot_contourf(x_grid, extent, grid_shape_2d, this_cep/1e3, x_sensors, None, levels, colors)
+            this_fig = _plot_contourf(x_grid, extent, search_space.grid_shape, this_cep/1e3, x_sensors, None, levels, colors)
             figs.append(this_fig)
 
     return figs
@@ -232,7 +233,7 @@ def example3(colors=None):
 
     # Plot geometry
     fig = plt.figure()
-    hdl = plt.scatter(x_sensors[0, :], x_sensors[1, :], marker='o', label='Sensors', clip_on=False)
+    hdl = plt.scatter(x_sensors[0, :], x_sensors[1, :], marker='o', label='Sensors', clip_on=False, zorder=3)
     for this_x, this_v in zip(x_sensors.T, v_sensors.T):  # transpose so the loop steps over sensors, not dimensions
         plt.arrow(x=this_x[0], y=this_x[1],
                   dx=this_v[0] * 10, dy=this_v[1] * 10,
@@ -256,15 +257,16 @@ def example3(colors=None):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=search_size,
                                epsilon=grid_res)
-    x_source, x_grid, grid_shape = make_nd_grid(search_space)
-    extent = (x_ctr[0] - max_offset, x_ctr[0] + max_offset, x_ctr[1] - max_offset, x_ctr[1] + max_offset)
+    x_source, x_grid = search_space.x_set, search_space.x_grid
+
+    extent = (x_ctr[0].item() - max_offset,
+              x_ctr[0].item() + max_offset,
+              x_ctr[1].item() - max_offset,
+              x_ctr[1].item() + max_offset)
 
     # Use a squeeze operation to ensure that the individual dimension
     # indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
-
-    # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
-    grid_shape_2d = [i for i in grid_shape if i > 1]
 
     # Loop over Sensor Pairs and compute CRLB
     figs = [fig]
@@ -282,7 +284,7 @@ def example3(colors=None):
 
         this_rmse = compute_rmse(this_crlb)
 
-        this_fig = _plot_contourf(x_grid, extent, grid_shape_2d, this_rmse/1e3, x_sensors, v_sensors, levels, colors)
+        this_fig = _plot_contourf(x_grid, extent, search_space.grid_shape, this_rmse/1e3, x_sensors, v_sensors, levels, colors)
         figs.append(this_fig)
 
     return figs
@@ -301,6 +303,7 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle to generated graphic
     """
+    # TODO: Debug; fig 3.11 shows poor performance for Gradient Descent
 
     # Set up sensor and target coordinates
     x_source_ctr = np.array([3, 4]) * 1e3
@@ -500,18 +503,19 @@ def _mc_iteration(pss:TDOAPassiveSurveillanceSystem, zeta, ml_search: SearchSpac
     return {'ml': x_ml, 'ls': x_ls, 'gd': x_gd}
 
 
-def _plot_contourf(x_grid, extent, grid_shape_2d, z, x_sensors, v_sensors, levels, colors):
+def _plot_contourf(x_grid, extent, grid_shape, z, x_sensors, v_sensors, levels, colors):
     this_fig = plt.figure()
-    hdl = plt.imshow(np.reshape(z, grid_shape_2d), origin='lower', cmap=colors, extent=extent,
+    hdl = plt.imshow(np.reshape(z, grid_shape), origin='lower', cmap=colors, extent=extent,
                      norm=matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1]))
     plt.colorbar(hdl, format='%d')
 
     # Unlike in MATLAB, contourf does not draw contour edges. Manually add contours
-    hdl2 = plt.contour(x_grid[0], x_grid[1], np.reshape(z, grid_shape_2d), levels=levels,
+    hdl2 = plt.contour(x_grid[0], x_grid[1], np.reshape(z, grid_shape), levels=levels,
                        origin='lower', colors='k')
     plt.clabel(hdl2, fontsize=10, colors='w')
 
-    hdl3 = plt.scatter(x_sensors[0, :], x_sensors[1, :], color='w', facecolors='none', marker='o', label='Sensors')
+    hdl3 = plt.scatter(x_sensors[0, :], x_sensors[1, :], color='w', facecolors='none', marker='o', label='Sensors',
+                       zorder=3)
     if v_sensors is not None:
         for this_x, this_v in zip(x_sensors.T, v_sensors.T):  # transpose so the loop steps over sensors, not dimensions
             plt.arrow(x=this_x[0], y=this_x[1],

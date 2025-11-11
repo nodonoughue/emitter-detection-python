@@ -37,6 +37,7 @@ class CovarianceMatrix:
             self._do_inverse = do_inverse
 
     def __str__(self):
+        np.set_printoptions(precision=4, suppress=False)
         return f"CovarianceMatrix: {np.matrix(self.cov)}"
 
     """
@@ -233,39 +234,146 @@ class CovarianceMatrix:
         self._eigenvectors = v
         return
 
-    def solve_aca(self, a: npt.ArrayLike):
+    def solve_aca(self, a: npt.ArrayLike, do_2d: bool = False):
         """
         Solve the matrix problem res = A @ C^{-1} @ A.T
 
         If self._inv is defined, this will be computed directly. If it is not defined, this will be
         computed via the Cholesky decomposition.
 
+        Inputs
+        ------
+        a : array_like
+            May be:
+              - 1D vector of shape (n, )
+              - 2D array of shape (m, n) where each row is a separate vector
+              - ND array of shape (*, n) for batch processing
+            If the optional argument do_2d is True, then valid sizes are:
+              - 2D array of shape (m, n) where the matrix is processed as one input
+              - ND array of shape (*, m, n) for batch processing
+        do_2d : bool
+            If True, then a will be treated as a 2D array. Default = False
+
+        Returns
+        -------
+        res : ndarray
+            Scalar if input is 1D.
+            If input is 2D, then res is an array of shape (m, ) if do_2d is False, or (m, m) if do_2d is True.
+            If input is ND, then res is an array of shape (*, ) if do_2d is False, or (m, m, *) if do_2d is True.
         """
 
-        # Make sure we've parsed the covariance
         self._parse()
+        n = self.size
+        a = np.asarray(a)
+        if a.shape[-1] != n:
+            raise ValueError(f"Input last dimension {a.shape[-1]} must match covariance size.")
 
-        # Check for the matrix inverse
-        if self._do_inverse:
-            if np.isscalar(self._inv) or np.size(self._inv) == 1:
-                val = self._inv * a @ np.conj(a.T)
-            else:
-                val = a @ self._inv @ np.conj(a.T)
-
-        # Check for Cholesky decomposition
-        elif self._do_cholesky:
-            c = solve_triangular(self._lower, a.T, lower=True)
-            if c.ndim == 1:
-                # It's a 1D vector, just take the sum of the square of each element
-                val = np.sum(np.abs(c)**2)
-            else:
-                val = np.conj(c.T) @ c
-
+        # Collapse all non-last dimensions into a batch axis
+        if do_2d:
+            batch_shape = list(a.shape[:-2])
+            batch_shape.extend([a.shape[-2], a.shape[-2]])
+            a_flat = a.reshape(-1, a.shape[-2], n)
         else:
-            # If we've gotten here, something is wrong
-            raise RuntimeError
+            batch_shape = a.shape[:-1]
+            a_flat = a.reshape(-1, n)
 
+        if self.do_inverse:
+            inv = self._inv
+            if np.isscalar(inv) or np.size(inv) == 1:
+                # a_flat should have shape (*, 1) if do_2d=False, or (*, m, 1) if do_2d=True
+                if do_2d:
+                    # We need to do a matrix multiplication of the last two dimensions, then multiply by the inverse
+                    val = inv * np.expand_dims(a_flat, -1) @ np.conj(np.expand_dims(a_flat, -2)) # shape (*, m, m)
+                else:
+                    # Result should be
+                    val = np.sum(np.abs(a_flat)**2, axis=1) * inv # shape (*, )
+            else:
+                # a_flat should have shape (*, n) if do_2d=False or (*, m, n) if do_2d=True
+                if do_2d:
+                    # (num_cases, m, n) x (n, n) -> (num_cases, m, n)
+                    tmp = a_flat @ inv
+                    # (num_cases, m, n) x (num_cases, n, m) -> (num_cases, m, m)
+                    # use np.conj to be complex-safe
+                    val = np.conj(tmp) @ np.swapaxes(a_flat, axis1=1, axis2=2)
+                else:
+                    # (num_cases, n) x (n, n) -> (num_cases, n)
+                    tmp = a_flat @ inv
+                    # each row dot with itself (complex‑safe)
+                    val = np.sum(np.conj(tmp) * a_flat, axis=1)
+        elif self.do_cholesky:
+            L = self._lower
+            # Using vectorized triangular solve for all columns at once
+
+            # if do_2d = True, then the operation is (n, n) and (*, n, m) -> (*, n, m)
+
+            if do_2d:
+                # shapes are (n, n) and (*, n, m) -> (*, n, m)
+                c = solve_triangular(L, np.transpose(a_flat, (0, 2, 1)), lower=True)
+                # (*, m, n) x (*, n, m) = (*, m, m)
+                val = np.conj(np.transpose(c, (0, 2, 1))) @ c
+            else:
+                # shapes are (n, n) and (n, *) -> (n, *)
+                c = solve_triangular(L, a_flat.T, lower=True)
+                # Energy term = sum(|c|^2)
+                val = np.sum(np.abs(c)**2, axis=0)
+        else:
+            raise RuntimeError("Unable to solve; covariance matrix not parse with Cholesky or inverse.")
+
+        val = np.reshape(val, batch_shape)
         return val
+
+        # # Check for multi-dimensional inputs
+        # if np.ndim(a) > 2 or (np.ndim(a)==2 and np.shape(a)[1] != self.size):
+        #     # Either there are 3+ dimensions, or it's 2D but the second dimension does not match the expected size
+        #     out_shp = np.shape(a)[1:]
+        #     if np.prod(out_shp) == 1: out_shp = []
+        #
+        #     a = np.reshape(a, (self.size, -1)).T
+        #
+        #     # Assume the first dimension follows the size of self, and any remaining dimensions are
+        #     # parallel cases
+        #     val = np.array([self.solve_aca(aa) for aa in a]).reshape(out_shp)
+        #     return val
+        #
+        # # Make sure we trim any dimensions after the second; we're doing matrix math here.
+        # if np.ndim(a) > 2:
+        #     a = np.squeeze(a, axis=tuple(range(2, np.ndim(a))))
+        #
+        # # Check the size of a
+        # if np.size(a)==self.size and (np.shape(a)[0]==self.size or np.shape(a)[-1]==self.size):
+        #     # It's a 1D array, but may be stored as a 2D array. Let's squeeze it, for convenience
+        #     a = np.squeeze(a)
+        # elif np.ndim(a)==1:
+        #     # Make sure a is a vector of the right size
+        #     assert np.shape(a)[0] == self.size, f"Input vector a must be the same size as the covariance matrix."
+        # else:
+        #     # Make sure the second dimension of a matches
+        #     assert np.shape(a)[1] == self.size, f"Input matrix a must have second dimension the same size as the covariance matrix."
+        #
+        # # Make sure we've parsed the covariance
+        # self._parse()
+        #
+        # # Check for the matrix inverse
+        # if self._do_inverse:
+        #     if np.isscalar(self._inv) or np.size(self._inv) == 1:
+        #         val = self._inv * a @ np.conj(a.T)
+        #     else:
+        #         val = a @ self._inv @ np.conj(a.T)
+        #
+        # # Check for Cholesky decomposition
+        # elif self._do_cholesky:
+        #     c = solve_triangular(self._lower, a.T, lower=True)
+        #     if c.ndim == 1:
+        #         # It's a 1D vector, just take the sum of the square of each element
+        #         val = np.sum(np.abs(c)**2)
+        #     else:
+        #         val = np.conj(c.T) @ c
+        #
+        # else:
+        #     # If we've gotten here, something is wrong
+        #     raise RuntimeError
+        #
+        # return val
 
     def solve_acb(self, a: npt.ArrayLike, b: npt.ArrayLike):
         """

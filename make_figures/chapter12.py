@@ -15,7 +15,7 @@ import numpy as np
 import numpy.typing as npt
 
 import ewgeo.fdoa as fdoa
-from ewgeo.utils import init_output_dir, init_plot_style, make_nd_grid, SearchSpace
+from ewgeo.utils import init_output_dir, init_plot_style, SearchSpace
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50
@@ -171,7 +171,8 @@ def make_figure_2(prefix=None):
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=5,
                                epsilon=.01)
-    x_set, x_grid, grid_shape = make_nd_grid(search_space)
+    x_set = search_space.x_set
+    x_grid = search_space.x_grid
 
     v_sensor0 = np.array([1., 0.])
     v_sensor1 = np.array([1., 0.])
@@ -182,7 +183,7 @@ def make_figure_2(prefix=None):
                              x_sensor1, v_sensor1, transmit_freq)
 
     fig2a, ax2a = plt.subplots()
-    ax2a.contour(x_grid[0], x_grid[1], np.reshape(ddop, shape=grid_shape), levels=20)
+    ax2a.contour(x_grid[0], x_grid[1], np.reshape(ddop, shape=search_space.grid_shape), levels=20)
     handle0 = plt.scatter(x_sensor0[0], x_sensor0[1], marker='o', s=10, color='k', zorder=3)
     handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k', zorder=3)
 
@@ -218,7 +219,7 @@ def make_figure_2(prefix=None):
                              x_sensor1, v_sensor1, transmit_freq)
 
     fig2b, ax2b = plt.subplots()
-    ax2b.contour(x_grid[0], x_grid[1], np.reshape(ddop, shape=grid_shape), levels=11)
+    ax2b.contour(x_grid[0], x_grid[1], np.reshape(ddop, shape=search_space.grid_shape), levels=11)
     handle0 = plt.scatter(x_sensor0[0], x_sensor0[1], marker='o', s=10, color='k', zorder=3)
     handle1 = plt.scatter(x_sensor1[0], x_sensor1[1], marker='o', s=10, color='k', zorder=3)
 
@@ -313,7 +314,7 @@ def make_figure_3(prefix):
 
 def _make_figure3_subfigure(eps: npt.ArrayLike,
                             x_vec: npt.NDArray[np.float64],
-                            y_vec: npt.ArrayLike,
+                            y_vec: npt.NDArray[np.float64],
                             x_sensor: npt.ArrayLike,
                             v_sensor: npt.ArrayLike,
                             x_source: npt.ArrayLike,
@@ -325,7 +326,8 @@ def _make_figure3_subfigure(eps: npt.ArrayLike,
     # Make the background image using the difference between each pixel's FDOA and the true source's FDOA
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore','divide by zero encountered in log10')
-        ax.imshow(lin_to_db(np.flipud(eps)), extent=(x_vec[0], x_vec[-1], y_vec[0], y_vec[-1]), aspect='auto')
+        ax.imshow(lin_to_db(np.flipud(eps)), extent=(x_vec[0].item(), x_vec[-1].item(),
+                                                     y_vec[0].item(), y_vec[-1].item()), aspect='auto')
 
     # Add the sensors and source markers
     handle_sensors = plt.scatter(x_sensor[sensors_to_plot, 0], x_sensor[sensors_to_plot, 1],
@@ -507,17 +509,15 @@ def make_figure_6(prefix):
     cov_rrdoa = cov_rroa.resample(ref_idx=ref_idx)
 
     # Define source positions
-    num_grid_points = 501
-    grid_extent = 100e3
-    grid_spacing = 2*grid_extent/(num_grid_points-1)
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
-                               max_offset=grid_extent,
-                               epsilon=grid_spacing)
-    x_source, x_grid, grid_shape = make_nd_grid(search_space)
+                               max_offset=100e3,
+                               points_per_dim=501)
+    x_source = search_space.x_set
+    x_grid = search_space.x_grid
 
     # Compute CRLB
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=search_space.grid_shape)
 
     # Set up contours
     contour_levels = [.1, 1, 5, 10, 50, 100, 1000]
@@ -541,11 +541,12 @@ def make_figure_6(prefix):
 
     # Figure 6b
     print('Generating Figure 12.6b...')
+    # TODO: Debug error in 12.6b; performance gets worse at top/bottom (there's an odd discontinuity)
 
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=search_space.grid_shape)
 
     # Draw Figure
     fig6b, ax = plt.subplots()
@@ -576,7 +577,7 @@ def make_figure_6(prefix):
 
     # Compute CRLB
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=search_space.grid_shape)
 
     # Draw Figure
     fig6c, ax = plt.subplots()
@@ -592,11 +593,12 @@ def make_figure_6(prefix):
 
     # Figure 6d
     print('Generating Figure 12.6d...')
+    # TODO: Debug error in 12.6d; performance gets worse at top/bottom (there's an odd discontinuity)
 
     # Repeat with +x velocity
     v_sensor = 100 * np.concatenate([np.ones((1, num_sensors)), np.zeros((1, num_sensors))], axis=0)
     crlb = fdoa.perf.compute_crlb(x_sensor, v_sensor, x_source, cov_rrdoa, do_resample=False, print_progress=True)
-    cep50 = np.reshape(compute_cep50(crlb), shape=grid_shape)
+    cep50 = np.reshape(compute_cep50(crlb), shape=search_space.grid_shape)
 
     # Draw Figure
     fig6d, ax = plt.subplots()

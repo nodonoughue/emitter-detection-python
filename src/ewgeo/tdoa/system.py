@@ -1,7 +1,9 @@
+import numpy as np
 import numpy.typing as npt
+import warnings
 
 from . import model, solvers
-from ewgeo.utils import parse_reference_sensor
+from ewgeo.utils import parse_reference_sensor, safe_2d_shape
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import DifferencePSS
@@ -91,6 +93,12 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
 
         return model.grad_sensor_pos(x_sensor=x_sensor, x_source=x_source, ref_idx=self.ref_idx)
 
+    def grad_sensor_vel(self, x_source: npt.ArrayLike, **kwargs)-> npt.NDArray:
+        out_shape = [self.num_dim * self.num_sensors, self.num_measurements]
+        _, num_source = safe_2d_shape(x_source)
+        if num_source > 1: out_shape.append(num_source)
+        return np.zeros(shape=out_shape)
+
     ## ============================================================================================================== ##
     ## Solver Methods
     ##
@@ -103,7 +111,8 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         else:
             x_sensor, _, bias = self.pos, None, self.bias
 
-        # ToDo: Get chan_ho to accept a bias term
+        if bias is not None:
+            warnings.warn("Chan-Ho TDOA solver does not accept bias. Ignoring bias.")
         return solvers.chan_ho(x_sensor=x_sensor, zeta=zeta, cov=self.cov, ref_idx=self.ref_idx, do_resample=False,
                                variance_is_toa=False)
 
@@ -129,7 +138,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
 
         test_idx_vec, ref_idx_vec = parse_reference_sensor(self.ref_idx, self.num_sensors)
 
-        isochrones = [model.draw_isochrone(x_ref=x_sensor[:,ref_idx], x_test=x_sensor[:,test_idx],
+        isochrones = [model.draw_isochrone(x_ref=x_sensor[:, ref_idx], x_test=x_sensor[:, test_idx],
                                            range_diff=this_range_diff, num_pts=num_pts, max_ortho=max_ortho) for
                       (test_idx, ref_idx, this_range_diff) in zip(test_idx_vec, ref_idx_vec, range_diff)]
         return isochrones

@@ -1,11 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
+from scipy.stats import multivariate_normal as mvn
 
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
-from ewgeo.utils import make_nd_grid, safe_2d_shape, SearchSpace
+from ewgeo.utils import safe_2d_shape, SearchSpace
 from ewgeo.utils.coordinates import correct_enu, ecef_to_enu, ecef_to_lla, enu_to_ecef, lla_to_ecef
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.constraints import bounded_alt, fixed_alt, fixed_cartesian
@@ -115,7 +116,7 @@ def example1(do_mod_cov: bool=False):
     return figs
 
 
-def example2():
+def example2(do_video_version: bool=False):
     """
     Executes Example 5.2.
 
@@ -124,6 +125,8 @@ def example2():
     Nicholas O'Donoughue
     7 February 2025
 
+    :param do_video_version: if True, generates a version of the example from the video discussing example 5.2, in
+                             addition to the one called for in example 5.2's prompt.
     :return: figure handle for the generated graphic
     """
 
@@ -161,40 +164,41 @@ def example2():
 
         # Initialize the plot
         this_fig, this_ax = plt.subplots(subplot_kw=dict(projection='3d'))
-        this_ax.stem(this_x_tdoa[0], this_x_tdoa[1], this_x_tdoa[2], basefmt='grey', linefmt='grey',
+        this_ax.stem(this_x_tdoa[0]/1e3, this_x_tdoa[1]/1e3, this_x_tdoa[2], basefmt='grey', linefmt='grey',
                      markerfmt='+', label='Sensors')
-        this_ax.stem([x_tgt[0]], [x_tgt[1]], [x_tgt[2]], basefmt='grey', linefmt='grey', markerfmt='^',
-                     label='Target')
+        this_ax.stem([x_tgt[0]/1e3], [x_tgt[1]/1e3], [x_tgt[2]], basefmt='grey', linefmt='grey',
+                     markerfmt='^', label='Target')
 
         # Add isochrones
         iso_label = 'Isochrones'
         isos = tdoa.draw_isochrones(range_diff=zeta, num_pts=101, max_ortho=40e3)
         for this_iso in isos:
-            plt.plot(this_iso[0], this_iso[1], '--k', linewidth=0.5, label=iso_label)
+            plt.plot(this_iso[0]/1e3, this_iso[1]/1e3, '--k', linewidth=0.5, label=iso_label)
             iso_label = None
 
         # Plot GD solution
-        this_ax.plot(x_gd_full[0], x_gd_full[1], x_gd_full[2], '-.s', markevery=[-1], label='GD (Unconstrained)')
-        this_ax.plot(x_gd_full_alt[0], x_gd_full_alt[1], x_gd_full_alt[2], '-.o', markevery=[-1],
+        this_ax.plot(x_gd_full[0]/1e3, x_gd_full[1]/1e3, x_gd_full[2], '-.s', markevery=[-1],
+                     label='GD (Unconstrained)')
+        this_ax.plot(x_gd_full_alt[0]/1e3, x_gd_full_alt[1]/1e3, x_gd_full_alt[2], '-.o', markevery=[-1],
                      label='GD (Constrained)')
 
-        this_ax.set_xlim([-20e3, 20e3])
-        this_ax.set_ylim([0e3, 50e3])
+        this_ax.set_xlim([-20, 20])
+        this_ax.set_ylim([0, 50])
         this_ax.set_zlim([0e3, 2.1e3])
         this_ax.set_clip_on(True)
 
         if title is not None:
             plt.title(title)
         plt.legend()
-        this_ax.set_xlabel('x [m]')
-        this_ax.set_ylabel('y [m]')
+        this_ax.set_xlabel('x [km]')
+        this_ax.set_ylabel('y [km]')
         this_ax.set_zlabel('z [m]')
 
         # Set the view angle
-        this_ax.azim = -45
+        this_ax.azim = -135
         this_ax.elev = 10
 
-        return this_fig
+        return this_fig, this_ax
 
     # Set up sensors
     alt1 = 1e3
@@ -203,18 +207,22 @@ def example2():
                        [0., 0., 0., 0.],
                        [alt1, alt1, alt1, alt1]])
 
-    figs = [_ex2_inner(x_tdoa, x_init, title='Example 5.2')]
 
-    # Try again with better elevation support
-    alt2 = 2*alt1
-    x_tdoa[2] = [alt1, alt2, alt1, alt2]
-    figs.append(_ex2_inner(x_tdoa, x_init, title='Better Altitude Support'))
+    fig_a, ax_a = _ex2_inner(x_tdoa, x_init, title='Example 5.2')
+    figs = [fig_a]
+    ax_a.set_zlim([0,1000]) # set the z-axis limits
 
-    # Video 5.2 modified altitude again
-    alt2 = 0.5*alt1
-    alt3 = 0*alt1
-    x_tdoa[2] = [alt2, alt1, alt3, alt2]
-    figs.append(_ex2_inner(x_tdoa, x_init, title='Video 5.2 Version'))
+    if do_video_version:
+        # Try again with better elevation support
+        alt2 = 2*alt1
+        x_tdoa[2] = [alt1, alt2, alt1, alt2]
+        figs.append(_ex2_inner(x_tdoa, x_init, title='Better Altitude Support')[0])
+
+        # Video 5.2 modified altitude again
+        alt2 = 0.5*alt1
+        alt3 = 0*alt1
+        x_tdoa[2] = [alt2, alt1, alt3, alt2]
+        figs.append(_ex2_inner(x_tdoa, x_init, title='Video 5.2 Version')[0])
 
     return figs
 
@@ -268,10 +276,10 @@ def example3():
     crlb_fix = hybrid.compute_crlb(x_source=x_tgt, eq_constraints_grad=[a_grad])
 
     print('CRLB (unconstrained):')
-    with np.printoptions(precision=0):
+    with np.printoptions(precision=4, suppress=True):
         print(crlb_raw)
     print('CRLB (constrained):')
-    with np.printoptions(precision=0, suppress=True):
+    with np.printoptions(precision=4, suppress=True):
         print(crlb_fix)
 
     # Plot for x/y grid
@@ -281,23 +289,23 @@ def example3():
     search_space = SearchSpace(x_ctr=x_tgt,
                                max_offset=max_offset,
                                points_per_dim=num_pts)
-    x_set, x_grid, out_shape = make_nd_grid(search_space)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
 
     # Compute CRLB across grid
     crlb_raw_grid = hybrid.compute_crlb(x_source=x_set, print_progress=True)
     crlb_fix_grid = hybrid.compute_crlb(x_source=x_set, print_progress=True, eq_constraints_grad=[a_grad])
 
     # Compute RMSE of each grid point
-    rmse_raw = np.reshape(compute_rmse(crlb_raw_grid), shape=out_shape)
-    rmse_fix = np.reshape(compute_rmse(crlb_fix_grid), shape=out_shape)
+    rmse_raw = np.reshape(compute_rmse(crlb_raw_grid), shape=search_space.grid_shape)
+    rmse_fix = np.reshape(compute_rmse(crlb_fix_grid), shape=search_space.grid_shape)
 
     # Plot RMSE
     fig, axes = plt.subplots(ncols=2)
     contour_levels = np.arange(20)
-    extent = ((x_tgt[0] - max_offset)/1e3,
-              (x_tgt[0] + max_offset)/1e3,
-              (x_tgt[1] - max_offset)/1e3,
-              (x_tgt[1] + max_offset)/1e3)
+    extent = ((x_tgt[0].item() - max_offset)/1e3,
+              (x_tgt[0].item() + max_offset)/1e3,
+              (x_tgt[1].item() - max_offset)/1e3,
+              (x_tgt[1].item() + max_offset)/1e3)
 
     # Unconstrained on axes[0] and Constrained on axes[1]
     for this_ax, this_z, this_title in zip(axes, [rmse_raw, rmse_fix], ['Unconstrained', 'Constrained']):
@@ -420,7 +428,7 @@ def example4():
     ax.set_zlabel('z [km]')
 
     # Set the view angle
-    ax.azim = -45
+    ax.azim = -135
     ax.elev = 10
 
     return [fig]
@@ -468,7 +476,7 @@ def example5():
     def prior(x):
         # x is (n_dim x n_position) array of potential source positions; compute the probability for each, but don't
         # bother with cross-terms
-        return np.array([scipy.stats.multivariate_normal.pdf(this_x, mean=x_prior, cov=cov_prior) for this_x in x.T])
+        return np.array([mvn.pdf(this_x, mean=x_prior, cov=cov_prior.cov) for this_x in x.T])
 
     # Measurement
     zeta = tdoa.noisy_measurement(x_source=x_tgt)
@@ -477,10 +485,10 @@ def example5():
     x_center = x_tgt
     grid_size = np.array([50e3, 50e3, 0])
     epsilon = 250
-    extent = (float(x_tgt[0] - grid_size[0]) / 1e3,
-              float(x_tgt[0] + grid_size[0]) / 1e3,
-              float(x_tgt[1] - grid_size[1]) / 1e3,
-              float(x_tgt[1] + grid_size[1]) / 1e3)  # cast each entry to a float to avoid a PyCharm type warning later
+    extent = ((x_tgt[0].item() - grid_size[0]) / 1e3,
+              (x_tgt[0].item() + grid_size[0]) / 1e3,
+              (x_tgt[1].item() - grid_size[1]) / 1e3,
+              (x_tgt[1].item() + grid_size[1]) / 1e3)
 
     ml_search = SearchSpace(x_ctr=x_center, max_offset=grid_size, epsilon=epsilon)
     x_ml, score, x_grid = tdoa.max_likelihood(zeta=zeta, search_space=ml_search)

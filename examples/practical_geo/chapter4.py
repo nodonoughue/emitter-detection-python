@@ -6,7 +6,7 @@ from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import print_elapsed, print_progress, make_nd_grid, safe_2d_shape, SearchSpace, remove_outliers
+from ewgeo.utils import print_elapsed, print_progress, safe_2d_shape, SearchSpace, remove_outliers
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.coordinates import lla_to_enu
 from ewgeo.utils.covariance import CovarianceMatrix
@@ -238,16 +238,16 @@ def example2(colors=None):
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=search_size,
                                epsilon=grid_res)
-    x_source_enu, x_grid, grid_shape = make_nd_grid(search_space)  # make the grid
-    extent = tuple(np.array([x_ctr[0] - max_offset, x_ctr[0] + max_offset,
-                             x_ctr[1] - max_offset, x_ctr[1] + max_offset])/1e3)
+    x_source_enu, x_grid = search_space.x_set, search_space.x_grid
+
+    extent = (x_ctr[0].item()/1e3 - max_offset/1e3,
+              x_ctr[0].item()/1e3 + max_offset/1e3,
+              x_ctr[1].item()/1e3 - max_offset/1e3,
+              x_ctr[1].item()/1e3 + max_offset/1e3)
 
     # Use a squeeze operation to ensure that the individual dimension
     # indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
-
-    # Remove singleton-dimensions from grid_shape so that contourf gets a 2D input
-    grid_shape_2d = [i for i in grid_shape if i > 1]
 
     # Sensor Selection
     _, n_tdoa = safe_2d_shape(x_sensor_lla)
@@ -280,12 +280,12 @@ def example2(colors=None):
     fig = plt.figure()
     # PyCharm throws a type warning on extent=extent on the next line; ignore it.
     # noinspection PyTypeChecker
-    plt.imshow(np.reshape(rmse_crlb/1e3, grid_shape_2d), origin='lower', cmap=colors, extent=extent,
+    plt.imshow(np.reshape(rmse_crlb/1e3, search_space.grid_shape), origin='lower', cmap=colors, extent=extent,
                vmin=color_lims[0], vmax=color_lims[-1])
     plt.colorbar(format=lambda x, _: f"{x:.0f} km")
 
     # Add contours
-    hdl2 = plt.contour(x_grid[0]/1e3, x_grid[1]/1e3, np.reshape(rmse_crlb/1e3, grid_shape_2d),
+    hdl2 = plt.contour(x_grid[0]/1e3, x_grid[1]/1e3, np.reshape(rmse_crlb/1e3, search_space.grid_shape),
                        origin='lower', colors='k', levels=levels)
     plt.clabel(hdl2, fontsize=10, colors='k', fmt='%.0f km')
 

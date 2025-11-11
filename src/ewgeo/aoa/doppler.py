@@ -117,14 +117,14 @@ def compute_df(r, x, ts, f, radius, fr, psi_res, min_psi, max_psi):
         phi0_mat = phi_0(psi_vec)  # shape: (num_samples, len(psi_vec))
 
         # Compute error at each test point in search vector and find minimum
-        err = np.sum((phi[:, np.newaxis] - phi0_mat)**2, axis=0)
+        err = np.sum(np.absolute(phi[:, np.newaxis] - phi0_mat)**2, axis=0)
         idx_opt = np.argmin(err)
         psi = psi_vec[idx_opt]
 
         # Refine search bounds for next iteration
         this_psi_res /= 10
-        idx_min = max(0, idx_opt - 2)
-        idx_max = min(len(psi_vec) - 1, idx_opt + 2)
+        idx_min = max(0, idx_opt - 4)
+        idx_max = min(len(psi_vec) - 1, idx_opt + 4)
         min_psi = psi_vec[idx_min]
         max_psi = psi_vec[idx_max]
 

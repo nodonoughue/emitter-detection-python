@@ -3,22 +3,22 @@ import numpy as np
 from numpy import typing as npt
 from scipy.stats import multivariate_normal as mvn
 
-from . import ensure_iterable, make_nd_grid, safe_2d_shape, SearchSpace
+from . import ensure_iterable, safe_2d_shape, SearchSpace
 from .constraints import constrain_likelihood, snap_to_equality_constraints, snap_to_inequality_constraints
 from .covariance import CovarianceMatrix
 
 
-def ls_solver(zeta,
+def ls_solver(y,
               jacobian,
               cov: CovarianceMatrix,
               x_init: npt.ArrayLike,
-              epsilon:float=1e-6,
+              epsilon:float=1e-3,
               max_num_iterations:int=int(10e3),
               force_full_calc:bool=False,
               plot_progress:bool=False,
               eq_constraints:list=None,
               ineq_constraints:list=None,
-              constraint_tolerance:float=1e-6):
+              constraint_tolerance:float=1e-6)-> tuple[npt.NDArray, npt.NDArray]:
     """
     Computes the least square solution for geolocation processing.
     
@@ -27,7 +27,7 @@ def ls_solver(zeta,
     Nicholas O'Donoughue
     14 January 2021
     
-    :param zeta: Measurement vector function handle (accepts n_dim vector of source position estimate, responds with
+    :param y: Measurement error vector function handle (accepts n_dim vector of source position estimate, responds with
                  error between received and modeled data vector)
     :param jacobian: Jacobian matrix function handle (accepts n_dim vector of source position estimate, and responds 
                      with n_dim x n_sensor Jacobian matrix)
@@ -78,14 +78,17 @@ def ls_solver(zeta,
         current_iteration += 1
 
         # Evaluate Residual and Jacobian Matrix
-        y_i = zeta(x_prev)
+        y_i = y(x_prev)
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use the squeeze command to drop the third dim (n_source = 1)
 
         # Compute delta_x^(i), according to 10.20
         delta_x = cov.solve_lstsq(y_i, jacobian_i)
+        if np.ndim(delta_x) > 1:
+            # There's a second dimension; take the average step across them
+            delta_x = np.mean(delta_x, axis=1)
 
         # Update predicted location
-        x_update = x_prev + np.squeeze(delta_x)
+        x_update = x_prev + delta_x
 
         # Apply Equality Constraints
         if eq_constraints is not None:
@@ -133,13 +136,13 @@ def gd_solver(y,
               x_init:npt.ArrayLike,
               alpha:float=0.3,
               beta:float=0.8,
-              epsilon:float=1.e-6,
+              epsilon:float=1.e-3,
               max_num_iterations:int=int(10e3),
               force_full_calc:bool=False,
               plot_progress:bool=False,
               eq_constraints:list=None,
               ineq_constraints:list=None,
-              constraint_tolerance:float=1e-6):
+              constraint_tolerance:float=1e-6)-> tuple[npt.NDArray, npt.NDArray]:
     """
     Computes the gradient descent solution for localization given the provided measurement and Jacobian function 
     handles, and measurement error covariance.
@@ -187,7 +190,7 @@ def gd_solver(y,
     # Cost Function for Gradient Descent
     def cost_fxn(z):
         this_y = y(z)
-        return cov.solve_aca(this_y.T)
+        return np.mean(cov.solve_aca(this_y.T))
 
     # Initialize Plotting
     if plot_progress:
@@ -214,24 +217,27 @@ def gd_solver(y,
         # Evaluate Residual and Jacobian Matrix
         y_i = y(x_prev)
         jacobian_i = np.squeeze(jacobian(x_prev))  # Use squeeze to remove third dimension (n_source=1)
-        
-        # Compute Gradient and Cost function
-        grad = -2 * cov.solve_acb(jacobian_i, y_i)
-        # if cov_is_inverted:
-        #     grad = -2 * jacobian_i @ covariance_inverse @ y_i
-        # else:
-        #     a = scipy.linalg.solve_triangular(covariance_lower, jacobian_i.T, lower=True)
-        #     b = scipy.linalg.solve_triangular(covariance_lower, y_i, lower=True)
-        #     grad = -2 * a.T @ b
-        
-        # Descent direction is the negative of the gradient
-        del_x = -np.squeeze(grad/np.linalg.norm(grad))
-        
-        # Compute the step size
-        t = backtracking_line_search(cost_fxn, x_prev, grad, del_x, alpha, beta)
-        
-        # Update x position
-        x_update = x_prev + t*del_x
+
+        # If y_i is zero, gradient descent will fail because we're at the bottom. Skip to the next iteration without
+        # changing anything
+        if np.sum(np.abs(y_i)) < 1e-20:
+            x_update = x_prev
+            t = 0.
+        else:
+            # Compute Gradient and Cost function
+            grad = -2 * cov.solve_acb(jacobian_i, y_i)
+            if np.ndim(grad) > 1:
+                # There's a second dimension; take the average gradient across them
+                grad = np.mean(grad, axis=1)
+
+            # Descent direction is the negative of the gradient
+            del_x = -np.squeeze(grad/np.linalg.norm(grad))
+
+            # Compute the step size
+            t = backtracking_line_search(cost_fxn, x_prev, grad, del_x, alpha, beta)
+
+            # Update x position
+            x_update = x_prev + t*del_x
 
         # Apply Equality Constraints
         if eq_constraints is not None:
@@ -294,7 +300,7 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
     """
 
     # Initialize the search parameters and direction
-    t = 1
+    t = 100
     starting_val = np.squeeze(f(x))
     slope = np.squeeze(np.conjugate(grad.T) @ del_x)
 
@@ -313,7 +319,8 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
 
 
 def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
-              prior=None, prior_wt: float = 0., print_progress=False, **kwargs):
+              prior=None, prior_wt: float = 0., print_progress=False, num_levels: int=1, zoom_per_level: float=2,
+              **kwargs):
     """
     Execute ML estimation through brute force computational methods.
 
@@ -342,8 +349,15 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
     """
 
+    if num_levels > 1:
+        # Call the solver with one less level to get the coarse estimate
+        x_est, _, _ = ml_solver(ell, search_space, eq_constraints, ineq_constraints, constraint_tolerance,
+                                prior, prior_wt, print_progress, num_levels-1, zoom_per_level, **kwargs)
+        # Zoom in and run as normal
+        search_space = search_space.zoom_in(new_ctr=x_est, zoom=zoom_per_level**(num_levels-1), overwrite=False)
+
     # Set up the search space
-    x_set, x_grid, out_shape = make_nd_grid(search_space)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
 
     # Constrain the likelihood, if needed
     if ineq_constraints is not None or eq_constraints is not None:
@@ -390,136 +404,16 @@ def bestfix_solver(pdfs, search_space: SearchSpace):
     """
 
     # Set up the search space
-    x_set, x_grid, out_shape = make_nd_grid(search_space)
+    x_set, x_grid = search_space.x_set, search_space.x_grid
 
     # Apply each PDF to all input coordinates and then multiply across PDFs
     result = np.asarray([np.prod(np.asarray([this_pdf(this_x) for this_pdf in pdfs])) for this_x in x_set.T])
 
     # Reshape
-    result = np.reshape(result, out_shape)
+    result = np.reshape(result, search_space.grid_shape)
 
     # Find the highest scoring position
     idx_pk = result.argmax()
     x_est = x_set[:, idx_pk]
 
     return x_est, result, x_grid
-
-def sensor_calibration(ell,
-                       pos_search: SearchSpace,
-                       vel_search: SearchSpace,
-                       bias_search: SearchSpace,
-                       num_iterations=1,
-                       pos_prior=None,
-                       vel_prior=None,
-                       bias_prior=None):
-    """
-    This function attempts to calibrate sensor uncertainties given a series of measurements (AOA, TDOA, and/or FDOA)
-    against a set of calibration emitters. Sensor uncertainties can take the form of unknown measurement bias or
-    position/velocity errors.
-
-    This follows the logic in Figure 6.11 of the 2022 text, loosely summarized:
-    1. Assume that the sensor positions and velocities are accurate, and estimate measurement biases.
-    2. Use the estimated measurement biases to update the sensor positions.
-    3. Use the estimated measurement biases and sensor positions to update sensor velocities.
-    4. (Optionally) Repeat Steps 1-3 num_iterations times.
-
-    Figure 6.11 shows this as a linear operation, but if the estimates are not accurate enough, repeated iterations
-    of the process may be desired. This can be achieved by calling the sensor_calibration function again with the
-    updated position and measurement bias estimates.
-
-    :param ell: function handle that accepts two inputs: (bias, x_sensor); bias being an array of measurement biases,
-                and x_sensor a 2D array of sensor positions.
-    :param pos_search: dictionary with parameters for the ML search for sensor positions
-    :param vel_search: dictionary with parameters for the ML search for sensor velocities
-    :param bias_search: dictionary with parameters for the ML search for measurement bias
-    :param num_iterations: number of times to repeat the calibration search
-    :return x_sensor_est: Estimated sensor positions
-    :return bias_est: Estimated measurement biases
-    """
-
-    # Make a default prior for sensor calibration that assumes a Gaussian distribution
-    def default_prior(x: npt.ArrayLike, search_space: SearchSpace):
-        return mvn.pdf(x.T,  # transpose -- our inputs are (n_dim, n_sample), but mvn expects the opposite
-                       mean=search_space.x_ctr.ravel(),
-                       cov=np.diag(search_space.max_offset.ravel()))
-
-    # Initialize Outputs
-    bias_est = bias_search.x_ctr if bias_search is not None else None
-    x_sensor_est = pos_search.x_ctr if pos_search is not None else None
-    v_sensor_est = vel_search.x_ctr if vel_search is not None else None
-
-    for _ in range(num_iterations):
-
-        # ================= Estimate Measurement Bias ========================
-        if bias_search is not None and np.any(bias_search.points_per_dim > 1):
-            x_sensor_vec = pos_search.x_ctr
-            v_sensor_vec = vel_search.x_ctr
-            def ell_bias(bias, **ell_kwargs):
-                # Input is num_parameters x num_test_points; iterate over test points
-                return [ell(this_bias, x_sensor_vec, v_sensor_vec, **ell_kwargs) for this_bias in bias.T]
-
-            if bias_prior is None:
-                this_bias_prior = lambda bias: default_prior(bias, bias_search)
-            else:
-                this_bias_prior = bias_prior
-
-            result = ml_solver(ell=ell_bias, search_space=bias_search, prior=this_bias_prior, prior_wt=0.3)
-            bias_est = result[0]
-            bias_search.x_ctr = bias_est # store result as center for next iteration
-
-        # =================== Estimate Sensor Position =========================
-        if pos_search is not None and np.any(pos_search.points_per_dim > 1):
-            v_sensor_vec = vel_search.x_ctr
-
-            def ell_pos(x, **ell_kwargs):
-                # Input is num_parameters x num_test_points; iterate over test points
-                return [ell(bias_est, this_x, v_sensor_vec, **ell_kwargs) for this_x in x.T]
-
-            if pos_prior is None:
-                this_pos_prior = lambda pos: default_prior(pos, pos_search)
-            else:
-                this_pos_prior = pos_prior
-
-            # Do them one at a time; set the points_per_dim to 1 on the others
-            points_per_dim = pos_search.points_per_dim
-            _, num_sensors = safe_2d_shape(points_per_dim)
-
-
-            for idx in np.arange(num_sensors):
-                # Only search the current sensor's position error
-                this_ppd = np.ones_like(points_per_dim)
-                this_ppd[:,idx] = points_per_dim[:, idx]
-                pos_search.points_per_dim = this_ppd
-                result = ml_solver(ell=ell_pos, search_space=pos_search, prior=this_pos_prior, prior_wt=0.3)
-                x_sensor_est = result[0]
-                # store result as center for next iteration
-                pos_search.x_ctr = np.reshape(x_sensor_est, shape=np.shape(points_per_dim))
-
-        # =================== Estimate Sensor Velocity =========================
-        if vel_search is not None and np.any(vel_search.points_per_dim > 1):
-            def ell_vel(v, **ell_kwargs):
-                # Input is num_parameters x num_test_points; iterate over test points
-                return [ell(bias_est, x_sensor_est, this_v, **ell_kwargs) for this_v in v.T]
-
-            if vel_prior is None:
-                if vel_prior is None:
-                    this_vel_prior = lambda vel: default_prior(vel, vel_search)
-                else:
-                    this_vel_prior = vel_prior
-
-            # Do them one at a time; set the points_per_dim to 1 on the others
-            points_per_dim = vel_search.points_per_dim
-            _, num_sensors = safe_2d_shape(points_per_dim)
-
-            for idx in np.arange(num_sensors):
-                # Only search the current sensor's position error
-                this_ppd = np.ones_like(points_per_dim)
-                this_ppd[:,idx] = points_per_dim[:, idx]
-                vel_search.points_per_dim = this_ppd
-                result = ml_solver(ell=ell_vel, search_space=vel_search, prior=this_vel_prior, prior_wt=0.3)
-                v_sensor_est = result[0]
-                # store result as center for next iteration
-                vel_search.x_ctr = np.reshape(v_sensor_est, shape=np.shape(points_per_dim))
-
-
-    return x_sensor_est, v_sensor_est, bias_est

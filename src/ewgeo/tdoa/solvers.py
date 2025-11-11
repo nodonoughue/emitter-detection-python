@@ -34,8 +34,6 @@ def chan_ho(x_sensor: npt.ArrayLike,
     :return: estimated source position [m]
     """
 
-    # TODO: Debug
-
     # Resample the covariance matrix, if needed
     cov = preprocess_cov(cov=cov, do_resample=do_resample, variance_is_toa=variance_is_toa, ref_idx=ref_idx)
 
@@ -163,7 +161,6 @@ def _chan_ho_theta_hat(cov_mod, b2, g1, g2, y2):
     :return theta: parameter vector (eq 11.36)
     """
 
-    # TODO: Debug and verify
     g1wg1 = g1.T @ cov_mod @ g1
     w2 = pinvh(b2.T @ pinvh(g1wg1) @ b2)
     g2w = g2.T @ w2

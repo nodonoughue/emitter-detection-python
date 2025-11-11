@@ -574,106 +574,212 @@ def safe_2d_shape(x: npt.ArrayLike)-> tuple[int, int]:
 
 
 class SearchSpace:
-    num_parameters: int
-    x_ctr: npt.ArrayLike
-    epsilon: npt.ArrayLike
-    points_per_dim: npt.NDArray[np.int64]
-    max_offset: npt.ArrayLike
+    _x_ctr: npt.ArrayLike or None = None
+    _epsilon: npt.ArrayLike or None = None
+    _points_per_dim: npt.NDArray[np.int64] or None = None
+    _max_offset: npt.ArrayLike or None = None
+
+    # Inferred grid
+    _x_set: npt.NDArray[np.int64] or None = None
+    _x_grid: tuple[*npt.NDArray[np.int64]] or None = None
 
     def __init__(self,
                  x_ctr:npt.ArrayLike,
                  epsilon:npt.ArrayLike=None,
                  points_per_dim:npt.NDArray[np.int64]=None,
                  max_offset:npt.ArrayLike=None):
-        self.x_ctr = x_ctr
+        self._x_ctr = x_ctr
+        self._epsilon = epsilon
+        self._points_per_dim = points_per_dim
+        self._max_offset = max_offset
 
-        if points_per_dim is None:
-            # infer from max_offset and epsilon
-            assert epsilon is not None and max_offset is not None, 'Not enough inputs.'
-            self.max_offset = max_offset
-            self.epsilon = epsilon
-            self.points_per_dim = np.floor(1 + 2 * self.max_offset / self.epsilon).astype(int)
-        elif max_offset is None:
-            # infer from points_per_dim and epsilon
-            assert epsilon is not None and points_per_dim is not None, 'Not enough inputs.'
-            self.epsilon = epsilon
-            self.points_per_dim = np.array(points_per_dim, dtype=int)
-            self.max_offset = self.epsilon * (self.points_per_dim - 1) / 2
-        elif epsilon is None:
-            # infer from points_per_dim and max_offset
-            assert max_offset is not None and points_per_dim is not None, 'Not enough inputs.'
-            self.points_per_dim = np.array(points_per_dim, dtype=int)
-            self.max_offset = max_offset
-            out_shape = np.amax(np.shape(points_per_dim), np.shape(max_offset))
-            self.epsilon = np.divide(max_offset, points_per_dim - 1, out=np.ones(out_shape), where=points_per_dim>1)
+        # Verify sizing and consistency
+        self.check_consistency()
+
+    @property
+    def num_parameters(self):
+        self.broadcast()
+        return np.prod(np.shape(self.x_ctr))
+
+    @property
+    def x_ctr(self):
+        self.broadcast()
+        return self._x_ctr
+
+    @x_ctr.setter
+    def x_ctr(self, x_ctr: npt.ArrayLike):
+        self.reset()  # clear the dependent fields
+        self._x_ctr = x_ctr
+
+    @property
+    def epsilon(self):
+        self.broadcast()
+        if self._epsilon is None:
+            # Build epsilon from max_offset and points_per_dim
+            out_shape = np.amax(np.shape(self.points_per_dim), np.shape(self.max_offset))
+            self._epsilon = np.divide(self.max_offset, self.points_per_dim - 1,
+                                      out=np.ones(out_shape), where=self.points_per_dim > 1)
+        return self._epsilon
+
+    @epsilon.setter
+    def epsilon(self, epsilon: npt.ArrayLike):
+        self.reset()  # clear the dependent fields
+        self._epsilon = epsilon
+        if self._epsilon is not None:
+            self.check_consistency()
+
+    @property
+    def max_offset(self):
+        self.broadcast()
+        if self._max_offset is None:
+            # Build max_offset from epsilon and points_per_dim
+            self._max_offset = self.epsilon * (self.points_per_dim - 1) / 2
+        return self._max_offset
+
+    @max_offset.setter
+    def max_offset(self, max_offset: npt.ArrayLike):
+        self.reset()  # clear the dependent fields
+        self._max_offset = max_offset
+        if self._max_offset is not None:
+            self.check_consistency()
+
+    @property
+    def points_per_dim(self):
+        if self._points_per_dim is None:
+            # Build points_per_dim from max_offset and epsilon
+            self._points_per_dim = np.where(self.epsilon != 0, np.floor(1 + 2 * self.max_offset / self.epsilon), 1).astype(int)
+        return self._points_per_dim
+
+    @points_per_dim.setter
+    def points_per_dim(self, points_per_dim: npt.ArrayLike):
+        self.reset()  # clear the dependent fields
+        self._points_per_dim = points_per_dim
+        if self._points_per_dim is not None:
+            self.check_consistency()
+
+    @property
+    def x_set(self):
+        if self._x_set is None:
+            self.make_nd_grid()
+        return self._x_set
+
+    @property
+    def x_grid(self):
+        if self._x_grid is None:
+            self.make_nd_grid()
+        return self._x_grid
+
+    @property
+    def grid_shape(self):
+        self.broadcast()
+        return [i for i in self.points_per_dim if i > 1]
+
+    def reset(self):
+        """
+        Clear dependent fields
+        """
+        self._x_set = None
+        self._x_grid = None
+
+    def check_consistency(self):
+        """
+        Check that max_offset, points_per_dim, and epsilon are consistent.  If not, raise an error.
+        """
+        if self._points_per_dim is None or self._epsilon is None or self._max_offset is None:
+            # Nothing to do; they're consistent because one is missing
+            return True
         else:
-            # make sure they align
-            assert np.all(np.equal(max_offset, (points_per_dim - 1)/2 * epsilon)), 'Bad inputs to search space.'
-            self.points_per_dim = np.array(points_per_dim, dtype=int)
-            self.max_offset = max_offset
+            # Compute epsilon from max_offset and points_per_dim
+            out_shape = np.maximum(np.shape(self.points_per_dim), np.shape(self.max_offset))
+            epsilon_local = np.divide(self.max_offset, self.points_per_dim - 1,
+                                      out=np.ones(out_shape), where=self.points_per_dim>1)
 
-        # Verify sizes and broadcast
-        attrs = ['x_ctr', 'epsilon', 'points_per_dim', 'max_offset']
-        b = np.broadcast(*[getattr(self, attr) for attr in attrs])
-        self.num_parameters = np.prod(b.shape)
-        for attr in attrs:
-            setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=b.shape))
+            # Compare to epsilon and throw an assertion error if it's more than 0.1% off
+            err = self.epsilon - epsilon_local
+            return np.sqrt(np.sum(np.abs(err)**2, axis=None)) < .001 * np.sqrt(np.sum(np.abs(self.epsilon)**2, axis=None))
 
-def make_nd_grid(search_space: SearchSpace)-> tuple[npt.NDArray, tuple, tuple[int]]:
-    """
-    Create and return an ND search grid, based on the specified center of the search space, extent, and grid spacing.
+    def broadcast(self)-> bool:
+        # Verify that all variable sizes are compatible
+        attrs = ['_x_ctr', '_epsilon', '_points_per_dim', '_max_offset']
+        try:
+            b = np.broadcast(*[getattr(self, attr) for attr in attrs if getattr(self, attr) is not None])
+            for attr in attrs:
+                if getattr(self, attr) is not None:
+                    setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=b.shape))
+            return True
+        except ValueError:
+            return False
 
-    28 December 2021
-    Nicholas O'Donoughue
+    def make_nd_grid(self):
+        """
+        Create and return an ND search grid, based on the specified center of the search space, extent, and grid spacing.
 
-    :return x_set: n_dim x N numpy array of positions
-    :return x_grid: n_dim-tuple of n_dim-dimensional numpy arrays containing the coordinates for each dimension.
-    :return out_shape:  tuple with the size of the generated grid
-    """
+        28 December 2021
+        Nicholas O'Donoughue
 
-    n_dim = search_space.num_parameters
+        :return x_set: n_dim x N numpy array of positions
+        :return x_grid: n_dim-tuple of n_dim-dimensional numpy arrays containing the coordinates for each dimension.
+        :return out_shape:  tuple with the size of the generated grid
+        """
 
-    if np.size(search_space.x_ctr) == 1:
-        x_ctr = search_space.x_ctr * np.ones((n_dim, ))
-    else:
-        x_ctr = search_space.x_ctr.ravel()
+        n_dim = self.num_parameters
 
-    if np.size(search_space.max_offset) == 1:
-        max_offset = search_space.max_offset * np.ones((n_dim, ))
-    else:
-        max_offset = search_space.max_offset.ravel()
+        if np.size(self.x_ctr) == 1:
+            x_ctr = self.x_ctr * np.ones((n_dim, ))
+        else:
+            x_ctr = self.x_ctr.ravel()
 
-    if np.size(search_space.points_per_dim) == 1:
-        points_per_dim = search_space.points_per_dim * np.ones((n_dim, ))
-    else:
-        points_per_dim = search_space.points_per_dim.ravel()
+        if np.size(self.max_offset) == 1:
+            max_offset = self.max_offset * np.ones((n_dim, ))
+        else:
+            max_offset = self.max_offset.ravel()
 
-    assert n_dim == np.size(max_offset) and n_dim == np.size(points_per_dim), \
-           'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
+        if np.size(self.points_per_dim) == 1:
+            points_per_dim = self.points_per_dim * np.ones((n_dim, ))
+        else:
+            points_per_dim = self.points_per_dim.ravel()
+
+        assert n_dim == np.size(max_offset) and n_dim == np.size(points_per_dim), \
+               'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
 
 
-    # Check Search Size
-    max_elements = 1e8  # Set a conservative limit
-    assert np.prod(points_per_dim) < max_elements, \
-           'Search size is too large; python is likely to crash or become unresponsive. Reduce your search size, or' \
-           + ' increase the max allowed.'
+        # Check Search Size
+        max_elements = 1e8  # Set a conservative limit
+        assert np.prod(points_per_dim) < max_elements, \
+               'Search size is too large; python is likely to crash or become unresponsive. Reduce your search size, or' \
+               + ' increase the max allowed.'
 
-    # Make a set of axes, one for each dimension, that are centered on x_ctr
-    dims = [x + np.linspace(start=-x_max, stop=x_max, num=n) if n > 1 else x for (x, x_max, n)
-            in zip(x_ctr, max_offset, points_per_dim)]
+        # Make a set of axes, one for each dimension, that are centered on x_ctr
+        dims = [x + np.linspace(start=-x_max, stop=x_max, num=n) if n > 1 else x for (x, x_max, n)
+                in zip(x_ctr, max_offset, points_per_dim)]
 
-    # Use meshgrid expansion; each element of x_grid is now a full n_dim dimensioned grid
-    x_grid = np.meshgrid(*dims)
+        # Use meshgrid expansion; each element of x_grid is now a full n_dim dimensioned grid
+        x_grid = np.meshgrid(*dims)
 
-    # Rearrange to a single 2D array of grid locations (n_dim x N)
-    x_set = np.asarray([x.flatten() for x in x_grid])
+        # Rearrange to a single 2D array of grid locations (n_dim x N)
+        x_set = np.asarray([x.flatten() for x in x_grid])
 
-    return x_set, x_grid, points_per_dim
+        self._x_set = x_set
+        self._x_grid = x_grid
+
+    def zoom_in(self, new_ctr: npt.ArrayLike, zoom: float=2.0, overwrite: bool=False):
+        if np.shape(new_ctr) != np.shape(self.x_ctr):
+            raise ValueError('New center must have the same dimensionality as the existing center.')
+
+        # Keep the number of grid points the same, but cut the grid resolution by the zoom factor
+        if overwrite:
+            self.epsilon = self.epsilon/zoom
+            self.max_offset = None
+            return
+        else:
+            return SearchSpace(x_ctr=new_ctr,
+                               epsilon=self.epsilon/zoom,
+                               points_per_dim=self.points_per_dim)
 
 
 def is_broadcastable(a: npt.ArrayLike, b: npt.ArrayLike)-> bool:
     """
-    Determine if two inputs are broadcastable. In other words, check all common dimensions, and
+    Determine if two inputs are broadcastable. In other words, check all common dimensions and
     ensure that they are either equal or of length 1.
 
     14 November 2022
@@ -695,6 +801,34 @@ def is_broadcastable(a: npt.ArrayLike, b: npt.ArrayLike)-> bool:
         return True
     except ValueError:
         return False
+
+
+def broadcast_backwards(arrs: list[npt.NDArray, ], start_dim: int=0)\
+        -> tuple[list[npt.NDArray, ], npt.NDArray]:
+    """
+    Ensure all inputs are broadcastable, with an optional starting dimension. Return extended arrays that have the same
+    number of dimensions so that numpy broadcasting works correctly.
+
+    In this utility, new dimensions are added to the end of the array, not the beginning, to align with the behavior
+    in MATLAB.
+    """
+
+    # Make sure they're long enough
+    max_len = max([len(np.shape(arr)) for arr in arrs])
+    if max_len < start_dim: max_len = start_dim
+    output_arrs = []
+    for arr in arrs:
+        while len(np.shape(arr)) < max_len:
+            arr = np.expand_dims(arr, axis=-1)
+        output_arrs.append(arr)
+
+    if max_len <= start_dim:
+        out_shp = []
+    else:
+        out_shp = np.broadcast_shapes(*[np.shape(arr)[start_dim:] for arr in output_arrs])
+
+    # Return
+    return output_arrs, out_shp
 
 
 def modulo2pi(x: npt.ArrayLike)-> npt.NDArray:
