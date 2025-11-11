@@ -765,7 +765,7 @@ class SearchSpace:
         self._x_set = x_set
         self._x_grid = x_grid
 
-    def get_extent(self, axes: npt.ArrayLike[int] or None=None, multiplier: float=1)-> tuple[float, ...]:
+    def get_extent(self, axes: npt.NDArray[int] or None=None, multiplier: float=1)-> tuple[float, ...]:
         """
         For the specified axes, generate and return a tuple to be used with plotting commands.
         Optionally accepts a multiplier to scale the extent (e.g., from meters to kilometers).
