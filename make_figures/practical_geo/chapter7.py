@@ -326,7 +326,7 @@ def make_figure_10(prefix=None):
     # Since we can't do geolocation with the first measurement, let's
     # initialize the track manually
     x_prev = np.array([0, 1e3])
-    p_prev = np.diag([1e3, 10e3])**2
+    p_prev = CovarianceMatrix(np.diag([1e3, 10e3])**2)
 
     cep_vec = np.zeros_like(t_vec)
     for idx in np.arange(t_vec.size):
@@ -338,7 +338,7 @@ def make_figure_10(prefix=None):
 
         this_psi = aoa.noisy_measurement(x_tgt)
 
-        this_x, this_p = tracker.ekf_update(x_prev, p_prev, this_psi, aoa.cov.cov, z_fun, h_fun)
+        this_x, this_p = tracker.ekf_update(x_prev, p_prev, this_psi, aoa.cov, z_fun, h_fun)
         cep_vec[idx] = compute_cep50(CovarianceMatrix(this_p))
 
         x_prev = this_x

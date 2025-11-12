@@ -329,12 +329,12 @@ def example3():
             this_p = aoa.compute_crlb(x_source=this_x)
         else:
             # EKF Update
-            this_x, this_p = tracker.ekf_update(x_prev=prev_x, p_prev=prev_p, zeta=this_zeta, cov=aoa.cov.cov,
+            this_x, this_p = tracker.ekf_update(x_prev=prev_x, p_prev=prev_p, zeta=this_zeta, cov=aoa.cov,
                                             z_fun=z_fun, h_fun=h_fun)
 
         # Store the results and update the variables
         x_est[:, idx] = this_x
-        cep[idx] = compute_cep50(CovarianceMatrix(this_p))
+        cep[idx] = compute_cep50(this_p)
 
         prev_x = this_x
         prev_p = this_p
@@ -441,11 +441,11 @@ def example4():
         else:
             # EKF Update
             this_x, this_p = tracker.ekf_update(x_prev=prev_x, p_prev=prev_p, zeta=zeta,
-                                            cov=aoa.cov.cov, z_fun=aoa.measurement, h_fun=h_fun)
+                                            cov=aoa.cov, z_fun=aoa.measurement, h_fun=h_fun)
 
         # Store the results and update the variables
         x_est[:, idx] = this_x
-        cep[idx] = compute_cep50(CovarianceMatrix(this_p))
+        cep[idx] = compute_cep50(this_p)
     
         prev_x = this_x
         prev_p = this_p

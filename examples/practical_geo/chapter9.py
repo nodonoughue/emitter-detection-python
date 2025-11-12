@@ -120,7 +120,8 @@ def example1():
 
     # Build a state covariance error from the CRLB
     for s in new_states:
-        s.covar = CovarianceMatrix(block_diag(pss.compute_crlb(s.position),1e6*np.eye(2)))
+        s.covar = CovarianceMatrix.block_diagonal(pss.compute_crlb(s.position),
+                                                  1e6*np.eye(2))
 
     # Predict the states forward and replot
     predicted_states = [transition.predict(t.curr_state, new_time=new_time) for t in tracks]

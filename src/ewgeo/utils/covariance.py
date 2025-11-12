@@ -3,10 +3,10 @@ import numpy as np
 from numpy import typing as npt
 from numpy.linalg import cholesky, lstsq
 from scipy.linalg import pinvh, solve_triangular, block_diag
+from typing import Self
 import warnings
 
-from . import ensure_invertible, parse_reference_sensor, resample_covariance_matrix, safe_2d_shape
-
+from . import parse_reference_sensor, resample_covariance_matrix, safe_2d_shape
 
 class CovarianceMatrix:
     # Covariance Matrix and it's Decompositions
@@ -37,8 +37,8 @@ class CovarianceMatrix:
             self._do_inverse = do_inverse
 
     def __str__(self):
-        np.set_printoptions(precision=4, suppress=False)
-        return f"CovarianceMatrix: {np.matrix(self.cov)}"
+        with np.printoptions(precision=4, suppress=False):
+            return f"CovarianceMatrix: {np.matrix(self.cov)}"
 
     """
     =========================================================
@@ -138,12 +138,18 @@ class CovarianceMatrix:
 
     @property
     def eigenvalues(self)-> npt.NDArray:
-        self._parse_eig()
+        if self._eigenvalues is None:
+            # We need to parse the covariance matrix
+            self._do_parse = True
+            self._parse()
         return self._eigenvalues
 
     @property
     def eigenvectors(self)-> npt.NDArray:
-        self._parse_eig()
+        if self._eigenvalues is None:
+            # We need to parse the covariance matrix
+            self._do_parse = True
+            self._parse()
         return self._eigenvectors
 
     """
@@ -161,6 +167,46 @@ class CovarianceMatrix:
         # We must typically be careful here, but CovarianceMatrix doesn't store any object references or large datasets
         # that must be shared, so deepcopy should be safe.
         return copy.deepcopy(self)
+
+    def _ensure_invertible(self, tolerance: float=1e-10):
+        """
+        Check the eigenvalues and ensure that they are all >= a small value (tolerance), to ensure that it can be
+        inverted.
+
+        If any of the eigenvalues are too small, then a diagonal loading term is applied to ensure that the matrix is
+        positive definite.
+
+        Ported from MATLAB code.
+
+        Nicholas O'Donoughue
+        5 Sept 2021
+
+        :param tolerance: numerical precision term (the smallest eigenvalue must be >= tolerance) [Default = 1e-10]
+        """
+
+        # Eigen-decomposition
+        lam, v = np.linalg.eigh(self.cov)
+
+        # Initialize the diagonal loading term
+        d = tolerance * np.eye(self.size)
+
+        # Repeat until the smallest eigenvalue is larger than tolerance
+        while np.amin(lam) < tolerance:
+            # Add the diagonal loading term
+            this_cov = self.cov + d
+
+            # Reexamine the eigenvalue
+            lam, v = np.linalg.eigh(this_cov)
+
+            # Increase the amount of diagonal loading (for the next iteration) by an order of magnitude
+            d *= 2.0
+
+        # When we're done, store the result
+        self._eigenvalues = lam
+        self._eigenvectors = v
+        self._cov += d # add the diagonal loading term to the stored matrix
+
+        return
 
     def _parse(self):
         """
@@ -181,57 +227,32 @@ class CovarianceMatrix:
             self._lower = None
             self._inv = 1/self._cov
 
-            # Clear the do_parse flag
-            self._do_parse = False
-            return
+            # Set the eigenvalues and eigenvectors
+            self._eigenvalues = np.abs(self._cov)
+            self._eigenvectors = self._cov / self._eigenvalues
 
         # Check for bad inputs
-        if not self._do_cholesky and not self._do_inverse:
+        elif not self._do_cholesky and not self._do_inverse:
             warnings.warn("Covariance matrix flags are preventing both Cholesky decomposition and matrix inversion.")
-
-        # Make sure the input is invertible
-        self._cov = ensure_invertible(self._cov)
-
-        # Perform a cholesky decomposition and matrix inversion
-        if self._do_cholesky:
-            self._lower = cholesky(self._cov)
         else:
-            self._lower = None
+            # Make sure the input is invertible
+            # This also generates and stores the eigenvalues and eigenvectors
+            self._ensure_invertible()
 
-        if self._do_inverse:
-            self._inv = pinvh(self._cov)
-        else:
-            self._inv = None
+            # Perform a cholesky decomposition and matrix inversion
+            if self._do_cholesky:
+                self._lower = cholesky(self._cov)
+            else:
+                self._lower = None
 
-        # Clear the eigenvectors and eigenvalues
-        self._eigenvalues = None
-        self._eigenvectors = None
+            if self._do_inverse:
+                self._inv = pinvh(self._cov)
+            else:
+                self._inv = None
 
         # Clear the do_parse flag
         self._do_parse = False
 
-        return
-
-    def _parse_eig(self):
-        """
-        Compute the eigenvectors and eigenvalues of the covariance matrix; store them to speed up repeated calls.
-        """
-        self._parse() # If a change happened to ._cov, ._inv, or ._lower, then this flag is set. Let's resolve it
-
-        if self._eigenvalues is not None and self._eigenvectors is not None:
-            # They were already computed
-            return
-
-        if self._cov is None:
-            # There is no covariance matrix; it can't have eigenvectors/eigenvalues
-            self._eigenvalues = None
-            self._eigenvectors = None
-            return
-
-        # Parse the covariance matrix
-        lam, v = np.linalg.eigh(self.cov)
-        self._eigenvalues = lam
-        self._eigenvectors = v
         return
 
     def solve_aca(self, a: npt.ArrayLike, do_2d: bool = False):
@@ -301,19 +322,18 @@ class CovarianceMatrix:
                     # each row dot with itself (complex‑safe)
                     val = np.sum(np.conj(tmp) * a_flat, axis=1)
         elif self.do_cholesky:
-            L = self._lower
+            lower = self._lower
             # Using vectorized triangular solve for all columns at once
-
             # if do_2d = True, then the operation is (n, n) and (*, n, m) -> (*, n, m)
 
             if do_2d:
                 # shapes are (n, n) and (*, n, m) -> (*, n, m)
-                c = solve_triangular(L, np.transpose(a_flat, (0, 2, 1)), lower=True)
+                c = solve_triangular(lower, np.transpose(a_flat, (0, 2, 1)), lower=True)
                 # (*, m, n) x (*, n, m) = (*, m, m)
                 val = np.conj(np.transpose(c, (0, 2, 1))) @ c
             else:
                 # shapes are (n, n) and (n, *) -> (n, *)
-                c = solve_triangular(L, a_flat.T, lower=True)
+                c = solve_triangular(lower, a_flat.T, lower=True)
                 # Energy term = sum(|c|^2)
                 val = np.sum(np.abs(c)**2, axis=0)
         else:
@@ -321,59 +341,6 @@ class CovarianceMatrix:
 
         val = np.reshape(val, batch_shape)
         return val
-
-        # # Check for multi-dimensional inputs
-        # if np.ndim(a) > 2 or (np.ndim(a)==2 and np.shape(a)[1] != self.size):
-        #     # Either there are 3+ dimensions, or it's 2D but the second dimension does not match the expected size
-        #     out_shp = np.shape(a)[1:]
-        #     if np.prod(out_shp) == 1: out_shp = []
-        #
-        #     a = np.reshape(a, (self.size, -1)).T
-        #
-        #     # Assume the first dimension follows the size of self, and any remaining dimensions are
-        #     # parallel cases
-        #     val = np.array([self.solve_aca(aa) for aa in a]).reshape(out_shp)
-        #     return val
-        #
-        # # Make sure we trim any dimensions after the second; we're doing matrix math here.
-        # if np.ndim(a) > 2:
-        #     a = np.squeeze(a, axis=tuple(range(2, np.ndim(a))))
-        #
-        # # Check the size of a
-        # if np.size(a)==self.size and (np.shape(a)[0]==self.size or np.shape(a)[-1]==self.size):
-        #     # It's a 1D array, but may be stored as a 2D array. Let's squeeze it, for convenience
-        #     a = np.squeeze(a)
-        # elif np.ndim(a)==1:
-        #     # Make sure a is a vector of the right size
-        #     assert np.shape(a)[0] == self.size, f"Input vector a must be the same size as the covariance matrix."
-        # else:
-        #     # Make sure the second dimension of a matches
-        #     assert np.shape(a)[1] == self.size, f"Input matrix a must have second dimension the same size as the covariance matrix."
-        #
-        # # Make sure we've parsed the covariance
-        # self._parse()
-        #
-        # # Check for the matrix inverse
-        # if self._do_inverse:
-        #     if np.isscalar(self._inv) or np.size(self._inv) == 1:
-        #         val = self._inv * a @ np.conj(a.T)
-        #     else:
-        #         val = a @ self._inv @ np.conj(a.T)
-        #
-        # # Check for Cholesky decomposition
-        # elif self._do_cholesky:
-        #     c = solve_triangular(self._lower, a.T, lower=True)
-        #     if c.ndim == 1:
-        #         # It's a 1D vector, just take the sum of the square of each element
-        #         val = np.sum(np.abs(c)**2)
-        #     else:
-        #         val = np.conj(c.T) @ c
-        #
-        # else:
-        #     # If we've gotten here, something is wrong
-        #     raise RuntimeError
-        #
-        # return val
 
     def solve_acb(self, a: npt.ArrayLike, b: npt.ArrayLike):
         """
@@ -611,6 +578,11 @@ class CovarianceMatrix:
         return x
 
     @classmethod
-    def block_diagonal(cls, *args: 'CovarianceMatrix') -> 'CovarianceMatrix':
-        c = block_diag(*[x.cov for x in args])
+    def block_diagonal(cls, *args: Self | npt.ArrayLike) -> Self:
+        arrs = []
+        for arg in args:
+            if isinstance(arg, CovarianceMatrix): arrs.append(arg.cov)
+            else: arrs.append(np.array(arg))
+
+        c = block_diag(*arrs)
         return CovarianceMatrix(c)

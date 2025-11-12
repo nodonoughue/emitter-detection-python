@@ -127,23 +127,23 @@ class MeasurementModel:
             # Compute the CRLB and put it on top of the covariance matrix object
             crlb = self.pss.compute_crlb(x_source=s.pos_vel)
             init_covar = 1e6*np.eye(self.state_space.num_states)
-            init_covar[:crlb.shape[0], :crlb.shape[1]] = crlb
+            init_covar[:crlb.size, :crlb.size] = crlb.cov
 
             s.covar = CovarianceMatrix(init_covar)
 
         return s
 
 # =============== Elementary Kalman Filter and Extended Kalman Filter Update Functions ================
-def kf_update(x_prev: npt.ArrayLike, p_prev: npt.ArrayLike,
-              zeta: npt.ArrayLike, cov: npt.ArrayLike, h: npt.ArrayLike) -> tuple[npt.NDArray, npt.NDArray]:
+def kf_update(x_prev: npt.ArrayLike, p_prev: CovarianceMatrix,
+              zeta: npt.ArrayLike, cov: CovarianceMatrix, h: npt.ArrayLike) -> tuple[npt.NDArray, CovarianceMatrix]:
     """
     Conduct a Kalman Filter update, given the previous state estimate and covariance, a measurement, and
     the measurement matrix.
 
     :param x_prev: Previous state estimate, shape: (n_states, )
-    :param p_prev: Previous state error covariance, shape: (n_states, n_states)
+    :param p_prev: Previous state error covariance, CovarianceMatrix object with size n_states
     :param zeta: Measurement vector, shape: (n_meas, )
-    :param cov: Measurement error covariance, shape: (n_meas, n_meas)
+    :param cov: Measurement error covariance (Covariance Matrix object with size n_meas)
     :param h: Measurement matrix, shape: (n_meas, n_states)
     :return x: Updated state estimate, shape: (n_states, )
     :return p: Updated state error covariance, shape: (n_states, n_states)
@@ -155,27 +155,28 @@ def kf_update(x_prev: npt.ArrayLike, p_prev: npt.ArrayLike,
     y = zeta - z
 
     # Compute the Innovation Covariance
-    s = h @ p_prev @ h.T + cov
+    s = h @ p_prev.cov @ h.T + cov.cov
 
     # Compute the Kalman Gain
-    k = p_prev@h.T/s
+    k = p_prev.cov @ h.T/s
 
     # Update the Estimate
     x = x_prev + k @ y
-    p = (np.eye(p_prev.shape[0]) - (k @ h)) @ p_prev
+    p = CovarianceMatrix((np.eye(p_prev.size) - (k @ h)) @ p_prev.cov)
 
     return x, p
 
 
-def ekf_update(x_prev, p_prev, zeta, cov, z_fun, h_fun):
+def ekf_update(x_prev: npt.ArrayLike, p_prev: CovarianceMatrix, zeta: npt.ArrayLike, cov: CovarianceMatrix,
+               z_fun, h_fun)-> tuple[npt.NDArray, CovarianceMatrix]:
     """
     Conduct an Extended Kalman Filter update, given the previous state estimate and covariance, a measurement function,
     and the measurement matrix function.
 
     :param x_prev: Previous state estimate, shape: (n_states, )
-    :param p_prev: Previous state error covariance, shape: (n_states, n_states)
+    :param p_prev: Previous state error covariance, Covariance Matrix with size n_states
     :param zeta: Measurement vector, shape: (n_meas, )
-    :param cov: Measurement error covariance, shape: (n_meas, n_meas)
+    :param cov: Measurement error covariance, Covariance Matrix with size n_meas
     :param z_fun: Function handle for measurement evaluation, returns a vector of shape (n_meas, )
     :param h_fun: Function handle for measurement matrix evaluation, returns a matrix of shape (n_meas, n_states)
     :return x: Updated state estimate, shape: (n_states, )
@@ -190,13 +191,13 @@ def ekf_update(x_prev, p_prev, zeta, cov, z_fun, h_fun):
     y = zeta - z
 
     # Compute the Innovation Covariance
-    s = h @ p_prev @ h.T + cov
+    s = h @ p_prev.cov @ h.T + cov.cov
 
     # Compute the Kalman Gain
-    k = p_prev @ h.T @ np.linalg.inv(s)
+    k = p_prev.cov @ h.T @ np.linalg.inv(s)
 
     # Update the Estimate
     x = x_prev + k @ y
-    p = (np.eye(p_prev.shape[0])- (k @ h)) @ p_prev
+    p = CovarianceMatrix((np.eye(p_prev.size)- (k @ h)) @ p_prev.cov)
 
     return x, p
