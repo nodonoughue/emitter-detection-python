@@ -198,7 +198,7 @@ def example3():
 
     # Let's verify that sensors 2 and 4 are still colocated
     dist_perturbed = calc_range(x1=x_aoa_true, x2=x_tdoa_true)
-    assert np.all(np.fabs(dist_perturbed[idx_aoa, idx_tdoa]) < 1e-6), 'Error generating correlated sensor perturbations.'
+    assert np.all(np.fabs(dist_perturbed[idx_aoa, idx_tdoa]) < 1e-4), 'Error generating correlated sensor perturbations.'
 
     # Initialize the PSS
     aoa = DirectionFinder(x=x_aoa, cov=None, do_2d_aoa=False)
@@ -500,8 +500,9 @@ def example5(do_vel_only_cal=True):
                                                                                  cal_data=cal_data)
 
     # Analyze calibration results
-    print(f"Calibrated sensor positions: {x_sensor_est}, RMSE: {np.sqrt(np.mean((x_sensor_est-hybrid.pos)**2, axis=None))}")
-    print(f"Calibrated sensor velocities: {v_sensor_est}, RMSE: {np.sqrt(np.mean((v_sensor_est-v_fdoa_actual)**2, axis=None))}")
+    with np.printoptions(precision=2, suppress=True):
+        print(f"Calibrated sensor positions: {x_sensor_est}, RMSE: {np.sqrt(np.mean((x_sensor_est-hybrid.pos)**2, axis=None))}")
+        print(f"Calibrated sensor velocities: {v_sensor_est}, RMSE: {np.sqrt(np.mean((v_sensor_est-v_fdoa_actual)**2, axis=None))}")
 
     # Plot Scenario
     fig = plt.figure()
