@@ -476,8 +476,8 @@ def print_progress(num_total: int,
         print('.', end='')  # Use end='' to prevent the newline
 
     if np.mod(curr_idx + 1, iterations_per_row) == 0:
-        print(' ({}/{}) '.format(curr_idx + 1, num_total), end='')
         pct_elapsed = curr_idx / num_total
+        print(' ({:.1f}% complete) '.format(pct_elapsed*100), end='')
         t_elapsed = time.perf_counter() - t_start
         print_predicted(t_elapsed, pct_elapsed, do_elapsed=True)
 
