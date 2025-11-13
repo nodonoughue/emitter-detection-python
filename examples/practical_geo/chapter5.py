@@ -49,7 +49,7 @@ def example1(do_mod_cov: bool=False):
 
     # Define received signals and covariance matrix
     psi = np.array([80, 87]) * _deg2rad
-    cov = CovarianceMatrix(np.diag([0.1, 1.0]))  # the second sensor is 10x worse than the first sensor
+    cov = CovarianceMatrix(np.eye(2))
     if do_mod_cov:
         cov = CovarianceMatrix(np.diag([0.05, 0.2]))
     x_init = np.array([0, 1])  # initial guess
