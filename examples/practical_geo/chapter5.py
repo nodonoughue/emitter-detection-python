@@ -1,12 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy
-from scipy.stats import multivariate_normal as mvn
+from scipy.stats import multivariate_normal
 
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
-from ewgeo.utils import safe_2d_shape, SearchSpace
+from ewgeo.utils import SearchSpace
 from ewgeo.utils.coordinates import correct_enu, ecef_to_enu, ecef_to_lla, enu_to_ecef, lla_to_ecef
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.constraints import bounded_alt, fixed_alt, fixed_cartesian
@@ -45,7 +44,7 @@ def example1(do_mod_cov: bool=False):
     # Set up sensors
     x_aoa = np.array([[-2, 2],
                       [0, 0]])
-    _, num_aoa = safe_2d_shape(x_aoa)
+    _, num_aoa = np.shape(x_aoa)
 
     # Define received signals and covariance matrix
     psi = np.array([80, 87]) * _deg2rad
@@ -132,7 +131,7 @@ def example2(do_video_version: bool=False):
 
     def _ex2_inner(this_x_tdoa, this_x_init, title=None):
         # Kernel of example 2; called multiple times with different sensor positions
-        _, num_tdoa = safe_2d_shape(this_x_tdoa)
+        _, num_tdoa = np.shape(this_x_tdoa)
 
         # Define target position
         tgt_alt = 100.
@@ -182,9 +181,9 @@ def example2(do_video_version: bool=False):
         this_ax.plot(x_gd_full_alt[0]/1e3, x_gd_full_alt[1]/1e3, x_gd_full_alt[2], '-.o', markevery=[-1],
                      label='GD (Constrained)')
 
-        this_ax.set_xlim([-20, 20])
-        this_ax.set_ylim([0, 50])
-        this_ax.set_zlim([0e3, 2.1e3])
+        this_ax.set_xlim((-20, 20))
+        this_ax.set_ylim((0, 50))
+        this_ax.set_zlim((0e3, 2.1e3))
         this_ax.set_clip_on(True)
 
         if title is not None:
@@ -245,7 +244,7 @@ def example3():
     x_tdoa = np.array([[20e3, 25e3],
                        np.zeros((2,)),
                        np.zeros((2,))])   # meters, ENU
-    _, num_tdoa = safe_2d_shape(x_tdoa)
+    _, num_tdoa = np.shape(x_tdoa)
     ref_idx = num_tdoa - 1  # index of TDOA reference sensor
 
     tgt_az = 30.    # degrees E of N
@@ -352,7 +351,7 @@ def example4():
     x_aoa_ecef = np.array(enu_to_ecef(east=x_aoa_enu[0], north=x_aoa_enu[1], up=x_aoa_enu[2],
                                       lat_ref=ref_lla[0], lon_ref=ref_lla[1], alt_ref=ref_lla[2],
                                       dist_units='m', angle_units='deg'))  # convert tuple output to an array
-    _, num_aoa = safe_2d_shape(x_aoa_ecef)
+    _, num_aoa = np.shape(x_aoa_ecef)
 
     sat_lla = np.array([27, -13, 575e3])  # deg lat, deg lon, m alt
     x_tgt_ecef = np.array(lla_to_ecef(lat=sat_lla[0], lon=sat_lla[1], alt=sat_lla[2],
@@ -476,7 +475,7 @@ def example5():
     def prior(x):
         # x is (n_dim x n_position) array of potential source positions; compute the probability for each, but don't
         # bother with cross-terms
-        return np.array([mvn.pdf(this_x, mean=x_prior, cov=cov_prior.cov) for this_x in x.T])
+        return np.array([multivariate_normal.pdf(this_x, mean=x_prior, cov=cov_prior.cov) for this_x in x.T])
 
     # Measurement
     zeta = tdoa.noisy_measurement(x_source=x_tgt)

@@ -8,11 +8,10 @@ Ported from MATLAB Code
 Nicholas O'Donoughue
 28 October 2022
 """
-import warnings
-
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
+import warnings
 
 import ewgeo.fdoa as fdoa
 from ewgeo.utils import init_output_dir, init_plot_style, SearchSpace
@@ -288,13 +287,13 @@ def make_figure_3(prefix):
 
     # Generate Plots
     print('Generating Figures 12.3a...')
-    fig3a = _make_figure3_subfigure(eps1, x_vec1, y_vec1, x_sensor, v_sensor, x_source, [int(0), int(1)])
+    fig3a = _make_figure3_subfigure(eps1, x_vec1, y_vec1, x_sensor, v_sensor, x_source, [0, 1])
     print('Generating Figure 12.3b...')
-    fig3b = _make_figure3_subfigure(eps2, x_vec2, y_vec2, x_sensor, v_sensor, x_source, [int(0), int(2)])
+    fig3b = _make_figure3_subfigure(eps2, x_vec2, y_vec2, x_sensor, v_sensor, x_source, [0, 1])
     print('Generating Figure 12.3c...')
-    fig3c = _make_figure3_subfigure(eps3, x_vec3, y_vec3, x_sensor, v_sensor, x_source, [int(1), int(2)])
+    fig3c = _make_figure3_subfigure(eps3, x_vec3, y_vec3, x_sensor, v_sensor, x_source, [0, 1])
     print('Generating Figure 12.3d...')
-    fig3d = _make_figure3_subfigure(eps4, x_vec4, y_vec4, x_sensor, v_sensor, x_source, np.arange(num_sensors))
+    fig3d = _make_figure3_subfigure(eps4, x_vec4, y_vec4, x_sensor, v_sensor, x_source, list(range(num_sensors)))
 
     if prefix is not None:
         fig3a.savefig(prefix + 'fig3a.png')
@@ -312,13 +311,13 @@ def make_figure_3(prefix):
     return fig3a, fig3b, fig3c, fig3d
 
 
-def _make_figure3_subfigure(eps: npt.ArrayLike,
+def _make_figure3_subfigure(eps: npt.NDArray[np.float64],
                             x_vec: npt.NDArray[np.float64],
                             y_vec: npt.NDArray[np.float64],
-                            x_sensor: npt.ArrayLike,
-                            v_sensor: npt.ArrayLike,
-                            x_source: npt.ArrayLike,
-                            sensors_to_plot: npt.NDArray[np.int64]):
+                            x_sensor: npt.NDArray[np.float64],
+                            v_sensor: npt.NDArray[np.float64],
+                            x_source: npt.NDArray[np.float64],
+                            sensors_to_plot: list[int]):
 
     # Open the plot
     fig, ax = plt.subplots()

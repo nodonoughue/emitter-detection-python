@@ -2,7 +2,6 @@ import numpy as np
 import numpy.typing as npt
 
 from . import model
-from ewgeo.utils import parse_reference_sensor, safe_2d_shape
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import DifferencePSS
 
@@ -31,14 +30,16 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ## These methods handle the physical model for a FDOA-based PSS, and are just wrappers for the static
     ## functions defined in model.py
     ## ============================================================================================================== ##
-    def measurement(self, x_source, v_source: npt.ArrayLike | None=None, x_sensor: npt.ArrayLike | None=None, v_sensor: npt.ArrayLike | None=None, bias: npt.ArrayLike | None=None):
+    def measurement(self, x_source, v_source: npt.ArrayLike | None=None, x_sensor: npt.ArrayLike | None=None,
+                    v_sensor: npt.ArrayLike | None=None, bias: npt.ArrayLike | None=None):
         if x_sensor is None: x_sensor = self.pos
         if v_sensor is None: v_sensor = self.vel
         if bias is None: bias = self.bias
         return model.measurement(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source,
                                  ref_idx=self.ref_idx, bias=bias)
 
-    def jacobian(self, x_source, v_source: npt.ArrayLike | None=None, x_sensor: npt.ArrayLike | None=None, v_sensor: npt.ArrayLike | None=None):
+    def jacobian(self, x_source, v_source: npt.ArrayLike | None=None, x_sensor: npt.ArrayLike | None=None,
+                 v_sensor: npt.ArrayLike | None=None):
         if x_sensor is None: x_sensor = self.pos
         if v_sensor is None: v_sensor = self.vel
         return model.jacobian(x_sensor=x_sensor, x_source=x_source, v_sensor=v_sensor, v_source=v_source,
@@ -58,7 +59,7 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         if bias is None: bias = self.bias
         return model.log_likelihood(x_sensor=x_sensor, rho_dot=zeta, x_source=x_source, cov=self.cov,
                                     v_sensor=v_sensor, v_source=v_source, ref_idx=self.ref_idx,
-                                    do_resample=False, bias=bias, **kwargs)
+                                    do_resample=False, bias=bias)
 
     def grad_x(self,
                x_source: npt.ArrayLike,
@@ -135,7 +136,13 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
         if v_sensor is None:
             v_sensor = self.vel
 
-        test_idx_vec, ref_idx_vec = parse_reference_sensor(self.ref_idx, self.num_sensors)
+        # Make sure x_sensor and v_sensor are numpy arrays
+        x_sensor = np.array(x_sensor)
+        v_sensor = np.array(v_sensor)
+
+        # Look up the test/ref index vectors
+        test_idx_vec = self.test_idx_vec
+        ref_idx_vec = self.ref_idx_vec
 
         test_pos = x_sensor[:,test_idx_vec]
         test_vel = v_sensor[:,test_idx_vec] if v_sensor is not None else np.zeros_like(test_pos)
@@ -148,18 +155,3 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
                        (x_t, v_t, x_r, v_r, v_diff) in zip(test_pos.T, test_vel.T, ref_pos.T, ref_vel.T, vel_diff)]
 
         return isodopplers
-
-    def parse_source_pos_vel(self, pos_vel, default_vel):
-        num_dim, _ = safe_2d_shape(pos_vel)
-        if num_dim==self.num_dim:
-            # Position only; return zero for velocity
-            pos = pos_vel
-            vel = default_vel
-        elif num_dim==2*self.num_dim:
-            # Position/Velocity
-            pos = pos_vel[:self.num_dim]
-            vel = pos_vel[self.num_dim:]
-        else:
-            raise ValueError("Unable to parse source position/velocity; unexpected number of spatial dimensions.")
-
-        return pos, vel

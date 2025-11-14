@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import ewgeo.triang as triang
-from ewgeo.utils import init_output_dir, init_plot_style, safe_2d_shape
+from ewgeo.utils import init_output_dir, init_plot_style
 from ewgeo.utils.geo import calc_range, find_intersect
 
 from examples.practical_geo import chapter6
@@ -129,7 +129,7 @@ def make_figure_6(prefix=None):
     x_aoa = np.array([[-1., 1.], [0., 0.]])
     x_target = np.array([0., 5.])
     x_err = np.array([1., 0.])
-    _, num_sensor = safe_2d_shape(x_aoa)
+    _, num_sensor = np.shape(x_aoa)
 
     x_aoa_un = x_aoa + x_err[:, np.newaxis]
     x_aoa_nonun = x_aoa + x_err[:, np.newaxis] @ np.array([[-1, 1]])

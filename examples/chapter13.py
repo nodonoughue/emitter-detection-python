@@ -7,7 +7,7 @@ from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import print_elapsed, print_progress, safe_2d_shape, SearchSpace
+from ewgeo.utils import print_elapsed, print_progress, SearchSpace
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
@@ -80,7 +80,8 @@ def example1(mc_params=None):
     rho_actual = hybrid.measurement(x_source=x_source)
 
     # Initialize Solvers
-    num_monte_carlo = int(1000)
+    num_monte_carlo = int(100)  # MATLAB uses 1,000. Reducing to 100 for faster runtime.
+    # TODO: Is 100 accurate enough?
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     x_extent = 5 * baseline
@@ -171,11 +172,11 @@ def example2(mc_params=None):
     #  Set up receiver system
     baseline = 10e3
     std_velocity = 100
-    x_aoa = baseline * np.array([-1., 1.])
+    x_aoa = baseline * np.array([[-1.], [1.]])
     x_time_freq = baseline * np.array([[-1., 1.], [0., 0.]])
     v_time_freq = std_velocity*np.array([np.zeros((2,)), np.ones((2,))])
-    _, num_aoa = safe_2d_shape(x_aoa)
-    _, num_time_freq = safe_2d_shape(x_time_freq)
+    _, num_aoa = np.shape(x_aoa)
+    _, num_time_freq = np.shape(x_time_freq)
 
     # Define Sensor Performance
     transmit_freq = 1e9             # Hz
@@ -210,7 +211,8 @@ def example2(mc_params=None):
     rho_actual = hybrid.measurement(x_source=x_source)
 
     # Initialize Solvers
-    num_monte_carlo = int(1000)
+    num_monte_carlo = int(100)  # MATLAB uses 1,000. Reducing to 100 for faster runtime.
+    # TODO: Is 100 accurate enough?
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     x_extent = 5 * baseline

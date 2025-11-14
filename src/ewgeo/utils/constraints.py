@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import typing as npt
 
-from . import ensure_iterable, safe_2d_shape
+from . import ensure_iterable
 from .constants import first_ecc_sq, radius_earth_true, semimajor_axis_km
 from .coordinates import ecef_to_lla, lla_to_ecef
 from .unit_conversions import convert
@@ -92,7 +92,8 @@ def bounded_alt(geo_type: str, alt_min: float = None, alt_max: float = None):
     return bounds
 
 
-def fixed_alt_constraint_flat(x: npt.ArrayLike, alt: float):
+def fixed_alt_constraint_flat(x: npt.NDArray[np.float64], alt: float)-> tuple[npt.NDArray[np.float64],
+                                                                              npt.NDArray[np.float64]]:
     """
     Implement the flat Earth altitude constraint; altitude is simply the 3rd cartesian dimension.
     Ported from MATLAB code.
@@ -207,7 +208,7 @@ def fixed_alt_constraint_ellipse(x: npt.ArrayLike, alt: float):
     return epsilon, x_valid
 
 
-def fixed_alt_gradient_ellipse(x: npt.ArrayLike):
+def fixed_alt_gradient_ellipse(x: npt.NDArray[np.float64])-> npt.NDArray[np.float64]:
     """
     Implement the gradient of the ellipsoidal Earth altitude constraint.
 
@@ -227,9 +228,9 @@ def fixed_alt_gradient_ellipse(x: npt.ArrayLike):
     a = semimajor_axis_km * 1e3
 
     # Break position into x/y/z components
-    xx = np.asarray(x)[0]
-    yy = np.asarray(x)[1]
-    zz = np.asarray(x)[2]
+    xx = np.asarray(x[0])
+    yy = np.asarray(x[1])
+    zz = np.asarray(x[2])
 
     # Compute geodetic latitude
     lat, _, _ = ecef_to_lla(xx, yy, zz)
@@ -348,7 +349,8 @@ def fixed_cartesian(bound_type: str, bound_val: float = None, x0: npt.ArrayLike 
     return a, a_gradient
 
 
-def fixed_cartesian_xyz(x: npt.ArrayLike, bound_val: float, axis: int):
+def fixed_cartesian_xyz(x: npt.NDArray[np.float64], bound_val: float, axis: int)-> tuple[npt.NDArray[np.float64],
+                                                                                         npt.NDArray[np.float64]]:
 
     # Cartesian bounds work on 2D or 3D
     # verify_3d_input(x)
@@ -374,11 +376,13 @@ def fixed_cartesian_gradient_xyz(x: npt.ArrayLike, axis: int):
     return epsilon_gradient
 
 
-def fixed_cartesian_linear(x: npt.ArrayLike, x0: npt.ArrayLike, u_vec: npt.ArrayLike):
+def fixed_cartesian_linear(x: npt.NDArray[np.float64], x0: npt.NDArray[np.float64], u_vec: npt.NDArray[np.float64])->\
+    tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
 
     # Make sure all three inputs have the same number of spatial coordinates
     verify_common_dim(x, x0, u_vec)
-    n_dim, _ = safe_2d_shape(x)
+    shp = np.shape(x)
+    n_dim = shp[0] if len(shp) > 0 else 1
 
     # Make sure the pointing vector is unit-norm and compute projection matrix
     u_vec = u_vec / np.linalg.norm(u_vec)
@@ -396,10 +400,12 @@ def fixed_cartesian_linear(x: npt.ArrayLike, x0: npt.ArrayLike, u_vec: npt.Array
     return epsilon, x_valid
 
 
-def fixed_cartesian_gradient_linear(x: npt.ArrayLike, x0: npt.ArrayLike, u_vec: npt.ArrayLike):
+def fixed_cartesian_gradient_linear(x: npt.NDArray[np.float64], x0: npt.NDArray[np.float64],
+                                    u_vec: npt.NDArray[np.float64])-> npt.NDArray[np.float64]:
     # Make sure all three inputs have the same number of spatial coordinates
     verify_common_dim(x, x0, u_vec)
-    n_dim, _ = safe_2d_shape(x)
+    shp = np.shape(x)
+    n_dim = shp[0] if len(shp) > 0 else 1
 
     # Make sure the pointing vector is unit-norm and compute projection matrix
     u_vec = u_vec / np.linalg.norm(u_vec)
@@ -412,11 +418,13 @@ def fixed_cartesian_gradient_linear(x: npt.ArrayLike, x0: npt.ArrayLike, u_vec: 
 # **********************************************************************************************************************
 # Utilities Constraints
 # **********************************************************************************************************************
-def verify_3d_input(x: npt.ArrayLike):
+def verify_3d_input(x: npt.NDArray):
     """
     Ensure that the input x is a (3,n) numpy array. Assert an error if it is not.
     """
-    n_dim, n_val = safe_2d_shape(x)
+    shp = np.shape(x)
+    n_dim = shp[0] if len(shp) > 0 else 1
+    # n_val = shp[1] if len(shp) > 1 else 1
     assert n_dim == 3, 'Unable to constrain altitude; input coordinates have unexpected shape.'
     return
 
@@ -425,11 +433,12 @@ def verify_common_dim(*args: npt.ArrayLike):
     """
     Ensure that all inputs args have a common first dimension
     """
-    dims = [np.shape(this_arg)[0] for this_arg in args]
+    dims = [np.shape(np.atleast_1d(this_arg))[0] for this_arg in args]
     assert np.all(dims == dims[0]), 'Not all inputs have the same number of spatial dimensions'
 
 
-def snap_to_equality_constraints(x: npt.ArrayLike, eq_constraints: list, tol: float = 1e-6):
+def snap_to_equality_constraints(x: npt.NDArray[np.float64], eq_constraints: list,
+                                 tol: float = 1e-6)->npt.NDArray[np.float64]:
     """
     Apply the equality constraints in the function handle eq_constraints to the position
     x, subject to a tolerance tol.
@@ -472,7 +481,7 @@ def snap_to_equality_constraints(x: npt.ArrayLike, eq_constraints: list, tol: fl
     return x_valid
 
 
-def snap_to_inequality_constraints(x: npt.ArrayLike, ineq_constraints: list):
+def snap_to_inequality_constraints(x: npt.NDArray[np.float64], ineq_constraints: list)-> npt.NDArray[np.float64]:
     """
     Apply the inequality constraints in the function handle ineq_constraints to the position
     x.

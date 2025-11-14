@@ -24,11 +24,15 @@ def crlb_det(covariance, noise_power, psi_vec, num_snapshots, v, v_dot):
     steer = v(psi_vec)                     # N x D
     steer_gradient = v_dot(psi_vec)                 # N x D, equation 8.78
 
+    shp = np.shape(steer)
+    # num_angles = shp[1] if len(shp) > 1 else 1
+    num_sources = shp[0] if len(shp) > 0 else 1
+
     # Construct the QR Decomposition of the vector subspace V, and use it to form the projection matrix orthogonal
     # to the subspace spanned by V
     q, r = np.linalg.qr(steer)
     proj = q.dot(np.conjugate(q).T)                    # N x N
-    proj_ortho = np.eye(N=np.shape(proj)[0]) - proj      # N x N
+    proj_ortho = np.eye(num_sources) - proj      # N x N
     h = np.conjugate(steer_gradient).T.dot(proj_ortho).dot(steer_gradient)       # D x D, equation 8.77
 
     # Build spectral matrix from linear SNR
@@ -65,7 +69,9 @@ def crlb_stochastic(covariance, noise_power, psi_vec, num_snapshots, v, v_dot):
     # Apply source steering angles to steering vector and steering vector gradient function handles.
     steer = v(psi_vec)  # N x D
     steer_gradient = v_dot(psi_vec)  # N x D, equation 8.78
-    num_elements, num_sources = np.shape(steer)
+    shp = np.shape(steer)
+    num_elements = shp[0] if len(shp) > 0 else 1
+    num_sources = shp[1] if len(shp) > 1 else 1
 
     # Construct the QR Decomposition of the vector subspace V, and use it to form the projection matrix orthogonal
     # to the subspace spanned by V

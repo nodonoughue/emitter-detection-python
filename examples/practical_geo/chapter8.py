@@ -5,7 +5,7 @@ import time
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo import tracker
-from ewgeo.utils import print_progress, print_elapsed, safe_2d_shape
+from ewgeo.utils import print_progress, print_elapsed
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.constraints import fixed_alt
 from ewgeo.utils.covariance import CovarianceMatrix
@@ -42,7 +42,7 @@ def example1(mc_params=None):
     x_tdoa = np.array([[5e3,   0,  0, -5e3],
                        [  0, 5e3,  0,    0],
                        [30,  60, 30,   60]])
-    num_dims, n_tdoa = safe_2d_shape(x_tdoa)
+    num_dims, n_tdoa = np.shape(x_tdoa)
 
     # ===  Define target trajectory
     x_tgt_init = np.array([-50e3, 100e3, 20e3*_ft2m])
@@ -123,12 +123,13 @@ def example1(mc_params=None):
     x_init = np.array([0, 50e3, 5e3])
     epsilon = 100
     x_pred[pos_slice], _ = tdoa.gradient_descent(zeta=zeta[:, 0], x_init=x_init, epsilon=epsilon)
-    p_pred[pos_slice, pos_slice] = 10*tdoa.compute_crlb(x_source=x_pred[pos_slice])
+    p_pred[pos_slice, pos_slice] = 10*tdoa.compute_crlb(x_source=x_pred[pos_slice]).cov
 
     # Bound initial velocity uncertainty by assumed max velocity of 340 m/s
     # (Mach 1 at sea level)
     max_vel = 340
     p_pred[vel_slice, vel_slice] = 10*max_vel**2*np.eye(num_dims)
+    p_pred = CovarianceMatrix(p_pred) # convert to a CovarianceMatrix object
 
     # ===  Step Through Time
     print('Iterating through EKF tracker time steps...')
@@ -152,7 +153,7 @@ def example1(mc_params=None):
         # Update Position Estimate
         # Previous prediction stored in x_pred, P_pred
         # Updated estimate will be stored in x_est, P_est
-        x_est, p_est = tracker.ekf_update(x_pred, p_pred, this_zeta, tdoa.cov.cov, z_fun, h_fun)
+        x_est, p_est = tracker.ekf_update(x_pred, p_pred, this_zeta, tdoa.cov, z_fun, h_fun)
 
         # Predict state to the next time step
         x_pred, p_pred = tracker.kf_predict(x_est, p_est, q, f)
@@ -161,12 +162,12 @@ def example1(mc_params=None):
         x_ekf_est[:,idx] = x_est[pos_slice]
         x_ekf_pred[:,idx] = x_pred[pos_slice]
 
-        rmse_cov_est[idx] = np.sqrt(np.linalg.trace(p_est[pos_slice,pos_slice]))
-        rmse_cov_pred[idx] = np.sqrt(np.linalg.trace(p_pred[pos_slice,pos_slice]))
+        rmse_cov_est[idx] = np.sqrt(np.linalg.trace(p_est.cov[pos_slice,pos_slice]))
+        rmse_cov_pred[idx] = np.sqrt(np.linalg.trace(p_pred.cov[pos_slice,pos_slice]))
 
         # Draw an error ellipse
         x_est_xyz = x_est[pos_slice]
-        p_est_xyz = p_est[pos_slice, pos_slice]
+        p_est_xyz = p_est.cov[pos_slice, pos_slice]
         x_est_xy = x_est_xyz[:2]
         p_est_xy = CovarianceMatrix(p_est_xyz[:2, :2])
         x_ell_est[:, :, idx] = draw_error_ellipse(x_est_xy, p_est_xy, num_ell_pts)
@@ -228,11 +229,12 @@ def example1(mc_params=None):
         x_init = np.array([0, 50e3, 5e3])
         epsilon = 100
         x_pred[pos_slice], _ = tdoa.gradient_descent(zeta[:, 0], x_init=x_init,epsilon=epsilon)
-        p_pred[pos_slice, pos_slice] = tdoa.compute_crlb(x_source=x_pred[pos_slice])
+        p_pred[pos_slice, pos_slice] = tdoa.compute_crlb(x_source=x_pred[pos_slice]).cov
 
         # Bound initial velocity uncertainty by assumed max velocity of 340 m/s
         # (Mach 1 at sea level)
         p_pred[vel_slice, vel_slice] = max_vel**2*np.eye(num_dims)
+        p_pred = CovarianceMatrix(p_pred)
 
         # Step Through Time
         x_ekf_est = np.zeros((num_dims,num_time))
@@ -244,7 +246,7 @@ def example1(mc_params=None):
             # Update Position Estimate
             # Previous prediction stored in x_pred, P_pred
             # Updated estimate will be stored in x_est, P_est
-            x_est, p_est = tracker.ekf_update(x_pred, p_pred, this_zeta, tdoa.cov.cov, z_fun, h_fun)
+            x_est, p_est = tracker.ekf_update(x_pred, p_pred, this_zeta, tdoa.cov, z_fun, h_fun)
 
             # Predict state to the next time step
             x_pred, p_pred = tracker.kf_predict(x_est, p_est, q, f)
@@ -253,8 +255,8 @@ def example1(mc_params=None):
             x_ekf_est[:, idx] = x_est[pos_slice]
             x_ekf_pred[:, idx] = x_pred[pos_slice]
 
-            sse_cov_est[idx_mc, idx] = np.linalg.trace(p_est[pos_slice, pos_slice])
-            sse_cov_pred[idx_mc, idx] = np.linalg.trace(p_pred[pos_slice, pos_slice])
+            sse_cov_est[idx_mc, idx] = np.linalg.trace(p_est.cov[pos_slice, pos_slice])
+            sse_cov_pred[idx_mc, idx] = np.linalg.trace(p_pred.cov[pos_slice, pos_slice])
 
         err_pred = x_ekf_pred[:, :-1] - x_tgt_full[:, 1:]
         err_est = x_ekf_est - x_tgt_full
@@ -399,7 +401,7 @@ def example2(rng=np.random.default_rng()):
     x_init_guess = np.array([10e3, 10e3, 0])
     bnd, bnd_grad = fixed_alt(0, 'flat')
     x_init, _ = aoa_init.gradient_descent(zeta=zeta_init, x_init=x_init_guess, eq_constraints=[bnd], epsilon=100)
-    p_init = aoa_init.compute_crlb(x_source=x_init, eq_constraints_grad=[bnd_grad])
+    p_init = aoa_init.compute_crlb(x_source=x_init, eq_constraints_grad=[bnd_grad]).cov
 
     x_pred[pos_slice] = x_init[:num_dims]
     p_pred[pos_slice, pos_slice] = p_init[:num_dims, :num_dims]
@@ -411,6 +413,7 @@ def example2(rng=np.random.default_rng()):
     p_vel[-1, :] = 0
     p_vel[:, -1] = 0
     p_pred[vel_slice, vel_slice] = p_vel
+    p_pred = CovarianceMatrix(p_pred)
 
     # ===  Step Through Time
     print('Iterating through EKF tracker time steps...')
@@ -450,7 +453,7 @@ def example2(rng=np.random.default_rng()):
         # Update Position Estimate
         # Previous prediction stored in x_pred, P_pred
         # Updated estimate will be stored in x_est, P_est
-        x_est, p_est = tracker.ekf_update(x_pred, p_pred, this_zeta, aoa.cov.cov, z_fun, h_fun)
+        x_est, p_est = tracker.ekf_update(x_pred, p_pred, this_zeta, aoa.cov, z_fun, h_fun)
 
         # Enforce known altitude
         pos_est = x_est[pos_slice]
@@ -459,14 +462,14 @@ def example2(rng=np.random.default_rng()):
         vel_est = x_est[vel_slice]
         vel_est[-1] = 0
         x_est[vel_slice] = vel_est
-        p_pos = p_est[pos_slice, pos_slice]
+        p_pos = p_est.cov[pos_slice, pos_slice]
         p_pos[-1, :] = 0
         p_pos[:, -1] = 0
-        p_est[pos_slice, pos_slice] = p_pos
-        p_vel = p_est[vel_slice, vel_slice]
+        p_est.cov[pos_slice, pos_slice] = p_pos
+        p_vel = p_est.cov[vel_slice, vel_slice]
         p_vel[-1, :] = 0
         p_vel[:, -1] = 0
-        p_est[vel_slice, vel_slice] = p_vel
+        p_est.cov[vel_slice, vel_slice] = p_vel
 
         # Predict state to the next time step
         x_pred, p_pred = tracker.kf_predict(x_est, p_est, q, f)
@@ -478,23 +481,23 @@ def example2(rng=np.random.default_rng()):
         vel_pred = x_pred[vel_slice]
         vel_pred[-1] = 0
         x_pred[vel_slice] = vel_pred
-        p_pos = p_pred[pos_slice, pos_slice]
+        p_pos = p_pred.cov[pos_slice, pos_slice]
         p_pos[-1, :] = 0
         p_pos[:, -1] = 0
-        p_pred[pos_slice, pos_slice] = p_pos
-        p_vel = p_pred[vel_slice, vel_slice]
+        p_pred.cov[pos_slice, pos_slice] = p_pos
+        p_vel = p_pred.cov[vel_slice, vel_slice]
         p_vel[-1, :] = 0
         p_vel[:, -1] = 0
-        p_pred[vel_slice, vel_slice] = p_vel
+        p_pred.cov[vel_slice, vel_slice] = p_vel
 
         # Output the current prediction/estimation state
         pos_est = x_est[pos_slice]
-        p_pos_est = p_est[pos_slice, pos_slice]
+        p_pos_est = p_est.cov[pos_slice, pos_slice]
         x_ekf_est[:, idx] = pos_est
         x_ekf_pred[:,idx] = x_pred[pos_slice]
 
-        rmse_cov_est[idx] = np.sqrt(np.linalg.trace(p_est[pos_slice, pos_slice]))
-        rmse_cov_pred[idx]= np.sqrt(np.linalg.trace(p_pred[pos_slice, pos_slice]))
+        rmse_cov_est[idx] = np.sqrt(np.linalg.trace(p_est.cov[pos_slice, pos_slice]))
+        rmse_cov_pred[idx]= np.sqrt(np.linalg.trace(p_pred.cov[pos_slice, pos_slice]))
 
         # Draw an error ellipse
         p_pos_xy = CovarianceMatrix(p_pos_est[:2, :2])

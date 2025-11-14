@@ -332,7 +332,7 @@ def example2(rng=np.random.default_rng(), mc_params=None):
     crlb_rmse_deg_stoch = np.sqrt(crlb_psi_stoch) * 180/np.pi
     
     # Compute MC Experiment
-    num_monte_carlo = 1000
+    num_monte_carlo = 100  # MATLAB code uses 1,000. Reducing to 100 for quicker runtime
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     sig = np.sqrt(1/2)*(rng.standard_normal(size=(num_samples, num_monte_carlo))
@@ -345,7 +345,7 @@ def example2(rng=np.random.default_rng(), mc_params=None):
     rmse_deg_music = np.zeros(shape=out_shp)
 
     print('Executing array DF monte carlo trial...')
-    iterations_per_marker = 10
+    iterations_per_marker = 5
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     total_iterations = num_monte_carlo * len(range_vec_m)

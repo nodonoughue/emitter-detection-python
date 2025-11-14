@@ -4,7 +4,6 @@ from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import safe_2d_shape
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 
@@ -33,9 +32,9 @@ def _make_pss_systems(err_aoa=None, err_time=None, err_freq=None, f0=1.0, tdoa_r
     """
 
     # Count the number of sensors in each type
-    num_dim, num_aoa = safe_2d_shape(x_aoa)
-    _, num_tdoa = safe_2d_shape(x_tdoa)
-    _, num_fdoa = safe_2d_shape(x_fdoa)
+    num_dim, num_aoa = np.shape(x_aoa)
+    _, num_tdoa = np.shape(x_tdoa)
+    _, num_fdoa = np.shape(x_fdoa)
 
     # Define Error Covariance Matrix
     if err_aoa is not None:

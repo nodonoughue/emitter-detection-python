@@ -26,7 +26,9 @@ def beamscan(x, v, psi_max=np.pi/2, num_points=101):
     psi_vec = np.linspace(start=-1, stop=1, num=num_points) * psi_max
 
     # Parse inputs
-    num_array_elements, num_samples = np.shape(x)
+    shp = np.shape(x)
+    # num_array_elements = shp[0] if len(shp) > 0 else 1
+    num_samples = shp[1] if len(shp) > 1 else 1
 
     # Generate steering vectors
     steering_vectors = v(psi_vec)/np.sqrt(num_samples)  # num_array_elements x num_points
@@ -62,7 +64,9 @@ def beamscan_mvdr(x, v, psi_max=np.pi/2, num_points=101):
     psi_vec = np.linspace(start=-1, stop=1, num=num_points) * psi_max
 
     # Compute the sample covariance matrix
-    num_array_elements, num_samples = np.shape(x)
+    shp = np.shape(x)
+    num_array_elements = shp[0] if len(shp) > 0 else 1
+    # num_samples = shp[1] if len(shp) > 1 else 1
     covariance = CovarianceMatrix(np.cov(x), do_inverse=True)
 
     # Steer each of the M data samples
@@ -102,7 +106,9 @@ def music(x, steer, num_sig_dims=0, max_psi=np.pi / 2, num_points=101):
     """
 
     # Compute the sample covariance matrix
-    n, m = np.shape(x)
+    shp = np.shape(x)
+    n = shp[0] if len(shp) > 0 else 1
+    m = shp[1] if len(shp) > 1 else 1
     # covariance = np.cov(x, bias=True)
     covariance = np.zeros((n, n), dtype=complex)
     for idx in np.arange(m):

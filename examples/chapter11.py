@@ -77,7 +77,8 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     # xy_isochrones = tdoa.draw_isochrones(range_diff=rho_actual, num_pts=1e3, max_ortho=5*baseline)
 
     # Set up the Monte Carlo Trial
-    num_monte_carlo = int(1000)
+    num_monte_carlo = int(100)  # MATLAB uses 1,000. Reducing to 100 for faster runtime.
+    # TODO: Is 100 accurate enough?
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     num_iterations = int(1000)

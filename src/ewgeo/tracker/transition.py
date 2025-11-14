@@ -16,7 +16,7 @@ class MotionModel(ABC):
     time_delta: float | None
     f: npt.ArrayLike                # Transition Matrix
     process_covar: npt.ArrayLike
-    q: npt.ArrayLike                # Process Noise
+    q: CovarianceMatrix | None            # Process Noise
 
     def __init__(self):
         pass
@@ -38,7 +38,7 @@ class MotionModel(ABC):
         pass
 
     @abstractmethod
-    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: float):
+    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: float)-> CovarianceMatrix:
         pass
 
     @property
@@ -72,7 +72,7 @@ class MotionModel(ABC):
         if s.covar is None:
             new_covar = None
         else:
-            new_covar = CovarianceMatrix(self.f @ s.covar.cov @ np.transpose(self.f) + self.q)
+            new_covar = CovarianceMatrix(self.f @ s.covar.cov @ np.transpose(self.f) + self.q.cov)
 
         # Make a new State object
         return s.copy(state=new_state, covar=new_covar, time=new_time)
@@ -163,7 +163,8 @@ class ConstantVelocityMotionModel(MotionModel):
         return np.block([[np.eye(self.num_dims), time_delta*np.eye(self.num_dims)],
                          [np.zeros((self.num_dims, self.num_dims)), np.eye(self.num_dims)]])
 
-    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike=None, time_delta: float=None):
+    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike=None,
+                                       time_delta: float=None)-> CovarianceMatrix:
         """
         Implement the process noise covariance Q for a constant velocity motion model
         """
@@ -171,8 +172,9 @@ class ConstantVelocityMotionModel(MotionModel):
         if time_delta is None:
             time_delta = self.time_delta
 
-        return np.block([[.25*time_delta**4*process_covar, .5*time_delta**3*process_covar],
-                         [.5*time_delta**3*process_covar, time_delta**2*process_covar]])
+        q_mat = np.block([[.25*time_delta**4*process_covar, .5*time_delta**3*process_covar],
+                          [.5*time_delta**3*process_covar, time_delta**2*process_covar]])
+        return CovarianceMatrix(q_mat)
 
 
 class ConstantAccelerationMotionModel(MotionModel):
@@ -220,15 +222,16 @@ class ConstantAccelerationMotionModel(MotionModel):
         if time_delta is None:
             time_delta = self.time_delta
 
-        return np.block([[.25*time_delta**4*process_covar,
-                          .5*time_delta**3*process_covar,
-                          .5*time_delta**2*process_covar],
-                         [.5*time_delta**3*process_covar,
-                          time_delta**2*process_covar,
-                          time_delta*process_covar],
-                         [.5*time_delta**2*process_covar,
-                          time_delta*process_covar,
-                          process_covar]])
+        q_mat = np.block([[.25*time_delta**4*process_covar,
+                           .5*time_delta**3*process_covar,
+                           .5*time_delta**2*process_covar],
+                          [.5*time_delta**3*process_covar,
+                           time_delta**2*process_covar,
+                           time_delta*process_covar],
+                          [.5*time_delta**2*process_covar,
+                           time_delta*process_covar,
+                           process_covar]])
+        return CovarianceMatrix(q_mat)
 
 
 class ConstantJerkMotionModel(MotionModel):
@@ -282,22 +285,23 @@ class ConstantJerkMotionModel(MotionModel):
         if time_delta is None:
             time_delta = self.time_delta
 
-        return np.block([[time_delta ** 7 / 252 * process_covar,
-                          time_delta ** 6 / 72 * process_covar,
-                          time_delta ** 5 / 30 * process_covar,
-                          time_delta ** 4 / 24 * process_covar],
-                         [time_delta ** 6 / 72 * process_covar,
-                          time_delta ** 5 / 20 * process_covar,
-                          time_delta ** 4 / 8 * process_covar,
-                          time_delta ** 3 / 6 * process_covar],
-                         [time_delta ** 5 / 30 * process_covar,
-                          time_delta ** 4 / 8 * process_covar,
-                          time_delta ** 3 / 3 * process_covar,
-                          time_delta ** 2 / 2 * process_covar],
-                         [time_delta ** 4 / 24 * process_covar,
-                          time_delta ** 3 / 6 * process_covar,
-                          time_delta ** 2 / 2 * process_covar,
-                          time_delta * process_covar]])
+        q_mat = np.block([[time_delta ** 7 / 252 * process_covar,
+                           time_delta ** 6 / 72 * process_covar,
+                           time_delta ** 5 / 30 * process_covar,
+                           time_delta ** 4 / 24 * process_covar],
+                          [time_delta ** 6 / 72 * process_covar,
+                           time_delta ** 5 / 20 * process_covar,
+                           time_delta ** 4 / 8 * process_covar,
+                           time_delta ** 3 / 6 * process_covar],
+                          [time_delta ** 5 / 30 * process_covar,
+                           time_delta ** 4 / 8 * process_covar,
+                           time_delta ** 3 / 3 * process_covar,
+                           time_delta ** 2 / 2 * process_covar],
+                          [time_delta ** 4 / 24 * process_covar,
+                           time_delta ** 3 / 6 * process_covar,
+                           time_delta ** 2 / 2 * process_covar,
+                           time_delta * process_covar]])
+        return CovarianceMatrix(q_mat)
 
 # class BallisticReentryMotionModel(MotionModel):
 # class ManeuveringReentryMotionModel(MotionModel):
@@ -305,14 +309,14 @@ class ConstantJerkMotionModel(MotionModel):
 # class BallisticMotionModel(MotionModel):
 
 # =============== Elementary Kalman Filter and Extended Kalman Filter Prediction Functions ================
-def kf_predict(x_est, p_est, q, f):
+def kf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f):
     """
     Conduct a Kalman Filter prediction, given the current estimated state and covariance, a transition matrix, and
     the process noise covariance.
 
     :param x_est: Current state estimate, shape: (n_states, )
-    :param p_est: Current state error covariance, shape: (n_states, n_states)
-    :param q: Process noise covariance, shape: (n_states, n_states)
+    :param p_est: Current state error covariance, CovarianceMatrix object with size n_states
+    :param q: Process noise covariance, CovarianceMatrix object with size n_states
     :param f: Transition matrix, shape: (n_states, n_states)
     :return x_pred: Predicted state estimate, shape: (n_states, )
     :return p_pred: Predicted state error covariance, shape: (n_states, n_states)
@@ -322,19 +326,19 @@ def kf_predict(x_est, p_est, q, f):
     x_pred = f @ x_est
 
     # Predict the next state error covariance
-    p_pred = f @ p_est @ f.T + q
+    p_pred = CovarianceMatrix(f @ p_est.cov @ f.T + q.cov)
 
     return x_pred, p_pred
 
 
-def ekf_predict(x_est, p_est, q, f_fun, g_fun):
+def ekf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f_fun, g_fun):
     """
     Conduct an Extended Kalman Filter prediction, given the current estimated state and covariance, a function handle
     to generate the predicted state, and a function handle to generate the transition matrix.
 
     :param x_est: Current state estimate, shape: (n_states, )
-    :param p_est: Current state error covariance, shape: (n_states, n_states)
-    :param q: Process noise covariance, shape: (n_states, n_states)
+    :param p_est: Current state error covariance, CovarianceMatrix object with size n_states
+    :param q: Process noise covariance, CovarianceMatrix object with size n_states
     :param f_fun: Transition function handle, returns an array of shape: (n_states, )
     :param g_fun: Transition matrix function handle, returns a matrix of shape: (n_states, n_states)
     :return x_pred: Predicted state estimate, shape: (n_states, )
@@ -346,6 +350,6 @@ def ekf_predict(x_est, p_est, q, f_fun, g_fun):
 
     # Forward prediction of state error covariance
     f = g_fun(x_est)
-    p_pred = f @ p_est @ np.transpose(f) + q
+    p_pred = CovarianceMatrix(f @ p_est.cov @ np.transpose(f) + q.cov)
 
     return x_pred, p_pred

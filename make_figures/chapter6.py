@@ -11,6 +11,7 @@ Nicholas O'Donoughue
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 
 from ewgeo.utils import init_output_dir, init_plot_style
 
@@ -67,38 +68,32 @@ def make_figure_1(prefix=None):
     # psi_0 = 95*np.pi/180
     
     # Narrow Beam (Marginal Distribution)
-    def element_pattern(psi):
+    def element_pattern(psi: npt.NDArray[np.float64])-> npt.NDArray[np.float64]:
         return np.absolute(np.cos(psi-np.pi/2))**1.2
     
-    def array_function_narrow(psi):
-        numerator = np.sin(np.pi*d_lam_narrow_beam*num_array_elements*(np.cos(psi)-np.cos(psi_0)))
-        denominator = np.sin(np.pi*d_lam_narrow_beam*(np.cos(psi)-np.cos(psi_0)))
+    def array_function_narrow(psi: npt.NDArray[np.float64])-> npt.NDArray[np.float64]:
+        numerator = lambda x: np.sin(np.pi*d_lam_narrow_beam*num_array_elements*(np.cos(x)-np.cos(psi_0)))
+        denominator = lambda x: np.sin(np.pi*d_lam_narrow_beam*(np.cos(x)-np.cos(psi_0)))
+        result = lambda x: np.absolute(numerator(x) / denominator(x)) / num_array_elements
 
-        # Throw in a little error handling; division by zero throws a runtime warning
-        limit_mask = denominator == 0
-        valid_mask = np.logical_not(limit_mask)
-        valid_result = np.absolute(numerator[valid_mask] / denominator[valid_mask])/num_array_elements
-
-        return np.piecewise(x=psi, condlist=[limit_mask],
-                            funclist=[1, valid_result])
+        return np.piecewise(x=psi,
+                            condlist=[denominator(psi) != 0],
+                            funclist=[result, 1])
 
     # Wide Beam (Prior Distribution)
     d_lam_wide_beam = .5
 
-    def array_function_wide(psi):
-        numerator = np.sin(np.pi*d_lam_wide_beam*num_array_elements*(np.cos(psi)-np.cos(psi_0)))
-        denominator = np.sin(np.pi*d_lam_wide_beam*(np.cos(psi)-np.cos(psi_0)))
+    def array_function_wide(psi: npt.NDArray[np.float64])-> npt.NDArray[np.float64]:
+        numerator = lambda x: np.sin(np.pi*d_lam_wide_beam*num_array_elements*(np.cos(x)-np.cos(psi_0)))
+        denominator = lambda x: np.sin(np.pi*d_lam_wide_beam*(np.cos(x)-np.cos(psi_0)))
+        result = lambda x: np.absolute(numerator(x) / denominator(x)) / num_array_elements
 
-        # Throw in a little error handling; division by zero throws a runtime warning
-        limit_mask = denominator == 0
-        valid_mask = np.logical_not(limit_mask)
-        valid_result = np.absolute(numerator[valid_mask] / denominator[valid_mask])/num_array_elements
-
-        return np.piecewise(x=psi, condlist=[limit_mask],
-                            funclist=[1, valid_result])
+        return np.piecewise(x=psi,
+                            condlist=[denominator(psi)!=0],
+                            funclist=[result, 1])
     
     fig1 = plt.figure()
-    psi_vec = np.arange(start=0, step=np.pi/1000, stop=np.pi)
+    psi_vec = np.arange(start=0, step=np.pi/1000, stop=np.pi, dtype=np.float64)
     plt.plot(psi_vec, element_pattern(psi_vec)*array_function_narrow(psi_vec), label='Narrow Beam (marginal)')
     plt.plot(psi_vec, array_function_wide(psi_vec), label='Wide Beam (prior)')
     plt.xlabel(r'$\psi$')

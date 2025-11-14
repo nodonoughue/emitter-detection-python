@@ -14,7 +14,7 @@ import numpy as np
 from ewgeo.triang import DirectionFinder
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo import tracker
-from ewgeo.utils import init_output_dir, init_plot_style, safe_2d_shape
+from ewgeo.utils import init_output_dir, init_plot_style
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50
 from ewgeo.utils.unit_conversions import convert
@@ -168,7 +168,7 @@ def make_figure_7(prefix=None):
 
     t = np.arange(1000)/10  # 0 to 100 in increments of .1
 
-    _, num_sensors = safe_2d_shape(x_tdoa)
+    _, num_sensors = np.shape(x_tdoa)
     num_t = len(t)
 
     x_tdoa_full = x_tdoa[:, :, np.newaxis] + v_tdoa[:, :, np.newaxis] * np.reshape(t, shape=(1, 1, num_t))
@@ -326,7 +326,7 @@ def make_figure_10(prefix=None):
     # Since we can't do geolocation with the first measurement, let's
     # initialize the track manually
     x_prev = np.array([0, 1e3])
-    p_prev = np.diag([1e3, 10e3])**2
+    p_prev = CovarianceMatrix(np.diag([1e3, 10e3])**2)
 
     cep_vec = np.zeros_like(t_vec)
     for idx in np.arange(t_vec.size):
@@ -338,7 +338,7 @@ def make_figure_10(prefix=None):
 
         this_psi = aoa.noisy_measurement(x_tgt)
 
-        this_x, this_p = tracker.ekf_update(x_prev, p_prev, this_psi, aoa.cov.cov, z_fun, h_fun)
+        this_x, this_p = tracker.ekf_update(x_prev, p_prev, this_psi, aoa.cov, z_fun, h_fun)
         cep_vec[idx] = compute_cep50(CovarianceMatrix(this_p))
 
         x_prev = this_x

@@ -1,17 +1,17 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import typing as npt
-from scipy.stats import multivariate_normal as mvn
+from typing import Callable
 
-from . import ensure_iterable, safe_2d_shape, SearchSpace
+from . import ensure_iterable, SearchSpace
 from .constraints import constrain_likelihood, snap_to_equality_constraints, snap_to_inequality_constraints
 from .covariance import CovarianceMatrix
 
 
-def ls_solver(y,
-              jacobian,
+def ls_solver(y: Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]],
+              jacobian: Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]],
               cov: CovarianceMatrix,
-              x_init: npt.ArrayLike,
+              x_init: npt.NDArray[np.float64],
               epsilon:float=1e-3,
               max_num_iterations:int=int(10e3),
               force_full_calc:bool=False,
@@ -319,8 +319,8 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
 
 
 def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constraints=None, constraint_tolerance=None,
-              prior=None, prior_wt: float = 0., print_progress=False, num_levels: int=1, zoom_per_level: float=2,
-              **kwargs):
+              prior=None, prior_wt: float = 0., num_levels: int=1, zoom_per_level: float=2,
+              **kwargs)-> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], tuple[npt.NDArray[np.float64], ...]]:
     """
     Execute ML estimation through brute force computational methods.
 
@@ -342,17 +342,19 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
                   the true source location, according to some prior distribution. Will be multiplied by log10 when
                   combined with the likelihood distribution (which is assumed to be a log likelihood).
     :param prior_wt: Weight to apply to the prior distribution; (1-prior_wt) will be applied to the likelihood function.
-    :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
-                           the console. [default=False]
+    :param num_levels: Number of repeated searches to conduct; each with a finer mesh around the previously estimated
+                       solution (int)
+    :param zoom_per_level: Decrease in the grid search area per search level, as a multiplier > 1  (float)
     :return x_est: Estimated minimum
     :return A: Likelihood computed at each x position in the search space
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
     """
 
+    if zoom_per_level <= 1: raise ValueError(f"zoom_per_level must be greater than one; received {zoom_per_level}")
     if num_levels > 1:
         # Call the solver with one less level to get the coarse estimate
         x_est, _, _ = ml_solver(ell, search_space, eq_constraints, ineq_constraints, constraint_tolerance,
-                                prior, prior_wt, print_progress, num_levels-1, zoom_per_level, **kwargs)
+                                prior, prior_wt, num_levels-1, zoom_per_level, **kwargs)
         # Zoom in and run as normal
         search_space = search_space.zoom_in(new_ctr=x_est, zoom=zoom_per_level**(num_levels-1), overwrite=False)
 
@@ -367,7 +369,7 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
                                    tol=constraint_tolerance)
 
     # Evaluate the likelihood function at each coordinate in the search space
-    likelihood = ell(x_set, print_progress=print_progress, **kwargs)
+    likelihood = ell(x_set, **kwargs)
 
     if prior is not None and prior_wt > 0:
         pdf_prior = np.reshape(prior(x_set), shape=np.shape(likelihood))

@@ -1,11 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-import time
 
-from ewgeo.utils import is_broadcastable, parse_reference_sensor, print_elapsed, safe_2d_shape, SearchSpace, \
-    broadcast_backwards
-from ewgeo.utils import print_progress as print_progress_inner
+from ewgeo.utils import parse_reference_sensor, SearchSpace, broadcast_backwards
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.geo import calc_doppler_diff
@@ -106,7 +103,8 @@ def jacobian(x_sensor: npt.ArrayLike,
     dv_norm = np.divide(dv, rn, out=np.zeros((n_dim, *out_shp)), where=rn!=0)  # shape: (n_dim, *out_shp)
     # Iterate the matmul over the number of sensors and sources
     this_eye = np.eye(n_dim)
-    while len(np.shape(this_eye)) < len(np.shape(px)): this_eye = np.expand_dims(this_eye, axis=-1)
+    arrs, _ = broadcast_backwards([this_eye, px], start_dim=0, do_broadcast=True)
+    this_eye, px = arrs
     nabla_rn = np.sum((this_eye - px) * dv_norm[np.newaxis, :, :], axis=1)  # shape: (n_dim, *out_shp)
 
     # Compute test/reference differences and reshape output
@@ -150,8 +148,8 @@ def jacobian_uncertainty(x_sensor: npt.ArrayLike,
     """
 
     # Parse inputs
-    n_dim1, n_sensor = safe_2d_shape(x_sensor)
-    n_dim2, n_source = safe_2d_shape(x_source)
+    n_dim1 = np.shape(x_sensor)[0] if np.ndim(x_sensor) > 0 else 1
+    n_dim2 = np.shape(x_source)[0] if np.ndim(x_source) > 0 else 1
 
     if n_dim1 != n_dim2:
         raise TypeError('Input variables must match along first dimension.')
@@ -191,8 +189,7 @@ def log_likelihood(x_sensor: npt.ArrayLike,
                    v_source: npt.ArrayLike | None=None,
                    ref_idx=None,
                    do_resample: bool=False,
-                   bias: npt.ArrayLike | None=None,
-                   print_progress: bool=False):
+                   bias: npt.ArrayLike | None=None):
     """
     # Computes the Log Likelihood for FDOA sensor measurement, given the
     # received measurement vector rho_dot, covariance matrix C,
@@ -212,8 +209,6 @@ def log_likelihood(x_sensor: npt.ArrayLike,
     :param ref_idx: Scalar index of reference sensor, or n_dim x n_pair matrix of sensor pairings
     :param do_resample: Boolean flag; if true the covariance matrix will be resampled, using ref_idx
     :param bias: sensor measurement biases
-    :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
-                           the console. [default=False]
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
@@ -301,14 +296,15 @@ def error(x_sensor: npt.ArrayLike,
     return np.reshape(epsilon_list, search_space.grid_shape), x_vec, y_vec
 
 
-def draw_isodoppler(x_ref: npt.ArrayLike,
-                    v_ref: npt.ArrayLike,
-                    x_test: npt.ArrayLike,
-                    v_test: npt.ArrayLike,
-                    vdiff: npt.ArrayLike,
+def draw_isodoppler(x_ref: npt.NDArray[np.float64],
+                    v_ref: npt.NDArray[np.float64],
+                    x_test: npt.NDArray[np.float64],
+                    v_test: npt.NDArray[np.float64],
+                    vdiff: npt.NDArray[np.float64],
                     num_pts: int,
-                    max_ortho: npt.ArrayLike,
-                    v_source: npt.ArrayLike | None=None):
+                    max_ortho: float,
+                    v_source: npt.NDArray[np.float64] | None=None)\
+        -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
     # Finds the isochrone with the stated range rate difference from points x1
     # and x2.  Generates an arc with 2*numPts-1 points, that spans up to
@@ -462,7 +458,8 @@ def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     # TODO: Debug
 
     # Parse the reference index
-    _, num_sensors = safe_2d_shape(x_sensor)
+    shp = np.shape(x_sensor)
+    num_sensors = shp[1] if len(shp) > 1 else 1
     test_idx_vec, ref_idx_vec = parse_reference_sensor(ref_idx, num_sensors)
 
     # According to eq 6.42, the m-th row is 1 for every column in which the m-th sensor is a test index, and -1 for
@@ -474,7 +471,8 @@ def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
         grad[ref, i] = -1
 
     # Repeat for each source position
-    _, num_sources = safe_2d_shape(x_source)
+    shp = np.shape(x_source)
+    num_sources = shp[1] if len(shp) > 1 else 1
     if num_sources > 1:
         grad = np.repeat(grad[:, :, np.newaxis], num_sources, axis=2)
 
@@ -516,7 +514,8 @@ def grad_sensor_pos(x_sensor: npt.ArrayLike,
 
     # Compute the gradient of R_n
     this_eye = np.eye(n_dim)  # shape: (n_dim, n_dim)
-    while len(np.shape(this_eye)) < len(np.shape(proj_x)): this_eye = np.expand_dims(this_eye, axis=-1)
+    arrs, _ = broadcast_backwards([this_eye, proj_x], start_dim=0, do_broadcast=True)
+    this_eye, proj_x = arrs
     nabla_rn = np.sum((this_eye - proj_x) * dv_norm[np.newaxis, :], axis=1)  # shape: (n_dim, *out_shp)
 
     # Parse the reference index
@@ -587,8 +586,10 @@ def grad_sensor_vel(x_sensor: npt.ArrayLike,
 
     return grad_vel
 
-def _check_inputs(x_source: npt.ArrayLike, v_source: npt.ArrayLike, x_sensor: npt.ArrayLike,
-                  v_sensor: npt.ArrayLike)-> tuple[int, int, int, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
+def _check_inputs(x_source: npt.NDArray[np.float64], v_source: npt.NDArray[np.float64] | None,
+                  x_sensor: npt.NDArray[np.float64], v_sensor: npt.NDArray[np.float64] | None)\
+                  -> tuple[int, int, int, tuple[int, ...], npt.NDArray[np.float64],
+                  npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
     Check the position and velocity inputs for source and sensors, enforce consistency in the number of sources/sensors
     and spatial dimensions, extend array dimensions to ensure proper broadcasting.
@@ -624,34 +625,13 @@ def _check_inputs(x_source: npt.ArrayLike, v_source: npt.ArrayLike, x_sensor: np
     arrs, in_shp = broadcast_backwards([x_source, v_source, x_sensor, v_sensor], start_dim=2)
     x_source, v_source, x_sensor, v_sensor = arrs
 
-    # # Ensure that they're at least 2D, but do it manually because numpy.atleast_2d will add new axes to the front, not
-    # # the back
-    # if len(np.shape(x_source)) < 2: x_source = x_source[:, np.newaxis]
-    # if len(np.shape(v_source)) < 2: v_source = v_source[:, np.newaxis]
-    # if len(np.shape(x_sensor)) < 2: x_ref = x_sensor[:, np.newaxis]
-    # if len(np.shape(v_sensor)) < 2: v_ref = v_sensor[:, np.newaxis]
-    #
-    # Find the dimensions
+    # Find the dimensions -- we already know it's at least 2D, thanks to broadcast_backwards
     num_dims, num_sources, *out_shp_1 = np.shape(x_source)
-    # num_dims2, num_sources2, *out_shp_2 = np.shape(v_source)
     _, num_sensors, *_ = np.shape(x_sensor)
-    # num_dims4, num_sensors2, *out_shp_4 = np.shape(v_sensor)
-    #
-    # if num_dims != num_dims2 or num_dims != num_dims3 or num_dims != num_dims4:
-    #     raise ValueError('All inputs must have the same number of spatial dimensions.')
-    #
-    # if num_sensors2 != num_sensors and num_sensors != 1 and num_sensors2 != 1:
-    #     raise ValueError('Number of sensors must be the same for both x_sensor and v_sensor.')
-    #
-    # if num_sources2 != num_sources and num_sources != 1 and num_sources2 != 1:
-    #     raise ValueError('Number of source must be the same for both x_source and v_source.')
-
-    # num_sensor = np.amax((num_sensors, num_sensors2))
-    # num_source = np.amax((num_sources, num_sources2))
 
     # Find the output shape
     # in_shp = np.broadcast_shapes(out_shp_1, out_shp_2, out_shp_3, out_shp_4)
     out_shp = [num_sensors, num_sources]
     out_shp.extend(in_shp)
 
-    return num_dims, num_sources, num_sensors, out_shp, x_source, v_source, x_sensor, v_sensor
+    return num_dims, num_sources, num_sensors, tuple(out_shp), x_source, v_source, x_sensor, v_sensor

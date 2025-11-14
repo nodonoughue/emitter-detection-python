@@ -1,20 +1,18 @@
 import numpy as np
 import numpy.typing as npt
-import time
 
 
-from ewgeo.utils import parse_reference_sensor, print_elapsed, safe_2d_shape
-from ewgeo.utils import print_progress as print_progress_inner
+from ewgeo.utils import parse_reference_sensor, broadcast_backwards
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.geo import calc_range, calc_range_diff
 from ewgeo.utils.unit_conversions import db_to_lin
 
 
-def measurement(x_sensor: npt.ArrayLike,
-                x_source: npt.ArrayLike,
+def measurement(x_sensor: npt.NDArray[np.float64],
+                x_source: npt.NDArray[np.float64],
                 ref_idx=None,
-                bias: npt.ArrayLike | None=None):
+                bias: npt.NDArray[np.float64] | None=None)-> npt.NDArray[np.float64]:
     """
     Computes TDOA measurements and converts to range difference of arrival (by compensating for the speed of light).
 
@@ -31,9 +29,12 @@ def measurement(x_sensor: npt.ArrayLike,
     """
 
     # Construct component measurements
-    n_dim1, n_sensor = safe_2d_shape(x_sensor)
-    n_dim2, n_source = safe_2d_shape(x_source)
-
+    shp = np.shape(x_sensor)
+    n_dim1 = shp[0] if len(shp) > 0 else 1
+    n_sensor = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_source)
+    n_dim2 = shp[0] if len(shp) > 0 else 1
+    n_source = shp[1] if len(shp) > 1 else 1
     if n_dim1 != n_dim2:
         raise TypeError('First dimension of all inputs must match')
 
@@ -50,9 +51,8 @@ def measurement(x_sensor: npt.ArrayLike,
 
     # Add bias
     if bias is not None:
-        if bias.shape != r.shape:
-            while bias.ndim < r.ndim:
-                bias = np.expand_dims(bias, axis=-1)
+        arrs, _ = broadcast_backwards([bias, r], start_dim=0, do_broadcast=True)
+        bias, r = arrs
 
         r = r + bias
 
@@ -80,8 +80,12 @@ def jacobian(x_sensor: npt.ArrayLike,
     """
 
     # Parse inputs
-    n_dim1, n_sensor = safe_2d_shape(x_sensor)
-    n_dim2, n_source = safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    n_dim1 = shp[0] if len(shp) > 0 else 1
+    n_sensor = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_source)
+    n_dim2 = shp[0] if len(shp) > 0 else 1
+    n_source = shp[1] if len(shp) > 1 else 1
 
     if n_dim1 != n_dim2:
         raise TypeError('Input variables must match along first dimension.')
@@ -138,8 +142,12 @@ def jacobian_uncertainty(x_sensor: npt.ArrayLike,
     """
 
     # Parse inputs
-    n_dim1, n_sensor = safe_2d_shape(x_sensor)
-    n_dim2, n_source = safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    n_dim1 = shp[0] if len(shp) > 0 else 1
+    # n_sensor = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_source)
+    n_dim2 = shp[0] if len(shp) > 0 else 1
+    # n_source = shp[1] if len(shp) > 1 else 1
 
     if n_dim1 != n_dim2:
         raise TypeError('Input variables must match along first dimension.')
@@ -176,8 +184,7 @@ def log_likelihood(x_sensor: npt.ArrayLike,
                    ref_idx=None,
                    do_resample: bool=False,
                    variance_is_toa: bool=True,
-                   bias: npt.ArrayLike | None=None,
-                   print_progress=False):
+                   bias: npt.ArrayLike | None=None):
     """
     Computes the Log Likelihood for TDOA sensor measurement, given the received range difference measurement vector
     zeta, covariance matrix cov, and set of candidate source positions x_source.
@@ -196,15 +203,8 @@ def log_likelihood(x_sensor: npt.ArrayLike,
     :param variance_is_toa: Boolean flag; if true then the input covariance matrix is in units of s^2; if false, then
     it is in m^2
     :param bias: sensor measurement biases
-    :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
-                           the console. [default=False]
     :return ell: Log-likelihood evaluated at each position x_source.
     """
-
-    n_dim, n_source_pos = safe_2d_shape(x_source)
-
-    # Parse the TDOA sensor pairs
-    _, n_tdoa = safe_2d_shape(x_sensor)
 
     if variance_is_toa:
         # Convert from TOA/TDOA to ROA/RDOA -- copy to a new object for sanity's sake
@@ -214,8 +214,8 @@ def log_likelihood(x_sensor: npt.ArrayLike,
         cov = cov.resample(ref_idx=ref_idx)
 
     rho = measurement(x_sensor=x_sensor, x_source=x_source, ref_idx=ref_idx, bias=bias)
-    while rho.ndim < zeta.ndim: rho = np.expand_dims(rho, -1)
-    while zeta.ndim < rho.ndim: zeta = np.expand_dims(zeta, -1)
+    arrs, _ = broadcast_backwards([rho, zeta], start_dim=0, do_broadcast=True)
+    rho, zeta = arrs
 
     err = rho - zeta
 
@@ -264,8 +264,6 @@ def error(x_sensor: npt.ArrayLike,
     # use the final sensor as the reference for all difference measurements.
     r = measurement(x_sensor, x_source, ref_idx)
 
-    _, num_sensors = np.shape(x_sensor)
-
     if variance_is_toa:
         # Convert from TOA/TDOA to ROA/RDOA
         cov = cov.multiply(speed_of_light ** 2, overwrite=False)
@@ -284,18 +282,6 @@ def error(x_sensor: npt.ArrayLike,
     rr = measurement(x_sensor, x_plot, ref_idx)
     err = r[:, np.newaxis] - rr
     epsilon = cov.solve_aca(err.T)
-    # epsilon = np.zeros_like(xx)
-    # for idx_pt in np.arange(np.size(xx)):
-    #     x_i = x_plot[:, idx_pt]
-    #
-    #     # Evaluate the measurement at x_i
-    #     rr_i = measurement(x_sensor, x_i, ref_idx)
-    #
-    #     # Compute the measurement error
-    #     err = r - rr_i
-    #
-    #     # Evaluate the scaled log likelihood
-    #     epsilon[idx_pt] = cov.solve_aca(err)
 
     return epsilon
 
@@ -352,11 +338,11 @@ def toa_error_cross_corr(snr: npt.ArrayLike,
     return 1/(8*np.pi*a)
 
 
-def draw_isochrone(x_ref: npt.ArrayLike,
-                   x_test: npt.ArrayLike,
-                   range_diff: npt.ArrayLike,
+def draw_isochrone(x_ref: npt.NDArray[np.float64],
+                   x_test: npt.NDArray[np.float64],
+                   range_diff: npt.NDArray[np.float64],
                    num_pts: int,
-                   max_ortho: float):
+                   max_ortho: float)-> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
     Finds the isochrone with the stated range difference from points x1
     and x2.  Generates an arc with 2*numPts-1 points, that spans up to
@@ -481,7 +467,9 @@ def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     # TODO: Debug
 
     # Parse the reference index
-    _, num_sensors = safe_2d_shape(x_sensor)
+    shp = np.shape(x_sensor)
+    # n_dim1 = shp[0] if len(shp) > 0 else 1
+    num_sensors = shp[1] if len(shp) > 1 else 1
     test_idx_vec, ref_idx_vec = parse_reference_sensor(ref_idx, num_sensors)
 
     # According to eq 6.32, the m-th row is 1 for every column in which the m-th sensor is a test index, and -1 for
@@ -493,14 +481,17 @@ def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
         grad[ref, i] = -1
 
     # Repeat for each source position
-    _, num_sources = safe_2d_shape(x_source)
+    shp = np.shape(x_source)
+    # n_dim2 = shp[0] if len(shp) > 0 else 1
+    num_sources = shp[1] if len(shp) > 1 else 1
     if num_sources > 1:
         grad = np.repeat(grad[:, :, np.newaxis], num_sources, axis=2)
 
     return grad
 
 
-def grad_sensor_pos(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
+def grad_sensor_pos(x_sensor: npt.NDArray[np.float64], x_source: npt.NDArray[np.float64],
+                    ref_idx=None)-> npt.NDArray[np.float64]:
     """
     Compute the gradient of TDOA measurements, with sensor uncertainties, with respect to sensor position,
     equation 6.31.
@@ -518,8 +509,12 @@ def grad_sensor_pos(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=No
     # TODO: Debug
 
     # Parse inputs
-    n_dim, n_sensor = safe_2d_shape(x_sensor)
-    _, n_source = safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    n_dim = shp[0] if len(shp) > 0 else 1
+    n_sensor = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_source)
+    # n_dim2 = shp[0] if len(shp) > 0 else 1
+    n_source = shp[1] if len(shp) > 1 else 1
 
     # Compute pointing vectors and projection matrix
     dx = x_sensor[:, :, np.newaxis] - np.reshape(x_source, shape=(n_dim, 1, n_source))
@@ -561,7 +556,9 @@ def generate_parameter_indices(x_sensor: npt.ArrayLike, do_bias: bool=True):
     :return: dictionary with fields 'target_pos', 'bias', and 'sensor_pos' indicating the indices corresponding
     to each parameter.
     """
-    num_dim, num_sensors = safe_2d_shape(x_sensor)
+    shp = np.shape(x_sensor)
+    num_dim = shp[0] if len(shp) > 0 else 1
+    num_sensors = shp[1] if len(shp) > 1 else 1
 
     indices = {'target_pos': np.arange(num_dim),
                'bias': np.arange(num_sensors) + num_dim if do_bias else None,

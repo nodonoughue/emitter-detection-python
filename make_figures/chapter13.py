@@ -127,7 +127,7 @@ def make_figure_1(prefix=None, colors=None):
     # Draw isodoppler line
     x_isodoppler, y_isodoppler = fdoa.model.draw_isodoppler(x_ref=x_sensor[0], v_ref=v_sensor[0],
                                                             x_test=x_sensor[1], v_test=v_sensor[1],
-                                                            vdiff=velocity_diff, num_pts=1000, max_ortho=5)
+                                                            vdiff=velocity_diff, num_pts=1000, max_ortho=5.)
 
     plt.plot(x_isodoppler, y_isodoppler, color=colors(4), linestyle='-.', label='Lines of Constant FDOA')
 
@@ -240,11 +240,11 @@ def make_figure_2(prefix=None):
     return fig2a, fig2b, fig2c, fig2d
 
 
-def _make_figure2_subfigure(x_sensor: npt.ArrayLike,
-                            v_sensor: npt.ArrayLike,
-                            x_source: npt.ArrayLike,
+def _make_figure2_subfigure(x_sensor: npt.NDArray[np.float64],
+                            v_sensor: npt.NDArray[np.float64],
+                            x_source: npt.NDArray[np.float64],
                             covar_rho: CovarianceMatrix,
-                            x_max: npt.ArrayLike,
+                            x_max: float,
                             num_pts: int):
 
     # Generate the likelihood; for plotting

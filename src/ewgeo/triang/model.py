@@ -1,12 +1,12 @@
 import numpy as np
 import numpy.typing as npt
-import time
 
 import ewgeo.utils as utils
 from ewgeo.utils.covariance import CovarianceMatrix
 
 
-def measurement(x_sensor, x_source, do_2d_aoa=False, bias: npt.ArrayLike | None=None):
+def measurement(x_sensor: npt.NDArray[np.float64], x_source: npt.NDArray[np.float64], do_2d_aoa: bool=False,
+                bias: npt.NDArray[np.float64] | None=None)-> npt.NDArray[np.float64]:
     """
     Computes angle of arrival measurements.
 
@@ -27,8 +27,12 @@ def measurement(x_sensor, x_source, do_2d_aoa=False, bias: npt.ArrayLike | None=
     """
 
     # Parse inputs
-    n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
-    n_dim2, n_source = utils.safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    n_dim1 = shp[0] if len(shp) > 0 else 1
+    n_sensor = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_source)
+    n_dim2 = shp[0] if len(shp) > 0 else 1
+    n_source = shp[1] if len(shp) > 1 else 1
 
     if n_dim1 != n_dim2:
         raise TypeError('First dimension of all inputs must match')
@@ -95,8 +99,12 @@ def jacobian(x_sensor, x_source, do_2d_aoa=False):
     """
 
     # Parse inputs
-    n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
-    n_dim2, n_source = utils.safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    n_dim1 = shp[0] if len(shp) > 0 else 1
+    n_sensor = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_source)
+    n_dim2 = shp[0] if len(shp) > 0 else 1
+    n_source = shp[1] if len(shp) > 1 else 1
 
     if n_dim1 != n_dim2:
         raise TypeError('Input variables must match along first dimension.')
@@ -177,8 +185,12 @@ def jacobian_uncertainty(x_sensor, x_source, do_2d_aoa=False, do_bias=False, do_
     """
 
     # Parse inputs
-    n_dim1, _ = utils.safe_2d_shape(x_sensor)
-    n_dim2, n_source = utils.safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    n_dim1 = shp[0] if len(shp) > 0 else 1
+    # n_sensor = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_source)
+    n_dim2 = shp[0] if len(shp) > 0 else 1
+    # n_source = shp[1] if len(shp) > 1 else 1
 
     if n_dim1 != n_dim2:
         raise TypeError('Input variables must match along first dimension.')
@@ -202,8 +214,7 @@ def jacobian_uncertainty(x_sensor, x_source, do_2d_aoa=False, do_bias=False, do_
 
     return j
 
-def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=False, bias: npt.ArrayLike | None=None,
-                   print_progress=True):
+def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=False, bias: npt.ArrayLike | None=None):
     """
     Computes the Log Likelihood for AOA sensor measurement, given the
     received measurement vector psi, covariance matrix cov,
@@ -224,14 +235,15 @@ def log_likelihood(x_sensor, zeta, cov: CovarianceMatrix, x_source, do_2d_aoa=Fa
     :param x_source: Candidate source positions
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :param bias: sensor measurement biases
-    :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
-                           the console. [default=False]
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
     # Parse inputs
-    n_dim1, n_sensor = utils.safe_2d_shape(x_sensor)
-    n_dim2, n_source_pos = utils.safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    n_dim1 = shp[0] if len(shp) > 0 else 1
+    shp = np.shape(x_source)
+    n_dim2 = shp[0] if len(shp) > 0 else 1
+    n_source_pos = shp[1] if len(shp) > 1 else 1
 
     if n_dim1 != n_dim2:
         raise TypeError('Input variables must match along first dimension.')
@@ -279,8 +291,12 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, do_2d_aoa=F
     :return y_vec:
     """
 
-    n_dim1, n_sensors = utils.safe_2d_shape(x_sensor)
-    n_dim2, n_source = utils.safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    n_dim1 = shp[0] if len(shp) > 0 else 1
+    # n_sensor = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_source)
+    n_dim2 = shp[0] if len(shp) > 0 else 1
+    # n_source = shp[1] if len(shp) > 1 else 1
 
     if n_dim1 != n_dim2:
         raise TypeError('Input variables must match along first dimension.')
@@ -315,7 +331,8 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, do_2d_aoa=F
 
 def draw_lob(x_sensor, psi, x_source=None, scale=1):
     # TODO: Expand for 3D LOBs
-    _, num_sensors = utils.safe_2d_shape(x_sensor)
+    shp = np.shape(x_sensor)
+    num_sensors = shp[1] if len(shp) > 1 else 1
     num_measurements = np.size(psi)
 
     if num_sensors != num_measurements:
@@ -388,8 +405,11 @@ def grad_bias(x_sensor, x_source, do_2d_aoa=False):
     # TODO: Debug
 
     # Parse the reference index
-    num_dim, num_sensors = utils.safe_2d_shape(x_sensor)
-    _, num_sources = utils.safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    # num_dim = shp[0] if len(shp) > 0 else 1
+    num_sensors = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_source)
+    num_sources = shp[1] if len(shp) > 1 else 1
 
     # According to eq 6.32, the m-th row is 1 for every column in which the m-th sensor is a test index, and -1 for
     # every column in which the m-th sensor is a reference index.
@@ -397,7 +417,6 @@ def grad_bias(x_sensor, x_source, do_2d_aoa=False):
     grad = np.eye(num_measurements)
 
     # Repeat for each source position
-    _, num_sources = utils.safe_2d_shape(x_source)
     if num_sources > 1:
         grad = np.repeat(grad, num_sources, axis=2)
 
@@ -422,8 +441,11 @@ def grad_sensor_pos(x_sensor, x_source, do_2d_aoa=False):
     # TODO: Debug
 
     # Parse inputs
-    n_dim, n_sensor = utils.safe_2d_shape(x_sensor)
-    _, n_source = utils.safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    n_dim = shp[0] if len(shp) > 0 else 1
+    n_sensor = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_source)
+    n_source = shp[1] if len(shp) > 1 else 1
 
     # Compute the Jacobian for Azimuth measurements
     # Equation 6.22 and 6.23 show that the gradient with respect to sensor position is the negative of the gradient

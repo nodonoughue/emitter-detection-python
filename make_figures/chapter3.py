@@ -209,7 +209,7 @@ def make_figure_3(prefix=None):
     eta_lin = db_to_lin(eta_db)
 
     # The complementary cdf (1 - CDF) is called the 'survival function'
-    prob_fa = stats.chi2.sf(x=np.expand_dims(eta_lin, axis=1), df=2*np.expand_dims(num_samples, axis=0))
+    prob_fa = np.array(stats.chi2.sf(x=np.expand_dims(eta_lin, axis=1), df=2*np.expand_dims(num_samples, axis=0)))
 
     # Plot
     fig3 = plt.figure()
@@ -251,12 +251,12 @@ def make_figure_4(prefix=None):
     xi_lin = db_to_lin(xi_db)
 
     # Compute threshold
-    eta = stats.chi2.ppf(q=1-prob_fa, df=2*num_samples)
+    eta = np.array(stats.chi2.ppf(q=1-prob_fa, df=2*num_samples))
 
     # Compute Probability of Detection
     chi_lambda = 2*xi_lin  # Non-centrality parameter, lambda, or chi-squared RV
-    prob_det = 1 - stats.ncx2.cdf(x=eta[np.newaxis, :], df=2*num_samples[np.newaxis, :],
-                                  nc=num_samples[np.newaxis, :]*chi_lambda[:, np.newaxis])
+    prob_det = 1 - np.array(stats.ncx2.cdf(x=eta[np.newaxis, :], df=2*num_samples[np.newaxis, :],
+                                           nc=num_samples[np.newaxis, :]*chi_lambda[:, np.newaxis]))
 
     # Plot
     fig4 = plt.figure()

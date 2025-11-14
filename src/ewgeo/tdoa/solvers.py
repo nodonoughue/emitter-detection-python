@@ -6,12 +6,12 @@ from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 
 
-def chan_ho(x_sensor: npt.ArrayLike,
-            zeta: npt.ArrayLike,
+def chan_ho(x_sensor: npt.NDArray[np.float64],
+            zeta: npt.NDArray[np.float64],
             cov: CovarianceMatrix,
             ref_idx=None,
             do_resample: bool=False,
-            variance_is_toa: bool=False):
+            variance_is_toa: bool=False)-> npt.NDArray[np.float64]:
     """
     Computes the Chan-Ho solution for TDOA processing.
 
@@ -38,7 +38,9 @@ def chan_ho(x_sensor: npt.ArrayLike,
     cov = preprocess_cov(cov=cov, do_resample=do_resample, variance_is_toa=variance_is_toa, ref_idx=ref_idx)
 
     # Accept an arbitrary reference position
-    n_dims, n_sensor = np.shape(x_sensor)
+    shp = np.shape(x_sensor)
+    n_dims = shp[0] if len(shp) > 0 else 1
+    n_sensor = shp[1] if len(shp) > 1 else 1
     if ref_idx is not None and ref_idx != n_sensor-1:
         # Throw an error if there are multiple reference sensors
         assert np.size(ref_idx) == 1, 'The Chan-Ho solver currently requires a single reference sensor.'

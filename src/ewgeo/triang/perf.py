@@ -1,7 +1,6 @@
 import numpy as np
 
 from . import model
-from ewgeo.utils import safe_2d_shape
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.perf import compute_crlb_gaussian
 
@@ -28,13 +27,15 @@ def compute_crlb(x_sensor, x_source, cov: CovarianceMatrix, do_2d_aoa=False,
     """
 
     # Parse inputs
-    num_dimension, num_sensors = safe_2d_shape(x_sensor)
-    num_dimension2, num_sources = safe_2d_shape(x_source)
+    shp = np.shape(x_sensor)
+    num_dimension = shp[0] if len(shp) > 0 else 1
+    shp = np.shape(x_source)
+    num_dimension2 = shp[0] if len(shp) > 0 else 1
 
     assert num_dimension == num_dimension2, "Sensor and Target positions must have the same number of dimensions"
 
     # Make sure that xs is a 2d array
-    if len(np.shape(x_source)) == 1:
+    if len(shp) == 1:
         x_source = np.expand_dims(x_source, axis=1)
 
     # Define a wrapper for the jacobian matrix that accepts only the position 'x'

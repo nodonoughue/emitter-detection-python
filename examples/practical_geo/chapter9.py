@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from random import shuffle
-from scipy.linalg import block_diag
 import time
 
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
@@ -13,7 +12,7 @@ from ewgeo.tracker.measurement import Measurement, MeasurementModel
 from ewgeo.tracker.promoter import MofNPromoter
 from ewgeo.tracker.transition import MotionModel, ConstantVelocityMotionModel, ConstantAccelerationMotionModel
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import safe_2d_shape, print_progress, print_elapsed
+from ewgeo.utils import print_progress, print_elapsed
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import PassiveSurveillanceSystem
@@ -120,7 +119,8 @@ def example1():
 
     # Build a state covariance error from the CRLB
     for s in new_states:
-        s.covar = CovarianceMatrix(block_diag(pss.compute_crlb(s.position),1e6*np.eye(2)))
+        s.covar = CovarianceMatrix.block_diagonal(pss.compute_crlb(s.position),
+                                                  1e6*np.eye(2))
 
     # Predict the states forward and replot
     predicted_states = [transition.predict(t.curr_state, new_time=new_time) for t in tracks]
@@ -347,7 +347,7 @@ def example4():
     x_tdoa = np.array([[5e3, 0, 0, -5e3],
                        [0, 5e3, 0, 0],
                        [30, 60, 30, 60]])
-    num_dims, n_tdoa = safe_2d_shape(x_tdoa)
+    num_dims, n_tdoa = np.shape(x_tdoa)
     ref_idx = 0
     sigma_toa = 10e-9
     cov_toa = (sigma_toa ** 2) * np.eye(n_tdoa)

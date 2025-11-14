@@ -6,7 +6,7 @@ from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import print_elapsed, print_progress, safe_2d_shape, SearchSpace, remove_outliers
+from ewgeo.utils import print_elapsed, print_progress, SearchSpace, remove_outliers
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.coordinates import lla_to_enu
 from ewgeo.utils.covariance import CovarianceMatrix
@@ -71,7 +71,7 @@ def example1(mc_params=None):
     x_source_enu = np.array([e_source, n_source, u_source])
 
     # Sensor Selection
-    num_dims, num_tdoa = safe_2d_shape(x_sensor_enu)
+    num_dims, num_tdoa = np.shape(x_sensor_enu)
     num_aoa = num_tdoa
     num_fdoa = num_aoa
     ref_tdoa = num_tdoa - 1
@@ -136,7 +136,7 @@ def example1(mc_params=None):
 
     # Remove outliers
     error = remove_outliers(error)
-    num_monte_carlo_actual, _ = safe_2d_shape(error)
+    num_monte_carlo_actual, _ = np.shape(error)
 
     # Plot RMSE and CRLB
     rmse_ls = np.sqrt(np.sum(error**2, 0)/num_monte_carlo_actual)
@@ -229,6 +229,13 @@ def example2(colors=None):
     # Use a squeeze operation to ensure that the individual dimension
     # indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
+
+    # Sensor Selection
+    _, n_tdoa = np.shape(x_sensor_lla)
+    n_aoa = n_tdoa
+    n_fdoa = n_aoa
+    ref_tdoa = n_tdoa - 1
+    ref_fdoa = n_fdoa - 1
 
     # Measurement Error
     err_aoa_rad = 3 * _deg2rad           # rad

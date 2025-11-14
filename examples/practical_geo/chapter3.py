@@ -9,7 +9,7 @@ from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse, compute_rmse
-from ewgeo.utils import print_elapsed, print_progress, resample_noise, safe_2d_shape, SearchSpace
+from ewgeo.utils import print_elapsed, print_progress, resample_noise, SearchSpace
 
 _rad2deg = 180.0/np.pi
 _deg2rad = np.pi/180.0
@@ -212,7 +212,7 @@ def example3(colors=None):
     # alt = 10e3
     # zz_sensors = alt*np.ones((num_sensors, ))
     # x_sensors = np.concatenate((x_sensors, zz_sensors), axis=0)
-    num_dims, num_sensors = safe_2d_shape(x_sensors)
+    num_dims, num_sensors = np.shape(x_sensors)
 
     # Define Covariance Matrix
     freq_hz = 1e9
@@ -314,7 +314,7 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     x_source = x_source_ctr[:, np.newaxis] + offset * (-1 + 2 * rng.standard_normal(size=(2, num_monte_carlo)))
 
     x_tdoa = np.array([[1., 3., 4., 5., 2.], [0., .5, 0., .5, -1.]]) * 1e3
-    _, num_tdoa = safe_2d_shape(x_tdoa)
+    _, num_tdoa = np.shape(x_tdoa)
 
     # Initialize error covariance matrix
     time_err = 1e-7         # 100 ns time of arrival error per sensor

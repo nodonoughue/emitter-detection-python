@@ -76,7 +76,8 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     rho_actual = fdoa.measurement(x_source=x_source, v_source=v_source)
 
     # Initialize Solvers
-    num_monte_carlo = int(1000)
+    num_monte_carlo = int(100)  # MATLAB uses 1,000. Reducing to 100 for faster runtime
+    # TODO: Is 100 accurate enough?
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
@@ -205,7 +206,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     cep50_bf = compute_cep50(cov_bf) / 1e3
 
     out_shp = (2, num_iterations)
-    out_cov_shp = (2, 2, num_iterations)
+    # out_cov_shp = (2, 2, num_iterations)
     bias_ls = np.zeros(shape=out_shp)
     bias_grad = np.zeros(shape=out_shp)
     cov_ls = []

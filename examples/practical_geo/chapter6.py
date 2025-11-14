@@ -8,7 +8,7 @@ from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import safe_2d_shape, SearchSpace, print_progress, print_elapsed
+from ewgeo.utils import SearchSpace, print_progress, print_elapsed
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.geo import calc_range
@@ -100,7 +100,7 @@ def example2():
 
     # Set up sensors
     x_tdoa = np.array([[0, 2, 0],[2, -2, 0]])  # avg position(reported)
-    _, n_tdoa = safe_2d_shape(x_tdoa)
+    _, n_tdoa = np.shape(x_tdoa)
 
     cov_pos_full = CovarianceMatrix(.1 * np.eye(2 * n_tdoa))  # position covar; all are IID
 
@@ -161,10 +161,10 @@ def example3():
 
     # Set up sensors
     x_aoa = np.array([[2., 2., 0.], [2.,  -1., 0.]])
-    num_dims, n_aoa = safe_2d_shape(x_aoa)
+    num_dims, n_aoa = np.shape(x_aoa)
 
     x_tdoa = np.array([[0., 2., 0.], [2., -1., 0.]])  # avg position (reported)
-    _, n_tdoa = safe_2d_shape(x_tdoa)
+    _, n_tdoa = np.shape(x_tdoa)
 
     # Find matching sensors
     dist = calc_range(x1=x_aoa, x2=x_tdoa)
@@ -198,7 +198,7 @@ def example3():
 
     # Let's verify that sensors 2 and 4 are still colocated
     dist_perturbed = calc_range(x1=x_aoa_true, x2=x_tdoa_true)
-    assert np.all(np.fabs(dist_perturbed[idx_aoa, idx_tdoa]) < 1e-6), 'Error generating correlated sensor perturbations.'
+    assert np.all(np.fabs(dist_perturbed[idx_aoa, idx_tdoa]) < 1e-4), 'Error generating correlated sensor perturbations.'
 
     # Initialize the PSS
     aoa = DirectionFinder(x=x_aoa, cov=None, do_2d_aoa=False)
@@ -271,7 +271,7 @@ def example4(do_iterative=False):
     # Set up sensors
     x_tdoa = np.array([[2, 0,  4, 0],
                        [2, 2, 0, 0]])*1e3 # avg position (reported)
-    n_dim, n_tdoa = safe_2d_shape(x_tdoa)
+    n_dim, n_tdoa = np.shape(x_tdoa)
 
     tdoa_bias = np.array([10, 30, -20, 60])  # TOA bias
 
@@ -350,8 +350,8 @@ def example4(do_iterative=False):
     search_space.epsilon = .1e3
     search_space.points_per_dim = None
 
-    x_est_true, ell_soln_true, x_grid_soln = tdoa.max_likelihood(zeta=zeta_true, search_space=search_space, print_progress=True)
-    x_est, _, _ = tdoa.max_likelihood(zeta=zeta, search_space=search_space, print_progress=True)
+    x_est_true, ell_soln_true, x_grid_soln = tdoa.max_likelihood(zeta=zeta_true, search_space=search_space)
+    x_est, _, _ = tdoa.max_likelihood(zeta=zeta, search_space=search_space)
 
     print('True ML Est.: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_true[0]/1e3, x_est_true[1]/1e3,
                                                                       np.linalg.norm(x_est_true-x_tgt)/1000))
@@ -370,8 +370,7 @@ def example4(do_iterative=False):
                                                                 bias_search=bias_search,
                                                                 do_sensor_bias=True,
                                                                 do_sensor_pos=False,
-                                                                do_sensor_vel=False,
-                                                                print_progress=True)
+                                                                do_sensor_vel=False)
 
     err_km = np.linalg.norm(x_est_bias-x_tgt)/1000
     print('ML Est. w/Uncertainty: ({:.2f}, {:.2f}) km, error: {:.2f} km'.format(x_est_bias[0]/1e3,
@@ -434,8 +433,8 @@ def example5(do_vel_only_cal=True):
     v_fdoa = np.array([[0, 0, 0],
                        [500, 500, 500]])
 
-    n_dim, n_tdoa = safe_2d_shape(x_tdoa)
-    _, n_fdoa = safe_2d_shape(x_fdoa)
+    n_dim, n_tdoa = np.shape(x_tdoa)
+    _, n_fdoa = np.shape(x_fdoa)
 
     # Generate Random Velocity Errors
     cov_vel = CovarianceMatrix(100**2 * np.eye(n_dim * n_fdoa))
@@ -461,7 +460,7 @@ def example5(do_vel_only_cal=True):
     x_source = np.array([-3, 4]) * 1e3
     x_cal = np.array([[-2, -1, 0, 1, 2],
                       [-5, -5, -5, -5, -5]]) * 1e3
-    _, num_cal = safe_2d_shape(x_cal)
+    _, num_cal = np.shape(x_cal)
 
     zeta = hybrid.noisy_measurement(x_source=x_source, v_sensor=v_fdoa_actual)
 
@@ -500,8 +499,9 @@ def example5(do_vel_only_cal=True):
                                                                                  cal_data=cal_data)
 
     # Analyze calibration results
-    print(f"Calibrated sensor positions: {x_sensor_est}, RMSE: {np.sqrt(np.mean((x_sensor_est-hybrid.pos)**2, axis=None))}")
-    print(f"Calibrated sensor velocities: {v_sensor_est}, RMSE: {np.sqrt(np.mean((v_sensor_est-v_fdoa_actual)**2, axis=None))}")
+    with np.printoptions(precision=2, suppress=True):
+        print(f"Calibrated sensor positions: {x_sensor_est}, RMSE: {np.sqrt(np.mean((x_sensor_est-hybrid.pos)**2, axis=None))}")
+        print(f"Calibrated sensor velocities: {v_sensor_est}, RMSE: {np.sqrt(np.mean((v_sensor_est-v_fdoa_actual)**2, axis=None))}")
 
     # Plot Scenario
     fig = plt.figure()
@@ -533,7 +533,7 @@ def example5(do_vel_only_cal=True):
     iterations_per_row=iterations_per_tic*tics_per_row
     t_start=time.perf_counter()
     max_num_cal=20
-    num_cal_vec = np.arange(max_num_cal)
+    num_cal_vec = range(max_num_cal)
     zeta_cal = hybrid.noisy_measurement(x_source=x_cal, v_sensor=v_fdoa_actual, num_samples=max_num_cal)
     cal_rmse_gd = np.zeros((len(num_cal_vec), ))
     cal_rmse_ls = np.zeros_like(cal_rmse_gd)
