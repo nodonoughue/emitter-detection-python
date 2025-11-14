@@ -1,13 +1,11 @@
 import numpy as np
 import numpy.typing as npt
 from scipy.linalg import block_diag
-import time
 
 import ewgeo.fdoa as fdoa
 import ewgeo.tdoa as tdoa
 import ewgeo.triang as triang
-from ewgeo.utils import modulo2pi, print_elapsed, safe_2d_shape, SearchSpace
-from ewgeo.utils import print_progress as print_progress_inner
+from ewgeo.utils import modulo2pi, SearchSpace, broadcast_backwards
 from ewgeo.utils.covariance import CovarianceMatrix
 
 
@@ -96,7 +94,9 @@ def jacobian(x_source: npt.ArrayLike,
     """
 
     # Find out how many source points are requested
-    n_dim, n_source = safe_2d_shape(x_source)
+    shp = np.shape(x_source)
+    n_dim = shp[0] if len(shp) > 0 else 1
+    n_source = shp[1] if len(shp) > 1 else 1
     if n_source > 1:
         empty_dims = (n_dim, 0, n_source)
     else:
@@ -192,22 +192,21 @@ def jacobian_uncertainty(x_source: npt.ArrayLike,
     return j
 
 
-def log_likelihood(x_source: npt.ArrayLike,
-                   zeta: npt.ArrayLike,
+def log_likelihood(x_source: npt.NDArray[np.float64],
+                   zeta: npt.NDArray[np.float64],
                    cov: CovarianceMatrix,
-                   x_aoa: npt.ArrayLike=None,
-                   x_tdoa: npt.ArrayLike=None,
-                   x_fdoa: npt.ArrayLike=None,
-                   v_fdoa: npt.ArrayLike=None,
-                   v_source: npt.ArrayLike | None=None,
+                   x_aoa: npt.NDArray[np.float64] | None=None,
+                   x_tdoa: npt.NDArray[np.float64] | None=None,
+                   x_fdoa: npt.NDArray[np.float64] | None=None,
+                   v_fdoa: npt.NDArray[np.float64] | None=None,
+                   v_source: npt.NDArray[np.float64] | None=None,
                    do_2d_aoa: bool=False,
                    tdoa_ref_idx=None,
                    fdoa_ref_idx=None,
                    do_resample: bool=False,
-                   angle_bias: npt.ArrayLike | None=None,
-                   range_bias: npt.ArrayLike | None=None,
-                   range_rate_bias: npt.ArrayLike | None=None,
-                   print_progress: bool=False):
+                   angle_bias: npt.NDArray[np.float64] | None=None,
+                   range_bias: npt.NDArray[np.float64] | None=None,
+                   range_rate_bias: npt.NDArray[np.float64] | None=None):
     """
     Computes the Log Likelihood for Hybrid sensor measurement (AOA, TDOA, and
     FDOA), given the received measurement vector zeta, covariance matrix C,
@@ -233,13 +232,14 @@ def log_likelihood(x_source: npt.ArrayLike,
     :param angle_bias: AOA measurement bias
     :param range_bias: TDOA measurement bias
     :param range_rate_bias: FDOA measurement bias
-    :param print_progress: Boolean flag, if true then progress updates and elapsed/remaining time will be printed to
-                           the console. [default=False]
     :return ell: Log-likelihood evaluated at each position x_source.
     """
 
-    n_dim, n_source_pos = safe_2d_shape(x_source)
-    _, n_source_pos2 = safe_2d_shape(v_source)
+    shp = np.shape(x_source)
+    # n_dim = shp[0] if len(shp) > 0 else 1
+    n_source_pos = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(v_source)
+    n_source_pos2 = shp[1] if len(shp) > 1 else 1
 
     # Make the source position and velocity 2D, if they're not already
     if n_source_pos == 1:
@@ -247,14 +247,14 @@ def log_likelihood(x_source: npt.ArrayLike,
     if v_source is not None and n_source_pos2 == 1:
         v_source = v_source[:, np.newaxis]
 
-    # Initialize the output variable
-    ell = np.zeros((n_source_pos, ))
-
     # Pre-compute covariance matrix inverses
     if do_resample:
-        _, num_aoa = safe_2d_shape(x_aoa)
-        _, num_tdoa = safe_2d_shape(x_tdoa)
-        _, num_fdoa = safe_2d_shape(x_fdoa)
+        shp = np.shape(x_aoa)
+        num_aoa = shp[1] if len(shp) > 1 else 1
+        shp = np.shape(x_tdoa)
+        num_tdoa = shp[1] if len(shp) > 1 else 1
+        shp = np.shape(x_fdoa)
+        num_fdoa = shp[1] if len(shp) > 1 else 1
         if do_2d_aoa: num_aoa *= 2
         # Use the hybrid-specific covariance matrix resampler, which handles the assumed structure.
         cov = cov.resample_hybrid(num_aoa=num_aoa, num_tdoa=num_tdoa, num_fdoa=num_fdoa,
@@ -264,11 +264,11 @@ def log_likelihood(x_source: npt.ArrayLike,
     zeta_dot = measurement(x_aoa=x_aoa, x_tdoa=x_tdoa, x_fdoa=x_fdoa, v_fdoa=v_fdoa, x_source=x_source,
                            v_source=v_source, do_2d_aoa=do_2d_aoa, tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx,
                             angle_bias=angle_bias, range_bias=range_bias, range_rate_bias=range_rate_bias)
-    while zeta_dot.ndim < zeta.ndim: zeta_dot = np.expand_dims(zeta_dot, -1)
-    while zeta.ndim < zeta_dot.ndim: zeta = np.expand_dims(zeta, -1)
+    arrs, _ = broadcast_backwards([zeta, zeta_dot], start_dim=0, do_broadcast=True)
+    zeta, zeta_dot = arrs
 
     # Evaluate the measurement error
-    err = (zeta_dot - zeta)
+    err = zeta_dot - zeta
 
     # Compute the scaled log likelihood
     ell = - cov.solve_aca(np.moveaxis(err, source=0, destination=-1))
@@ -324,9 +324,12 @@ def error(x_source: npt.ArrayLike,
 
     # Pre-process the covariance matrix
     if do_resample:
-        _, num_aoa = safe_2d_shape(x_aoa)
-        _, num_tdoa = safe_2d_shape(x_tdoa)
-        _, num_fdoa = safe_2d_shape(x_fdoa)
+        shp = np.shape(x_aoa)
+        num_aoa = shp[1] if len(shp) > 1 else 1
+        shp = np.shape(x_tdoa)
+        num_tdoa = shp[1] if len(shp) > 1 else 1
+        shp = np.shape(x_fdoa)
+        num_fdoa = shp[1] if len(shp) > 1 else 1
         if do_2d_aoa: num_aoa *= 2
         cov = cov.resample_hybrid(num_aoa=num_aoa, num_tdoa=num_tdoa, num_fdoa=num_fdoa,
                                   tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)
@@ -347,7 +350,9 @@ def error(x_source: npt.ArrayLike,
 
     # Angle measurements require a modulo 2*pi operation to avoid edge effects
     if x_aoa is not None:
-        for idx_aoa in np.arange(safe_2d_shape(x_aoa)[1]):
+        shp = np.shape(x_aoa)
+        num_aoa = shp[1] if len(shp) > 1 else 1
+        for idx_aoa in range(num_aoa):
             err[idx_aoa, :] = modulo2pi(err[idx_aoa, :])
 
     # epsilon_list = [cov.solve_aca(this_err) for this_err in err.T]
@@ -445,23 +450,28 @@ def grad_bias(x_source: npt.ArrayLike,
         gradients.append(fdoa.model.grad_bias(x_source=x_source, x_sensor=x_fdoa,
                                               ref_idx=fdoa_ref_idx))
 
-    _, n_source = safe_2d_shape(x_source)
-    if n_source <= 1:
-        # There is only one source, combine the gradients with a block diagonal across axes 0 and 1
-        grad = block_diag(gradients)
-    else:
-        # The individual gradients are 3D, but block_diag only works on 2D, let's do some reshaping.
-        # We need to move the third axis to the front
-        gradients_reshape = [np.moveaxis(x, -1, 0) for x in gradients]
+    if len(gradients) == 0:
+        # No gradients; nothing to return
+        return np.array([])
+    elif len(gradients) == 1:
+        # Only one gradient was generated; return it directly
+        return gradients[0]
 
-        # Now we can use list comprehension to call block_diag on each in turn
-        res = [block_diag(*arrs) for arrs in zip(*gradients_reshape)]
+    orig_shapes = [np.shape(g) for g in gradients]
+    max_len = max(map(len, orig_shapes))
+    if max_len > 2:
+        # Move axes (0, 1) to the end so that block_diag will work on them properly
+        gradients = [np.moveaxis(g, (0, 1), (-2, -1)) for g in gradients]
 
-        # This is now a list of length n_source, where each entry is a block-diagonal jacobian matrix at that source
-        # position. Convert back to an ndarray and rearrange the axes
-        grad = np.moveaxis(np.asarray(res), 0, -1)  # Move the first axis (n_source) back to the end.
+    # At this point, we know len(grads) is >0, but PyCharm doesn't, so it's presenting a static analysis warning.
+    # Shift the function call to grads[0], *grads[1:] to ensure at least one positional argument is passed in.
+    gradients = block_diag(gradients[0], *gradients[1:])
 
-    return grad
+    # Move the axes back
+    if max_len > 2:
+        gradients = np.moveaxis(gradients, (-2, -1), (0, 1))
+
+    return gradients
 
 
 def grad_sensor_pos(x_source: npt.ArrayLike,

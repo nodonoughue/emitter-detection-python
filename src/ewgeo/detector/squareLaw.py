@@ -20,12 +20,16 @@ def det_test(z, noise_var, prob_fa):
     :param prob_fa: Acceptable probability of false alarm
     :return detResult: Array of N binary detection results 
     """
-    
+
+    shp = np.shape(z)
+    m = shp[0] if len(shp) > 0 else 1
+    # n = shp[1] if len(shp) > 1 else 1
+
     # Compute the sufficient statistic
     suff_stat = np.sum(np.absolute(z)**2, axis=0)/noise_var
     
     # Compute the threshold
-    eta = stats.chi2.ppf(q=1-prob_fa, df=2*np.shape(z)[0])
+    eta = stats.chi2.ppf(q=1-prob_fa, df=2*m)
 
     # Compare T to eta
     det_result = np.greater(suff_stat, eta)

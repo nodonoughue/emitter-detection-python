@@ -6,7 +6,7 @@ from scipy.linalg import pinvh, solve_triangular, block_diag
 from typing import Self
 import warnings
 
-from . import parse_reference_sensor, resample_covariance_matrix, safe_2d_shape
+from . import parse_reference_sensor, resample_covariance_matrix
 
 class CovarianceMatrix:
     # Covariance Matrix and it's Decompositions
@@ -15,6 +15,7 @@ class CovarianceMatrix:
     _lower: npt.ArrayLike | None = None
     _eigenvalues: npt.ArrayLike | None = None
     _eigenvectors: npt.ArrayLike | None = None
+    _size: int = 0
 
     # Flags
     _do_parse: bool = True          # A parse is needed
@@ -29,10 +30,9 @@ class CovarianceMatrix:
             for key, value in new_cov.__dict__.items():
                 setattr(self, key, value)
         else:
-            self._cov = np.asarray(cov)  # Store the covariance matrix; use copy to make sure it's a fresh copy
+            self.cov = np.asarray(cov)  # Store the covariance matrix; use copy to make sure it's a fresh copy
             self._inv = None
             self._lower = None
-            self._do_parse = True
             self._do_cholesky = do_cholesky
             self._do_inverse = do_inverse
 
@@ -52,12 +52,18 @@ class CovarianceMatrix:
     @cov.setter
     def cov(self, cov: npt.ArrayLike):
         self._cov = cov.copy()
+        self._size = cov.shape[0]
         self._do_parse = True
 
     @cov.deleter
     def cov(self):
         self._cov = None
+        self._size = 0
         self._do_parse = True
+
+    @property
+    def size(self)-> int:
+        return self._size
 
     @property
     def lower(self):
@@ -130,13 +136,6 @@ class CovarianceMatrix:
             self._do_parse = True  # Clear the do_parse flag, to make sure it gets recomputed
 
     @property
-    def size(self)-> int:
-        if self._cov is None:
-            return 0
-        else:
-            return np.shape(self._cov)[0]
-
-    @property
     def eigenvalues(self)-> npt.NDArray:
         if self._eigenvalues is None:
             # We need to parse the covariance matrix
@@ -159,7 +158,7 @@ class CovarianceMatrix:
     copy, parsing the object (for inverse and Cholesky), etc.
     =========================================================
     """
-    def copy(self) -> 'CovarianceMatrix':
+    def copy(self) -> Self:
         """
         Make a copy of self and return it.
         """
@@ -342,7 +341,7 @@ class CovarianceMatrix:
         val = np.reshape(val, batch_shape)
         return val
 
-    def solve_acb(self, a: npt.ArrayLike, b: npt.ArrayLike):
+    def solve_acb(self, a: npt.NDArray[np.float64], b: npt.NDArray[np.float64])-> npt.NDArray[np.float64]:
         """
         Solve the matrix problem res = A @ C^{-1} @ B
 
@@ -414,8 +413,7 @@ class CovarianceMatrix:
 
         return val
 
-    def resample(self, ref_idx=None, ref_idx_vec: npt.ArrayLike = None, test_idx_vec: npt.ArrayLike = None) \
-            -> 'CovarianceMatrix':
+    def resample(self, ref_idx=None, ref_idx_vec: npt.ArrayLike = None, test_idx_vec: npt.ArrayLike = None)-> Self:
         """
         Resample the covariance matrix. Users may specify the reference index in one of three ways:
 
@@ -441,9 +439,12 @@ class CovarianceMatrix:
         # Parse the inputs
         if ref_idx_vec is not None and test_idx_vec is not None:
             # Make sure they're both 1D arrays
-            num_ref, dim1 = safe_2d_shape(ref_idx_vec)
-            num_test, dim2 = safe_2d_shape(test_idx_vec)
-
+            shp = np.shape(ref_idx_vec)
+            num_ref = shp[0] if len(shp) > 0 else 1
+            dim1 = shp[1] if len(shp) > 1 else 1
+            shp = np.shape(test_idx_vec)
+            num_test = shp[0] if len(shp) > 0 else 1
+            dim2 = shp[1] if len(shp) > 1 else 1
             assert num_ref == num_test, 'Inputs ref_idx_vec and test_idx_vec must match shape.'
             assert dim1 == dim2 == 1, 'Inputs ref_idx_vec and test_idx_vec must be vectors.'
         else:
@@ -456,7 +457,7 @@ class CovarianceMatrix:
         return CovarianceMatrix(new_cov)
 
     def resample_hybrid(self, num_aoa: int=0, num_tdoa: int=None, num_fdoa: int=None,
-                        tdoa_ref_idx=None, fdoa_ref_idx=None) -> 'CovarianceMatrix':
+                        tdoa_ref_idx=None, fdoa_ref_idx=None) -> Self:
         """
         Resample a block-diagonal covariance matrix representing AOA, TDOA, and FDOA measurements errors. Original
         matrix size is square with (num_aoa*aoa_dim + num_tdoa + num_fdoa) rows/columns. Output matrix size will be
@@ -525,7 +526,7 @@ class CovarianceMatrix:
 
         return None
 
-    def sample(self, num_samples: int = None, mean_vec:npt.ArrayLike = None) -> npt.ArrayLike:
+    def sample(self, num_samples: int = None, mean_vec:npt.NDArray[np.float64] | None = None) -> npt.ArrayLike:
         """
         Generate a random sample from the covariance matrix.
 
@@ -562,7 +563,7 @@ class CovarianceMatrix:
 
         if mean_vec is not None:
             # Make sure that mean_vec is a 1d array
-            mean_vec_dims = safe_2d_shape(mean_vec)
+            mean_vec_dims = np.shape(mean_vec)
             if mean_vec_dims[1] > 1:
                 warnings.warn("Input mean_vec is not a 1D array; it will be ignored.")
             elif num_measurements != mean_vec_dims[0]:
@@ -579,10 +580,13 @@ class CovarianceMatrix:
 
     @classmethod
     def block_diagonal(cls, *args: Self | npt.ArrayLike) -> Self:
+        if len(args) == 1:
+            return CovarianceMatrix(args[0])
+
         arrs = []
         for arg in args:
             if isinstance(arg, CovarianceMatrix): arrs.append(arg.cov)
             else: arrs.append(np.array(arg))
 
-        c = block_diag(*arrs)
+        c = block_diag(arrs[0], *arrs[1:])
         return CovarianceMatrix(c)

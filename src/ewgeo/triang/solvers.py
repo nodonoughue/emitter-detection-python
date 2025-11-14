@@ -3,11 +3,10 @@ import math
 import numpy as np
 import numpy.typing as npt
 
-from ewgeo.utils import safe_2d_shape
 from ewgeo.utils.geo import find_intersect
 
 
-def angle_bisector(x_sensor: npt.ArrayLike, zeta: npt.ArrayLike):
+def angle_bisector(x_sensor: npt.NDArray[np.float64], zeta: npt.NDArray[np.float64])-> npt.NDArray[np.float64]:
     """
     Compute the center via intersection of angle bisectors for  
     3 or more LOBs given by sensor positions xi and angle 
@@ -63,7 +62,7 @@ def angle_bisector(x_sensor: npt.ArrayLike, zeta: npt.ArrayLike):
     return x_est/num_sets
 
 
-def centroid(x_sensor: npt.ArrayLike, zeta: npt.ArrayLike):
+def centroid(x_sensor: npt.NDArray[np.float64], zeta: npt.NDArray[np.float64])-> npt.NDArray[np.float64]:
     """
     Compute the centroid of the intersection of 3 or more LOBs given by
     sensor positions x_source and angle of arrival measurements zeta.
@@ -89,7 +88,7 @@ def centroid(x_sensor: npt.ArrayLike, zeta: npt.ArrayLike):
 
     for sensor_set in sensor_sets:
         # Find vertices
-        v0, v1, v2 = _find_vertices(x_sensor[:, np.asarray(sensor_set)], zeta[np.asarray(sensor_set)])
+        v0, v1, v2 = _find_vertices(x_sensor[:, np.asarray(sensor_set, dtype=np.int64)], zeta[np.asarray(sensor_set)])
 
         # Find Centroid by averaging the three vertices
         this_cntr = (v0 + v1 + v2) / 3
@@ -100,10 +99,12 @@ def centroid(x_sensor: npt.ArrayLike, zeta: npt.ArrayLike):
     return x_est/num_sets
 
 
-def _parse_sensor_triplets(x_sensor: npt.ArrayLike):
+def _parse_sensor_triplets(x_sensor: npt.NDArray[np.float64])-> tuple[list, int]:
 
     # Parse Inputs
-    num_dim, num_sensors = safe_2d_shape(x_sensor)
+    shp = np.shape(x_sensor)
+    num_dim = shp[0] if len(shp) > 0 else 1
+    num_sensors = shp[1] if len(shp) > 1 else 1
 
     if num_dim != 2:
         raise TypeError("Angle Bisector Solution only works in x/y space.")
@@ -116,13 +117,14 @@ def _parse_sensor_triplets(x_sensor: npt.ArrayLike):
     else:
         # If there are more than ~15 rows, combinations returns an extremely large set.
         # Instead, just make sequential groups of three
-        sensor_sets = [(i, i + 1, i + 2) for i in np.arange(num_sensors - 2)]
+        sensor_sets = [(i, i + 1, i + 2) for i in range(num_sensors - 2)]
         num_sets = len(sensor_sets)
 
     return sensor_sets, num_sets
 
 
-def _find_vertices(x: npt.ArrayLike, zeta: npt.ArrayLike) -> tuple[npt.ArrayLike, npt.ArrayLike, npt.ArrayLike]:
+def _find_vertices(x: npt.NDArray[np.float64], zeta: npt.NDArray[np.float64])->\
+        tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     # Find vertices
     v0 = find_intersect(x[:, 0], zeta[0], x[:, 1], zeta[1])
     v1 = find_intersect(x[:, 1], zeta[1], x[:, 2], zeta[2])

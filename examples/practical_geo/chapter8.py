@@ -5,7 +5,7 @@ import time
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo import tracker
-from ewgeo.utils import print_progress, print_elapsed, safe_2d_shape
+from ewgeo.utils import print_progress, print_elapsed
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.constraints import fixed_alt
 from ewgeo.utils.covariance import CovarianceMatrix
@@ -42,7 +42,7 @@ def example1(mc_params=None):
     x_tdoa = np.array([[5e3,   0,  0, -5e3],
                        [  0, 5e3,  0,    0],
                        [30,  60, 30,   60]])
-    num_dims, n_tdoa = safe_2d_shape(x_tdoa)
+    num_dims, n_tdoa = np.shape(x_tdoa)
 
     # ===  Define target trajectory
     x_tgt_init = np.array([-50e3, 100e3, 20e3*_ft2m])

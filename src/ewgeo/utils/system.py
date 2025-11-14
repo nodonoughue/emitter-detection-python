@@ -1,21 +1,20 @@
-import math
 from abc import ABC, abstractmethod
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 
-from . import make_pdfs, safe_2d_shape, SearchSpace
+from . import make_pdfs, SearchSpace, parse_reference_sensor, broadcast_backwards
 from .covariance import CovarianceMatrix
 from .perf import compute_crlb_gaussian
 from .solvers import ml_solver, gd_solver, ls_solver, bestfix_solver
 
 class PassiveSurveillanceSystem(ABC):
     _cov: CovarianceMatrix | None = None
-    pos: npt.ArrayLike
-    num_sensors: int
-    num_dim: int
-    num_measurements: int
+    _pos: npt.ArrayLike
+    _num_sensors: int
+    _num_dim: int
+    _num_measurements: int
 
     # Optional Fields
     bias: npt.ArrayLike | None = None              # User-defined sensor measurement biases
@@ -41,7 +40,7 @@ class PassiveSurveillanceSystem(ABC):
                  bias: npt.ArrayLike | None=None,
                  cov_pos: CovarianceMatrix | npt.ArrayLike | None=None,
                  vel: npt.ArrayLike | None=None):
-        if len(np.shape(x))<2: x = np.expand_dims(x, 1) # Add a second dimension if there isn't one
+        if np.ndim(x)<2: x = np.expand_dims(x, 1) # Add a second dimension if there isn't one
         self.pos = x
 
         # Populate optional fields
@@ -51,7 +50,22 @@ class PassiveSurveillanceSystem(ABC):
         self.vel = vel
 
     @property
-    def vel(self)-> npt.ArrayLike:
+    def pos(self)-> npt.NDArray[np.float64]:
+        return self._pos
+
+    @pos.setter
+    def pos(self, val: npt.ArrayLike):
+        val = np.array(val)
+        if val.ndim < 2:
+            val = val[:, np.newaxis]
+        elif val.ndim > 2:
+            raise ValueError(f"Sensor pos must be a 2D array (num_dim, num_sensors); received {val.shape}.")
+        self._pos = val
+        self._num_dim = val.shape[0]
+        self._num_sensors = val.shape[1]
+
+    @property
+    def vel(self)-> npt.NDArray[np.float64] | None:
         return self._vel
 
     @vel.setter
@@ -67,15 +81,20 @@ class PassiveSurveillanceSystem(ABC):
 
     @property
     def num_sensors(self)-> int:
-        return self.pos.shape[1]
+        return self._num_sensors
 
     @property
     def num_dim(self)-> int:
-        return self.pos.shape[0]
+        return self._num_dim
 
     @property
     def num_measurements(self)-> int:
         return self.num_sensors # default is one measurement per sensor; subclasses should override this
+
+    @property
+    def num_measurements_raw(self)-> int:
+        # raw (before difference sampling) number of measurements; used for reference index error checking
+        return self.num_measurements
 
     @property
     def cov(self)-> CovarianceMatrix:
@@ -162,12 +181,14 @@ class PassiveSurveillanceSystem(ABC):
 
         :param x_source: 1D or 2D array of source positions
         :param num_samples: Optional integer specifying the number of samples to generate
+        :param cov: Optional CovarianceMatrix to use to generate noise; if not None, this overrides self.cov
         All other parameters are passed directly to self.measurement() as keyword arguments
         :return: 1D or 2D array of noisy measurements, depending on the shape of x_source and num_samples.
         """
 
         # Generate noise-free measurement
-        _, num_sources = safe_2d_shape(x_source)
+        shp = np.shape(x_source)
+        num_sources = shp[1] if len(shp) > 1 else 1
         z = np.reshape(self.measurement(x_source, **kwargs), (self.num_measurements, num_sources))
 
         # Generate noise
@@ -212,8 +233,8 @@ class PassiveSurveillanceSystem(ABC):
         kwargs['x_source'] = pos
 
         j = self.jacobian(**kwargs)
-        n_dim = np.shape(pos_vel)[0]
-        n_dim2 = np.shape(j)[0]
+        n_dim = np.shape(np.atleast_1d(pos_vel))[0]
+        n_dim2 = np.shape(np.atleast_1d(j))[0]
         if n_dim == 2*n_dim2:
             # Calling function is asking for both pos and vel, but the native jacobian function only returned pos
             # Append with a zeros-matrix (measurements do not depend on velocity at all)
@@ -261,9 +282,9 @@ class PassiveSurveillanceSystem(ABC):
                                    do_sensor_bias: bool=False,
                                    do_sensor_pos: bool=False,
                                    do_sensor_vel: bool=False,
-                                   cov_pos: CovarianceMatrix or None=None,
-                                   cov_vel: CovarianceMatrix or None=None,
-                                   cov_bias: CovarianceMatrix or None=None,
+                                   cov_pos: CovarianceMatrix | None=None,
+                                   cov_vel: CovarianceMatrix | None=None,
+                                   cov_bias: CovarianceMatrix | None=None,
                                    **kwargs):
 
         if not do_sensor_bias and not do_sensor_pos and not do_sensor_vel:
@@ -282,8 +303,8 @@ class PassiveSurveillanceSystem(ABC):
         z = self.measurement(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_source, v_source=v_source, bias=bias)
 
         # Check dimensions to ensure error is computed correctly
-        while len(np.shape(zeta)) < len(np.shape(z)):
-            zeta = np.expand_dims(zeta, -1) # add a new axis on the end
+        arrs, _ = broadcast_backwards([z, zeta], start_dim=0, do_broadcast=True)
+        z, zeta = arrs
 
         # Evaluate the measurement error and scaled log likelihood
         err = zeta - z
@@ -291,7 +312,9 @@ class PassiveSurveillanceSystem(ABC):
 
         if do_sensor_pos:
             x_0 = self.pos
-            while len(np.shape(x_0)) < len(np.shape(x_sensor)): x_0 = np.expand_dims(x_0,-1)
+            arrs, _ = broadcast_backwards([x_0, x_sensor], start_dim=0, do_broadcast=True)
+            x_0, x_sensor = arrs
+
             err_pos = x_0 - x_sensor
 
             # Make sure err_pos is reshaped to have the first dimension be the same size as self.cov_pos
@@ -307,7 +330,9 @@ class PassiveSurveillanceSystem(ABC):
             # way the covariance matrices are assembled.
             vel_ref = self.vel if self.vel is not None else 0.
             vel_test = v_sensor if v_sensor is not None else 0.
-            while len(np.shape(vel_ref)) < len(np.shape(vel_test)): vel_ref = np.expand_dims(vel_ref, -1)
+            arrs, _ = broadcast_backwards([vel_ref, vel_test], start_dim=0, do_broadcast=True)
+            vel_ref, vel_test = arrs
+
             err_vel = vel_ref - vel_test
             aa, bb, *cc = np.shape(err_vel)
             # out_shp = [aa * bb]
@@ -321,7 +346,8 @@ class PassiveSurveillanceSystem(ABC):
             # way the covariance matrices are assembled.
             bias_ref = self.bias if self.bias is not None else 0.
             bias_test = bias if bias is not None else 0.
-            while len(np.shape(bias_ref)) < len(np.shape(bias_test)): bias_ref = np.expand_dims(bias_ref, -1)
+            arrs, _ = broadcast_backwards([bias_ref, bias_test], start_dim=0, do_broadcast=True)
+            bias_ref, bias_test = arrs
             err_bias = bias_ref - bias_test
             aa, *bb = np.shape(err_bias)
 
@@ -396,7 +422,10 @@ class PassiveSurveillanceSystem(ABC):
                                    do_sensor_bias: bool, do_sensor_pos: bool, do_sensor_vel:bool,
                                    bias_search: SearchSpace=None, pos_search: SearchSpace=None,
                                    vel_search: SearchSpace=None, print_progress=False,
-                                   **kwargs):
+                                   **kwargs)-> tuple[npt.NDArray[np.float64],
+                                                     npt.NDArray[np.float64],
+                                                     tuple[npt.NDArray[np.float64], ...],
+                                                     dict]:
         """
         To perform a Max Likelihood Search with extra uncertainty parameters (e.g., sensor bias,
         sensor position, or sensor velocity), we must encapsulate those extra variables in a broader
@@ -428,7 +457,7 @@ class PassiveSurveillanceSystem(ABC):
         # Make sure at least one term is true; otherwise this is just ML
         if not do_sensor_bias and not do_sensor_pos and not do_sensor_vel:
             x_est, likelihood, x_grid = self.max_likelihood(zeta, search_space=source_search, **kwargs)
-            return x_est, likelihood, x_grid, None
+            return x_est, likelihood, x_grid, {}
 
         # Double check that we actually want to search for sensor velocities...
         do_sensor_vel = do_sensor_vel and self.vel is not None
@@ -466,8 +495,7 @@ class PassiveSurveillanceSystem(ABC):
                                                    do_sensor_pos=do_sensor_pos, do_sensor_vel=do_sensor_vel,
                                                    **ell_kwargs)
 
-        th_est, likelihood, th_grid = ml_solver(ell=ell, search_space=search_space,
-                                                print_progress=True, **kwargs)
+        th_est, likelihood, th_grid = ml_solver(ell=ell, search_space=search_space, **kwargs)
 
         # Parse the estimates
         x_est = th_est[indices['source_indices']]
@@ -496,19 +524,20 @@ class PassiveSurveillanceSystem(ABC):
         def jacobian(pos_vel: npt.ArrayLike):
             return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_sensor=v_sensor)
 
-        result = gd_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+        x, x_full = gd_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
         if cal_data is not None:
-            return result + (x_sensor, v_sensor, bias)
+            return x, x_full, x_sensor, v_sensor, bias
         else:
-            return result
+            return x, x_full
 
     def gradient_descent_uncertainty(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike,
                                      do_sensor_pos: bool=False, x_sensor: npt.ArrayLike=None,
                                      do_sensor_vel: bool=False, v_sensor: npt.ArrayLike=None,
                                      do_sensor_bias: bool=False, bias: npt.ArrayLike=None, **kwargs):
 
-        num_source = len(x_init)
-        source_slice = np.s_[:num_source]
+        x_init = np.array(x_init)
+        num_source_vars = x_init.size
+        source_slice = np.s_[:num_source_vars]
         th_init = x_init[:]
 
         if do_sensor_bias:
@@ -516,7 +545,7 @@ class PassiveSurveillanceSystem(ABC):
                 bias = self.bias if self.bias is not None else np.zeros(self.num_measurements, )
             th_init = np.append(th_init, bias)
             num_bias = np.size(bias)
-            bias_slice = np.s_[num_source:num_source+num_bias]  # one for each measurement
+            bias_slice = np.s_[num_source_vars:num_source_vars+num_bias]  # one for each measurement
 
         else:
             num_bias = 0
@@ -537,36 +566,42 @@ class PassiveSurveillanceSystem(ABC):
             if v_sensor is None: v_sensor = self.vel.ravel()
             th_init = np.append(th_init, v_sensor)
         else:
-            num_vel = 0
             vel_slice = None
 
         # ==================== Measurement Wrapper Function ================
+        pos_shape = (self.num_dim, self.num_sensors)
         def y(th: npt.ArrayLike):
             # The theta vector contains both measurement biases and sensor position/velocity errors
+            th = np.array(th)
             x_source, v_source = self.parse_source_pos_vel(th[source_slice], default_vel=np.zeros_like(x_init))
-            bias = th[bias_slice] if bias_slice is not None else None
-            x_sensor = np.reshape(th[pos_slice], shape=(self.num_dim, self.num_sensors)) if pos_slice is not None else None
-            v_sensor = np.reshape(th[vel_slice], shape=(self.num_dim, self.num_sensors)) if vel_slice is not None else None
-            return np.ravel(zeta - self.measurement(x_sensor=x_sensor, v_sensor=v_sensor, bias=bias,
+            this_bias = th[bias_slice] if bias_slice is not None else None
+            this_x_sensor = np.reshape(th[pos_slice], shape=pos_shape) if pos_slice is not None else None
+            this_v_sensor = np.reshape(th[vel_slice], shape=pos_shape) if vel_slice is not None else None
+            return np.ravel(zeta - self.measurement(x_sensor=this_x_sensor, v_sensor=this_v_sensor, bias=this_bias,
                                                     x_source=x_source, v_source=v_source))
 
         def jacobian(th: npt.ArrayLike):
+            th = np.array(th)
             pos_vel = th[source_slice]
             x_source, v_source = self.parse_source_pos_vel(pos_vel, default_vel=np.zeros_like(pos_vel))
-            bias = th[bias_slice] if bias_slice is not None else self.bias
-            x_sensor = np.reshape(th[pos_slice], shape=(self.num_dim, self.num_sensors)) if pos_slice is not None else None
-            v_sensor = np.reshape(th[vel_slice], shape=(self.num_dim, self.num_sensors)) if vel_slice is not None else None
+            # this_bias = th[bias_slice] if bias_slice is not None else self.bias  # not used for jacobian
+            this_x_sensor = np.reshape(th[pos_slice], shape=pos_shape) if pos_slice is not None else None
+            this_v_sensor = np.reshape(th[vel_slice], shape=pos_shape) if vel_slice is not None else None
 
-            j_source = self.jacobian(x_source=x_source, v_source=v_source, x_sensor=x_sensor, v_sensor=v_sensor)
+            j_source = self.jacobian(x_source=x_source, v_source=v_source,
+                                     x_sensor=this_x_sensor, v_sensor=this_v_sensor)
             arrs = [j_source]
             if do_sensor_bias:
-                j_a = self.grad_bias(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_source, v_source=v_source)
+                j_a = self.grad_bias(x_sensor=this_x_sensor, v_sensor=this_v_sensor,
+                                     x_source=x_source, v_source=v_source)
                 arrs.append(j_a)
             if do_sensor_pos:
-                j_b = self.grad_sensor_pos(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_source, v_source=v_source)
+                j_b = self.grad_sensor_pos(x_sensor=this_x_sensor, v_sensor=this_v_sensor,
+                                           x_source=x_source, v_source=v_source)
                 arrs.append(j_b)
             if do_sensor_vel:
-                j_c = self.grad_sensor_vel(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_source, v_source=v_source)
+                j_c = self.grad_sensor_vel(x_sensor=this_x_sensor, v_sensor=this_v_sensor,
+                                           x_source=x_source, v_source=v_source)
                 arrs.append(j_c)
 
             return np.concatenate(arrs, axis=0)
@@ -647,9 +682,10 @@ class PassiveSurveillanceSystem(ABC):
 
         Either pos_search or bias_search (or both) must be defined.
 
-        :param zeta_cal: 2D array of calibration measurements (n_msmt, n_cal)
-        :param x_cal: 2D array of calibration emitter locations (n_dim, n_cal)
         :param solver_type: String indicating which solver type to use. Options are: 'ml', 'gd', 'ls'.
+        :param do_pos_cal: Boolean (default=False), set to True to force calibration to consider sensor position errors
+        :param do_vel_cal: Boolean (default=False), set to True to force calibration to consider sensor velocity errors
+        :param do_bias_cal: Boolean (default=False), set to True to force calibration to consider sensor bias
         :param cal_data: Dictionary containing solver-specific calibration fields.
         :return x_sensor_est: Estimated sensor positions (None if ignored)
         :return bias_est: Estimated measurement biases (None if ignored)
@@ -713,6 +749,9 @@ class PassiveSurveillanceSystem(ABC):
         :param pos_search: optional dictionary with parameters for the ML search for sensor positions
         :param vel_search: optional dictionary with parameters for the ML search for sensor positions
         :param bias_search: optional dictionary with parameters for the ML search for measurement bias
+        :param cov_pos: CovarianceMatrix defining sensor position errors
+        :param cov_vel: CovarianceMatrix defining sensor velocity errors
+        :param cov_bias: CovarianceMatrix defining sensor bias
         :param do_pos_cal: boolean flag (default True); if True calibration data will be used to estimate sensor
                            positions
         :param do_vel_cal: boolean flag (default False); if True calibration data will be used to estimate sensor
@@ -726,16 +765,23 @@ class PassiveSurveillanceSystem(ABC):
         # ================ Parse inputs =========================
 
 
-        num_dim_cal, num_cal = safe_2d_shape(x_cal)
-        num_msmt, num_cal2, *cal_batch_shape = np.shape(zeta_cal)
-        num_cov, _ = safe_2d_shape(self.cov.cov)
+        shp = np.shape(x_cal)
+        num_dim_cal = shp[0] if len(shp) > 0 else 1
+        num_cal = shp[1] if len(shp) > 1 else 1
+        if np.ndim(zeta_cal) < 2:
+            # num_msmt = np.size(zeta_cal)
+            num_cal2 = 1
+            cal_batch_shape = ()
+        else:
+            _, num_cal2, *cal_batch_shape = np.shape(zeta_cal)
+        # num_cov = self.cov.size
 
         # Check dimension agreement
         assert num_dim_cal == self.num_dim, "Disagreement in number of spatial dimensions between sensor positions and calibration emitter positions."
         assert num_cal == num_cal2, "Disagreement in number of calibration emitters between x_cal and zeta_cal."
 
         if v_cal is not None:
-            num_dim_v, num_cal_v = safe_2d_shape(v_cal)
+            num_dim_v, num_cal_v, *_ = np.shape(v_cal)
             assert num_dim_cal == num_dim_v and num_cal == num_cal_v, "Disagreement in size of calibration emitter velocities and sensor positions."
         else:
             v_cal = np.zeros_like(x_cal)  # assume zero velocity; simplified code later on
@@ -756,6 +802,10 @@ class PassiveSurveillanceSystem(ABC):
             v_sensor = np.reshape(vel_search.x_ctr, shape=np.shape(self.vel))
         else:
             v_sensor = np.zeros_like(x_sensor)
+
+        x_sensor = np.array(x_sensor)
+        v_sensor = np.array(v_sensor)
+        zeta_cal = np.array(zeta_cal)
 
         bias = self.bias
         # ==================== Measurement Bias Search ========================
@@ -779,10 +829,11 @@ class PassiveSurveillanceSystem(ABC):
                 raise ValueError("Sensor calibration error. If do_pos_cal is True, then pos_search must be defined as a SearchSpace object.")
 
             x_shp = np.shape(x_sensor)
-            num_pos = np.size(x_sensor)
+            # num_pos = np.size(x_sensor)
 
             def ell_pos(x: npt.ArrayLike, **ell_kwargs)-> npt.NDArray:
-                xx = np.reshape(x, list(x_shp).append(-1))
+                x = np.array(x)
+                xx = np.reshape(x, list(x_shp)+[-1])
                 ell = self.log_likelihood_uncertainty(x_sensor=xx, v_sensor=v_sensor, bias=bias,
                                                        x_source=x_cal, v_source=v_cal, zeta=zeta_cal,
                                                        cov_pos=cov_pos, cov_vel=cov_vel, cov_bias=cov_bias,
@@ -799,8 +850,8 @@ class PassiveSurveillanceSystem(ABC):
             num_search_pts = np.prod(vel_search.points_per_dim)
             v_shp = list(np.shape(v_sensor))
             v_shp_3d = v_shp+[-1]+[1]*len(cal_batch_shape)
-            num_vel = np.size(v_sensor)
-            ell_shp = [num_cal, num_search_pts] + cal_batch_shape
+            # num_vel = np.size(v_sensor)
+            # ell_shp = [num_cal, num_search_pts] + cal_batch_shape
             def ell_vel(v: npt.ArrayLike, **ell_kwargs) -> npt.NDArray:
                 vv = np.reshape(v, v_shp_3d)
                 ell = self.log_likelihood_uncertainty(x_sensor=x_sensor, v_sensor=vv, bias=bias,
@@ -837,13 +888,19 @@ class PassiveSurveillanceSystem(ABC):
         :param zeta_cal: 2D array of calibration measurements (n_msmt, n_cal)
         :param x_cal: 2D array of calibration emitter locations (n_dim, n_cal)
         :param v_cal: 2D array of calibration emitter velocities (n_dim, n_cal)
-        :param do_pos_cal: boolean flag (default True); if True calibration data will be used to estimate sensor
+        :param x_sensor: Optional starting sensor positions (otherwise self.pos is used)
+        :param v_sensor: Optional starting sensor velocities (otherwise self.vel is used)
+        :param bias: Optional starting sensor bias (otherwise self.bias is used)
+        :param do_pos_cal: boolean flag (default=True); if True calibration data will be used to estimate sensor
                            positions
-        :param do_vel_cal: boolean flag (default False); if True calibration data will be used to estimate sensor
+        :param do_vel_cal: boolean flag (default=False); if True calibration data will be used to estimate sensor
                            velocities
-        :param do_bias_cal: boolean flag (default False); if True calibration data will be used to estimate sensor
+        :param do_bias_cal: boolean flag (default=False); if True calibration data will be used to estimate sensor
                             measurement biases
+        :param do_gd: Optional boolean (default=True) specifying whether GD is to be used (true) or LS to solver for
+                      calibration results.
         :return x_sensor_est: Estimated sensor positions (None if ignored)
+        :return v_sensor_est: Estimated sensor velocities (None if ignored)
         :return bias_est: Estimated measurement biases (None if ignored)
         """
 
@@ -857,16 +914,16 @@ class PassiveSurveillanceSystem(ABC):
             # No calibration called for
             return x_sensor, v_sensor, bias
 
-        num_dim_cal, num_cal = safe_2d_shape(x_cal)
-        num_msmt, num_cal2 = safe_2d_shape(zeta_cal)
-        num_cov, _ = safe_2d_shape(self.cov.cov)
+        num_dim_cal, num_cal, *_ = np.shape(x_cal)
+        num_msmt, num_cal2, *_ = np.shape(zeta_cal)
+        # num_cov = self.cov.size
 
         # Check dimension agreement
         assert num_dim_cal == self.num_dim, "Disagreement in number of spatial dimensions between sensor positions and calibration emitter positions."
         assert num_cal == num_cal2, "Disagreement in number of calibration emitters between x_cal and zeta_cal."
 
         if v_cal is not None:
-            num_dim_v, num_cal_v = safe_2d_shape(v_cal)
+            num_dim_v, num_cal_v = np.shape(v_cal)
             assert num_dim_cal == num_dim_v and num_cal == num_cal_v, "Disagreement in size of calibration emitter velocities and sensor positions."
         else:
             v_cal = np.zeros_like(x_cal)  # assume zero velocity; simplified code later on
@@ -904,15 +961,17 @@ class PassiveSurveillanceSystem(ABC):
             num_vel = np.size(v_sensor)
 
             def y_posvel(pos_vel: npt.ArrayLike)-> npt.NDArray:
+                pos_vel = np.array(pos_vel)
                 xx = np.reshape(pos_vel[:num_pos], shape=x_shp)
                 vv = np.reshape(pos_vel[num_pos:], shape=v_shp)
 
                 # shape: (self.num_measurements, num_cal)
                 z = self.measurement(x_sensor=xx, v_sensor=vv, bias=bias, x_source=x_cal, v_source=v_cal)
-                while np.ndim(zeta_cal) > np.ndim(z): z = np.expand_dims(z, axis=-1)
+                arrs, _ = broadcast_backwards([z, zeta_cal], start_dim=0, do_broadcast=True)
+                z, this_zeta_cal = arrs
 
                 # shape: (self.num_measurements * num_cal, num_cal_repetitions)
-                return np.reshape(zeta_cal - z, shape=(num_cal*num_msmt, -1), order='F')
+                return np.reshape(this_zeta_cal - z, shape=(num_cal*num_msmt, -1), order='F')
 
             def jacobian_posvel(pos_vel: npt.ArrayLike)-> npt.NDArray:
                 """
@@ -920,6 +979,7 @@ class PassiveSurveillanceSystem(ABC):
                 If do_pos_cal is False, then we set those rows to zero to ensure no change in sensor position is made.
                 If do_vel_cal is False, then we set those columns to zero to ensure no change in sensor velocity is made.
                 """
+                pos_vel = np.array(pos_vel)
                 xx = np.reshape(pos_vel[:num_pos], shape=x_shp)
                 vv = np.reshape(pos_vel[num_pos:], shape=v_shp)
 
@@ -1134,7 +1194,8 @@ class PassiveSurveillanceSystem(ABC):
         :return pos:
         :return vel:
         """
-        num_dim, _ = safe_2d_shape(pos_vel)
+        num_dim = np.shape(pos_vel)[0] if np.ndim(pos_vel) > 0 else 0
+        pos_vel = np.array(pos_vel)
         if num_dim==self.num_dim:
             # Position only; return zero for velocity
             pos = pos_vel
@@ -1147,6 +1208,7 @@ class PassiveSurveillanceSystem(ABC):
             raise ValueError("Unable to parse source position/velocity; unexpected number of spatial dimensions.")
 
         return pos, vel
+
 
 class DifferencePSS(PassiveSurveillanceSystem, ABC):
     """
@@ -1165,6 +1227,9 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
                                                       #   int                         Index of common reference sensor
                                                       #   (2, num_pairs) ndarray      List of sensor pairs
                                                       #   'full'                      Use all possible sensor pairs
+    _ref_idx_vec: npt.NDArray[np.int64] | None = None
+    _test_idx_vec: npt.NDArray[np.int64] | None = None
+
     _cov_resample: CovarianceMatrix | None           # difference-level covariance matrix
     _cov_raw: CovarianceMatrix | None                # sensor-level covariance matrix
     _do_resample: bool = True
@@ -1182,20 +1247,7 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
 
     @property
     def num_measurements(self)-> int:
-        # Check the reference index; it determines how many measurements there will be
-        if self.ref_idx is None or np.isscalar(self.ref_idx):
-            # common reference sensor
-            return self.num_sensors - 1
-        elif isinstance(self.ref_idx, str):
-            if self.ref_idx.lower() == 'full':
-                # all possible cominations
-                return math.comb(self.num_sensors, 2)
-            else:
-                raise ValueError(f"Unrecognized reference index setting, {self.ref_idx}.")
-        else:
-            # Pair of vectors; first row is test sensors, second is reference
-            _, num_pairs = safe_2d_shape(self.ref_idx)
-            return num_pairs
+        return self._num_measurements
 
     @property
     def cov_raw(self)-> CovarianceMatrix:
@@ -1245,20 +1297,42 @@ class DifferencePSS(PassiveSurveillanceSystem, ABC):
         if self.parent is not None: self.parent._do_resample = True
 
     @property
+    def num_measurements_raw(self)-> int:
+        # for difference PSS systems, the raw (non-difference) number of measurements is one per sensor
+        return self.num_sensors
+
+    @property
     def ref_idx(self):
         return self._ref_idx
 
     @ref_idx.setter
     def ref_idx(self, idx: str | npt.ArrayLike | None):
-        self._ref_idx = idx
+        # Generate the test/ref index vectors
+        self._test_idx_vec, self._ref_idx_vec = parse_reference_sensor(idx, num_sensors=self.num_measurements_raw)
+
+        # Store their combination as the pre-processed reference index
+        self._ref_idx = np.array([self._test_idx_vec, self._ref_idx_vec])
+        self._num_measurements = len(self._test_idx_vec)
         self._do_resample = True  # Reset the do_resample flag
         if self.parent is not None: self.parent._do_resample = True
 
     @ref_idx.deleter
     def ref_idx(self):
         self._ref_idx = None
+        self._test_idx_vec = None
+        self._ref_idx_vec = None
+        self._num_measurements = 0
+
         self._do_resample = True
         if self.parent is not None: self.parent._do_resample = True
+
+    @property
+    def test_idx_vec(self):
+        return self._test_idx_vec
+
+    @property
+    def ref_idx_vec(self):
+        return self._ref_idx_vec
 
     def resample(self):
         if self._do_resample:

@@ -29,7 +29,9 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
     """
 
     # Parse inputs
-    n_dim, n_source = utils.safe_2d_shape(x_source)
+    shp = np.shape(x_source)
+    n_dim = shp[0] if len(shp) > 0 else 1
+    n_source = shp[1] if len(shp) > 1 else 1
     if n_source==1 and len(x_source.shape) == 1:
         x_source = x_source[:, np.newaxis]
 

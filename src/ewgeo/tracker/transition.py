@@ -16,7 +16,7 @@ class MotionModel(ABC):
     time_delta: float | None
     f: npt.ArrayLike                # Transition Matrix
     process_covar: npt.ArrayLike
-    q: CovarianceMatrix             # Process Noise
+    q: CovarianceMatrix | None            # Process Noise
 
     def __init__(self):
         pass

@@ -1,7 +1,6 @@
 import numpy as np
 
 from . import model
-from ewgeo.utils import safe_2d_shape
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.perf import compute_crlb_gaussian
 
@@ -35,16 +34,21 @@ def compute_crlb(x_source, cov: CovarianceMatrix, x_aoa=None, x_tdoa=None, x_fdo
     :return crlb: Lower bound on the error covariance matrix for an unbiased AOA/TDOA/FDOA estimator (Ndim x Ndim)
     """
 
-    n_dim, n_source = safe_2d_shape(x_source)
+    shp = np.shape(x_source)
+    n_dim = shp[0] if len(shp) > 0 else 1
+    n_source = shp[1] if len(shp) > 1 else 1
 
     if n_source == 1:
         # Make sure it's got a second dimension, so that it doesn't fail when we iterate over source positions
         x_source = x_source[:, np.newaxis]
 
     if do_resample:
-        _, num_aoa = safe_2d_shape(x_aoa)
-        _, num_tdoa = safe_2d_shape(x_tdoa)
-        _, num_fdoa = safe_2d_shape(x_fdoa)
+        shp = np.shape(x_aoa)
+        num_aoa = shp[1] if len(shp) > 1 else 1
+        shp = np.shape(x_tdoa)
+        num_tdoa = shp[1] if len(shp) > 1 else 1
+        shp = np.shape(x_fdoa)
+        num_fdoa = shp[1] if len(shp) > 1 else 1
         if do_2d_aoa: num_aoa *= 2
         cov = cov.resample_hybrid(num_aoa=num_aoa, num_tdoa=num_tdoa, num_fdoa=num_fdoa,
                                   tdoa_ref_idx=tdoa_ref_idx, fdoa_ref_idx=fdoa_ref_idx)

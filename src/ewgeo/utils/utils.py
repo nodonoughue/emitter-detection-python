@@ -1,5 +1,4 @@
 from collections.abc import Iterable
-from itertools import combinations
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import typing as npt
@@ -8,6 +7,7 @@ from scipy.special import erfcinv
 from scipy import stats
 import seaborn as sns
 import time
+from typing import Self
 
 from .unit_conversions import lin_to_db
 
@@ -139,31 +139,50 @@ def parse_reference_sensor(ref_idx: str | npt.NDArray[np.int64] | None,
         reference (e.g., AoA).
     """
 
+    # Basic sanity checks
+    if num_sensors <= 0:
+        raise ValueError("num_sensors must be a positive integer.")
+
+    # Case 1: Default common reference (last sensor)
     if ref_idx is None:
         # The default behavior is to use the last sensor as a common reference
-        test_idx_vec = np.arange(num_sensors-1)
-        ref_idx_vec = np.full(num_sensors - 1, num_sensors-1)
+        test_idx_vec = np.arange(num_sensors-1, dtype=np.int64)
+        ref_idx_vec = np.full(num_sensors - 1, num_sensors-1, dtype=np.int64)
 
+    # Case 2: String keyword
     elif isinstance(ref_idx, str):
         if ref_idx.lower() == 'full':
-            # Generate all possible sensor pairs
-            pairs = np.array(list(combinations(np.arange(num_sensors), 2)))
-            test_idx_vec, ref_idx_vec = pairs[:, 0], pairs[:, 1]
+            # Generate all unique sensor pairs (i < j)
+            test_idx_vec, ref_idx_vec = np.triu_indices(num_sensors, k=1)
         else:
             raise ValueError(f"Unrecognized reference index setting, {ref_idx}.")
 
+    # Case 3: Scalar index
     elif np.isscalar(ref_idx):
+        ref_idx = int(ref_idx)  # convert to base int type
         # Check for error condition
-        if not (0 <= int(ref_idx) < num_sensors):
+        if not (0 <= ref_idx < num_sensors):
             raise ValueError('Bad reference index; unable to parse.')
 
-        # Scalar reference index, use all other sensors as test sensors
-        test_idx_vec = np.delete(np.arange(num_sensors), ref_idx)
-        ref_idx_vec = np.full(num_sensors - 1, ref_idx)
+        # All sensors except the reference one
+        test_idx_vec = np.r_[np.arange(ref_idx), np.arange(ref_idx + 1, num_sensors)].astype(np.int64)
+        ref_idx_vec = np.full(num_sensors - 1, ref_idx, dtype=np.int64)
 
+    # Case 4: Explicit array of pairs
     else:
         # Pair of vectors; first row is test sensors, second is reference
-        test_idx_vec, ref_idx_vec = np.asarray(ref_idx)
+        arr = np.asarray(ref_idx)
+
+        if arr.ndim != 2 or arr.shape[0] != 2:
+            raise ValueError(f"ref_idx must be a (2, N) array of sensor pairs, got shape {arr.shape}.")
+        if np.any((arr < 0) | (arr >= num_sensors)):
+            raise ValueError("All sensor indices must be within the valid range [0, num_sensors-1].")
+
+        test_idx_vec, ref_idx_vec = arr
+
+        # Ensure contiguous arrays for faster downstream use
+        test_idx_vec = np.ascontiguousarray(test_idx_vec)
+        ref_idx_vec = np.ascontiguousarray(ref_idx_vec)
 
     return test_idx_vec, ref_idx_vec
 
@@ -279,7 +298,9 @@ def resample_noise(noise: npt.NDArray[np.float64],
     :return: numpy ndarray of resampled noise; the first dimension has the same length as test_idx and ref_idx.
     """
     # Parse Inputs
-    n_sensor, n_sample = safe_2d_shape(noise)
+    shp = np.shape(noise)
+    n_sensor = shp[0] if len(shp) > 0 else 1
+    n_sample = shp[1] if len(shp) > 1 else 1
 
     if test_idx is None:
         # We need to use the ref_idx
@@ -300,26 +321,26 @@ def resample_noise(noise: npt.NDArray[np.float64],
     if test_weights:
         shp_test_wt = np.size(test_weights)
 
-    shp_ref_wt = 1
+    shp_ref_wt = int(1)
     if ref_weights:
         shp_ref_wt = np.size(ref_weights)
 
     # Function to execute at each entry of output covariance matrix
-    def element_func(idx_row: int):
-        row_int = np.astype(idx_row, int)
-        a_i = test_idx_vec[row_int % n_test]
-        b_i = ref_idx_vec[row_int % n_ref]
+    def element_func(idx_row: npt.NDArray[np.int64]):
+        idx_row = np.astype(idx_row, int)
+        a_i = test_idx_vec[idx_row % n_test]
+        b_i = ref_idx_vec[idx_row % n_ref]
 
         if test_weights:
-            a_i_wt = test_weights[row_int % shp_test_wt]
+            a_i_wt = test_weights[idx_row % shp_test_wt]
         else:
             a_i_wt = 1.
         if ref_weights:
-            b_i_wt = ref_weights[row_int % shp_ref_wt]
+            b_i_wt = ref_weights[idx_row % shp_ref_wt]
         else:
             b_i_wt = 1.
 
-        noise_ai = np.zeros((len(a_i), safe_2d_shape(noise)[1]))
+        noise_ai = np.zeros((len(a_i), n_sample))
         noise_bi = np.zeros_like(noise_ai)
 
         mask_ai = ~np.isnan(a_i)
@@ -482,45 +503,21 @@ def print_progress(num_total: int,
         print_predicted(t_elapsed, pct_elapsed, do_elapsed=True)
 
 
-def safe_2d_shape(x: npt.ArrayLike)-> tuple[int, int]:
-    """
-    Compute the 2D shape of the input, x, safely. Avoids errors when the input is a 1D array (in which case, the
-    second output is 1).  Any dimensions higher than the second are ignored.
-
-    Nicholas O'Donoughue
-    19 May 2021
-
-    :param x: ND array to analyze.
-    :return dim1: Length of the first dimension.
-    :return dim2: Length of the second dimension.
-    """
-
-    if x is None:
-        return 0, 0
-        
-    # Wrap x in an array, in case it's a scalar or list
-    x = np.asarray(x)
-    shape = x.shape
-
-    # Pad with (1, 1), if needed, then return just the first two dimensions
-    return (shape + (1, 1))[:2]
-
-
 class SearchSpace:
-    _x_ctr: npt.ArrayLike or None = None
-    _epsilon: npt.ArrayLike or None = None
-    _points_per_dim: npt.NDArray[np.int64] or None = None
-    _max_offset: npt.ArrayLike or None = None
+    _x_ctr: npt.ArrayLike | None = None
+    _epsilon: npt.ArrayLike | None = None
+    _points_per_dim: npt.NDArray[np.int64] | None = None
+    _max_offset: npt.ArrayLike | None = None
 
     # Inferred grid
-    _x_set: npt.NDArray[np.int64] or None = None
-    _x_grid: tuple[*npt.NDArray[np.int64]] or None = None
+    _x_set: npt.NDArray[np.int64] | None = None
+    _x_grid: tuple[npt.NDArray[np.int64], ...] | None = None
 
     def __init__(self,
-                 x_ctr:npt.ArrayLike,
-                 epsilon:npt.ArrayLike=None,
-                 points_per_dim:npt.NDArray[np.int64]=None,
-                 max_offset:npt.ArrayLike=None):
+                 x_ctr:npt.NDArray[np.float64] | float,
+                 epsilon:npt.NDArray[np.float64] | float | None=None,
+                 points_per_dim:npt.NDArray[np.int64] | int | None=None,
+                 max_offset:npt.NDArray[np.float64] | float | None=None):
         self._x_ctr = x_ctr
         self._epsilon = epsilon
         self._points_per_dim = points_per_dim
@@ -530,12 +527,12 @@ class SearchSpace:
         self.check_consistency()
 
     @property
-    def num_parameters(self):
+    def num_parameters(self)-> int:
         self.broadcast()
-        return np.prod(np.shape(self.x_ctr))
+        return np.prod(np.shape(self.x_ctr)).astype(np.int64).item()
 
     @property
-    def x_ctr(self):
+    def x_ctr(self)-> npt.NDArray:
         self.broadcast()
         return self._x_ctr
 
@@ -545,7 +542,7 @@ class SearchSpace:
         self._x_ctr = x_ctr
 
     @property
-    def epsilon(self):
+    def epsilon(self)-> npt.NDArray[np.float64]:
         self.broadcast()
         if self._epsilon is None:
             # Build epsilon from max_offset and points_per_dim
@@ -562,7 +559,7 @@ class SearchSpace:
             self.check_consistency()
 
     @property
-    def max_offset(self):
+    def max_offset(self)-> npt.NDArray[np.float64]:
         self.broadcast()
         if self._max_offset is None:
             # Build max_offset from epsilon and points_per_dim
@@ -577,7 +574,7 @@ class SearchSpace:
             self.check_consistency()
 
     @property
-    def points_per_dim(self):
+    def points_per_dim(self)-> npt.NDArray[np.int64]:
         if self._points_per_dim is None:
             # Build points_per_dim from max_offset and epsilon
             self._points_per_dim = np.where(self.epsilon != 0, np.floor(1 + 2 * self.max_offset / self.epsilon), 1).astype(int)
@@ -591,21 +588,21 @@ class SearchSpace:
             self.check_consistency()
 
     @property
-    def x_set(self):
+    def x_set(self)-> npt.NDArray[np.float64]:
         if self._x_set is None:
             self.make_nd_grid()
-        return self._x_set
+        return np.array(self._x_set)
 
     @property
-    def x_grid(self):
+    def x_grid(self)-> tuple[npt.NDArray, ...]:
         if self._x_grid is None:
             self.make_nd_grid()
         return self._x_grid
 
     @property
-    def grid_shape(self):
+    def grid_shape(self)-> tuple[int, ...]:
         self.broadcast()
-        return [i for i in self.points_per_dim if i > 1]
+        return tuple([i for i in self.points_per_dim if i > 1])
 
     def reset(self):
         """
@@ -695,7 +692,7 @@ class SearchSpace:
         self._x_set = x_set
         self._x_grid = x_grid
 
-    def zoom_in(self, new_ctr: npt.ArrayLike, zoom: float=2.0, overwrite: bool=False):
+    def zoom_in(self, new_ctr: npt.ArrayLike, zoom: float=2.0, overwrite: bool=False)-> Self | None:
         if np.shape(new_ctr) != np.shape(self.x_ctr):
             raise ValueError('New center must have the same dimensionality as the existing center.')
 
@@ -703,41 +700,15 @@ class SearchSpace:
         if overwrite:
             self.epsilon = self.epsilon/zoom
             self.max_offset = None
-            return
+            return None
         else:
             return SearchSpace(x_ctr=new_ctr,
                                epsilon=self.epsilon/zoom,
                                points_per_dim=self.points_per_dim)
 
 
-def is_broadcastable(a: npt.ArrayLike, b: npt.ArrayLike)-> bool:
-    """
-    Determine if two inputs are broadcastable. In other words, check all common dimensions and
-    ensure that they are either equal or of length 1.
-
-    14 November 2022
-    Nicholas O'Donoughue
-
-    :param a: first input array
-    :param b: second input array
-    :return result:  Boolean (true if a and b are broadcastable)
-    """
-
-    while len(np.shape(a)) > len(np.shape(b)):
-        b = b[:, np.newaxis]
-
-    while len(np.shape(b)) > len(np.shape(a)):
-        a = a[:, np.newaxis]
-
-    try:
-        np.broadcast_arrays(a, b)
-        return True
-    except ValueError:
-        return False
-
-
-def broadcast_backwards(arrs: list[npt.NDArray, ], start_dim: int=0)\
-        -> tuple[list[npt.NDArray, ], npt.NDArray]:
+def broadcast_backwards(arrs: list[npt.NDArray, ], start_dim: int=0, do_broadcast: bool=False)\
+        -> tuple[list[npt.NDArray, ], tuple]:
     """
     Ensure all inputs are broadcastable, with an optional starting dimension. Return extended arrays that have the same
     number of dimensions so that numpy broadcasting works correctly.
@@ -746,19 +717,31 @@ def broadcast_backwards(arrs: list[npt.NDArray, ], start_dim: int=0)\
     in MATLAB.
     """
 
-    # Make sure they're long enough
-    max_len = max([len(np.shape(arr)) for arr in arrs])
-    if max_len < start_dim: max_len = start_dim
+    # Parse the input shapes
+    orig_shapes = [np.shape(a) for a in arrs]
+    max_len = max(map(len, orig_shapes), default=start_dim) # find out how long to make the new array shapes
+    max_len = max(max_len, start_dim)  # ensure they're at least as long as start_dim
+
+    # Pad arrays with singleton trailing dimensions
     output_arrs = []
-    for arr in arrs:
-        while len(np.shape(arr)) < max_len:
-            arr = np.expand_dims(arr, axis=-1)
+    for arr, shp in zip(arrs, orig_shapes):
+        ndim_missing = max_len - len(shp)
+        if ndim_missing > 0:
+            # Do a reshape to the correct size
+            arr = np.reshape(arr, shp + (1, ) * ndim_missing)
+
+        # Append the array to our list
         output_arrs.append(arr)
 
+    # Compute broadcast shape after start_dim
     if max_len <= start_dim:
-        out_shp = []
+        out_shp = ()
     else:
-        out_shp = np.broadcast_shapes(*[np.shape(arr)[start_dim:] for arr in output_arrs])
+        out_shp = np.broadcast_shapes(*[np.shape(a)[start_dim:] for a in output_arrs])
+
+    if do_broadcast:
+        # Perform the broadcasting; arrays will align along any dimensions after start_dim
+        output_arrs = [np.broadcast_to(a, np.shape(a)[:start_dim]+out_shp) for a in output_arrs]
 
     # Return
     return output_arrs, out_shp
@@ -863,55 +846,18 @@ def ensure_iterable(var, flatten: bool=False)->Iterable:
 
     return var
 
+def atleast_nd_trailing(x: npt.NDArray, n: int)-> npt.NDArray:
+    """
+    Replicates the functionality of numpy.atleast_2d with two changes:
+    1) New dimensions are added to the end (trailing) rather than the front
+    2) Accepts arbitrary number of desired dimensions
+    """
+    # Make sure the input is a numpy array
+    x = np.array(x, copy=False, subok=True)
 
-def parse_sensor_coords(x_aoa: npt.ArrayLike=None,
-                        x_tdoa: npt.ArrayLike=None,
-                        x_fdoa: npt.ArrayLike=None,
-                        v_fdoa: npt.ArrayLike=None,
-                        do_2d_aoa: bool=False,
-                        tdoa_ref_idx=None,
-                        fdoa_ref_idx=None):
+    # If the number of dimensions is sufficient, do nothing
+    if x.ndim >= n:
+        return x
 
-    n_dim1, n_aoa = safe_2d_shape(x_aoa)  # returns 0, 0 if x_aoa is None
-    n_dim2, n_tdoa = safe_2d_shape(x_tdoa)
-    n_dim3, n_fdoa = safe_2d_shape(x_fdoa)
-    n_dim4, _ = safe_2d_shape(v_fdoa)
-
-    # Check number of dimensions
-    n_dim_set = np.array([n_dim1, n_dim2, n_dim3, n_dim4])
-    n_dim_nonzero = n_dim_set[n_dim_set != 0]
-    if len(n_dim_nonzero) <= 0:
-        raise TypeError('At least one sensor position must be specified (they can\'t all be none).')
-
-    if len(set(n_dim_nonzero)) > 1:
-        raise TypeError('Not all defined sensor positions have the same number of dimensions.')
-
-    if x_fdoa is not None and v_fdoa is not None and not is_broadcastable(x_fdoa, v_fdoa):
-        raise TypeError('FDOA sensor position and velocity inputs must have matching shapes.')
-
-    # Determine the Number of Sensor Measurements
-    n_aoa_msmt = n_aoa * (2 if do_2d_aoa else 1)
-
-    if n_tdoa > 0:
-        tdoa_ref_vec, _ = parse_reference_sensor(ref_idx=tdoa_ref_idx, num_sensors=n_tdoa)
-        n_tdoa_msmt = len(tdoa_ref_vec)
-    else:
-        n_tdoa_msmt = 0
-
-    if n_fdoa > 0:
-        fdoa_ref_vec, _ = parse_reference_sensor(ref_idx=fdoa_ref_idx, num_sensors=n_fdoa)
-        n_fdoa_msmt = len(fdoa_ref_vec)
-    else:
-        n_fdoa_msmt = 0
-
-    # Package Response
-    sensor_coords = {'num_dim': n_dim_nonzero[0],
-                     'num_aoa': n_aoa,
-                     'num_tdoa': n_tdoa,
-                     'num_fdoa': n_fdoa,
-                     'num_aoa_msmt': n_aoa_msmt,
-                     'num_tdoa_msmt': n_tdoa_msmt,
-                     'num_fdoa_msmt': n_fdoa_msmt}
-
-    return sensor_coords
-
+    # Otherwise, use reshape to add extra dimensions
+    return np.reshape(x, x.shape + (1,) * (n - x.ndim))

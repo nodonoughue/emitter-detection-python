@@ -500,7 +500,7 @@ def make_figure_12(prefix=None, rng=np.random.default_rng(), mc_params=None):
     crlb_rmse_deg = np.sqrt(crlb_psi)*180/np.pi
     crlb_rmse_deg_stoch = np.sqrt(crlb_psi_stoch)*180/np.pi
 
-    num_monte_carlo = 1000
+    num_monte_carlo = 100  # MATLAB code uses 1,000; reducing to 100 for faster runtime
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     s = np.exp(1j*rng.uniform(low=0, high=2*np.pi, size=(1, num_samples, num_monte_carlo)))
@@ -512,7 +512,7 @@ def make_figure_12(prefix=None, rng=np.random.default_rng(), mc_params=None):
     rmse_deg_music = np.zeros(shape=(np.size(snr_db), ))
     
     print('Executing array DF monte carlo trial...')
-    iterations_per_marker = 10
+    iterations_per_marker = 5
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     total_iterations = num_monte_carlo * len(snr_lin)

@@ -1,7 +1,6 @@
 import numpy as np
 
 from . import model
-from ewgeo.utils import safe_2d_shape
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.perf import compute_crlb_gaussian
@@ -31,7 +30,9 @@ def compute_crlb(x_sensor, x_source, cov: CovarianceMatrix, ref_idx=None, do_res
     """
 
     # Parse inputs
-    _, n_source = safe_2d_shape(x_source)
+    shp = np.shape(x_source)
+    # n_dim2 = shp[0] if len(shp) > 0 else 1
+    n_source = shp[1] if len(shp) > 1 else 1
 
     # Make sure that xs is 2D
     if n_source == 1:

@@ -25,8 +25,12 @@ def calc_range(x1: npt.ArrayLike, x2: npt.ArrayLike)-> npt.NDArray:
     x1, x2 = arrs
 
     # Find the input dimensions and test for compatibility
-    num_dim_1, num_x1, *_ = np.shape(x1)
-    num_dim_2, num_x2, *_ = np.shape(x2)
+    shp = np.shape(x1)
+    num_dim_1 = shp[0] if len(shp) > 0 else 1
+    num_x1 = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x2)
+    num_dim_2 = shp[0] if len(shp) > 0 else 1
+    num_x2 = shp[1] if len(shp) > 1 else 1
     if num_dim_1 != num_dim_2:
         raise TypeError('First dimension of both inputs must match.')
 
@@ -82,7 +86,7 @@ def calc_range_diff(x0: npt.ArrayLike, x1: npt.ArrayLike, x2: npt.ArrayLike)-> n
     r2 = calc_range(x0, x2)  # (1, num_x2, *out_shp)
 
     # Take the difference, with appropriate dimension reshaping
-    if out_shp==[]:
+    if not out_shp:
         # M1 and M2 are both one; we expect both r1 and r2 to be single-element arrays, just take the difference
         # directly
         pass
@@ -134,10 +138,10 @@ def calc_doppler(x_source: npt.ArrayLike, v_source: npt.ArrayLike, x_sensor: npt
     #     raise TypeError('Input dimensions do not match.')
 
     # Parse input dimensions
-    num_dims, num_sources, *_ = np.shape(x_source)
-    # _, num_sources2, *out_shp_2 = np.shape(v_source)
-    _, num_sensors, *_ = np.shape(x_sensor)
-    # _, num_sensors2, *out_shp_4 = np.shape(v_sensor)
+    shp = np.shape(x_source)
+    num_sources = shp[1] if len(shp) > 1 else 1
+    shp = np.shape(x_sensor)
+    num_sensors = shp[1] if len(shp) > 1 else 1
 
     # in_shp = np.broadcast_shapes(out_shp_1, out_shp_2, out_shp_3, out_shp_4)
     out_shp = [num_sources, num_sensors]
@@ -272,7 +276,8 @@ def compute_slant_range(alt1: npt.ArrayLike, alt2: npt.ArrayLike, el_angle_deg: 
     return np.sqrt(r1c**2 + r2**2 - r1**2) - r1c
 
 
-def find_intersect(x0: list[float, float], psi0: float, x1: list[float, float], psi1: float)-> npt.NDArray:
+def find_intersect(x0: npt.NDArray[np.float64], psi0: float,
+                   x1: npt.NDArray[np.float64], psi1: float)-> npt.NDArray[np.float64]:
     """
     # Find the intersection of two lines of bearing with origins at x0 and x1, and bearing given by psi0 and psi1.
 

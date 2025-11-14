@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import time
 import warnings
 
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import print_elapsed, print_progress, safe_2d_shape, SearchSpace
+from ewgeo.utils import print_elapsed, print_progress, SearchSpace
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
 from ewgeo.utils.geo import calc_range
@@ -41,7 +42,7 @@ def example1(mc_params=None):
 
     # Define sensor positions and PSS object
     x_sensor = 30.0*np.array([[-1., 0., 1.], [0.,  0., 0.]])
-    num_dims, num_sensors = safe_2d_shape(x_sensor)
+    num_dims, num_sensors = np.shape(x_sensor)
     covar_psi = CovarianceMatrix((2*np.pi/180)**2 * np.eye(num_sensors))
     triang = DirectionFinder(x=x_sensor, cov=covar_psi, do_2d_aoa=False)
 
@@ -55,7 +56,7 @@ def example1(mc_params=None):
     range_act = calc_range(x_sensor, x_source)
 
     # Error Values
-    angle_error = 3*np.sqrt(np.diag(covar_psi.cov))
+    angle_error: npt.NDArray[np.float64] = 3*np.sqrt(np.diag(covar_psi.cov))
 
     # Start the first figure; geometry
     fig_geo = plt.figure()
@@ -64,8 +65,8 @@ def example1(mc_params=None):
     for idx_sensor, this_psi in enumerate(psi_act):
         this_x = np.expand_dims(x_sensor[:, idx_sensor], axis=1)
         this_range = range_act[idx_sensor]
-        this_err = angle_error[idx_sensor]
-
+        this_err = float(angle_error[idx_sensor])
+        this_psi = float(this_psi)
         # Vector from sensor to source
         # dx = x_source - this_x
 
@@ -93,7 +94,8 @@ def example1(mc_params=None):
 
     # Iterative Methods
     epsilon = .5  # km
-    num_monte_carlo = 1000
+    num_monte_carlo = 100  # MATLAB uses 1,000. Reducing to 100 for faster runtime
+    # TODO: Is 100 accurate enough?
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     num_iterations = 50
@@ -183,7 +185,7 @@ def example1(mc_params=None):
     cep50_inc = compute_cep50(cov_inc)
 
     out_shp = (2, num_iterations)
-    out_cov_shp = (2, 2, num_iterations)
+    # out_cov_shp = (2, 2, num_iterations)
     bias_ls = np.zeros(shape=out_shp)
     bias_grad = np.zeros(shape=out_shp)
     cov_ls = []
@@ -256,7 +258,7 @@ def _mc_iteration(pss: DirectionFinder, ml_search: SearchSpace, args: dict):
     psi = args['psi_act'] + pss.cov.sample()
 
     # Generate solutions
-    res_ml, _, _ = pss.max_likelihood(zeta=psi, search_space=ml_search, print_progress=False)
+    res_ml, _, _ = pss.max_likelihood(zeta=psi, search_space=ml_search)
     # Sometimes we get an underflow error; we don't really care
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore','underflow encountered in exp')
@@ -320,7 +322,8 @@ def example2():
     # Blank out y=0
     nan_mask = np.abs(x_grid[1]) < 1e-6  # x_grid is a list of meshgrid outputs; search the y-dimension
     cep50[nan_mask] = np.nan
-    
+
+    # TODO: Debug; fig 10.6 doesn't look right; the close in CRLB contour has a weird cut at top/bottom that matches what is seen in FDOA plots
     # Plot
     fig = plt.figure()
     plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='AOA Sensors')

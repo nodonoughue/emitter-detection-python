@@ -3,7 +3,6 @@ import numpy.typing as npt
 import warnings
 
 from . import model, solvers
-from ewgeo.utils import parse_reference_sensor, safe_2d_shape
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import DifferencePSS
@@ -66,7 +65,7 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         if x_sensor is None: x_sensor = self.pos
         if bias is None: bias = self.bias
         return model.log_likelihood(x_sensor=x_sensor, zeta=zeta, x_source=x_source, cov=self.cov, ref_idx=self.ref_idx,
-                                    variance_is_toa=False, do_resample=False, bias=bias, **kwargs)
+                                    variance_is_toa=False, do_resample=False, bias=bias)
 
     def grad_x(self,
                x_source: npt.ArrayLike,
@@ -95,7 +94,8 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
 
     def grad_sensor_vel(self, x_source: npt.ArrayLike, **kwargs)-> npt.NDArray:
         out_shape = [self.num_dim * self.num_sensors, self.num_measurements]
-        _, num_source = safe_2d_shape(x_source)
+        shp = np.shape(x_source)
+        num_source = shp[1] if len(shp) > 1 else 1
         if num_source > 1: out_shape.append(num_source)
         return np.zeros(shape=out_shape)
 
@@ -113,8 +113,8 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
 
         if bias is not None:
             warnings.warn("Chan-Ho TDOA solver does not accept bias. Ignoring bias.")
-        return solvers.chan_ho(x_sensor=x_sensor, zeta=zeta, cov=self.cov, ref_idx=self.ref_idx, do_resample=False,
-                               variance_is_toa=False)
+        return solvers.chan_ho(x_sensor=x_sensor, zeta=zeta, cov=self.cov, ref_idx=self._ref_idx_vec[0],
+                               do_resample=False, variance_is_toa=False)
 
     ## ============================================================================================================== ##
     ## Performance Methods
@@ -136,7 +136,11 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         if x_sensor is None:
             x_sensor = self.pos
 
-        test_idx_vec, ref_idx_vec = parse_reference_sensor(self.ref_idx, self.num_sensors)
+        # Make sure x_sensor is a numpy array
+        x_sensor = np.array(x_sensor)
+
+        test_idx_vec = self.test_idx_vec
+        ref_idx_vec = self.ref_idx_vec
 
         isochrones = [model.draw_isochrone(x_ref=x_sensor[:, ref_idx], x_test=x_sensor[:, test_idx],
                                            range_diff=this_range_diff, num_pts=num_pts, max_ortho=max_ortho) for

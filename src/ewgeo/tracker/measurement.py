@@ -9,16 +9,16 @@ from .states import StateSpace, State
 class Measurement:
     time: float
     sensor: PassiveSurveillanceSystem | None
-    zeta: npt.ArrayLike
+    zeta: npt.NDArray[np.float64]
 
-    def __init__(self, time: float, sensor: PassiveSurveillanceSystem | None, zeta: npt.ArrayLike):
+    def __init__(self, time: float, sensor: PassiveSurveillanceSystem | None, zeta: npt.NDArray[np.float64]):
         self.time = time
         self.sensor = sensor
         self.zeta = zeta
 
     @property
-    def size(self):
-        return len(self.zeta)
+    def size(self)->int:
+        return self.zeta.size
 
     def __str__(self):
         return f"Measurement at t={self.time}: {self.zeta}"
@@ -37,14 +37,14 @@ class MeasurementModel:
         self.pss = pss
 
     @property
-    def num_measurement_dimensions(self):
+    def num_measurement_dimensions(self)->int:
         return self.pss.num_measurements
 
     @property
-    def num_state_dimensions(self):
+    def num_state_dimensions(self)->int:
         return self.state_space.num_states
 
-    def false_alarm(self, max_val: npt.ArrayLike, num: int, time: float = None):
+    def false_alarm(self, max_val: float, num: int, time: float = None)-> list[Measurement]:
         return [Measurement(time=time,
                             sensor=self.pss,
                             zeta=np.random.uniform(low=-max_val,

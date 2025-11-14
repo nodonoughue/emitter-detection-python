@@ -3,7 +3,7 @@ import numpy as np
 from numpy import typing as npt
 
 from . import model, solvers
-from ewgeo.utils import safe_2d_shape, SearchSpace
+from ewgeo.utils import SearchSpace
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import PassiveSurveillanceSystem
 
@@ -27,8 +27,8 @@ class DirectionFinder(PassiveSurveillanceSystem):
         self.default_bias_search_size = self._default_aoa_bias_search_size
 
     @property
-    def num_measurements(self):
-        return safe_2d_shape(self.pos)[1] * (2 if self.do_2d_aoa else 1)
+    def num_measurements(self)-> int:
+        return self.num_sensors * (2 if self.do_2d_aoa else 1)
 
     # For DF, if we're doing 2D AOA, then there are two bias terms per sensor, not 1.
     @property
@@ -52,7 +52,8 @@ class DirectionFinder(PassiveSurveillanceSystem):
     ## These methods handle the physical model for a Triangulation-based PSS, and are just wrappers for the static
     ## functions defined in model.py
     ## ============================================================================================================== ##
-    def measurement(self, x_source, x_sensor: npt.ArrayLike | None=None, bias: npt.ArrayLike | None=None, v_sensor: npt.ArrayLike | None=None, v_source: npt.ArrayLike | None=None):
+    def measurement(self, x_source, x_sensor: npt.ArrayLike | None=None, bias: npt.ArrayLike | None=None,
+                    v_sensor: npt.ArrayLike | None=None, v_source: npt.ArrayLike | None=None)->npt.NDArray[np.float64]:
         if x_sensor is None: x_sensor = self.pos
         if bias is None: bias = self.bias
         return model.measurement(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa, bias=bias)
@@ -102,9 +103,10 @@ class DirectionFinder(PassiveSurveillanceSystem):
         if x_sensor is None: x_sensor = self.pos
         return model.grad_sensor_pos(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=self.do_2d_aoa)
 
-    def grad_sensor_vel(self, x_source: npt.ArrayLike, **kwargs)-> npt.NDArray:
+    def grad_sensor_vel(self, x_source: npt.NDArray[np.float64], **kwargs)-> npt.NDArray[np.float64]:
         out_shape = [self.num_dim * self.num_sensors, self.num_measurements]
-        _, num_source = safe_2d_shape(x_source)
+        shp = np.shape(x_source)
+        num_source = shp[1] if len(shp) > 1 else 1
         if num_source > 1: out_shape.append(num_source)
         return np.zeros(shape=out_shape)
 
@@ -158,13 +160,18 @@ class DirectionFinder(PassiveSurveillanceSystem):
             x_sensor = self.pos
             num_sensors= self.num_measurements
         else:
-            num_dim, num_sensors = safe_2d_shape(x_sensor)
+            shp = np.shape(x_sensor)
+            # num_dim = shp[0] if len(shp) > 0 else 1
+            num_sensors = shp[1] if len(shp) > 1 else 1
 
+        x_sensor = np.array(x_sensor)  # make sure it's a numpy array
         if num_sensors == 1 & len(x_sensor.shape) == 1:
             x_sensor = x_sensor[:, np.newaxis]  # make sure it's not a 1d array; that'll mess up indexing later
 
         # Parse the input measurements
-        num_zeta, num_cases = safe_2d_shape(zeta)
+        shp = np.shape(zeta)
+        num_zeta = shp[0] if len(shp) > 0 else 1
+        num_cases = shp[1] if len(shp) > 1 else 1
         # assert num_zeta == num_measurements, "Sensor measurement dimension mismatch."
         zeta_reshape = np.reshape(zeta, shape=(num_zeta, num_cases))
 

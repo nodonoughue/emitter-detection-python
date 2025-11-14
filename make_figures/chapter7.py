@@ -279,7 +279,7 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
     # Set up the parameter sweep
     num_samples_vec = np.array([1, 10, 100], dtype=int)  # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-10, stop=20.1, step=1)  # signal-to-noise ratio
-    num_monte_carlo = 10000  # number of monte carlo trials at each parameter setting
+    num_monte_carlo = 1000  # number of monte carlo trials at each parameter setting
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
@@ -290,7 +290,7 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
 
     # Loop over parameters
     print('Executing Rectangular Aperture Monte Carlo sweep...')
-    iterations_per_marker = 1000
+    iterations_per_marker = 100
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     total_iterations = num_monte_carlo * len(snr_db_vec) * len(num_samples_vec)
@@ -606,7 +606,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_par
     # Set up the parameter sweep
     num_samples_vec = np.array([10, 100, 1000], dtype=int)  # Number of temporal samples at each antenna test point
     snr_db_vec = np.arange(start=-10, step=2, stop=30.1)  # signal-to-noise ratio
-    num_monte_carlo = 10000  # number of monte carlo trials at each parameter setting
+    num_monte_carlo = 1000  # number of monte carlo trials at each parameter setting
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
@@ -617,7 +617,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_par
 
     # Loop over parameters
     print('Executing Doppler Monte Carlo sweep...')
-    iterations_per_marker = 1000
+    iterations_per_marker = 200
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     total_iterations = num_monte_carlo * len(snr_db_vec) * len(num_samples_vec)

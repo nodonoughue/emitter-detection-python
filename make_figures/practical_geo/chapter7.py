@@ -14,7 +14,7 @@ import numpy as np
 from ewgeo.triang import DirectionFinder
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo import tracker
-from ewgeo.utils import init_output_dir, init_plot_style, safe_2d_shape
+from ewgeo.utils import init_output_dir, init_plot_style
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50
 from ewgeo.utils.unit_conversions import convert
@@ -168,7 +168,7 @@ def make_figure_7(prefix=None):
 
     t = np.arange(1000)/10  # 0 to 100 in increments of .1
 
-    _, num_sensors = safe_2d_shape(x_tdoa)
+    _, num_sensors = np.shape(x_tdoa)
     num_t = len(t)
 
     x_tdoa_full = x_tdoa[:, :, np.newaxis] + v_tdoa[:, :, np.newaxis] * np.reshape(t, shape=(1, 1, num_t))

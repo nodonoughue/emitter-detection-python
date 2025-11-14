@@ -5,7 +5,7 @@ from scipy.linalg import block_diag
 from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import parse_reference_sensor, safe_2d_shape, SearchSpace
+from ewgeo.utils import SearchSpace
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import DifferencePSS
 
@@ -16,13 +16,13 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     tdoa: TDOAPassiveSurveillanceSystem | None = None
     fdoa: FDOAPassiveSurveillanceSystem | None = None
 
-    aoa_sensor_idx = None
-    tdoa_sensor_idx = None
-    fdoa_sensor_idx = None
-
-    aoa_measurement_idx = None
-    tdoa_measurement_idx = None
-    fdoa_measurement_idx = None
+    # Subordinate fields
+    _aoa_sensor_idx: npt.NDArray[np.int64] | None = None
+    _tdoa_sensor_idx: npt.NDArray[np.int64] | None = None
+    _fdoa_sensor_idx: npt.NDArray[np.int64] | None = None
+    _aoa_measurement_idx: npt.NDArray[np.int64] | None = None
+    _tdoa_measurement_idx: npt.NDArray[np.int64] | None = None
+    _fdoa_measurement_idx: npt.NDArray[np.int64] | None = None
 
     def __init__(self, cov: CovarianceMatrix | npt.ArrayLike | None=None,
                  aoa: DirectionFinder | None=None, tdoa: TDOAPassiveSurveillanceSystem | None=None,
@@ -37,11 +37,16 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         self.tdoa = tdoa
         self.fdoa = fdoa
 
+        # Pull reference indices and covariance matrices from subordinates, if they aren't
+        # explicitly provided as inputs
         if ref_idx is None:
             ref_idx = self.parse_reference_indices()
 
         if cov is None:
             cov = self.parse_covariance_matrix()
+
+        # Parse the subordinates
+        self.parse_subordinates()
 
         # Initiate the superclass
         super().__init__(self.pos, cov, ref_idx, vel=self.vel, **kwargs)
@@ -57,12 +62,26 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
                            then the arrays are flattened before use.
         :return: Attribute values concatenated along the specified dimension.
         """
-        arr = [getattr(pss, attr) for pss in [self.aoa, self.tdoa, self.fdoa]
-               if pss is not None and getattr(pss, attr) is not None] # ignore any empty PSS fields,
-        if not arr:
-            return None
-        else:
-            return np.concatenate(arr, axis=concat_dim)
+        pss_list = (self.aoa, self.tdoa, self.fdoa)
+
+        collected = []
+        for pss in pss_list:
+            if pss is None: continue
+            val = getattr(pss, attr, None)
+            if val is not None: collected.append(np.atleast_1d(val))
+
+        # None of the PSS objects have a defined value for this attr
+        if not collected: return None
+
+        # Scalar response; no need to concatenate
+        if len(collected)==1: return np.asarray(collected[0])
+
+        # If concat_dim is None -- flatten before concatenation
+        if concat_dim is None:
+            collected = [v.reshape(-1) for v in collected]
+            concat_dim = 0
+
+        return np.concatenate(collected, axis=concat_dim)
 
     @property
     def pos(self):
@@ -70,14 +89,12 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
     @pos.setter
     def pos(self, x: npt.ArrayLike):
-        desired_dims = (self.num_dim, self.num_sensors)
-        if np.any(x.shape != desired_dims):
-            raise ValueError(f'Input array shape {x.shape} does not match desired shape {desired_dims}.')
-        if self.aoa:
+        x = np.array(x)
+        if self.aoa and self._aoa_sensor_idx is not None:
             self.aoa.pos = x[:, self.aoa_sensor_idx]
-        if self.tdoa:
+        if self.tdoa and self._tdoa_sensor_idx is not None:
             self.tdoa.pos = x[:, self.tdoa_sensor_idx]
-        if self.fdoa:
+        if self.fdoa and self._fdoa_sensor_idx is not None:
             self.fdoa.pos = x[:, self.fdoa_sensor_idx]
 
     @property
@@ -102,7 +119,8 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
             # Check dimensions, parse the velocity, and distribute the result
             desired_dims_full = (self.num_dim, self.num_sensors)
             desired_dims_partial = (self.num_dim, self.num_fdoa_sensors)
-            if np.shape(v) == desired_dims_partial:
+            v = np.array(v)
+            if v.shape == desired_dims_partial:
                 # Only FDOA velocity defined
                 # Clear it from AOA/TDOA, for good measure
                 [delattr(pss, 'vel') for pss in [self.aoa, self.tdoa] if pss is not None]
@@ -151,28 +169,32 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         return self.num_aoa_measurements + self.num_tdoa_measurements + self.num_fdoa_measurements
 
     @property
+    def num_measurements_raw(self)-> int:
+        return np.sum(self.get_attr_from_pss("num_measurements_raw"), axis=None)
+
+    @property
     def aoa_sensor_idx(self)-> npt.NDArray[np.int64]:
-        return np.arange(self.num_aoa_sensors)
+        return self._aoa_sensor_idx
 
     @property
     def tdoa_sensor_idx(self)-> npt.NDArray[np.int64]:
-        return np.arange(self.num_tdoa_sensors) + self.num_aoa_sensors
+        return self._tdoa_sensor_idx
 
     @property
     def fdoa_sensor_idx(self)-> npt.NDArray[np.int64]:
-        return np.arange(self.num_fdoa_sensors) + self.num_aoa_sensors + self.num_tdoa_sensors
+        return self._fdoa_sensor_idx
 
     @property
     def aoa_measurement_idx(self)-> npt.NDArray[np.int64]:
-        return np.arange(self.num_aoa_measurements)
+        return self._aoa_measurement_idx
 
     @property
     def tdoa_measurement_idx(self)-> npt.NDArray[np.int64]:
-        return np.arange(self.num_tdoa_measurements) + self.num_aoa_measurements
+        return self._tdoa_measurement_idx
 
     @property
     def fdoa_measurement_idx(self)-> npt.NDArray[np.int64]:
-        return np.arange(self.num_fdoa_measurements) + self.num_tdoa_measurements + self.num_aoa_measurements
+        return self._fdoa_measurement_idx
 
     @property
     def default_bias_search_epsilon(self)-> npt.NDArray[np.float64]:
@@ -211,7 +233,8 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
             if pss is None: continue
 
             # Add defaults from this PSS
-            sensor_pos_search_epsilon.append(pss.default_sensor_pos_search_epsilon * np.ones([self.num_dim, pss.num_sensors]))
+            sensor_pos_search_epsilon.append(pss.default_sensor_pos_search_epsilon
+                                             * np.ones([self.num_dim, pss.num_sensors]))
         return np.concatenate(sensor_pos_search_epsilon, axis=1)
 
     @property
@@ -225,16 +248,16 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         return np.concatenate(sensor_pos_search_size, axis=1).astype(int)
 
     @property
-    def default_sensor_vel_search_epsilon(self) -> npt.NDArray[np.float64]:
+    def default_sensor_vel_search_epsilon(self) -> float | None:
         if self.fdoa is not None:
             return self.fdoa.default_sensor_vel_search_epsilon
         else:
             return None
 
     @property
-    def default_sensor_vel_search_size(self) -> npt.NDArray[np.int64]:
+    def default_sensor_vel_search_size(self) -> int | None:
         if self.fdoa is not None:
-            return np.array(self.fdoa.default_sensor_vel_search_size, dtype=int)
+            return self.fdoa.default_sensor_vel_search_size
         else:
             return None
 
@@ -356,9 +379,11 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         result = 0
         if self.aoa is not None:
-            result = result + self.aoa.log_likelihood(x_source=x_source, zeta=z_aoa, x_sensor=x_aoa, bias=b_aoa, **kwargs)
+            result = result + self.aoa.log_likelihood(x_source=x_source, zeta=z_aoa,
+                                                      x_sensor=x_aoa, bias=b_aoa, **kwargs)
         if self.tdoa is not None:
-            result = result + self.tdoa.log_likelihood(x_source=x_source, zeta=z_tdoa, x_sensor=x_tdoa, bias=b_tdoa, **kwargs)
+            result = result + self.tdoa.log_likelihood(x_source=x_source, zeta=z_tdoa,
+                                                       x_sensor=x_tdoa, bias=b_tdoa, **kwargs)
         if self.fdoa is not None:
             result = result + self.fdoa.log_likelihood(x_source=x_source, zeta=z_fdoa, x_sensor=x_fdoa,
                                                        v_sensor=v_fdoa, v_source=v_source, bias=b_fdoa, **kwargs)
@@ -386,11 +411,11 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         result = 0
         if self.aoa is not None:
-            result = result + self.aoa.log_likelihood_uncertainty(x_source=x_source, zeta=z_aoa, x_sensor=x_aoa, bias=b_aoa,
-                                                          **kwargs)
+            result = result + self.aoa.log_likelihood_uncertainty(x_source=x_source, zeta=z_aoa,
+                                                                  x_sensor=x_aoa, bias=b_aoa, **kwargs)
         if self.tdoa is not None:
-            result = result + self.tdoa.log_likelihood_uncertainty(x_source=x_source, zeta=z_tdoa, x_sensor=x_tdoa, bias=b_tdoa,
-                                                           **kwargs)
+            result = result + self.tdoa.log_likelihood_uncertainty(x_source=x_source, zeta=z_tdoa,
+                                                                   x_sensor=x_tdoa, bias=b_tdoa, **kwargs)
         if self.fdoa is not None:
             result = result + self.fdoa.log_likelihood_uncertainty(x_source=x_source, zeta=z_fdoa, x_sensor=x_fdoa,
                                                            v_sensor=v_fdoa, v_source=v_source, bias=b_fdoa, **kwargs)
@@ -458,21 +483,26 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
             if pss is not None
         ]
 
-        _, n_source = safe_2d_shape(x_source)
-        if n_source <= 1:
-            # There is only one source, combine the gradients with a block diagonal across axes 0 and 1
-            grad = block_diag(grads)
-        else:
-            # The individual gradients are 3D, but block_diag only works on 2D, let's do some reshaping.
-            # We need to move the third axis to the front
-            gradients_reshape = [np.moveaxis(x, -1, 0) for x in grads]
+        if len(grads) == 0:
+            # No gradients; nothing to return
+            return np.array([])
+        elif len(grads) == 1:
+            # Only one gradient was generated; return it directly
+            return grads[0]
 
-            # Now we can use list comprehension to call block_diag on each in turn
-            res = [block_diag(*arrays) for arrays in zip(*gradients_reshape)]
+        orig_shapes = [np.shape(g) for g in grads]
+        max_len = max(map(len, orig_shapes))
+        if max_len > 2:
+            # Move axes (0, 1) to the end so that block_diag will work on them properly
+            grads = [np.moveaxis(g, (0, 1), (-2, -1)) for g in grads]
 
-            # This is now a list of length n_source, where each entry is a block-diagonal jacobian matrix at that source
-            # position. Convert back to an array and rearrange the axes
-            grad = np.moveaxis(np.asarray(res), 0, -1)  # Move the first axis (n_source) back to the end.
+        # At this point, we know len(grads) is >0, but PyCharm doesn't, so it's presenting a static analysis warning.
+        # Shift the function call to grads[0], *grads[1:] to ensure at least one positional argument is passed in.
+        grad = block_diag(grads[0], *grads[1:])
+
+        # Move the axes back
+        if max_len > 2:
+            grad = np.moveaxis(grad, (-2, -1), (0, 1))
 
         return grad
 
@@ -493,7 +523,8 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
                                                            default_vel=np.zeros_like(x_source))
 
         to_concat = []
-        _, num_sources = safe_2d_shape(x_source)
+        shp = np.shape(x_source)
+        num_sources = shp[1] if len(shp) > 1 else 1
         if self.aoa is not None:
             # Response is (num_dim * num_aoa_sensors, num_aoa_measurements, num_sources)
             # Expand vertically to account for *all* sensors, then horizontally to account for *all* measurements
@@ -543,7 +574,8 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         # Initialize the matrix as all zeros. We'll use the gradient w.r.t FDOA to fill in the appropriate columns
         out_shape = [self.num_dim * self.num_fdoa_sensors, self.num_measurements]
-        _, num_sources = safe_2d_shape(x_source)
+        shp = np.shape(x_source)
+        num_sources = shp[1] if len(shp) > 1 else 1
         if num_sources > 1: out_shape.append(num_sources)
         res = np.zeros(shape=out_shape)
 
@@ -560,7 +592,10 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     ## ============================================================================================================== ##
     def max_likelihood_uncertainty(self, zeta: npt.ArrayLike, search_space:SearchSpace,
                                    do_sensor_bias: bool=False, do_sensor_pos: bool=False, do_sensor_vel: bool=False,
-                                   **kwargs)-> tuple[npt.NDArray, npt.NDArray, dict]:
+                                   **kwargs)-> tuple[npt.NDArray[np.float64],
+                                                     npt.NDArray[np.float64],
+                                                     tuple[npt.NDArray[np.float64], ...],
+                                                     dict]:
 
         # Call the super class to do the search, then reparse the results
         x_est, likelihood, th_grid, th_est = super().max_likelihood_uncertainty(zeta, search_space, do_sensor_bias,
@@ -580,55 +615,6 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         return x_est, likelihood, th_grid, th_est
 
-    def get_uncertainty_search_space(self, do_source_vel: bool=False, do_sensor_bias: bool=False,
-                                     do_sensor_pos: bool=False, do_sensor_vel: bool=False)-> dict:
-        """
-        Define and return a dict describing the uncertainty search vector
-        """
-
-        # Get Search Space for the Components
-        aoa_search = self.aoa.get_uncertainty_search_space(do_source_vel=do_source_vel, do_sensor_bias=do_sensor_bias,
-                                                           do_sensor_pos=do_sensor_pos) if self.aoa is not None \
-            else None
-        tdoa_search = self.tdoa.get_uncertainty_search_space(do_source_vel=do_source_vel, do_sensor_bias=do_sensor_bias,
-                                                             do_sensor_pos=do_sensor_pos) if self.tdoa is not None \
-            else None
-        fdoa_search = self.fdoa.get_uncertainty_search_space(do_source_vel=do_source_vel, do_sensor_bias=do_sensor_bias,
-                                                             do_sensor_pos=do_sensor_pos, do_sensor_vel=do_sensor_vel) \
-            if self.fdoa is not None else None
-
-        # Parse the component search spaces
-        source_indices = aoa_search['source_idx'] if aoa_search is not None \
-            else tdoa_search['source_idx'] if tdoa_search is not None else fdoa_search['source_idx']
-        num_source_indices = len(source_indices)
-
-        num_aoa_bias = aoa_search['num_bias_idx'] if aoa_search is not None else 0
-        num_tdoa_bias = tdoa_search['num_bias_idx'] if tdoa_search is not None else 0
-        num_fdoa_bias = fdoa_search['num_bias_idx'] if fdoa_search is not None else 0
-        num_bias_indices = num_aoa_bias + num_tdoa_bias + num_fdoa_bias
-
-        num_aoa_pos = aoa_search['num_pos_idx'] if aoa_search is not None else 0
-        num_tdoa_pos = tdoa_search['num_pos_idx'] if tdoa_search is not None else 0
-        num_fdoa_pos = fdoa_search['num_pos_idx'] if fdoa_search is not None else 0
-        num_pos_indices = num_aoa_pos + num_tdoa_pos + num_fdoa_pos
-
-        num_vel_indices = fdoa_search['num_vel_idx'] if fdoa_search is not None else 0
-
-        # Construct indices
-        bias_indices = num_source_indices + np.arange(num_bias_indices)
-        pos_indices = num_source_indices + num_bias_indices + np.arange(num_pos_indices)
-        vel_indices = num_source_indices + num_bias_indices + num_vel_indices + np.arange(num_vel_indices)
-
-        # Assemble the dict and return
-        return {'source_idx': source_indices,
-                'bias_idx': bias_indices,
-                'sensor_pos_idx': pos_indices,
-                'sensor_vel_idx': vel_indices,
-                'num_source_idx': num_source_indices,
-                'num_bias_idx': num_bias_indices,
-                'num_pos_idx': num_pos_indices,
-                'num_vel_idx': num_vel_indices}
-
     ## ============================================================================================================== ##
     ## Performance Methods
     ##
@@ -640,7 +626,30 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These are generic utility functions that are unique to this class
     ## ============================================================================================================== ##
-    def parse_reference_indices(self)-> npt.NDArray:
+    def parse_subordinates(self):
+        # Get dimensions and sizes from the subordinate objects, then compute sensor and measurement indices
+        dims = self.get_attr_from_pss(attr='num_dim', concat_dim=0)
+        if len(dims) > 1:
+            if any(dims != dims[0]):
+                raise ValueError("Dimension mismatch; all PassiveSurveillanceSystem objects must have the same "
+                                 "number of physical dimensions.")
+
+        self._num_dim = dims[0]
+        self._num_sensors = np.sum(self.get_attr_from_pss(attr='num_sensors', concat_dim=0), axis=None)
+        self._num_measurements = np.sum(self.get_attr_from_pss(attr='num_measurements', concat_dim=0), axis=None)
+
+        self._aoa_sensor_idx = np.arange(self.num_aoa_sensors)
+        self._tdoa_sensor_idx = np.arange(self.num_tdoa_sensors) + self.num_aoa_sensors
+        self._fdoa_sensor_idx = np.arange(self.num_fdoa_sensors) + self.num_aoa_sensors + self.num_tdoa_sensors
+
+        self._aoa_measurement_idx = np.arange(self.num_aoa_measurements)
+        self._tdoa_measurement_idx = np.arange(self.num_tdoa_measurements) + self.num_aoa_measurements
+        self._fdoa_measurement_idx = (np.arange(self.num_fdoa_measurements) + self.num_aoa_measurements
+                                      + self.num_tdoa_measurements)
+
+        return
+
+    def parse_reference_indices(self)-> npt.NDArray[np.int64]:
         # Intuit reference indices from the components
 
         # First, we generate the test and reference index vectors
@@ -648,13 +657,15 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         ref_idx_vec_aoa = np.nan * np.ones((self.num_aoa_measurements,))
 
         if self.tdoa is not None:
-            test_idx_vec_tdoa, ref_idx_vec_tdoa = parse_reference_sensor(self.tdoa.ref_idx, self.num_tdoa_sensors)
+            test_idx_vec_tdoa = self.tdoa.test_idx_vec
+            ref_idx_vec_tdoa = self.tdoa.ref_idx_vec
         else:
             test_idx_vec_tdoa = np.array([])
             ref_idx_vec_tdoa = np.array([])
 
         if self.fdoa is not None:
-            test_idx_vec_fdoa, ref_idx_vec_fdoa = parse_reference_sensor(self.fdoa.ref_idx, self.num_fdoa_sensors)
+            test_idx_vec_fdoa = self.fdoa.test_idx_vec
+            ref_idx_vec_fdoa = self.fdoa.ref_idx_vec
         else:
             test_idx_vec_fdoa = np.array([])
             ref_idx_vec_fdoa = np.array([])
@@ -672,9 +683,12 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
     def update_reference_indices(self):
         self.ref_idx = self.parse_reference_indices()
+        # The number of measurements may have changed; update the indices
+        self.parse_subordinates()
+        return
 
     def parse_covariance_matrix(self)-> CovarianceMatrix:
-        # Pull the covariance matrix from the components; we need the unresampled version because
+        # Pull the covariance matrix from the components; we need the un-resampled version because
         # when we set it we will resample it.
 
         to_concat = []
@@ -715,7 +729,8 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         #  2D; num_dim x num_sensors
         #      num_dim x self.fdoa.num_sensors (if vel_input=True)
         #  1D; num_sensors
-        data_shape = np.shape(data)
+        data = np.array(data)
+        data_shape = data.shape
 
         # Initialize outputs
         data_aoa = None
@@ -748,8 +763,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         return data_aoa, data_tdoa, data_fdoa
 
-    def parse_measurement_data(self, data: npt.ArrayLike, do_source_vel: bool=False, do_bias: bool=False, do_sensor_pos: bool=False,
-                               do_sensor_vel: bool=False):
+    def parse_measurement_data(self, data: npt.ArrayLike):
         if data is None:
             # There's nothing to split; all three returns should be Nones
             return None, None, None
@@ -769,92 +783,3 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         data_fdoa = data_split[2] if self.fdoa is not None else None
 
         return data_aoa, data_tdoa, data_fdoa
-
-    def parse_uncertainty_data(self, data: npt.ArrayLike, indices: dict):
-        # Uncertainty parameters take the form:
-        #   [x_source, v_source, bias, x_sensor.ravel(), v_sensor.ravel()]
-        # Expanded, to show the components, they are:
-        #   source pos (n_dim x 1)
-        #   source vel (n_dim x 1)
-        #   aoa bias
-        #   tdoa bias
-        #   fdoa bias
-        #   aoa sensor pos
-        #   tdoa sensor pos
-        #   fdoa sensor pos
-        #   fdoa sensor vel
-        #
-        # This function parses it into three separate uncertainty vectors, to be passed to
-        # self.aoa, self.tdoa, and self.fdoa
-
-        # source_pos and vel are unchanged; grab directly from the combined indices
-        source_pos_ind = indices['source_pos_indices']
-        source_vel_ind = indices['source_vel_indices']
-
-        # bias
-        if indices['num_bias'] > 0:
-            if indices['num_bias'] != self.num_aoa_measurements + self.num_tdoa_measurements + self.num_fdoa_measurements:
-                raise ValueError('Unable to parse bias uncertainty data.')
-            bias_start_ind = indices['bias_indices'][0]
-            aoa_bias_ind = bias_start_ind + np.arange(self.num_aoa_measurements)
-            tdoa_bias_ind = bias_start_ind + self.num_aoa_measurements + np.arange(self.num_tdoa_measurements)
-            fdoa_bias_ind = (bias_start_ind + self.num_aoa_measurements + self.num_tdoa_measurements
-                             + np.arange(self.num_fdoa_measurements))
-        else:
-            aoa_bias_ind = np.array([])
-            tdoa_bias_ind = np.array([])
-            fdoa_bias_ind = np.array([])
-
-        # sensor position
-        if indices['num_pos'] > 0:
-            if indices['num_pos'] != self.num_sensors*self.num_dim:
-                raise ValueError('Unable to parse sensor position uncertainty data.')
-            pos_start_ind = indices['pos_indices'][0]
-            aoa_pos_ind = pos_start_ind + np.arange(self.num_aoa_sensors)
-            tdoa_pos_ind = pos_start_ind + self.num_aoa_sensors + np.arange(self.num_tdoa_sensors)
-            fdoa_pos_ind = pos_start_ind + self.num_aoa_sensors + self.num_tdoa_sensors + np.arange(self.num_fdoa_sensors)
-        else:
-            aoa_pos_ind = np.array([])
-            tdoa_pos_ind = np.array([])
-            fdoa_pos_ind = np.array([])
-
-        # sensor velocity
-        if indices['num_vel'] > 0:
-            if indices['num_vel'] != self.num_fdoa_sensors*self.num_dim:
-                raise ValueError('Unable to parse sensor velocity uncertainty data.')
-            vel_start_ind = indices['vel_indices'][0]
-            fdoa_vel_ind = vel_start_ind + np.arange(self.num_fdoa_sensors)
-        else:
-            fdoa_vel_ind = np.array([])
-
-        if self.aoa is None:
-            theta_aoa = None
-        else:
-            theta_aoa = data[np.concatenate((source_pos_ind, aoa_bias_ind, aoa_pos_ind), axis=None).astype(int)]
-
-        if self.tdoa is None:
-            theta_tdoa = None
-        else:
-            theta_tdoa = data[np.concatenate((source_pos_ind, tdoa_bias_ind, tdoa_pos_ind), axis=None).astype(int)]
-
-        if self.fdoa is None:
-            theta_fdoa = None
-        else:
-            theta_fdoa = data[np.concatenate((source_pos_ind, source_vel_ind, fdoa_bias_ind, fdoa_pos_ind, fdoa_vel_ind), axis=None).astype(int)]
-
-        return theta_aoa, theta_tdoa, theta_fdoa
-
-    def parse_source_pos_vel(self, pos_vel: npt.ArrayLike, default_vel: npt.ArrayLike):
-        num_dim, _ = safe_2d_shape(pos_vel)
-        if num_dim==self.num_dim:
-            # Position only; return zero for velocity
-            pos = pos_vel
-            vel = default_vel
-        elif num_dim==2*self.num_dim:
-            # Position/Velocity
-            pos = pos_vel[:self.num_dim]
-            vel = pos_vel[self.num_dim:]
-        else:
-            raise ValueError("Unable to parse source position/velocity; unexpected number of spatial dimensions.")
-
-        return pos, vel

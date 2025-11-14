@@ -2,17 +2,16 @@ import numpy as np
 import numpy.typing as npt
 
 from . import model
-from ewgeo.utils import safe_2d_shape
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.perf import compute_crlb_gaussian
 from ewgeo.utils.unit_conversions import db_to_lin
 
 
-def compute_crlb(x_sensor: npt.ArrayLike,
-                 v_sensor: npt.ArrayLike,
-                 x_source: npt.ArrayLike,
+def compute_crlb(x_sensor: npt.NDArray[np.float64],
+                 v_sensor: npt.NDArray[np.float64],
+                 x_source: npt.NDArray[np.float64],
                  cov: CovarianceMatrix,
-                 v_source: npt.ArrayLike | None=None,
+                 v_source: npt.NDArray[np.float64] | None=None,
                  ref_idx=None,
                  do_resample: bool=True,
                  print_progress: bool=False, **kwargs)-> CovarianceMatrix | list[CovarianceMatrix]:
@@ -40,7 +39,9 @@ def compute_crlb(x_sensor: npt.ArrayLike,
     """
 
     # Parse inputs
-    n_dim, n_source = safe_2d_shape(x_source)
+    shp = np.shape(x_source)
+    n_dim = shp[0] if len(shp) > 0 else 1
+    n_source = shp[1] if len(shp) > 1 else 1
 
     # Make sure that xs is 2D
     if n_source == 1:

@@ -7,7 +7,7 @@ from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import print_elapsed, print_progress, safe_2d_shape, SearchSpace
+from ewgeo.utils import print_elapsed, print_progress, SearchSpace
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse, compute_rmse
@@ -71,9 +71,9 @@ def _make_pss_systems(err_aoa=None, err_time=None, err_freq=None, f0=1.0, tdoa_r
     """
 
     # Count the number of sensors in each type
-    num_dim, num_aoa = safe_2d_shape(x_aoa)
-    _, num_tdoa = safe_2d_shape(x_tdoa)
-    _, num_fdoa = safe_2d_shape(x_fdoa)
+    num_dim, num_aoa = np.shape(x_aoa)
+    _, num_tdoa = np.shape(x_tdoa)
+    _, num_fdoa = np.shape(x_fdoa)
 
     # Define Error Covariance Matrix
     if err_aoa is not None:
@@ -288,7 +288,7 @@ def example2(colors=None):
     }
     # ---- Apply Various Solvers ----
     # ML Solution
-    x_ml, _, _ = pss.max_likelihood(zeta=zeta, search_space=search_space, print_progress=True)
+    x_ml, _, _ = pss.max_likelihood(zeta=zeta, search_space=search_space)
 
     # GD Solution
     x_gd, x_gd_full = pss.gradient_descent(zeta=zeta, **gd_ls_args)
@@ -456,7 +456,7 @@ def example3_mc(colors=None, mc_params=None):
     markers_per_row = 40
     iterations_per_row = markers_per_row * iterations_per_marker
     res = {}
-    for idx in np.arange(num_monte_carlo):
+    for idx in range(num_monte_carlo):
         print_progress(num_monte_carlo, idx, iterations_per_marker, iterations_per_row, t_start)
 
         res = _mc_iteration(z, pss, ml_args, gd_ls_args)

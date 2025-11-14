@@ -4,7 +4,7 @@ import numpy as np
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo import tracker
-from ewgeo.utils import safe_2d_shape, SearchSpace
+from ewgeo.utils import SearchSpace
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse
@@ -44,7 +44,7 @@ def example1(colors=None):
     x_tgt = np.array([2e3, 4e3])
 
     # Define sensor accuracy
-    _, n_sensors = safe_2d_shape(x_aoa)
+    _, n_sensors = np.shape(x_aoa)
     sigma_theta = 5
     sigma_psi = sigma_theta * _deg2rad
     cov_psi = CovarianceMatrix(sigma_psi**2 * np.eye(n_sensors))
@@ -159,7 +159,7 @@ def example2():
     x_tgt = np.array([5e3, -15e3])
     
     # Define sensor accuracy
-    _, n_sensors = safe_2d_shape(x_tdoa)
+    _, n_sensors = np.shape(x_tdoa)
     sigma_t = 1e-6
     cov_toa = CovarianceMatrix(sigma_t**2*np.eye(n_sensors))
     cov_roa = cov_toa.multiply(speed_of_light ** 2, overwrite=False)
@@ -291,7 +291,7 @@ def example3():
     x_tgt = np.array([ 3e3, 25e3])
 
     # Define sensor accuracy
-    _, n_sensors = safe_2d_shape(x_aoa)
+    _, n_sensors = np.shape(x_aoa)
     sigma_theta = 10
     sigma_psi = sigma_theta*_deg2rad
     cov_psi = CovarianceMatrix(sigma_psi**2*np.eye(n_sensors))
@@ -401,7 +401,7 @@ def example4():
     x_tgt = np.array([3e3, 25e3])
     
     # Define sensor accuracy
-    num_dims, num_sensors = safe_2d_shape(x_aoa)
+    num_dims, num_sensors = np.shape(x_aoa)
     sigma_theta = 10
     sigma_psi = sigma_theta*_deg2rad
     cov_psi = CovarianceMatrix((sigma_psi**2)*np.eye(num_sensors))
