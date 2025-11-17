@@ -1,4 +1,6 @@
+import matplotlib.figure
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from scipy.stats import multivariate_normal
 
@@ -48,7 +50,7 @@ def example1(do_mod_cov: bool=False):
 
     # Define received signals and covariance matrix
     psi = np.array([80, 87]) * _deg2rad
-    cov = CovarianceMatrix(np.diag([0.1, 1.0]))  # the second sensor is 10x worse than the first sensor
+    cov = CovarianceMatrix(np.diag([1.0, 1.0]))
     if do_mod_cov:
         cov = CovarianceMatrix(np.diag([0.05, 0.2]))
     x_init = np.array([0, 1])  # initial guess
@@ -129,7 +131,7 @@ def example2(do_video_version: bool=False):
     :return: figure handle for the generated graphic
     """
 
-    def _ex2_inner(this_x_tdoa, this_x_init, title=None):
+    def _ex2_inner(this_x_tdoa, this_x_init, title=None)-> tuple[matplotlib.figure.Figure, Axes3D]:
         # Kernel of example 2; called multiple times with different sensor positions
         _, num_tdoa = np.shape(this_x_tdoa)
 
@@ -162,7 +164,8 @@ def example2(do_video_version: bool=False):
                                                                                      x_gd_alt[2]/1e3))
 
         # Initialize the plot
-        this_fig, this_ax = plt.subplots(subplot_kw=dict(projection='3d'))
+        this_fig = plt.figure()
+        this_ax = this_fig.add_subplot(projection='3d')
         this_ax.stem(this_x_tdoa[0]/1e3, this_x_tdoa[1]/1e3, this_x_tdoa[2], basefmt='grey', linefmt='grey',
                      markerfmt='+', label='Sensors')
         this_ax.stem([x_tgt[0]/1e3], [x_tgt[1]/1e3], [x_tgt[2]], basefmt='grey', linefmt='grey',
@@ -207,21 +210,21 @@ def example2(do_video_version: bool=False):
                        [alt1, alt1, alt1, alt1]])
 
 
-    fig_a, ax_a = _ex2_inner(x_tdoa, x_init, title='Example 5.2')
+    fig_a, ax_a = _ex2_inner(x_tdoa[:], x_init, title='Example 5.2')
     figs = [fig_a]
-    ax_a.set_zlim([0,1000]) # set the z-axis limits
+    ax_a.set_zlim((0,1000)) # set the z-axis limits
 
     if do_video_version:
         # Try again with better elevation support
         alt2 = 2*alt1
         x_tdoa[2] = [alt1, alt2, alt1, alt2]
-        figs.append(_ex2_inner(x_tdoa, x_init, title='Better Altitude Support')[0])
+        figs.append(_ex2_inner(x_tdoa[:], x_init, title='Better Altitude Support')[0])
 
         # Video 5.2 modified altitude again
         alt2 = 0.5*alt1
         alt3 = 0*alt1
         x_tdoa[2] = [alt2, alt1, alt3, alt2]
-        figs.append(_ex2_inner(x_tdoa, x_init, title='Video 5.2 Version')[0])
+        figs.append(_ex2_inner(x_tdoa[:], x_init, title='Video 5.2 Version')[0])
 
     return figs
 

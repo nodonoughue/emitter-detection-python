@@ -303,7 +303,6 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     :param mc_params: Optional struct to control Monte Carlo trial size
     :return: figure handle to generated graphic
     """
-    # TODO: Debug; fig 3.11 shows poor performance for Gradient Descent
 
     # Set up sensor and target coordinates
     x_source_ctr = np.array([3, 4]) * 1e3

@@ -81,7 +81,6 @@ def example1(mc_params=None):
 
     # Initialize Solvers
     num_monte_carlo = int(100)  # MATLAB uses 1,000. Reducing to 100 for faster runtime.
-    # TODO: Is 100 accurate enough?
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     x_extent = 5 * baseline
@@ -212,7 +211,6 @@ def example2(mc_params=None):
 
     # Initialize Solvers
     num_monte_carlo = int(100)  # MATLAB uses 1,000. Reducing to 100 for faster runtime.
-    # TODO: Is 100 accurate enough?
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     x_extent = 5 * baseline

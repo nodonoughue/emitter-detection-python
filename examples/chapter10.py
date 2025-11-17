@@ -95,7 +95,6 @@ def example1(mc_params=None):
     # Iterative Methods
     epsilon = .5  # km
     num_monte_carlo = 100  # MATLAB uses 1,000. Reducing to 100 for faster runtime
-    # TODO: Is 100 accurate enough?
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     num_iterations = 50
