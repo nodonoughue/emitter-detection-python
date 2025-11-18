@@ -345,9 +345,9 @@ def make_figure_10(prefix=None):
         p_prev = this_p
 
     fig10b=plt.figure()
-    plt.semilogy(t_vec, cep_vec)
+    plt.semilogy(t_vec, cep_vec/1e3)
     plt.xlabel('Time [s]')
-    plt.ylabel('$CEP_{50}$ [m]')
+    plt.ylabel('$CEP_{50}$ [km]')
 
     # Output to file
     figs = [fig10a, fig10b]

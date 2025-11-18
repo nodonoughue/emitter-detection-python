@@ -103,7 +103,8 @@ class Track:
             else:
                 this_label = "Predicted State"
 
-            trk_pred_hdl = ax.plot(*pred_coords, linestyle='--', color=trk_hdl.get_color(), label=this_label)
+            trk_pred_hdl = ax.plot(*pred_coords, linestyle='--', marker='o', markevery=[-1],
+                                   color=trk_hdl.get_color(), label=this_label)
 
             # Velocity and Covariance of predicted state
             _, trk_err_hdl, trk_vel_hdl =  predicted_state.plot(ax=ax, plot_dims=plot_dims,

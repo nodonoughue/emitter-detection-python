@@ -50,7 +50,7 @@ def example1(do_mod_cov: bool=False):
 
     # Define received signals and covariance matrix
     psi = np.array([80, 87]) * _deg2rad
-    cov = CovarianceMatrix(np.eye(2))
+    cov = CovarianceMatrix(np.diag([1.0, 1.0]))
     if do_mod_cov:
         cov = CovarianceMatrix(np.diag([0.05, 0.2]))
     x_init = np.array([0, 1])  # initial guess
@@ -131,7 +131,7 @@ def example2(do_video_version: bool=False):
     :return: figure handle for the generated graphic
     """
 
-    def _ex2_inner(this_x_tdoa, this_x_init, title=None)->tuple[matplotlib.figure.Figure, Axes3D]:
+    def _ex2_inner(this_x_tdoa, this_x_init, title=None)-> tuple[matplotlib.figure.Figure, Axes3D]:
         # Kernel of example 2; called multiple times with different sensor positions
         _, num_tdoa = np.shape(this_x_tdoa)
 
@@ -212,21 +212,21 @@ def example2(do_video_version: bool=False):
                        [alt1, alt1, alt1, alt1]])
 
 
-    fig_a, ax_a = _ex2_inner(x_tdoa, x_init, title='Example 5.2')
+    fig_a, ax_a = _ex2_inner(x_tdoa[:], x_init, title='Example 5.2')
     figs = [fig_a]
-    ax_a.set_zlim([0,1000]) # set the z-axis limits
+    ax_a.set_zlim((0,1000)) # set the z-axis limits
 
     if do_video_version:
         # Try again with better elevation support
         alt2 = 2*alt1
         x_tdoa[2] = [alt1, alt2, alt1, alt2]
-        figs.append(_ex2_inner(x_tdoa, x_init, title='Better Altitude Support')[0])
+        figs.append(_ex2_inner(x_tdoa[:], x_init, title='Better Altitude Support')[0])
 
         # Video 5.2 modified altitude again
         alt2 = 0.5*alt1
         alt3 = 0*alt1
         x_tdoa[2] = [alt2, alt1, alt3, alt2]
-        figs.append(_ex2_inner(x_tdoa, x_init, title='Video 5.2 Version')[0])
+        figs.append(_ex2_inner(x_tdoa[:], x_init, title='Video 5.2 Version')[0])
 
     return figs
 
@@ -459,7 +459,7 @@ def example5():
     x_tdoa = np.concatenate((np.zeros((3, 1)), x_tdoa), axis=1)  # add a sensor at the origin
 
     # Errors
-    err_time = 3e-6
+    err_time = 3e-7
     err_range = speed_of_light * err_time
     cov_roa = CovarianceMatrix(err_range**2 * np.eye(num_tdoa))
     ref_idx = None

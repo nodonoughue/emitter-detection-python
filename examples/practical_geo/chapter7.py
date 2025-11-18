@@ -131,7 +131,7 @@ def example1(colors=None):
 
         # Add contour lines
         hdl2 = plt.contour(x_grid[0]/1e3, x_grid[1]/1e3, cep/1e3, origin='lower', colors='k')
-        plt.clabel(hdl2, fontsize=10, colors='w')
+        plt.clabel(hdl2, fontsize=10, colors='k')
         plt.xlabel('x [km]')
         plt.ylabel('y [km]')
 
