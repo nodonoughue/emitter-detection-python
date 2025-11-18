@@ -1,4 +1,5 @@
 from .utils import *
+from .search_space import SearchSpace
 from . import constants
 from . import errors
 from . import geo

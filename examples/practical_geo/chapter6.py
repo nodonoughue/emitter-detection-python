@@ -298,12 +298,11 @@ def example4(do_iterative=False):
                                max_offset=search_size,
                                epsilon=grid_res)
     x_set, x_grid = search_space.x_set, search_space.x_grid
-
-    # TODO: Have SearchSpace generate the extent automatically; optional scale parameter to change from m to km
-    extent = (x_ctr[0].item()/1e3 - search_size/1e3,
-              x_ctr[0].item()/1e3 + search_size/1e3,
-              x_ctr[1].item()/1e3 - search_size/1e3,
-              x_ctr[1].item()/1e3 + search_size/1e3)
+    extent = search_space.get_extent(multiplier=1/1e3)
+    # extent = (x_ctr[0].item()/1e3 - search_size/1e3,
+    #           x_ctr[0].item()/1e3 + search_size/1e3,
+    #           x_ctr[1].item()/1e3 - search_size/1e3,
+    #           x_ctr[1].item()/1e3 + search_size/1e3)
 
     ell = tdoa.log_likelihood(zeta=zeta, x_source=x_set)
     ell_true = tdoa.log_likelihood(zeta=zeta_true, x_source=x_set)

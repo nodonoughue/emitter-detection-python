@@ -259,8 +259,6 @@ def example2(colors=None):
 
     # Plotting
     fig = plt.figure()
-    # PyCharm throws a type warning on extent=extent on the next line; ignore it.
-    # noinspection PyTypeChecker
     plt.imshow(np.reshape(rmse_crlb/1e3, search_space.grid_shape), origin='lower', cmap=colors, extent=extent,
                vmin=color_lims[0], vmax=color_lims[-1])
     plt.colorbar(format=lambda x, _: f"{x:.0f} km")

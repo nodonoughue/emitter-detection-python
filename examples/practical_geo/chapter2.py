@@ -202,11 +202,17 @@ def example1(colors=None):
     print('FDOA {} m^2/s^2'.format(pss.fdoa.cov_raw))
 
     # Set Up Search Grid
-    x_grid = np.arange(-0.5, 5.5, 0.02) * 1e3
-    y_grid = np.arange(0, 4, 0.02) * 1e3
-    xx, yy = np.meshgrid(x_grid, y_grid)
-    x_test_pos = np.vstack((xx.ravel(), yy.ravel()))
-    grid_extent = (x_grid[0].item(), x_grid[-1].item(), y_grid[0].item(), y_grid[-1].item())
+    # x_grid = np.arange(-0.5, 5.5, 0.02) * 1e3
+    # y_grid = np.arange(0, 4, 0.02) * 1e3
+    # xx, yy = np.meshgrid(x_grid, y_grid)
+    # x_test_pos = np.vstack((xx.ravel(), yy.ravel()))
+    # grid_extent = (x_grid[0].item(), x_grid[-1].item(), y_grid[0].item(), y_grid[-1].item())
+    search_space = SearchSpace(x_ctr=np.array([2.5, 2.0])*1e3,
+                               max_offset=np.array([3.0, 2.0])*1e3,
+                               epsilon=.02e3)
+    x_test_pos = search_space.x_set
+    grid_extent = search_space.get_extent(multiplier=1)
+    grid_shape = search_space.grid_shape
 
     # Log-Likelihood Figure Generator
     def _make_subfigure(ell, do_aoa=False, do_tdoa=False, do_fdoa=False):
@@ -223,19 +229,19 @@ def example1(colors=None):
         return _fig
 
     # Plot AOA Likelihood
-    ell_aoa = pss.aoa.log_likelihood(zeta=psi_act, x_source=x_test_pos).reshape(xx.shape)
+    ell_aoa = pss.aoa.log_likelihood(zeta=psi_act, x_source=x_test_pos).reshape(grid_shape)
     fig2 = _make_subfigure(ell_aoa, do_aoa=True)
 
     # TDOA
-    ell_tdoa = pss.tdoa.log_likelihood(zeta=range_diff, x_source=x_test_pos).reshape(xx.shape)
+    ell_tdoa = pss.tdoa.log_likelihood(zeta=range_diff, x_source=x_test_pos).reshape(grid_shape)
     fig3 = _make_subfigure(ell_tdoa, do_tdoa=True)
 
     # FDOA
-    ell_fdoa = pss.fdoa.log_likelihood(zeta=velocity_diff, x_source=x_test_pos).reshape(xx.shape)
+    ell_fdoa = pss.fdoa.log_likelihood(zeta=velocity_diff, x_source=x_test_pos).reshape(grid_shape)
     fig4 = _make_subfigure(ell_fdoa, do_fdoa=True)
 
     # Hybrid
-    ell_hybrid = pss.log_likelihood(zeta=z, x_source=x_test_pos, v_source=None).reshape(xx.shape)
+    ell_hybrid = pss.log_likelihood(zeta=z, x_source=x_test_pos, v_source=None).reshape(grid_shape)
     fig5 = _make_subfigure(ell_hybrid, do_aoa=True, do_tdoa=True, do_fdoa=True)
 
     # Package figure handles

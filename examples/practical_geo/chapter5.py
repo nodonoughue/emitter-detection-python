@@ -305,10 +305,11 @@ def example3():
     # Plot RMSE
     fig, axes = plt.subplots(ncols=2)
     contour_levels = np.arange(20)
-    extent = ((x_tgt[0].item() - max_offset)/1e3,
-              (x_tgt[0].item() + max_offset)/1e3,
-              (x_tgt[1].item() - max_offset)/1e3,
-              (x_tgt[1].item() + max_offset)/1e3)
+    extent = search_space.get_extent(multiplier=1/1e3)
+    # extent = ((x_tgt[0].item() - max_offset)/1e3,
+    #           (x_tgt[0].item() + max_offset)/1e3,
+    #           (x_tgt[1].item() - max_offset)/1e3,
+    #           (x_tgt[1].item() + max_offset)/1e3)
 
     # Unconstrained on axes[0] and Constrained on axes[1]
     for this_ax, this_z, this_title in zip(axes, [rmse_raw, rmse_fix], ['Unconstrained', 'Constrained']):
