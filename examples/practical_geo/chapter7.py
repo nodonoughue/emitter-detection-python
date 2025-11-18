@@ -182,7 +182,9 @@ def example2():
     sigma_t_vec = np.array([.1e-6, 1e-6, 10e-6])
     cep_vec = np.zeros((len(sigma_t_vec), len(time_vec)))
     for idx_s, this_sigma_t in enumerate(sigma_t_vec):
+        this_sigma_t = np.array(this_sigma_t)
         for idx_t, this_time in enumerate(time_vec):
+            this_time = np.array(this_time)
             this_num_samples = 1 + np.floor(this_time/pri)
 
             this_cov_roa = (this_sigma_t ** 2 * speed_of_light ** 2 / this_num_samples) * np.eye(n_sensors)

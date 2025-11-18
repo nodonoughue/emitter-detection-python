@@ -327,7 +327,6 @@ def resample_noise(noise: npt.NDArray[np.float64],
 
     # Function to execute at each entry of output covariance matrix
     def element_func(idx_row: npt.NDArray[np.int64]):
-        idx_row = np.astype(idx_row, int)
         a_i = test_idx_vec[idx_row % n_test]
         b_i = ref_idx_vec[idx_row % n_ref]
 
@@ -498,20 +497,20 @@ def print_progress(num_total: int,
 
     if np.mod(curr_idx + 1, iterations_per_row) == 0:
         pct_elapsed = curr_idx / num_total
-        print(' ({:.1f}% complete) '.format(pct_elapsed*100), end='')
+        print(f' ({pct_elapsed*100:.1f}%) ', end='')
         t_elapsed = time.perf_counter() - t_start
         print_predicted(t_elapsed, pct_elapsed, do_elapsed=True)
 
 
 class SearchSpace:
-    _x_ctr: npt.ArrayLike | None = None
-    _epsilon: npt.ArrayLike | None = None
+    _x_ctr: npt.NDArray[np.float64] | None = None
+    _epsilon: npt.NDArray[np.float64] | None = None
     _points_per_dim: npt.NDArray[np.int64] | None = None
-    _max_offset: npt.ArrayLike | None = None
+    _max_offset: npt.NDArray[np.float64] | None = None
 
     # Inferred grid
-    _x_set: npt.NDArray[np.int64] | None = None
-    _x_grid: tuple[npt.NDArray[np.int64], ...] | None = None
+    _x_set: npt.NDArray[np.float64] | None = None
+    _x_grid: tuple[npt.NDArray[np.float64], ...] | None = None
     _extent: tuple[float, ...] | None = None
 
     def __init__(self,
@@ -519,10 +518,10 @@ class SearchSpace:
                  epsilon:npt.NDArray[np.float64] | float | None=None,
                  points_per_dim:npt.NDArray[np.int64] | int | None=None,
                  max_offset:npt.NDArray[np.float64] | float | None=None):
-        self._x_ctr = x_ctr
-        self._epsilon = epsilon
-        self._points_per_dim = points_per_dim
-        self._max_offset = max_offset
+        self._x_ctr = np.array(x_ctr, dtype=np.float64)
+        if epsilon is not None: self._epsilon = np.array(epsilon, dtype=np.float64)
+        if points_per_dim is not None: self._points_per_dim = np.array(points_per_dim, dtype=np.int64)
+        if max_offset is not None: self._max_offset = np.array(max_offset, dtype=np.float64)
 
         # Verify sizing and consistency
         self.check_consistency()
@@ -533,12 +532,12 @@ class SearchSpace:
         return np.prod(np.shape(self.x_ctr)).astype(np.int64).item()
 
     @property
-    def x_ctr(self)-> npt.NDArray:
+    def x_ctr(self)-> npt.NDArray[np.float64]:
         self.broadcast()
         return self._x_ctr
 
     @x_ctr.setter
-    def x_ctr(self, x_ctr: npt.ArrayLike):
+    def x_ctr(self, x_ctr: npt.NDArray[np.float64]):
         self.reset()  # clear the dependent fields
         self._x_ctr = x_ctr
 
@@ -553,7 +552,7 @@ class SearchSpace:
         return self._epsilon
 
     @epsilon.setter
-    def epsilon(self, epsilon: npt.ArrayLike):
+    def epsilon(self, epsilon: npt.NDArray[np.float64]):
         self.reset()  # clear the dependent fields
         self._epsilon = epsilon
         if self._epsilon is not None:
@@ -568,7 +567,7 @@ class SearchSpace:
         return self._max_offset
 
     @max_offset.setter
-    def max_offset(self, max_offset: npt.ArrayLike):
+    def max_offset(self, max_offset: npt.NDArray[np.float64]):
         self.reset()  # clear the dependent fields
         self._max_offset = max_offset
         if self._max_offset is not None:
@@ -582,7 +581,7 @@ class SearchSpace:
         return self._points_per_dim
 
     @points_per_dim.setter
-    def points_per_dim(self, points_per_dim: npt.ArrayLike):
+    def points_per_dim(self, points_per_dim: npt.NDArray[np.int64]):
         self.reset()  # clear the dependent fields
         self._points_per_dim = points_per_dim
         if self._points_per_dim is not None:
@@ -595,7 +594,7 @@ class SearchSpace:
         return np.array(self._x_set)
 
     @property
-    def x_grid(self)-> tuple[npt.NDArray, ...]:
+    def x_grid(self)-> tuple[npt.NDArray[np.float64], ...]:
         if self._x_grid is None:
             self.make_nd_grid()
         return self._x_grid
@@ -689,13 +688,12 @@ class SearchSpace:
         # Rearrange to a single 2D array of grid locations (n_dim x N)
         x_set = np.asarray([x.flatten() for x in x_grid])
 
-        # Generate a tuple with the grid's extent, for use with plotting commands
-        extent = tuple(ctr.item() - offset.item() for ctr, offset in zip(x_ctr, max_offset))
-
         self._x_set = x_set
         self._x_grid = x_grid
 
-    def get_extent(self, axes: npt.NDArray[int] or None=None, multiplier: float=1)-> tuple[float, ...]:
+
+    def get_extent(self, axes: tuple[int, int] | list[int] | npt.NDArray[np.int64] | None=None,
+                   multiplier: float=1)-> tuple[float, float, float, float]:
         """
         For the specified axes, generate and return a tuple to be used with plotting commands.
         Optionally accepts a multiplier to scale the extent (e.g., from meters to kilometers).
@@ -708,13 +706,20 @@ class SearchSpace:
             self.make_nd_grid()
 
         if axes is None:
-            this_ctr = self.x_ctr
-            this_off = self.max_offset
+            ax0 = 0
+            ax1 = 1
+        elif len(axes) == 2:
+            ax0 = axes[0]
+            ax1 = axes[1]
         else:
-            this_ctr = self.x_ctr[axes]
-            this_off = self.max_offset[axes]
+            raise ValueError(f'axes must have 2 entries; received {axes}')
 
-        return tuple((ctr - offset) * multiplier for ctr, offset in zip(this_ctr, this_off))
+        x0 = self.x_ctr[ax0].item()*multiplier
+        x1 = self.x_ctr[ax1].item()*multiplier
+        o0 = self.max_offset[ax0].item()*multiplier
+        o1 = self.max_offset[ax1].item()*multiplier
+
+        return x0-o0, x0+o0, x1-o1, x1+o1
 
     def zoom_in(self, new_ctr: npt.ArrayLike, zoom: float=2.0, overwrite: bool=False)-> Self | None:
         if np.shape(new_ctr) != np.shape(self.x_ctr):

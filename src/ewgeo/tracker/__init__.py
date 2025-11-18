@@ -1,6 +1,3 @@
-import numpy as np
-import numpy.typing as npt
-
 # Directly import several classes for easier reference
 from .states import *
 from .track import *

@@ -68,7 +68,7 @@ class Track:
              predicted_state: State=None,
              do_vel: bool=False, do_cov: bool=True,
              scale: float=1, cov_ellipse_confidence: float=.75,
-             **kwargs)-> tuple[Line2D or None, Line2D or None, Line2D or None, Quiver or None]:
+             **kwargs)-> tuple[Line2D | None, Line2D | None, Line2D | None, Quiver | None]:
         """
         Plot the states on the provided axis, with an optional scale factor (for converting from m to km, etc.).
 
@@ -126,8 +126,8 @@ class Track:
         return trk_hdl, trk_pred_hdl, trk_err_hdl, trk_vel_hdl
 
     def update_plot(self,
-                    trk_hdl: Line2D or None, trk_pred_hdl: Line2D or None, trk_err_hdl: Line2D or None,
-                    trk_vel_hdl: Quiver or None,
+                    trk_hdl: Line2D | None, trk_pred_hdl: Line2D | None, trk_err_hdl: Line2D | None,
+                    trk_vel_hdl: Quiver | None,
                     plot_dims: slice= np.s_[:],
                     predicted_state: State=None,
                     do_vel: bool=False, do_cov: bool=True,

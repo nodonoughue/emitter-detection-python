@@ -221,7 +221,7 @@ class Hypothesis:
 class MissedDetectionHypothesis(Hypothesis):
     def __init__(self, track: Track, motion_model: MotionModel, sensor: PassiveSurveillanceSystem | None,
                  distance: float, time: float):
-        dummy_measurement = Measurement(sensor=sensor, time=time, zeta=0.0)
+        dummy_measurement = Measurement(sensor=sensor, time=time, zeta=np.array([0.0]))
         super().__init__(track, dummy_measurement, motion_model)
 
         # The innovation of a missed detection is zero, set some dummy values for likelihood, as well

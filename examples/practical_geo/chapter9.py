@@ -76,10 +76,10 @@ def __init_example1():
     pss = DirectionFinder(x=x_aoa, cov=c_zeta, do_2d_aoa=False)
 
     # Define measurements
-    zeta = [[1.811, 1.652],
-             [1.253, 0.803],
-             [1.140, 0.726],
-             [1.679, 1.454]]
+    zeta = np.array([[1.811, 1.652],
+                     [1.253, 0.803],
+                     [1.140, 0.726],
+                     [1.679, 1.454]])
     new_time: float = 5
     measurements: list[Measurement] = [Measurement(time=new_time, sensor=pss, zeta=z) for z in zeta]
 

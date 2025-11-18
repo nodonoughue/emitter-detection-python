@@ -21,7 +21,7 @@ def make_gain_functions(aperture_type, d_lam, psi_0):
     :return g_dot: Function handle to the gradient of the antenna pattern, g_dot(psi), for psi in radians.
     """
 
-    #  type = 'Adcock' or 'Rectangular'
+    #  type = 'adcock' or 'Rectangular'
     # params
     #   d_lam = baseline (in wavelengths)
     #   psi_0 = central angle
@@ -42,7 +42,7 @@ def make_gain_functions(aperture_type, d_lam, psi_0):
     def g_rect(psi):
         # In the text, the function is sinc((psi-psi_0)*d/2*lam), but the sinc function is defined sin(x)/x
         # In numpy, the sinc function is sin(pi*x)/(pi*x), thus we should divide the argument to numpy.sinc by pi
-        return np.abs(np.sinc((psi-psi_0)*d_lam/(np.pi)))  # sinc includes implicit pi
+        return np.abs(np.sinc((psi-psi_0)*d_lam/np.pi))  # sinc includes implicit pi
 
     def g_dot_rect(psi):
         return sinc_derivative((psi - psi_0) * d_lam) * d_lam

@@ -1,4 +1,6 @@
+import matplotlib.figure
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from scipy.stats import multivariate_normal
 
@@ -129,7 +131,7 @@ def example2(do_video_version: bool=False):
     :return: figure handle for the generated graphic
     """
 
-    def _ex2_inner(this_x_tdoa, this_x_init, title=None):
+    def _ex2_inner(this_x_tdoa, this_x_init, title=None)->tuple[matplotlib.figure.Figure, Axes3D]:
         # Kernel of example 2; called multiple times with different sensor positions
         _, num_tdoa = np.shape(this_x_tdoa)
 
@@ -154,6 +156,7 @@ def example2(do_video_version: bool=False):
         x_gd_alt, x_gd_full_alt = tdoa.gradient_descent(**gd_args, eq_constraints=[a])
         if title is not None:
             print(title)
+
         print('Unconstrained Solution: ({:.2f} km E, {:.2f} km N, {:.2f} km U)'.format(x_gd[0]/1e3,
                                                                                        x_gd[1]/1e3,
                                                                                        x_gd[2]/1e3))
@@ -162,7 +165,9 @@ def example2(do_video_version: bool=False):
                                                                                      x_gd_alt[2]/1e3))
 
         # Initialize the plot
-        this_fig, this_ax = plt.subplots(subplot_kw=dict(projection='3d'))
+        this_fig = plt.figure()
+        this_ax = this_fig.add_subplot(111, projection='3d')  # Create 3D axes
+
         this_ax.stem(this_x_tdoa[0]/1e3, this_x_tdoa[1]/1e3, this_x_tdoa[2], basefmt='grey', linefmt='grey',
                      markerfmt='+', label='Sensors')
         this_ax.stem([x_tgt[0]/1e3], [x_tgt[1]/1e3], [x_tgt[2]], basefmt='grey', linefmt='grey',
@@ -237,6 +242,7 @@ def example3():
 
     :return: figure handle for the generated graphic
     """
+    print('Example 5.3')
 
     # Set up scene
     # ref_lla = np.array([20., -150., 0.])  # deg lat, deg lon, m alt
@@ -275,11 +281,9 @@ def example3():
     crlb_fix = hybrid.compute_crlb(x_source=x_tgt, eq_constraints_grad=[a_grad])
 
     print('CRLB (unconstrained):')
-    with np.printoptions(precision=4, suppress=True):
-        print(crlb_raw)
+    print(np.matrix(crlb_raw.cov))
     print('CRLB (constrained):')
-    with np.printoptions(precision=4, suppress=True):
-        print(crlb_fix)
+    print(np.matrix(crlb_fix.cov))
 
     # Plot for x/y grid
     # Initialize grid
@@ -342,6 +346,7 @@ def example4():
 
     :return: figure handle for the generated graphic
     """
+    print('Example 5.4')
 
     # Set up scene
     ref_lla = np.array([25., -15., 0.])  # deg lat, deg lon, m alt
@@ -392,7 +397,7 @@ def example4():
     print('Unconstrained Solution: {:.2f} deg N, {:.2f} deg W, {:.2f} km'.format(x_gd_lla[0],
                                                                                  np.fabs(x_gd_lla[1]),
                                                                                  x_gd_lla[2]/1e3))
-    gd_err = np.linalg.norm(x_gd-x_tgt_ecef)/1e3
+    gd_err = np.linalg.norm(x_gd-x_tgt_ecef) / np.array(1e3)
     print('   Error: {:.2f} km'.format(gd_err))
 
     x_gd_bound_lla = np.array(ecef_to_lla(x_gd_bound[0], x_gd_bound[1], x_gd_bound[2],
@@ -400,7 +405,7 @@ def example4():
     print('Constrained Solution: {:.2f} deg N, {:.2f} deg W, {:.2f} km'.format(x_gd_bound_lla[0],
                                                                                np.fabs(x_gd_bound_lla[1]),
                                                                                x_gd_bound_lla[2] / 1e3))
-    gd_bound_err = np.linalg.norm(x_gd_bound - x_tgt_ecef) / 1e3
+    gd_bound_err = np.linalg.norm(x_gd_bound - x_tgt_ecef) / np.array(1e3)
     print('   Error: {:.2f} km'.format(gd_bound_err))
 
     # Plot in ENU Coordinates
@@ -411,7 +416,8 @@ def example4():
                                           lat_ref=ref_lla[0], lon_ref=ref_lla[1], alt_ref=ref_lla[2],
                                           angle_units='deg', dist_units='m'))
 
-    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
     ax.stem(x_aoa_enu[0]/1e3, x_aoa_enu[1]/1e3, x_aoa_enu[2]/1e3, basefmt='grey', linefmt='grey',
             markerfmt='+', label='Sensors')
     ax.stem([x_tgt_enu[0]/1e3], [x_tgt_enu[1]/1e3], [x_tgt_enu[2]/1e3], basefmt='grey', linefmt='grey',
@@ -453,7 +459,7 @@ def example5():
     x_tdoa = np.concatenate((np.zeros((3, 1)), x_tdoa), axis=1)  # add a sensor at the origin
 
     # Errors
-    err_time = 3e-7
+    err_time = 3e-6
     err_range = speed_of_light * err_time
     cov_roa = CovarianceMatrix(err_range**2 * np.eye(num_tdoa))
     ref_idx = None
@@ -481,26 +487,22 @@ def example5():
     zeta = tdoa.noisy_measurement(x_source=x_tgt)
 
     # Solution
-    x_center = x_tgt
-    grid_size = np.array([50e3, 50e3, 0])
-    epsilon = 250
-    extent = ((x_tgt[0].item() - grid_size[0]) / 1e3,
-              (x_tgt[0].item() + grid_size[0]) / 1e3,
-              (x_tgt[1].item() - grid_size[1]) / 1e3,
-              (x_tgt[1].item() + grid_size[1]) / 1e3)
+    ml_search = SearchSpace(x_ctr=x_tgt,
+                            max_offset=np.array([50e3, 50e3, 0]),
+                            epsilon=250)
 
-    ml_search = SearchSpace(x_ctr=x_center, max_offset=grid_size, epsilon=epsilon)
     x_ml, score, x_grid = tdoa.max_likelihood(zeta=zeta, search_space=ml_search)
     x_ml_prior, score_prior, _ = tdoa.max_likelihood(zeta=zeta, search_space=ml_search, prior=prior, prior_wt=0.5)
 
     print('Solution w/o prior: {:.2f} km, {:.2f} km, {:.2f} km'.format(x_ml[0]/1e3, x_ml[1]/1e3, x_ml[2]/1e3))
-    print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml-x_tgt)/1e3))
+    print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml-x_tgt)/np.array(1e3)))
     print('Solution w/prior: {:.2f} km, {:.2f} km, {:.2f} km'.format(x_ml_prior[0]/1e3,
                                                                      x_ml_prior[2]/1e3,
                                                                      x_ml_prior[2]/1e3))
-    print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml_prior - x_tgt)/1e3))
+    print('    Error: {:.2f} km'.format(np.linalg.norm(x_ml_prior - x_tgt)/np.array(1e3)))
 
     # Plot
+    extent = ml_search.get_extent(multiplier=1 / 1e3)
     def _do_plot(this_ell, title, do_prior=False):
         this_fig = plt.figure()
         im = plt.imshow(this_ell, origin='lower', extent=extent, cmap='viridis', label=None, vmin=-50, vmax=0)

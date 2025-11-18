@@ -41,7 +41,7 @@ class Tracker:
     plot_state_velocity: bool = False
     plot_is_initialized: bool = False
     plot_measurements: bool = False
-    track_handles: dict[Track, tuple[Line2D or None, Line2D or None, Line2D or None, Quiver or None]] = None
+    track_handles: dict[Track, tuple[Line2D | None, Line2D | None, Line2D | None, Quiver | None]] = None
     msmt_handle: PathCollection = None
     animator: Animation = None
 

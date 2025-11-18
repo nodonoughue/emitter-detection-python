@@ -65,8 +65,8 @@ def example1(mc_params=None):
     for idx_sensor, this_psi in enumerate(psi_act):
         this_x = np.expand_dims(x_sensor[:, idx_sensor], axis=1)
         this_range = range_act[idx_sensor]
-        this_err = float(angle_error[idx_sensor])
-        this_psi = float(this_psi)
+        this_err = np.array(angle_error[idx_sensor])
+        this_psi = np.array(this_psi)
         # Vector from sensor to source
         # dx = x_source - this_x
 

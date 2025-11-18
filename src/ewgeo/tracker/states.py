@@ -3,6 +3,7 @@ import numpy as np
 import numpy.typing as npt
 from matplotlib.lines import Line2D
 from matplotlib.quiver import Quiver
+from typing import Self
 
 from ..utils.covariance import CovarianceMatrix
 from ..utils.errors import draw_error_ellipse
@@ -25,19 +26,19 @@ class StateSpace:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    def pos_component(self, x: npt.ArrayLike) -> npt.NDArray:
+    def pos_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         return x[self.pos_slice]
 
-    def vel_component(self, x: npt.ArrayLike) -> npt.NDArray:
+    def vel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         return x[self.vel_slice] if self.has_vel else None
 
-    def pos_vel_component(self, x: npt.ArrayLike) -> npt.NDArray:
+    def pos_vel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         return x[self.pos_vel_slice] if self.has_vel else self.pos_component(x)
 
-    def accel_component(self, x: npt.ArrayLike) -> npt.NDArray:
+    def accel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         return x[self.accel_slice] if self.has_accel else None
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs)-> Self:
         new_state_space = StateSpace(**self.__dict__)
         for key, value in kwargs.items():
             new_state_space.__setattr__(key, value)
@@ -50,7 +51,7 @@ class State:
     """
     state_space: StateSpace
     time: float
-    state: npt.ArrayLike
+    state: npt.NDArray[np.float64]
     covar: CovarianceMatrix
 
     def __init__(self, state_space: StateSpace, time: float, state: npt.ArrayLike, covar: CovarianceMatrix=None):
@@ -59,14 +60,14 @@ class State:
         if state is None:
             self.state = np.zeros((state_space.num_states,))
         else:
-            self.state = np.asarray(state)
+            self.state = np.array(state, dtype=np.float64)
         if covar is not None:
             self.covar = CovarianceMatrix(covar)
 
     def __str__(self):
         return f"State at t={self.time}: {self.state}"
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs)->Self:
         new_state=State(self.state_space, self.time, self.state, self.covar)
         for key, value in kwargs.items():
             new_state.__setattr__(key, value)
@@ -77,44 +78,44 @@ class State:
         return self.state_space.num_states
 
     @property
-    def position(self) -> npt.NDArray:
+    def position(self) -> npt.NDArray[np.float64]:
         return self.state_space.pos_component(self.state)
 
     @position.setter
     def position(self, value: npt.ArrayLike):
-        self.state[self.state_space.pos_slice] = value
+        self.state[self.state_space.pos_slice] = np.array(value)
 
     @property
-    def velocity(self) -> npt.NDArray:
+    def velocity(self) -> npt.NDArray[np.float64] | None:
         return self.state_space.vel_component(self.state) if self.has_vel else None
 
     @velocity.setter
     def velocity(self, value: npt.ArrayLike):
         if self.has_vel:
-            self.state[self.state_space.vel_slice] = value
+            self.state[self.state_space.vel_slice] = np.array(value)
         else:
             raise ValueError("Unable to set velocity component of state that has not velocity component.")
 
     @property
-    def pos_vel(self) -> npt.NDArray:
+    def pos_vel(self) -> npt.NDArray[np.float64] | None:
         return self.state_space.pos_vel_component(self.state) if self.has_vel else None
 
     @pos_vel.setter
     def pos_vel(self, value: npt.ArrayLike):
         if self.has_vel:
-            self.state[self.state_space.pos_vel_slice] = value
+            self.state[self.state_space.pos_vel_slice] = np.array(value)
         else:
             # Try to just set the position
-            self.position = value
+            self.position = np.array(value)
 
     @property
-    def acceleration(self) -> npt.NDArray:
+    def acceleration(self) -> npt.NDArray[np.float64] | None:
         return self.state_space.accel_component(self.state) if self.has_accel else None
 
     @acceleration.setter
     def acceleration(self, value: npt.ArrayLike):
         if self.has_accel:
-            self.state[self.state_space.accel_slice] = value
+            self.state[self.state_space.accel_slice] = np.array(value)
         else:
             raise ValueError("Unable to set acceleration component of state that has not acceleration component.")
 
@@ -161,7 +162,7 @@ class State:
     def plot(self, ax: plt.Axes, plot_dims: slice=np.s_[:],
              do_pos: bool=True, do_vel: bool=False, do_cov: bool=False,
              scale: float=1, cov_ellipse_confidence: float=0.75,
-             **kwargs)-> tuple[Line2D, Line2D, Quiver] or None:
+             **kwargs)-> tuple[Line2D, Line2D, Quiver] | None:
 
         coords = self.position[plot_dims]/scale
 
@@ -191,7 +192,7 @@ class State:
         return trk_hdl, trk_err_hdl, trk_vel_hdl
 
     def update_plot(self,
-                    trk_hdl: Line2D or None, trk_err_hdl: Line2D or None, trk_vel_hdl: Quiver or None,
+                    trk_hdl: Line2D | None, trk_err_hdl: Line2D | None, trk_vel_hdl: Quiver | None,
                     plot_dims: slice = np.s_[:], do_pos: bool=True, do_vel: bool=False, do_cov: bool=False,
                     scale: float=1, cov_ellipse_confidence: float=0.75):
 

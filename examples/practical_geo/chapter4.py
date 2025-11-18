@@ -230,13 +230,6 @@ def example2(colors=None):
     # indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
 
-    # Sensor Selection
-    _, n_tdoa = np.shape(x_sensor_lla)
-    n_aoa = n_tdoa
-    n_fdoa = n_aoa
-    ref_tdoa = n_tdoa - 1
-    ref_fdoa = n_fdoa - 1
-
     # Measurement Error
     err_aoa_rad = 3 * _deg2rad           # rad
     err_r = 1e-5 * speed_of_light        # meters

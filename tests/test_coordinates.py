@@ -1,5 +1,3 @@
-import numpy as np
-
 import ewgeo.utils.coordinates as coordinates
 
 

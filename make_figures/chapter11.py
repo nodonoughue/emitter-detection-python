@@ -738,8 +738,8 @@ def make_figure_10(prefix=None):
     isochrone_distance = np.sqrt((x_isochrone1[:, np.newaxis] - x_isochrone2[np.newaxis, :])**2
                                  + (y_isochrone1[:, np.newaxis] - y_isochrone2[np.newaxis, :])**2)
     crossing_index = isochrone_distance.argmin()
-    row = int(crossing_index / len(x_isochrone1))
-    col = crossing_index % len(x_isochrone1)
+    row = int(crossing_index / np.array(len(x_isochrone1)))
+    col = crossing_index % np.array(len(x_isochrone1))
     x_false_solution = .5*np.array([x_isochrone1[row] + x_isochrone2[col],
                                     y_isochrone1[row] + y_isochrone2[col]])
 

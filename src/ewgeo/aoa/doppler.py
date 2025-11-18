@@ -45,11 +45,11 @@ def crlb(snr, num_samples, amplitude, ts, f, radius, fr, psi):
     sx_ddot = 2 * np.pi * f * (radius / c) * np.sin(2 * np.pi * fr * ts * sample_vec - psi)          # Eq 7.72
     
     # Build Jacobian of test (doppler) signal
-    es_dot = np.sum(sx_dot)                     # Eq 7.75
-    es_ddot = np.sum(sx_ddot)                   # Eq 7.76
-    es_dot_dot = np.sum(sx_dot**2)              # Eq 7.77
-    es_ddot_ddot = np.sum(sx_ddot**2)           # Eq 7.78
-    es_dot_ddot = np.sum(sx_dot*sx_ddot)        # Eq 7.79
+    es_dot = np.sum(sx_dot).item()               # Eq 7.75
+    es_ddot = np.sum(sx_ddot).item()             # Eq 7.76
+    es_dot_dot = np.sum(sx_dot**2).item()        # Eq 7.77
+    es_ddot_ddot = np.sum(sx_ddot**2).item()     # Eq 7.78
+    es_dot_ddot = np.sum(sx_dot*sx_ddot).item()  # Eq 7.79
     
     jx = 2 * num_samples * snr_lin \
            * np.array([[1. / amplitude ** 2, 0., 0., 0.],
@@ -163,7 +163,7 @@ def run_example(mc_params=None):
     snr_db_vec = np.arange(start=-10, step=2, stop=22)   # signal-to-noise ratio
     num_monte_carlo = 1.e6                       # number of monte carlo trials at each parameter setting
     if mc_params is not None:
-        num_monte_carlo = min(np.astype(num_monte_carlo / mc_params['monte_carlo_decimation'], 'int'),mc_params['min_num_monte_carlo'])
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
     # Set up output variables
     out_shp = (np.size(num_samples_vec), np.size(snr_db_vec))
