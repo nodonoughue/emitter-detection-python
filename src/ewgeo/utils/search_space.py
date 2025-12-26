@@ -2,6 +2,8 @@ import numpy as np
 import numpy.typing as npt
 from typing import Self
 
+max_elements = 1e8  # Set a conservative limit
+
 class SearchSpace:
     _x_ctr: npt.NDArray[np.float64] | None = None
     _epsilon: npt.NDArray[np.float64] | None = None
@@ -180,7 +182,6 @@ class SearchSpace:
                'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
 
         # Check Search Size
-        max_elements = 1e8  # Set a conservative limit
         assert np.prod(points_per_dim) < max_elements, \
                'Search size is too large; python is likely to crash or become unresponsive. Reduce your search size, or' \
                + ' increase the max allowed.'
@@ -230,8 +231,11 @@ class SearchSpace:
         return x0-o0, x0+o0, x1-o1, x1+o1
 
     def zoom_in(self, new_ctr: npt.ArrayLike, zoom: float=2.0, overwrite: bool=False)-> Self | None:
-        if np.shape(new_ctr) != np.shape(self.x_ctr):
+        if np.size(new_ctr) != np.size(self.x_ctr):
             raise ValueError('New center must have the same dimensionality as the existing center.')
+
+        if np.shape(new_ctr) != np.shape(self.x_ctr):
+            new_ctr = np.reshape(new_ctr, self.x_ctr.shape)
 
         # Keep the number of grid points the same, but cut the grid resolution by the zoom factor
         if overwrite:
@@ -242,3 +246,39 @@ class SearchSpace:
             return SearchSpace(x_ctr=new_ctr,
                                epsilon=self.epsilon/zoom,
                                points_per_dim=self.points_per_dim)
+
+    def setup_mosaic(self, zoom_per_level: float=2.0)-> tuple[Self, float, int]:
+        """
+        Set up a mosaic version of this search space that won't violate the maximum number of elements in a search.
+        """
+
+        total_num_elements = np.prod(self.points_per_dim)
+        if total_num_elements > max_elements:
+            # Determine how many zoom levels are needed
+            num_nonsingleton_params = np.sum(self.points_per_dim > 1, axis=None)
+            scale_per_level = zoom_per_level ** num_nonsingleton_params
+            # each level divides the number of search elements by scale_per_level
+            scale_needed = total_num_elements / max_elements
+            num_levels = np.fix(np.log(scale_needed)/np.log(scale_per_level)).astype(int) + 2
+
+            # Make a new epsilon
+            new_epsilon = self.epsilon*(zoom_per_level**(num_levels-1))
+
+            # Make a new search
+            new_search = SearchSpace(x_ctr=self.x_ctr,
+                                     epsilon=new_epsilon,
+                                     max_offset=self.max_offset)
+
+            # Edge case -- sometimes this isn't enough because points_per_dim will round up. Check and add one more
+            # level
+            if np.prod(new_search.points_per_dim) > max_elements:
+                num_levels = num_levels + 1
+                new_epsilon *= zoom_per_level
+                new_search = SearchSpace(x_ctr=self.x_ctr,
+                                         epsilon=new_epsilon,
+                                         max_offset=self.max_offset)
+
+            return new_search, zoom_per_level, num_levels
+        else:
+            # No mosaic needed
+            return self, 1.0, 1

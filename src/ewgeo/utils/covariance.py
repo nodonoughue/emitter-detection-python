@@ -37,8 +37,7 @@ class CovarianceMatrix:
             self._do_inverse = do_inverse
 
     def __str__(self):
-        with np.printoptions(precision=4, suppress=False):
-            return f"CovarianceMatrix: {np.matrix(self.cov)}"
+        return f"CovarianceMatrix: {np.matrix(self.cov)}"
 
     """
     =========================================================
@@ -493,7 +492,7 @@ class CovarianceMatrix:
         # Finally, call the generic resampler and return the result
         return self.resample(test_idx_vec=test_idx_vec, ref_idx_vec=ref_idx_vec)
 
-    def multiply(self, val, overwrite=True):
+    def multiply(self, val, overwrite=True)-> Self | None:
         """
         Multiply the covariance matrix by a given value. val must be a finite number.
 

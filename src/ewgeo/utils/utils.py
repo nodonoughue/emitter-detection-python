@@ -1,12 +1,15 @@
 from collections.abc import Iterable
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import typing as npt
 import os
-from scipy.special import erfcinv
 from scipy import stats
+from scipy.special import erfcinv
+from scipy.linalg import pinvh
 import seaborn as sns
 import time
+from typing import Callable
 
 from .unit_conversions import lin_to_db
 
@@ -316,7 +319,7 @@ def resample_noise(noise: npt.NDArray[np.float64],
     n_test, n_ref, n_pair_out = parse_ref_vec_output_size(test_idx_vec, ref_idx_vec, n_sensor)
 
     # Parse sensor weights
-    shp_test_wt = 1
+    shp_test_wt = int(1)
     if test_weights:
         shp_test_wt = np.size(test_weights)
 
@@ -326,6 +329,7 @@ def resample_noise(noise: npt.NDArray[np.float64],
 
     # Function to execute at each entry of output covariance matrix
     def element_func(idx_row: npt.NDArray[np.int64]):
+        idx_row = np.asarray(idx_row, dtype=np.int64)
         a_i = test_idx_vec[idx_row % n_test]
         b_i = ref_idx_vec[idx_row % n_ref]
 
@@ -417,6 +421,34 @@ def make_pdfs(measurement_function,
         raise KeyError('Unrecognized PDF type setting: ''{}'''.format(pdf_type))
 
     return pdfs
+
+
+def make_prior(pdf_type: str, mean: npt.NDArray[np.float64], covariance: npt.NDArray[np.float64])\
+        -> tuple[Callable, Callable]:
+    """
+    Return a prior distribution, and its Fisher Information Matrix. Currently
+    only supports Gaussian (multivariate normal) as a valid type, for which
+    the usage is:
+    
+    :param pdf_type: String dictating type of statistical prior; currently only 'gaussian' is implemented
+    :param mean: numpy array (n_dim, ) with the expected value of the prior
+    :param covariance: CovarianceMatrix object (with size n_dim) of the prior
+    :return prior: function handle for the statistical prior; accepts (n_dim, ) or (num_batch, n_dim) inputs and returns
+                   a (num_batch, ) array of probabilities.
+    :return fim_prior: function handle for the Fisher Information Matrix; accepts (n_dim, ) or (num_batch, n_dim) inputs 
+                   and returns a (num_batch, ) array of CovarianceMatrix objects. 
+    """
+    if pdf_type.lower() == 'gaussian':
+        rv = stats.multivariate_normal(mean=mean, cov=covariance)
+        fim = rv.pdf
+
+        # For a multivariate Gaussian, the FIM is the inverse of the covariance matrix, regardless of the input
+        inv = pinvh(covariance)
+        fim_prior = lambda x: inv
+    else:
+        raise KeyError('Unrecognized PDF type setting: ''{}'''.format(pdf_type))
+
+    return fim, fim_prior
 
 
 def print_elapsed(t_elapsed: float):
@@ -655,3 +687,35 @@ def atleast_nd_trailing(x: npt.NDArray, n: int)-> npt.NDArray:
 
     # Otherwise, use reshape to add extra dimensions
     return np.reshape(x, x.shape + (1,) * (n - x.ndim))
+
+def print_matrix(x: npt.NDArray)->None:
+    """
+    Print a numpy array using MATLAB-style matrices.
+    If the array has more than two dimensions, any dimension
+    before the last two will be used as a batch dimension.
+    """
+
+    if np.ndim(x) > 2:
+        # Batching
+        for indices in itertools.product(*[range(s) for s in np.shape(x)[:-2]]):
+            # indices is a tuple like (0, 0), (0, 1), etc.
+            print('[',end='')
+            [print('{:d},'.format(i), end='') for i in indices]
+            print(':,:]')
+
+            print_matrix(x[indices])
+
+    # === Print the matrix pretty ===
+
+    # 1. Find the scale
+    scale = 10**np.fix(np.log10(np.amax(np.abs(x),axis=None)))
+
+    # 2. Print the scale
+    print(f"   {scale:.2g} *")
+
+    # 3. Print the array
+    with np.printoptions(formatter={'all': lambda x: (
+            f"{x:8.4f}" if x >= 1e-4 else
+            "  0.    ")}):
+        print(np.matrix(x/scale))
+
