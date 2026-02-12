@@ -31,6 +31,9 @@ class CovarianceMatrix:
                 setattr(self, key, value)
         else:
             self.cov = np.asarray(cov)  # Store the covariance matrix; use copy to make sure it's a fresh copy
+            # check for 1D inputs; use as the diagonal
+            if np.ndim(self.cov) == 1:
+                self.cov = np.diag(self.cov)
             self._inv = None
             self._lower = None
             self._do_cholesky = do_cholesky
