@@ -30,7 +30,7 @@ class CovarianceMatrix:
             for key, value in new_cov.__dict__.items():
                 setattr(self, key, value)
         else:
-            self.cov = np.asarray(cov)  # Store the covariance matrix; use copy to make sure it's a fresh copy
+            self.cov = np.asarray(cov, dtype=float)  # Store the covariance matrix; use copy to make sure it's a fresh copy
             self._inv = None
             self._lower = None
             self._do_cholesky = do_cholesky
@@ -181,6 +181,9 @@ class CovarianceMatrix:
 
         :param tolerance: numerical precision term (the smallest eigenvalue must be >= tolerance) [Default = 1e-10]
         """
+
+        # Error-prevention -- this loop will fail if self._cov is an integer type, let's force it to be a float
+        self._cov = np.asarray(self._cov, dtype=float)
 
         # Eigen-decomposition
         lam, v = np.linalg.eigh(self.cov)
