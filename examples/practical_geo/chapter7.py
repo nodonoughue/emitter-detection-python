@@ -198,7 +198,7 @@ def example2():
 
     plt.plot(time_vec, 10*np.ones_like(time_vec),'k-.', label='10 m')
     plt.xlabel('Time [s]')
-    plt.ylabel('$CcEP_{50}$ [m]')
+    plt.ylabel('$CEP_{50}$ [m]')
     plt.ylim([1, 1000])
     plt.legend(loc='upper right')
     plt.grid(True)
@@ -476,7 +476,7 @@ def example4():
     
     fig2=plt.figure()
     plt.semilogy(time_vec,err,label='Measured')
-    plt.plot(time_vec,cep,label='Predicted (CEP_{50})')
+    plt.plot(time_vec,cep,label='$Predicted (CEP_{50})$')
     plt.xlabel('Time [s]')
     plt.ylabel('Error [m]')
     plt.legend(loc='upper right')

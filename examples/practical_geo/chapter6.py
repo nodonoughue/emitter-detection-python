@@ -479,7 +479,7 @@ def example5(do_vel_only_cal=True):
                                                                      # Tiling the covariance matrix enforces this.
     cov_pos.multiply(val=10**2, overwrite=True)   # Multiply the position covariance by the square of the max offset
                                                   # of our search space to provide a weak prior
-    vel_search = SearchSpace(x_ctr=v_fdoa_actual,
+    vel_search = SearchSpace(x_ctr=v_fdoa,
                              epsilon=1,       # Desired velocity resolution is 5 m/s
                              max_offset=200)  # Max allowable offset is 200 m/s
     vel_search.points_per_dim[:, -1] = 1
@@ -492,15 +492,20 @@ def example5(do_vel_only_cal=True):
                 'do_pos_cal': True,
                 'do_vel_cal': True,
                 'do_bias_cal': False,
+                'pos_search': pos_search,
+                'vel_search': vel_search,
+                'solver_type': 'ml',
                 'epsilon': 1}  # don't bother calibrating across measurement biases; let's just do pos/vel
     _, x_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init, epsilon=.01)
-    _, x_est_cal, x_sensor_est, v_sensor_est, bias_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init, epsilon=.01,
+    _, x_est_cal, x_sensor_est, v_sensor_est, bias_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init, epsilon=1,
                                                                                  cal_data=cal_data)
 
     # Analyze calibration results
     with np.printoptions(precision=2, suppress=True):
-        print(f"Calibrated sensor positions: {x_sensor_est}, RMSE: {np.sqrt(np.mean((x_sensor_est-hybrid.pos)**2, axis=None))}")
-        print(f"Calibrated sensor velocities: {v_sensor_est}, RMSE: {np.sqrt(np.mean((v_sensor_est-v_fdoa_actual)**2, axis=None))}")
+        print(f"Actual sensor positions:\n {hybrid.pos}")
+        print(f"Calibrated sensor positions:\n {x_sensor_est}, RMSE: {np.sqrt(np.mean((x_sensor_est-hybrid.pos)**2, axis=None))}")
+        print(f"Actual sensor velocities:\n {v_fdoa_actual}")
+        print(f"Calibrated sensor velocities:\n {v_sensor_est}, RMSE: {np.sqrt(np.mean((v_sensor_est-v_fdoa_actual)**2, axis=None))}")
 
     # Plot Scenario
     fig = plt.figure()
@@ -531,36 +536,37 @@ def example5(do_vel_only_cal=True):
     tics_per_row=10
     iterations_per_row=iterations_per_tic*tics_per_row
     t_start=time.perf_counter()
-    max_num_cal=20
-    num_cal_vec = range(max_num_cal)
-    zeta_cal = hybrid.noisy_measurement(x_source=x_cal, v_sensor=v_fdoa_actual, num_samples=max_num_cal)
+    num_cal_vec = [1, 3, 5, 10, 30, 50, 100, 300, 500, 1000, 3000, 5000, 10000, 30000, 50000]
     cal_rmse_gd = np.zeros((len(num_cal_vec), ))
     cal_rmse_ls = np.zeros_like(cal_rmse_gd)
     cal_rmse_ml = np.zeros_like(cal_rmse_gd)
+    cal_data['epsilon'] = 1
     for idx, this_num_cal in enumerate(num_cal_vec):
-        print_progress(max_num_cal, idx, iterations_per_tic, iterations_per_row, t_start)
-        this_zeta_cal = zeta_cal[:, :, :1+this_num_cal]
-        cal_data['zeta_cal'] = this_zeta_cal
+        print_progress(len(num_cal_vec), idx, iterations_per_tic, iterations_per_row, t_start)
+        this_cov = hybrid.cov.multiply(1/this_num_cal, overwrite=False)
+        zeta_cal = hybrid.noisy_measurement(x_source=x_cal, v_sensor=v_fdoa_actual, cov=this_cov)
+        # zeta_cal = hybrid.measurement(x_source=x_cal, v_sensor=v_fdoa_actual)
+        cal_data['zeta_cal'] = zeta_cal
 
         cal_data['solver_type'] = 'gd'
         _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
-        cal_rmse_gd[idx] = np.sqrt(np.sum(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
+        cal_rmse_gd[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
 
         # TODO: LS Cal doesn't seem to work
-        cal_data['solver_type'] = 'ls'
-        _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
-        cal_rmse_ls[idx] = np.sqrt(np.sum(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
+        # cal_data['solver_type'] = 'ls'
+        # _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
+        # cal_rmse_ls[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
 
         cal_data['solver_type'] = 'ml'
         _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
-        cal_rmse_ml[idx] = np.sqrt(np.sum(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
+        cal_rmse_ml[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
     print('done.')
     print_elapsed(time.perf_counter()-t_start)
 
     fig2 = plt.figure()
-    plt.plot(num_cal_vec, cal_rmse_gd, label='GD')
-    plt.plot(num_cal_vec, cal_rmse_ls, label='LS')
-    plt.plot(num_cal_vec, cal_rmse_ml, label='ML')
+    plt.semilogy(num_cal_vec, cal_rmse_gd, label='GD')
+    # plt.semilogy(num_cal_vec, cal_rmse_ls, label='LS')
+    plt.semilogy(num_cal_vec, cal_rmse_ml, label='ML')
     plt.xlabel('Number of Calibration Samples')
     plt.ylabel('RMSE (m/s)')
     plt.title('Benefit of Repeated Calibration Samples')

@@ -10,9 +10,23 @@ The textbooks can be purchased from Artech House directly at the following links
 
 ## Installation
 
-Clone the repository, then
+### PyPI Install (recommended)
+Use pip to install the package from the PyPI repository
 ```
-cd passive-geolocation-python
+pip install ewgeo
+```
+
+All the tools will be installed and available by importing the `ewgeo` package.
+```
+import ewgeo
+```
+
+### Local Install
+After cloning or downloading the git repository, you can install it locally in any virtual environment.
+
+If the path to your downloaded copy of the repository is `<PATH_TO_EWGEO>`, then issue the following commands in a terminal window.
+```
+cd <PATH_TO_EWGEO>
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -e .
@@ -43,19 +57,19 @@ chap1_figs = make_figures.chapter1.make_all_figures()
 The **examples/** folder contains the code to execute each of the examples in the textbook. The subfolder **examples/practical_geo** has examples from the second textbook.
 
 ## Utilities
-A number of utilities are provided in this repository, under the following namespaces:
+A number of utilities are provided in this repository, under the following modules:
 
-+ **aoa/** Code to execute angle-of-arrival estimation, as discussed in Chapter 7
-+ **array/** Code to execute array-based angle-of-arrival estimation, as discussed in Chapter 8
-+ **atm/** Code to model atmospheric loss, as discussed in Appendix Carlo
-+ **detector/** Code to model detection performance, as discussed in Chapter 3-4
-+ **fdoa/** Code to execute Frequency Difference of Arrival (FDOA) geolocation processing, as discussed in Chapter 12.
-+ **hybrid/** Code to execute hybrid geolocation processing, as discussed in Chapter 13.
-+ **noise/** Code to model noise power, as discussed in Appendix D.
-+ **prop/** Code to model propagation losses, as discussed in Appendix B.
-+ **tdoa/** Code to execute Time Difference of Arrival (TDOA) geolocation processing, as discussed in Chapter 11.
-+ **triang/** Code to model triangulation from multiple AOA measurements, as discussed in Chapter 10.
-+ **utils/** Generic utilities, including numerical solvers used in geolocation algorithms.
++ **ewgeo.aoa** Code to execute angle-of-arrival estimation, as discussed in Chapter 7
++ **ewgeo.array** Code to execute array-based angle-of-arrival estimation, as discussed in Chapter 8
++ **ewgeo.atm** Code to model atmospheric loss, as discussed in Appendix Carlo
++ **ewgeo.detector** Code to model detection performance, as discussed in Chapter 3-4
++ **ewgeo.fdoa** Code to execute Frequency Difference of Arrival (FDOA) geolocation processing, as discussed in Chapter 12.
++ **ewgeo.hybrid** Code to execute hybrid geolocation processing, as discussed in Chapter 13.
++ **ewgeo.noise** Code to model noise power, as discussed in Appendix D.
++ **ewgeo.prop** Code to model propagation losses, as discussed in Appendix B.
++ **ewgeo.tdoa** Code to execute Time Difference of Arrival (TDOA) geolocation processing, as discussed in Chapter 11.
++ **ewgeo.triang** Code to model triangulation from multiple AOA measurements, as discussed in Chapter 10.
++ **ewgeo.utils** Generic utilities, including numerical solvers used in geolocation algorithms.
 
 ## Feedback
 Please submit any suggestions, bugs, or comments as issues in this git repository.

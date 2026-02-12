@@ -231,7 +231,7 @@ def gd_solver(y,
                 grad = np.mean(grad, axis=1)
 
             # Descent direction is the negative of the gradient
-            del_x = -np.squeeze(grad/np.linalg.norm(grad))
+            del_x = -grad #/np.linalg.norm(grad))
 
             # Compute the step size
             t = backtracking_line_search(cost_fxn, x_prev, grad, del_x, alpha, beta)
@@ -251,10 +251,10 @@ def gd_solver(y,
         # TODO: What to do if both ineq and eq constraints are in use?
 
         # Update variables
+        error = np.linalg.norm(x_update - x_prev)  # how much did we adjust our position
         x_full[:, current_iteration] = x_update
         x_prev = x_update
-        error = t
-        
+
         if plot_progress:
             ax1.plot(current_iteration, error, '.')
             ax2.plot(x_full[0, np.arange(current_iteration)], x_full[1, np.arange(current_iteration)], '-+')
@@ -280,7 +280,7 @@ def gd_solver(y,
     return x, x_full
         
 
-def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
+def backtracking_line_search(f, x, grad, del_x, alpha=0.5, beta=0.8, do_plot: bool=False):
     """
     # Performs backtracking line search according to algorithm 9.2 of
     # Stephen Boyd's, Convex Optimization
@@ -300,20 +300,35 @@ def backtracking_line_search(f, x, grad, del_x, alpha=0.3, beta=0.8):
     """
 
     # Initialize the search parameters and direction
-    t = 100
+    t = 1
     starting_val = np.squeeze(f(x))
-    slope = np.squeeze(np.conjugate(grad.T) @ del_x)
+    slope = np.squeeze(grad.T @ del_x)
+    if slope > 0:
+        raise ValueError(f"Error conducting backtracking line search; slope should be <0, but {slope} was encountered.")
 
     # Make sure that x, del_x are arrays (not matrices)
     del_x = np.squeeze(del_x)
     x = np.squeeze(x)
     # Make sure the starting value is large enough
-    while f(x+t*del_x) < starting_val+alpha*t*slope:
+    while f(x+t*del_x) <= starting_val+alpha*t*slope:
         t = 2*t
     
     # Conduct the backtracking line search
     while f(x+t*del_x) > starting_val+alpha*t*slope:
         t = beta*t
+
+    if do_plot:
+        start_val = np.max((2*t, 10))
+        t_vec = np.linspace(start=-1*start_val, stop=start_val, num=100)
+        plt.figure()
+        plt.plot(t_vec, [f(x+t*del_x) for t in t_vec])
+        plt.plot([0, t], [starting_val, f(x+t*del_x)],'-.')
+        plt.grid(True)
+        plt.show()
+
+    # Ensure that the cost function did not increase
+    if f(x+t*del_x) > starting_val:
+        raise ValueError(f"Error conducting backtracking line search; unable to reduce the cost function.")
 
     return t
 
