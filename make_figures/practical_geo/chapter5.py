@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 
-from ewgeo.utils import init_output_dir, init_plot_style
+from ewgeo.utils import init_output_dir, init_plot_style, SearchSpace
 
 from examples.practical_geo import chapter5
 
@@ -243,12 +243,17 @@ def make_figure_15(prefix=None):
     print('Generating Figure 5.15...')
 
     # Axes
-    y_axis = np.linspace(start=0, stop=10, num=101)
-    x_axis = np.linspace(start=-10, stop=10, num=1001)
+    # y_axis = np.linspace(start=0, stop=10, num=101)
+    # x_axis = np.linspace(start=-10, stop=10, num=1001)
     # Define the corners of the grid, for imshow. Cast as float types to avoid type warning
-    extent = (x_axis[0].item(), x_axis[-1].item(), y_axis[0].item(), y_axis[-1].item())
-
-    xx, yy = np.meshgrid(x_axis, y_axis)
+    # extent = (x_axis[0].item(), x_axis[-1].item(), y_axis[0].item(), y_axis[-1].item())
+    search_space = SearchSpace(x_ctr = np.array([0, 5]),
+                               max_offset=np.array([10, 5]),
+                               points_per_dim=np.array([1001, 101]))
+    # xx, yy = np.meshgrid(x_axis, y_axis)
+    xx, yy = search_space.x_grid
+    x_axis, y_axis = search_space.x_vec
+    extent = search_space.get_extent()
 
     # Data Likelihood
     y_ctr = 5.

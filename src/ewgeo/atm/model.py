@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 
 from . import reference
 from ewgeo.utils.geo import compute_slant_range
@@ -60,7 +61,9 @@ def calc_atm_loss(freq_hz, gas_path_len_m=0, rain_path_len_m=0, cloud_path_len_m
     return loss_gas_db + loss_rain_db + loss_cloud_db
 
 
-def calc_zenith_loss(freq_hz, alt_start_m=0, zenith_angle_deg=0):
+def calc_zenith_loss(freq_hz: npt.ArrayLike,
+                     alt_start_m: npt.ArrayLike=np.array([0.]),
+                     zenith_angle_deg: npt.ArrayLike=np.array([0.])):
     """
     # Computes the cumulative loss from alt_start [m] to zenith (100 km
     # altitude), for the given frequencies (freq) in Hz and angle from zenith
@@ -82,6 +85,9 @@ def calc_zenith_loss(freq_hz, alt_start_m=0, zenith_angle_deg=0):
     :return zenith_loss_o: Cumulative loss due to dry air [dB]
     :return zenith_loss_w: Cumulative loss due to water vapor [dB]
     """
+    freq_hz = np.array(freq_hz, dtype=np.float64)
+    alt_start_m = np.array(alt_start_m, dtype=np.float64)
+    zenith_angle_deg = np.array(zenith_angle_deg, dtype=np.float64)
 
     # Add a new trailing dimension, to allow for array operations in this function; we'll sum over and remove the
     # new dimension before returning the result

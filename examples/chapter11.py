@@ -208,7 +208,6 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     cep50_chan_ho = compute_cep50(cov_chan_ho)/1e3
 
     out_shp = (2, num_iterations)
-    out_cov_shp = (2, 2, num_iterations)
     bias_ls = np.zeros(shape=out_shp)
     bias_grad = np.zeros(shape=out_shp)
     cov_ls = []

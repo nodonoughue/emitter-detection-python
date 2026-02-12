@@ -44,7 +44,7 @@ def example1():
     prob_fa = 1e-6
     
     threshold = stats.chi2.ppf(q=1-prob_fa, df=2*num_samples)
-    prob_det = stats.ncx2.sf(x=threshold, df=2*num_samples, nc=2*num_samples*snr_lin_vec)
+    prob_det = np.array(stats.ncx2.sf(x=threshold, df=2*num_samples, nc=2*num_samples*snr_lin_vec))
 
     fig = plt.figure()
     for idx, this_thop in enumerate(t_hop.tolist()):

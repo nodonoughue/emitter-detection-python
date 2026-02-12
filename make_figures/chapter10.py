@@ -83,7 +83,7 @@ def make_figure_1(prefix=None, cmap=None):
     x_source = np.array([[.1], [.9]])
 
     # Error Values
-    ang_err = 5*np.pi/180
+    ang_err = np.array(5*np.pi/180)
 
     # Compute Ranges and Angles
     range_act = calc_range(x_sensor, x_source)
@@ -166,7 +166,7 @@ def make_figure_2(prefix=None, cmap=None):
     x_source = np.array([[.1], [.9]])
 
     # Error Values
-    ang_err = 5*np.pi/180
+    ang_err = np.array(5*np.pi/180)
 
     # Compute Ranges and Angles
     range_act = calc_range(x_sensor, x_source)

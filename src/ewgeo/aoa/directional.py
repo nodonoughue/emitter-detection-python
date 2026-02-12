@@ -201,7 +201,7 @@ def run_example(mc_params=None):
     snr_db_vec = np.arange(start=-20, step=2, stop=20 + 2)  # signal-to-noise ratio
     num_monte_carlo = 1000  # number of monte carlo trials at each parameter setting
     if mc_params is not None:
-        num_monte_carlo = min(np.astype(num_monte_carlo / mc_params['monte_carlo_decimation'], 'int'),mc_params['min_num_monte_carlo'])
+        num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
     # Set up output variables
     out_shp = [np.size(num_samples_vec), np.size(snr_db_vec)]

@@ -4,7 +4,6 @@ from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
-from ewgeo.utils import SearchSpace
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, compute_rmse

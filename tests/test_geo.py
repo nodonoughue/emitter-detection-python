@@ -1,7 +1,7 @@
 import numpy as np
 
 from ewgeo.utils.constants import speed_of_light
-from ewgeo.utils.geo import calc_range, calc_range_diff, calc_doppler, calc_doppler_diff
+from ewgeo.utils.geo import calc_range, calc_range_diff, calc_doppler
 
 def test_calc_range():
     """

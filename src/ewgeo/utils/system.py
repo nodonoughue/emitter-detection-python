@@ -505,13 +505,14 @@ class PassiveSurveillanceSystem(ABC):
 
         return x_est, likelihood, th_grid, th_est
 
-
-    def gradient_descent(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, cal_data: dict=None, **kwargs)->\
+    def gd_ls_solver(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, do_gd: bool, cal_data: dict=None, **kwargs)->\
         tuple[npt.NDArray, npt.NDArray] | tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
 
         # Perform sensor calibration
         if cal_data is not None:
-            if 'solver_type' not in cal_data: cal_data['solver_type'] = 'gd'
+            if 'solver_type' not in cal_data:
+                if do_gd: cal_data['solver_type'] = 'gd'
+                else: cal_data['solver_type'] = 'ls'
             x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
             x_sensor, v_sensor, bias = self.pos, None, self.bias
@@ -524,16 +525,29 @@ class PassiveSurveillanceSystem(ABC):
         def jacobian(pos_vel: npt.ArrayLike):
             return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_sensor=v_sensor)
 
-        x, x_full = gd_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+        if do_gd:
+            x, x_full = gd_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+        else:
+            x, x_full = ls_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+
         if cal_data is not None:
             return x, x_full, x_sensor, v_sensor, bias
         else:
             return x, x_full
 
-    def gradient_descent_uncertainty(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike,
-                                     do_sensor_pos: bool=False, x_sensor: npt.ArrayLike=None,
-                                     do_sensor_vel: bool=False, v_sensor: npt.ArrayLike=None,
-                                     do_sensor_bias: bool=False, bias: npt.ArrayLike=None, **kwargs):
+    def gradient_descent(self, **kwargs)-> tuple[npt.NDArray, npt.NDArray] |\
+                                           tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
+        return self.gd_ls_solver(do_gd=True, **kwargs)
+
+    def least_square(self, **kwargs)-> tuple[npt.NDArray, npt.NDArray] |\
+                                           tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
+        return self.gd_ls_solver(do_gd=False, **kwargs)
+
+    def gd_ls_uncertainty(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, do_gd: bool,
+                          do_sensor_pos: bool=False, x_sensor: npt.ArrayLike=None,
+                          do_sensor_vel: bool=False, v_sensor: npt.ArrayLike=None,
+                          do_sensor_bias: bool=False, bias: npt.ArrayLike=None, **kwargs)->\
+            tuple[npt.NDArray[np.float64], dict, npt.NDArray[np.float64]]:
 
         x_init = np.array(x_init)
         num_source_vars = x_init.size
@@ -606,7 +620,11 @@ class PassiveSurveillanceSystem(ABC):
 
             return np.concatenate(arrs, axis=0)
 
-        result = gd_solver(x_init=th_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+        if do_gd:
+            result = gd_solver(x_init=th_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+        else:
+            result = ls_solver(x_init=th_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+
         th_est = result[0]
         th_est_full = result[1]
 
@@ -618,37 +636,11 @@ class PassiveSurveillanceSystem(ABC):
 
         return x_est, th_est, th_est_full
 
-    def least_square(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike=None, cal_data: dict=None, **kwargs):
-        # TODO: Make an uncertainty version -- see max_likelihood_uncertainty for inspiration
+    def gradient_descent_uncertainty(self, **kwargs)-> tuple[npt.NDArray[np.float64], dict, npt.NDArray[np.float64]]:
+        return self.gd_ls_uncertainty(do_gd=True, **kwargs)
 
-        # Perform sensor calibration
-        if cal_data is not None:
-            if 'solver_type' not in cal_data: cal_data['solver_type'] = 'ls' # default to least-squares-based cal
-            x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
-        else:
-            x_sensor, v_sensor, bias = self.pos, None, self.bias
-
-        # Initialize x_init
-        if x_init is None:
-            # Start at origin -- anything better we can do???
-            x_init = np.zeros((self.num_dim, ))
-
-        # Make a function handle for the measurement difference (y)
-        def y(pos_vel: npt.ArrayLike):
-            return zeta - self.measurement_from_pos_vel(pos_vel=pos_vel,
-                                                        x_sensor=x_sensor, v_sensor=v_sensor, bias=bias)
-
-        def jacobian(pos_vel: npt.ArrayLike):
-            return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_sensor=v_sensor)
-
-        return ls_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
-
-    def least_square_uncertainty(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike,
-                                     do_sensor_pos: bool=False, x_sensor: npt.ArrayLike=None,
-                                     do_sensor_vel: bool=False, v_sensor: npt.ArrayLike=None,
-                                     do_sensor_bias: bool=False, bias: npt.ArrayLike=None, **kwargs):
-        pass
-        #TODO: Implement
+    def least_square_uncertainty(self, **kwargs)-> tuple[npt.NDArray[np.float64], dict, npt.NDArray[np.float64]]:
+        return self.gd_ls_uncertainty(do_gd=False, **kwargs)
 
     def bestfix(self, zeta: npt.ArrayLike, search_space: SearchSpace, pdf_type=None, cal_data: dict=None):
         # Perform sensor calibration
@@ -813,6 +805,8 @@ class PassiveSurveillanceSystem(ABC):
             if bias_search is None:
                 raise ValueError("Sensor calibration error. If do_bias_cal is True, then bias_search must be defined as a SearchSpace object.")
 
+            bias_search, zoom_per_level, num_levels = bias_search.setup_mosaic()
+
             def ell_bias(b: npt.ArrayLike, **ell_kwargs)-> npt.NDArray:
                 # shape ( num_cal, num_search_positions)
                 ell = self.log_likelihood_uncertainty(x_sensor=x_sensor, v_sensor=v_sensor, bias=b,
@@ -821,7 +815,8 @@ class PassiveSurveillanceSystem(ABC):
                                                        **ell_kwargs)
                 return np.sum(ell, axis=0)
 
-            bias_est, _, _ = ml_solver(ell=ell_bias, search_space=bias_search, **kwargs)
+            bias_est, _, _ = ml_solver(ell=ell_bias, search_space=bias_search,
+                                       zoom_per_level=zoom_per_level, num_levels=num_levels, **kwargs)
             bias = bias_est
 
         if do_pos_cal:
@@ -830,6 +825,8 @@ class PassiveSurveillanceSystem(ABC):
 
             x_shp = np.shape(x_sensor)
             # num_pos = np.size(x_sensor)
+
+            pos_search, zoom_per_level, num_levels = pos_search.setup_mosaic()
 
             def ell_pos(x: npt.ArrayLike, **ell_kwargs)-> npt.NDArray:
                 x = np.array(x)
@@ -840,12 +837,15 @@ class PassiveSurveillanceSystem(ABC):
                                                        **ell_kwargs)
                 return np.sum(ell, axis=0)
 
-            x_sensor_est, _, _ = ml_solver(ell=ell_pos, search_space=pos_search, **kwargs)
+            x_sensor_est, _, _ = ml_solver(ell=ell_pos, search_space=pos_search,
+                                           zoom_per_level=zoom_per_level, num_levels=num_levels, **kwargs)
             x_sensor = np.reshape(x_sensor_est, shape=x_shp)
 
         if do_vel_cal:
             if vel_search is None:
                 raise ValueError("Sensor calibration error. If do_vel_cal is True, then vel_search must be defined as a SearchSpace object.")
+
+            vel_search, zoom_per_level, num_levels = vel_search.setup_mosaic()
 
             num_search_pts = np.prod(vel_search.points_per_dim)
             v_shp = list(np.shape(v_sensor))
@@ -861,7 +861,8 @@ class PassiveSurveillanceSystem(ABC):
                 # shape: (num_cal, num_search_pts, *cal_batch_shape)
                 return np.sum(np.reshape(np.moveaxis(ell, source=1, destination=0), (num_search_pts, -1)), axis=1)
 
-            v_sensor_est, _, _ = ml_solver(ell=ell_vel, search_space=vel_search, **kwargs)
+            v_sensor_est, _, _ = ml_solver(ell=ell_vel, search_space=vel_search,
+                                           zoom_per_level=zoom_per_level, num_levels=num_levels, **kwargs)
             v_sensor = np.reshape(v_sensor_est, shape=v_shp)
 
         return x_sensor, v_sensor, bias

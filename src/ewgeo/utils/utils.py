@@ -1,13 +1,15 @@
 from collections.abc import Iterable
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import typing as npt
 import os
-from scipy.special import erfcinv
 from scipy import stats
+from scipy.special import erfcinv
+from scipy.linalg import pinvh
 import seaborn as sns
 import time
-from typing import Self
+from typing import Callable
 
 from .unit_conversions import lin_to_db
 
@@ -317,7 +319,7 @@ def resample_noise(noise: npt.NDArray[np.float64],
     n_test, n_ref, n_pair_out = parse_ref_vec_output_size(test_idx_vec, ref_idx_vec, n_sensor)
 
     # Parse sensor weights
-    shp_test_wt = 1
+    shp_test_wt = int(1)
     if test_weights:
         shp_test_wt = np.size(test_weights)
 
@@ -327,7 +329,7 @@ def resample_noise(noise: npt.NDArray[np.float64],
 
     # Function to execute at each entry of output covariance matrix
     def element_func(idx_row: npt.NDArray[np.int64]):
-        idx_row = np.astype(idx_row, int)
+        idx_row = np.asarray(idx_row, dtype=np.int64)
         a_i = test_idx_vec[idx_row % n_test]
         b_i = ref_idx_vec[idx_row % n_ref]
 
@@ -421,6 +423,34 @@ def make_pdfs(measurement_function,
     return pdfs
 
 
+def make_prior(pdf_type: str, mean: npt.NDArray[np.float64], covariance: npt.NDArray[np.float64])\
+        -> tuple[Callable, Callable]:
+    """
+    Return a prior distribution, and its Fisher Information Matrix. Currently
+    only supports Gaussian (multivariate normal) as a valid type, for which
+    the usage is:
+    
+    :param pdf_type: String dictating type of statistical prior; currently only 'gaussian' is implemented
+    :param mean: numpy array (n_dim, ) with the expected value of the prior
+    :param covariance: CovarianceMatrix object (with size n_dim) of the prior
+    :return prior: function handle for the statistical prior; accepts (n_dim, ) or (num_batch, n_dim) inputs and returns
+                   a (num_batch, ) array of probabilities.
+    :return fim_prior: function handle for the Fisher Information Matrix; accepts (n_dim, ) or (num_batch, n_dim) inputs 
+                   and returns a (num_batch, ) array of CovarianceMatrix objects. 
+    """
+    if pdf_type.lower() == 'gaussian':
+        rv = stats.multivariate_normal(mean=mean, cov=covariance)
+        fim = rv.pdf
+
+        # For a multivariate Gaussian, the FIM is the inverse of the covariance matrix, regardless of the input
+        inv = pinvh(covariance)
+        fim_prior = lambda x: inv
+    else:
+        raise KeyError('Unrecognized PDF type setting: ''{}'''.format(pdf_type))
+
+    return fim, fim_prior
+
+
 def print_elapsed(t_elapsed: float):
     """
     Print the elapsed time, provided in seconds.
@@ -498,213 +528,9 @@ def print_progress(num_total: int,
 
     if np.mod(curr_idx + 1, iterations_per_row) == 0:
         pct_elapsed = curr_idx / num_total
-        print(' ({:.1f}% complete) '.format(pct_elapsed*100), end='')
+        print(f' ({pct_elapsed*100:.1f}%) ', end='')
         t_elapsed = time.perf_counter() - t_start
         print_predicted(t_elapsed, pct_elapsed, do_elapsed=True)
-
-
-class SearchSpace:
-    _x_ctr: npt.ArrayLike | None = None
-    _epsilon: npt.ArrayLike | None = None
-    _points_per_dim: npt.NDArray[np.int64] | None = None
-    _max_offset: npt.ArrayLike | None = None
-
-    # Inferred grid
-    _x_set: npt.NDArray[np.int64] | None = None
-    _x_grid: tuple[npt.NDArray[np.int64], ...] | None = None
-
-    def __init__(self,
-                 x_ctr:npt.NDArray[np.float64] | float,
-                 epsilon:npt.NDArray[np.float64] | float | None=None,
-                 points_per_dim:npt.NDArray[np.int64] | int | None=None,
-                 max_offset:npt.NDArray[np.float64] | float | None=None):
-        self._x_ctr = x_ctr
-        self._epsilon = epsilon
-        self._points_per_dim = points_per_dim
-        self._max_offset = max_offset
-
-        # Verify sizing and consistency
-        self.check_consistency()
-
-    @property
-    def num_parameters(self)-> int:
-        self.broadcast()
-        return np.prod(np.shape(self.x_ctr)).astype(np.int64).item()
-
-    @property
-    def x_ctr(self)-> npt.NDArray:
-        self.broadcast()
-        return self._x_ctr
-
-    @x_ctr.setter
-    def x_ctr(self, x_ctr: npt.ArrayLike):
-        self.reset()  # clear the dependent fields
-        self._x_ctr = x_ctr
-
-    @property
-    def epsilon(self)-> npt.NDArray[np.float64]:
-        self.broadcast()
-        if self._epsilon is None:
-            # Build epsilon from max_offset and points_per_dim
-            out_shape = np.amax(np.shape(self.points_per_dim), np.shape(self.max_offset))
-            self._epsilon = np.divide(self.max_offset, self.points_per_dim - 1,
-                                      out=np.ones(out_shape), where=self.points_per_dim > 1)
-        return self._epsilon
-
-    @epsilon.setter
-    def epsilon(self, epsilon: npt.ArrayLike):
-        self.reset()  # clear the dependent fields
-        self._epsilon = epsilon
-        if self._epsilon is not None:
-            self.check_consistency()
-
-    @property
-    def max_offset(self)-> npt.NDArray[np.float64]:
-        self.broadcast()
-        if self._max_offset is None:
-            # Build max_offset from epsilon and points_per_dim
-            self._max_offset = self.epsilon * (self.points_per_dim - 1) / 2
-        return self._max_offset
-
-    @max_offset.setter
-    def max_offset(self, max_offset: npt.ArrayLike):
-        self.reset()  # clear the dependent fields
-        self._max_offset = max_offset
-        if self._max_offset is not None:
-            self.check_consistency()
-
-    @property
-    def points_per_dim(self)-> npt.NDArray[np.int64]:
-        if self._points_per_dim is None:
-            # Build points_per_dim from max_offset and epsilon
-            self._points_per_dim = np.where(self.epsilon != 0, np.floor(1 + 2 * self.max_offset / self.epsilon), 1).astype(int)
-        return self._points_per_dim
-
-    @points_per_dim.setter
-    def points_per_dim(self, points_per_dim: npt.ArrayLike):
-        self.reset()  # clear the dependent fields
-        self._points_per_dim = points_per_dim
-        if self._points_per_dim is not None:
-            self.check_consistency()
-
-    @property
-    def x_set(self)-> npt.NDArray[np.float64]:
-        if self._x_set is None:
-            self.make_nd_grid()
-        return np.array(self._x_set)
-
-    @property
-    def x_grid(self)-> tuple[npt.NDArray, ...]:
-        if self._x_grid is None:
-            self.make_nd_grid()
-        return self._x_grid
-
-    @property
-    def grid_shape(self)-> tuple[int, ...]:
-        self.broadcast()
-        return tuple([i for i in self.points_per_dim if i > 1])
-
-    def reset(self):
-        """
-        Clear dependent fields
-        """
-        self._x_set = None
-        self._x_grid = None
-
-    def check_consistency(self):
-        """
-        Check that max_offset, points_per_dim, and epsilon are consistent.  If not, raise an error.
-        """
-        if self._points_per_dim is None or self._epsilon is None or self._max_offset is None:
-            # Nothing to do; they're consistent because one is missing
-            return True
-        else:
-            # Compute epsilon from max_offset and points_per_dim
-            out_shape = np.maximum(np.shape(self.points_per_dim), np.shape(self.max_offset))
-            epsilon_local = np.divide(self.max_offset, self.points_per_dim - 1,
-                                      out=np.ones(out_shape), where=self.points_per_dim>1)
-
-            # Compare to epsilon and throw an assertion error if it's more than 0.1% off
-            err = self.epsilon - epsilon_local
-            return np.sqrt(np.sum(np.abs(err)**2, axis=None)) < .001 * np.sqrt(np.sum(np.abs(self.epsilon)**2, axis=None))
-
-    def broadcast(self)-> bool:
-        # Verify that all variable sizes are compatible
-        attrs = ['_x_ctr', '_epsilon', '_points_per_dim', '_max_offset']
-        try:
-            b = np.broadcast(*[getattr(self, attr) for attr in attrs if getattr(self, attr) is not None])
-            for attr in attrs:
-                if getattr(self, attr) is not None:
-                    setattr(self, attr, np.broadcast_to(getattr(self, attr), shape=b.shape))
-            return True
-        except ValueError:
-            return False
-
-    def make_nd_grid(self):
-        """
-        Create and return an ND search grid, based on the specified center of the search space, extent, and grid spacing.
-
-        28 December 2021
-        Nicholas O'Donoughue
-
-        :return x_set: n_dim x N numpy array of positions
-        :return x_grid: n_dim-tuple of n_dim-dimensional numpy arrays containing the coordinates for each dimension.
-        :return out_shape:  tuple with the size of the generated grid
-        """
-
-        n_dim = self.num_parameters
-
-        if np.size(self.x_ctr) == 1:
-            x_ctr = self.x_ctr * np.ones((n_dim, ))
-        else:
-            x_ctr = self.x_ctr.ravel()
-
-        if np.size(self.max_offset) == 1:
-            max_offset = self.max_offset * np.ones((n_dim, ))
-        else:
-            max_offset = self.max_offset.ravel()
-
-        if np.size(self.points_per_dim) == 1:
-            points_per_dim = self.points_per_dim * np.ones((n_dim, ))
-        else:
-            points_per_dim = self.points_per_dim.ravel()
-
-        assert n_dim == np.size(max_offset) and n_dim == np.size(points_per_dim), \
-               'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
-
-
-        # Check Search Size
-        max_elements = 1e8  # Set a conservative limit
-        assert np.prod(points_per_dim) < max_elements, \
-               'Search size is too large; python is likely to crash or become unresponsive. Reduce your search size, or' \
-               + ' increase the max allowed.'
-
-        # Make a set of axes, one for each dimension, that are centered on x_ctr
-        dims = [x + np.linspace(start=-x_max, stop=x_max, num=n) if n > 1 else x for (x, x_max, n)
-                in zip(x_ctr, max_offset, points_per_dim)]
-
-        # Use meshgrid expansion; each element of x_grid is now a full n_dim dimensioned grid
-        x_grid = np.meshgrid(*dims)
-
-        # Rearrange to a single 2D array of grid locations (n_dim x N)
-        x_set = np.asarray([x.flatten() for x in x_grid])
-
-        self._x_set = x_set
-        self._x_grid = x_grid
-
-    def zoom_in(self, new_ctr: npt.ArrayLike, zoom: float=2.0, overwrite: bool=False)-> Self | None:
-        if np.shape(new_ctr) != np.shape(self.x_ctr):
-            raise ValueError('New center must have the same dimensionality as the existing center.')
-
-        # Keep the number of grid points the same, but cut the grid resolution by the zoom factor
-        if overwrite:
-            self.epsilon = self.epsilon/zoom
-            self.max_offset = None
-            return None
-        else:
-            return SearchSpace(x_ctr=new_ctr,
-                               epsilon=self.epsilon/zoom,
-                               points_per_dim=self.points_per_dim)
 
 
 def broadcast_backwards(arrs: list[npt.NDArray, ], start_dim: int=0, do_broadcast: bool=False)\
@@ -861,3 +687,35 @@ def atleast_nd_trailing(x: npt.NDArray, n: int)-> npt.NDArray:
 
     # Otherwise, use reshape to add extra dimensions
     return np.reshape(x, x.shape + (1,) * (n - x.ndim))
+
+def print_matrix(x: npt.NDArray)->None:
+    """
+    Print a numpy array using MATLAB-style matrices.
+    If the array has more than two dimensions, any dimension
+    before the last two will be used as a batch dimension.
+    """
+
+    if np.ndim(x) > 2:
+        # Batching
+        for indices in itertools.product(*[range(s) for s in np.shape(x)[:-2]]):
+            # indices is a tuple like (0, 0), (0, 1), etc.
+            print('[',end='')
+            [print('{:d},'.format(i), end='') for i in indices]
+            print(':,:]')
+
+            print_matrix(x[indices])
+
+    # === Print the matrix pretty ===
+
+    # 1. Find the scale
+    scale = 10**np.fix(np.log10(np.amax(np.abs(x),axis=None)))
+
+    # 2. Print the scale
+    print(f"   {scale:.2g} *")
+
+    # 3. Print the array
+    with np.printoptions(formatter={'all': lambda x: (
+            f"{x:8.4f}" if x >= 1e-4 else
+            "  0.    ")}):
+        print(np.matrix(x/scale))
+

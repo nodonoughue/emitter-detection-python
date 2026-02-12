@@ -105,11 +105,11 @@ def example1(colors=None):
                                max_offset=offset,
                                epsilon=grid_res)
     x_set, x_grid = search_space.x_set, search_space.x_grid
-
-    extent = ((x_ctr[0].item() - offset[0])/1e3,
-              (x_ctr[0].item() + offset[0])/1e3,
-              (x_ctr[1].item() - offset[1])/1e3,
-              (x_ctr[1].item() + offset[1])/1e3)
+    extent = search_space.get_extent(multiplier=1/1e3)
+    # extent = ((x_ctr[0].item() - offset[0])/1e3,
+    #           (x_ctr[0].item() + offset[0])/1e3,
+    #           (x_ctr[1].item() - offset[1])/1e3,
+    #           (x_ctr[1].item() + offset[1])/1e3)
 
     # Use a squeeze operation to ensure that the individual dimension indices in x_grid are 2D
     x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
@@ -182,7 +182,9 @@ def example2():
     sigma_t_vec = np.array([.1e-6, 1e-6, 10e-6])
     cep_vec = np.zeros((len(sigma_t_vec), len(time_vec)))
     for idx_s, this_sigma_t in enumerate(sigma_t_vec):
+        this_sigma_t = np.array(this_sigma_t)
         for idx_t, this_time in enumerate(time_vec):
+            this_time = np.array(this_time)
             this_num_samples = 1 + np.floor(this_time/pri)
 
             this_cov_roa = (this_sigma_t ** 2 * speed_of_light ** 2 / this_num_samples) * np.eye(n_sensors)

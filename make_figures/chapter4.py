@@ -487,12 +487,12 @@ def make_figure_6(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
     # Energy Detector Performance
     prob_fa = 1e-6
 
-    threshold_ed = stats.chi2.ppf(q=1-prob_fa, df=2*tbwp_vec_lin)
-    prob_det_ed = stats.ncx2.sf(x=threshold_ed, df=2*tbwp_vec_lin, nc=2*tbwp_vec_lin*input_snr_vec_lin)
+    threshold_ed = np.array(stats.chi2.ppf(q=1-prob_fa, df=2*tbwp_vec_lin))
+    prob_det_ed = np.array(stats.ncx2.sf(x=threshold_ed, df=2*tbwp_vec_lin, nc=2*tbwp_vec_lin*input_snr_vec_lin))
 
     # Cross-Correlator Performance
     threshold_xc = stats.chi2.ppf(q=1-prob_fa, df=2)
-    prob_det_xc = stats.ncx2.sf(x=threshold_xc/(1+2*input_snr_vec_lin), df=2, nc=2*output_snr_vec_lin)
+    prob_det_xc = np.array(stats.ncx2.sf(x=threshold_xc/(1+2*input_snr_vec_lin), df=2, nc=2*output_snr_vec_lin))
     
     # Monte Carlo Trials
     input_snr_vec_coarse_db = input_snr_vec_db[::10]

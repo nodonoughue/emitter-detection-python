@@ -157,7 +157,7 @@ def fixed_alt_constraint_sphere(x: npt.ArrayLike, alt: float):
     epsilon = radius_target_square - (radius_earth_true + alt)**2      # eq 5.5
     scale = (radius_earth_true + alt) / np.sqrt(radius_target_square)  # eq 5.9, modified
 
-    x_valid = scale @ x
+    x_valid = scale[np.newaxis, :] * x
     return epsilon, x_valid
 
 
