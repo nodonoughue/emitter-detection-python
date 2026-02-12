@@ -30,6 +30,8 @@ class CovarianceMatrix:
             for key, value in new_cov.__dict__.items():
                 setattr(self, key, value)
         else:
+            if np.ndim(cov) == 1:
+                cov = np.diag(cov)
             self.cov = np.asarray(cov, dtype=float)  # Store the covariance matrix; use copy to make sure it's a fresh copy
             self._inv = None
             self._lower = None

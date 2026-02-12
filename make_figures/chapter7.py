@@ -129,7 +129,7 @@ def make_figure_3(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
 
     if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
         print('Skipping Figure 7.3... (re-run with mc_params[\'force_recalc\']=True to generate)')
-        return None
+        return None,
 
     print('Generating Figure 7.3...')
 
@@ -255,7 +255,7 @@ def make_figure_5(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
 
     if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
         print('Skipping Figure 7.5... (re-run with mc_params[\'force_recalc\']=True to generate)')
-        return None
+        return None,
 
     print('Generating Figure 7.5...')
 
@@ -416,7 +416,7 @@ def make_figure_7(prefix=None, rng=np.random.default_rng(), colors=None, mc_para
 
     if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
         print('Skipping Figure 7.7... (re-run with mc_params[\'force_recalc\']=True to generate)')
-        return None
+        return None,
 
     print('Generating Figure 7.7...')
 
@@ -582,7 +582,7 @@ def make_figure_10(prefix=None, rng=np.random.default_rng(), colors=None, mc_par
 
     if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
         print('Skipping Figure 7.10... (re-run with mc_params[\'force_recalc\']=True to generate)')
-        return None
+        return None,
 
     print('Generating Figure 7.10...')
 
