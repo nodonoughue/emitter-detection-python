@@ -120,6 +120,8 @@ def _make_plot(pss: HybridPassiveSurveillanceSystem, x_ml, x_ls, x_gd, x_init, c
         plt.plot(crlb_ellipse[0], crlb_ellipse[1], linestyle='--', color='k',
                  label='{:d}% Error Ellipse'.format(conf_interval))
 
+    plt.xlabel('x [m]')
+    plt.ylabel('y [m]')
     plt.legend(loc='best')
 
     return fig
@@ -186,6 +188,8 @@ def example1(colors=None):
     # Adjust Plot Display
     plt.ylim([-0.5e3, 4e3])
     plt.xlim([-.5e3, 5.5e3])
+    plt.xlabel('x [m]')
+    plt.ylabel('y [m]')
     plt.legend(loc='upper right')
 
     # Remove the axes for a clean image
@@ -223,6 +227,8 @@ def example1(colors=None):
 
         plt.ylim([0, 4e3])
         plt.xlim([-.5e3, 5.5e3])
+        plt.xlabel('x [m]')
+        plt.ylabel('y [m]')
         plt.clim(-20, 0)
         plt.legend(loc='upper right')
 
