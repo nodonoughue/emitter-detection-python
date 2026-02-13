@@ -1165,7 +1165,12 @@ class PassiveSurveillanceSystem(ABC):
         def this_jacobian(pos_vel):
             return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_source=v_source, v_sensor=v_sensor)
 
-        return compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov,
+        if 'cov' not in kwargs.keys():
+            # If the user didn't manually specify a covariance matrix, use this object's current covariance matrix
+            # as the default.
+            kwargs['cov'] = self.cov
+
+        return compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian,
                                      **kwargs)
 
     # ==================== Helper Methods =====================
