@@ -82,6 +82,8 @@ def example1():
     plt.legend(loc='upper left')
     plt.xlim(-1, 6)
     plt.ylim(-1, 5)
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     return [fig]
 
@@ -117,8 +119,8 @@ def example2():
     zeta_unc = tdoa.measurement(x_sensor=x_tdoa_actual, x_source=x_tgt)  # manually specify actual sensor pos.
 
     print('Measurements from sensors 1-2 (w.r.t sensor 0):')
-    print('Nominal Positions: {:.2f} m, {:.2f} m'.format(zeta[0], zeta[1]))
-    print('Random Positions:  {:.2f} m, {:.2f} m'.format(zeta_unc[0], zeta_unc[1]))
+    print('Nominal Positions: {:.2f} km, {:.2f} km'.format(zeta[0], zeta[1]))
+    print('Random Positions:  {:.2f} km, {:.2f} km'.format(zeta_unc[0], zeta_unc[1]))
 
     # Plot Scenario
     fig = plt.figure()
@@ -143,6 +145,8 @@ def example2():
     plt.legend(loc='lower right')
     plt.xlim(-1, 8)
     plt.ylim(-3, 4)
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     return [fig]
 
@@ -231,6 +235,8 @@ def example3():
     plt.scatter(x_tdoa_true[0], x_tdoa_true[1], marker='o', label='TDOA Sensors (true positions)')
     plt.scatter(x_tgt[0], x_tgt[1],marker='^', color='k', label='Target')
     plt.grid(True)
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     # Draw the Isochrones and LOBs -- Truth
     xy_lobs = aoa.draw_lobs(zeta=zeta_unc_bias[:n_aoa], x_source=x_tgt, scale=1.5)
@@ -333,6 +339,8 @@ def example4(do_iterative=False):
 
         plt.xlim([0, 10])
         plt.ylim([0, 10])
+        plt.xlabel('x [km]')
+        plt.ylabel('y [km]')
 
         if title is not None:
             plt.title(title)
@@ -509,14 +517,14 @@ def example5(do_vel_only_cal=True):
 
     # Plot Scenario
     fig = plt.figure()
-    tdoa.plot_sensors(marker='^', label='Sensors', clip_on=False, zorder=3)
-    plt.scatter(x_source[0], x_source[1], marker='o', label='Target', clip_on=False, zorder=3)
-    plt.scatter(x_cal[0], x_cal[1], marker='v', label='Calibration Sources', clip_on=False, zorder=3)
+    tdoa.plot_sensors(scale=1e3, marker='^', label='Sensors', clip_on=False, zorder=3)
+    plt.scatter(x_source[0]/1e3, x_source[1]/1e3, marker='o', label='Target', clip_on=False, zorder=3)
+    plt.scatter(x_cal[0]/1e3, x_cal[1]/1e3, marker='v', label='Calibration Sources', clip_on=False, zorder=3)
 
     # Plot Iterative Solutions
-    plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
-    plt.plot(x_est[0], x_est[1], linestyle='--', marker='s', markevery=[-1], label='Solution (w/o cal)')
-    plt.plot(x_est_cal[0], x_est_cal[1], linestyle='--', marker='s', markevery=[-1], label='Solution (w/pos & vel cal)')
+    plt.scatter(x_init[0]/1e3, x_init[1]/1e3, marker='x', color='k', label='Initial Estimate')
+    plt.plot(x_est[0]/1e3, x_est[1]/1e3, linestyle='--', marker='s', markevery=[-1], label='Solution (w/o cal)')
+    plt.plot(x_est_cal[0]/1e3, x_est_cal[1]/1e3, linestyle='--', marker='s', markevery=[-1], label='Solution (w/pos & vel cal)')
 
     # Bonus: FDOA-only Cal
     if do_vel_only_cal:
@@ -525,10 +533,12 @@ def example5(do_vel_only_cal=True):
         _, x_est_fdoa_cal, x_sensor_est, v_sensor_est, bias_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init, cal_data=cal_data)
 
         # Plot the scenario
-        plt.plot(x_est_fdoa_cal[0], x_est_fdoa_cal[1], linestyle='-.', marker='s', markevery=[-1],
+        plt.plot(x_est_fdoa_cal[0]/1e3, x_est_fdoa_cal[1]/1e3, linestyle='-.', marker='s', markevery=[-1],
                  label='Solution (w/velocity cal)')
 
     plt.legend(loc='lower left')
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     # ToDo: Get working, and add to text
     print('Testing the impact of repeated calibration measurements...')
