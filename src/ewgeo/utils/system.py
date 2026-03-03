@@ -957,14 +957,16 @@ class PassiveSurveillanceSystem(ABC):
         # ==================== Sensor Position and Velocity Search ========================
         if do_pos_cal or do_vel_cal:
             x_shp = np.shape(x_sensor)
+            x_shp_rev = np.shape(x_sensor.T)
             v_shp = np.shape(v_sensor)
+            v_shp_rev = np.shape(v_sensor.T)
             num_pos = np.size(x_sensor)
             num_vel = np.size(v_sensor)
 
             def y_posvel(pos_vel: npt.ArrayLike)-> npt.NDArray:
                 pos_vel = np.array(pos_vel)
-                xx = np.reshape(pos_vel[:num_pos], shape=x_shp)
-                vv = np.reshape(pos_vel[num_pos:], shape=v_shp)
+                xx = np.reshape(pos_vel[:num_pos], shape=x_shp_rev).T
+                vv = np.reshape(pos_vel[num_pos:], shape=v_shp_rev).T
 
                 # shape: (self.num_measurements, num_cal)
                 z = self.measurement(x_sensor=xx, v_sensor=vv, bias=bias, x_source=x_cal, v_source=v_cal)
@@ -981,8 +983,8 @@ class PassiveSurveillanceSystem(ABC):
                 If do_vel_cal is False, then we set those columns to zero to ensure no change in sensor velocity is made.
                 """
                 pos_vel = np.array(pos_vel)
-                xx = np.reshape(pos_vel[:num_pos], shape=x_shp)
-                vv = np.reshape(pos_vel[num_pos:], shape=v_shp)
+                xx = np.reshape(pos_vel[:num_pos], shape=x_shp_rev).T
+                vv = np.reshape(pos_vel[num_pos:], shape=v_shp_rev).T
 
                 j = np.zeros((num_pos + num_vel, self.num_measurements*num_cal))
 
@@ -1000,12 +1002,12 @@ class PassiveSurveillanceSystem(ABC):
                 return j
 
             posvel_est, _ = solver(y=y_posvel, jacobian=jacobian_posvel,
-                                     x_init=np.concatenate((x_sensor.ravel(), v_sensor.ravel()), axis=0),
+                                     x_init=np.concatenate((x_sensor.T.ravel(), v_sensor.T.ravel()), axis=0),
                                      cov=cov_cal, **gd_kwargs)
             if do_pos_cal:
-                x_sensor = np.reshape(posvel_est[:num_pos], x_shp)
+                x_sensor = np.reshape(posvel_est[:num_pos], x_shp_rev).T
             if do_vel_cal:
-                v_sensor = np.reshape(posvel_est[num_pos:], v_shp)
+                v_sensor = np.reshape(posvel_est[num_pos:], v_shp_rev).T
 
         return x_sensor, v_sensor, bias
 
