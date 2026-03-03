@@ -365,8 +365,9 @@ def ml_solver(ell, search_space: SearchSpace, eq_constraints=None, ineq_constrai
     :return x_grid: Set of x positions for the entire search space (M x N) for N=1, 2, or 3.
     """
 
-    if zoom_per_level <= 1: raise ValueError(f"zoom_per_level must be greater than one; received {zoom_per_level}")
     if num_levels > 1:
+        if zoom_per_level <= 1: raise ValueError(f"zoom_per_level must be greater than one; received {zoom_per_level}")
+
         # Call the solver with one less level to get the coarse estimate
         x_est, _, _ = ml_solver(ell, search_space, eq_constraints, ineq_constraints, constraint_tolerance,
                                 prior, prior_wt, num_levels-1, zoom_per_level, **kwargs)
