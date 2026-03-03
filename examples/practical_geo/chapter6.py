@@ -529,7 +529,10 @@ def example5(do_vel_only_cal=True):
     cal_rmse_gd = np.zeros((len(num_cal_vec), ))
     cal_rmse_ml = np.zeros_like(cal_rmse_gd)
     cal_rmse_ls = np.zeros_like(cal_rmse_gd)
-    cal_data['epsilon'] = 1
+    cal_data['epsilon'] = 0.1
+    # cal_data['vel_search'] = SearchSpace(x_ctr=hybrid.vel,
+    #                                      epsilon=0.01,
+    #                                      max_offset=200.0)
     for idx, this_num_cal in enumerate(num_cal_vec):
         print_progress(len(num_cal_vec), idx, iterations_per_tic, iterations_per_row, t_start)
         this_cov = hybrid.cov.multiply(1/this_num_cal, overwrite=False)
@@ -545,16 +548,16 @@ def example5(do_vel_only_cal=True):
         _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
         cal_rmse_ls[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
 
-        # cal_data['solver_type'] = 'ml'
-        # _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
-        # cal_rmse_ml[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
+        cal_data['solver_type'] = 'ml'
+        _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
+        cal_rmse_ml[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
     print('done.')
     print_elapsed(time.perf_counter()-t_start)
 
     fig2 = plt.figure()
     plt.semilogy(num_cal_vec, cal_rmse_gd, label='GD')
     plt.semilogy(num_cal_vec, cal_rmse_ls, label='LS')
-    # plt.semilogy(num_cal_vec, cal_rmse_ml, label='ML')
+    plt.semilogy(num_cal_vec, cal_rmse_ml, label='ML')
     plt.xlabel('Number of Calibration Samples')
     plt.ylabel('RMSE (m/s)')
     plt.title('Benefit of Repeated Calibration Samples')
@@ -563,5 +566,6 @@ def example5(do_vel_only_cal=True):
 
 
 if __name__ == '__main__':
-    run_all_examples()
+    example5(do_vel_only_cal=False)
+    # run_all_examples()
     plt.show()
