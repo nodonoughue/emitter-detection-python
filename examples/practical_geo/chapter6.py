@@ -473,33 +473,13 @@ def example5(do_vel_only_cal=True):
 
     # Estimate Position
     x_init = np.array([0, 5])*1e3
-    pos_search = SearchSpace(x_ctr=hybrid.pos,
-                             epsilon=1,
-                             max_offset=200)
-    pos_search.points_per_dim[:, tdoa.num_sensors-1] = 1
-    pos_search.points_per_dim[:, -1] = 1
-    pos_search.max_offset = None
-    cov_pos = CovarianceMatrix(np.tile(np.eye(n_tdoa), (2, 2))) # The TDOA/FDOA sensors are at the same positions
-                                                                     # Tiling the covariance matrix enforces this.
-    cov_pos.multiply(val=10**2, overwrite=True)   # Multiply the position covariance by the square of the max offset
-                                                  # of our search space to provide a weak prior
-    vel_search = SearchSpace(x_ctr=v_fdoa,
-                             epsilon=1,       # Desired velocity resolution is 5 m/s
-                             max_offset=200)  # Max allowable offset is 200 m/s
-    vel_search.points_per_dim[:, -1] = 1
-    vel_search.max_offset = None
-
-    cov_vel = CovarianceMatrix(np.eye(n_dim * n_fdoa))
-    cov_vel.multiply(val=100**2, overwrite=True)
     cal_data = {'zeta_cal': zeta_cal,
                 'x_cal': x_cal,
                 'do_pos_cal': True,
                 'do_vel_cal': True,
                 'do_bias_cal': False,
-                'pos_search': pos_search,
-                'vel_search': vel_search,
-                'solver_type': 'ml',
-                'epsilon': 1}  # don't bother calibrating across measurement biases; let's just do pos/vel
+                'solver_type': 'gd',
+                'epsilon': 1}
     _, x_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init, epsilon=.01)
     _, x_est_cal, x_sensor_est, v_sensor_est, bias_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init, epsilon=1,
                                                                                  cal_data=cal_data)
@@ -536,17 +516,19 @@ def example5(do_vel_only_cal=True):
     plt.xlabel('x [km]')
     plt.ylabel('y [km]')
 
-    # ToDo: Get working, and add to text
     print('Testing the impact of repeated calibration measurements...')
     iterations_per_tic=1
     tics_per_row=10
     iterations_per_row=iterations_per_tic*tics_per_row
     t_start=time.perf_counter()
-    num_cal_vec = [1, 3, 5, 10, 30, 50, 100, 300, 500, 1000, 3000, 5000, 10000, 30000, 50000]
+    num_cal_vec = [1, 3, 5, 10, 30, 50, 100, 500, 1000, 3000, 5000]
     cal_rmse_gd = np.zeros((len(num_cal_vec), ))
-    cal_rmse_ls = np.zeros_like(cal_rmse_gd)
     cal_rmse_ml = np.zeros_like(cal_rmse_gd)
-    cal_data['epsilon'] = 1
+    cal_rmse_ls = np.zeros_like(cal_rmse_gd)
+    cal_data['epsilon'] = 0.1
+    # cal_data['vel_search'] = SearchSpace(x_ctr=hybrid.vel,
+    #                                      epsilon=0.01,
+    #                                      max_offset=200.0)
     for idx, this_num_cal in enumerate(num_cal_vec):
         print_progress(len(num_cal_vec), idx, iterations_per_tic, iterations_per_row, t_start)
         this_cov = hybrid.cov.multiply(1/this_num_cal, overwrite=False)
@@ -558,10 +540,9 @@ def example5(do_vel_only_cal=True):
         _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
         cal_rmse_gd[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
 
-        # TODO: LS Cal doesn't seem to work
-        # cal_data['solver_type'] = 'ls'
-        # _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
-        # cal_rmse_ls[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
+        cal_data['solver_type'] = 'ls'
+        _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
+        cal_rmse_ls[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
 
         cal_data['solver_type'] = 'ml'
         _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
@@ -571,7 +552,7 @@ def example5(do_vel_only_cal=True):
 
     fig2 = plt.figure()
     plt.semilogy(num_cal_vec, cal_rmse_gd, label='GD')
-    # plt.semilogy(num_cal_vec, cal_rmse_ls, label='LS')
+    plt.semilogy(num_cal_vec, cal_rmse_ls, label='LS')
     plt.semilogy(num_cal_vec, cal_rmse_ml, label='ML')
     plt.xlabel('Number of Calibration Samples')
     plt.ylabel('RMSE (m/s)')
@@ -581,5 +562,6 @@ def example5(do_vel_only_cal=True):
 
 
 if __name__ == '__main__':
-    run_all_examples()
+    example5(do_vel_only_cal=False)
+    # run_all_examples()
     plt.show()

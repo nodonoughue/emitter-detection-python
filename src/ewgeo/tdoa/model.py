@@ -493,8 +493,7 @@ def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
 def grad_sensor_pos(x_sensor: npt.NDArray[np.float64], x_source: npt.NDArray[np.float64],
                     ref_idx=None)-> npt.NDArray[np.float64]:
     """
-    Compute the gradient of TDOA measurements, with sensor uncertainties, with respect to sensor position,
-    equation 6.31.
+
 
     Ported from MATLAB code.
 
