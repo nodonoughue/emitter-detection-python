@@ -6,7 +6,7 @@ from scipy.linalg import pinvh, solve_triangular, block_diag
 from typing import Self
 import warnings
 
-from . import parse_reference_sensor, resample_covariance_matrix
+from . import parse_reference_sensor, resample_covariance_matrix, print_matrix
 
 class CovarianceMatrix:
     # Covariance Matrix and it's Decompositions

@@ -261,7 +261,7 @@ def example3():
     return [fig]
 
 
-def example4(do_iterative=False):
+def example4(do_iterative=True):
     """
     Executes Example 6.4.
 
@@ -305,10 +305,6 @@ def example4(do_iterative=False):
                                epsilon=grid_res)
     x_set, x_grid = search_space.x_set, search_space.x_grid
     extent = search_space.get_extent(multiplier=1/1e3)
-    # extent = (x_ctr[0].item()/1e3 - search_size/1e3,
-    #           x_ctr[0].item()/1e3 + search_size/1e3,
-    #           x_ctr[1].item()/1e3 - search_size/1e3,
-    #           x_ctr[1].item()/1e3 + search_size/1e3)
 
     ell = tdoa.log_likelihood(zeta=zeta, x_source=x_set)
     ell_true = tdoa.log_likelihood(zeta=zeta_true, x_source=x_set)
@@ -405,14 +401,14 @@ def example4(do_iterative=False):
                             'do_sensor_vel': False}
         # TODO: Debug
         # Iterative Solvers
-        x_est_gd, bias_est_gd, th_est_gd_full = tdoa.gradient_descent_uncertainty(zeta=zeta, **iter_solver_args)
-        x_est_ls, bias_est_ls , th_est_ls_full= tdoa.least_square_uncertainty(zeta=zeta, **iter_solver_args)
+        x_est_gd, th_est_gd, th_est_gd_full = tdoa.gradient_descent_uncertainty(zeta=zeta, **iter_solver_args)
+        x_est_ls, th_est_ls, th_est_ls_full = tdoa.least_square_uncertainty(zeta=zeta, **iter_solver_args)
 
         with np.printoptions(precision=3, suppress=True):
             print('GD Est. range bias: (', end='')
-            print(*bias_est_gd, sep=', ', end=') m\n')
-            print('LS Est. range bias: (', end='')
-            print(*bias_est_ls, sep=', ', end=') m\n')
+            print(*th_est_gd['bias'], sep=', ', end=') m\n')
+            # print('LS Est. range bias: (', end='')
+            # print(*th_est_ls['bias'], sep=', ', end=') m\n')
 
         figs.append(_make_plot(ell_plot, [x_tdoa, x_tgt, x_est_true, x_est_bias, x_est_gd, x_est_ls],
                                ['Sensors', 'Target', 'ML Est.', 'ML Est. w/unc.', 'GD Est.', 'LS Est.']))
@@ -471,7 +467,7 @@ def example5(do_vel_only_cal=True):
 
     zeta = hybrid.noisy_measurement(x_source=x_source, v_sensor=v_fdoa_actual)
 
-    # Generate calibration data; assume that the noise power is 1%, due to repeated measurements
+    # Generate calibration data
     num_cal_samples = 1
     zeta_cal = hybrid.noisy_measurement(x_source=x_cal, v_sensor=v_fdoa_actual, num_samples=num_cal_samples)
 
