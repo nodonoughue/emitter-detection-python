@@ -78,7 +78,7 @@ def make_figures_5_6(prefix=None, mc_params=None):
 
     # Output to file
     if prefix is not None:
-        labels = ['fig5', 'fig6', 'fig6_err', 'fig6_video']
+        labels = ['fig5', 'fig6a', 'fig6b', 'fig6_video']
         if len(labels) != len(figs):
             print('**Error saving figures 5.5 and 5.6; unexpected number of figures returned from Example 5.1.')
         else:

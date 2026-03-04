@@ -7,7 +7,7 @@ from scipy.stats import multivariate_normal
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
-from ewgeo.utils import SearchSpace
+from ewgeo.utils import SearchSpace, print_matrix
 from ewgeo.utils.coordinates import correct_enu, ecef_to_enu, ecef_to_lla, enu_to_ecef, lla_to_ecef
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.constraints import bounded_alt, fixed_alt, fixed_cartesian
@@ -298,10 +298,11 @@ def example3():
     _, a_grad = fixed_alt(tgt_alt, geo_type='flat')
     crlb_fix = hybrid.compute_crlb(x_source=x_tgt, eq_constraints_grad=[a_grad])
 
+    # with np.printoptions(formatter={'all': lambda x: f"{x:11.5g}"}):
     print('CRLB (unconstrained):')
-    print(np.matrix(crlb_raw.cov))
+    print_matrix(crlb_raw.cov)
     print('CRLB (constrained):')
-    print(np.matrix(crlb_fix.cov))
+    print_matrix(crlb_fix.cov)
 
     # Plot for x/y grid
     # Initialize grid
