@@ -332,7 +332,7 @@ def example4(do_iterative=False):
 
         # Scatter plots
         for this_x, this_label in zip(x_plot, label_set):
-            plt.scatter(this_x[0]/1e3, this_x[1]/1e3, label=this_label, clip_on=False)
+            plt.scatter(this_x[0]/1e3, this_x[1]/1e3, label=this_label, clip_on=False, zorder=3)
 
         plt.grid(True)
         plt.legend(loc='upper left')

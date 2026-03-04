@@ -71,8 +71,8 @@ def example1(do_mod_cov: bool=False):
         for xy_lob, hdl in zip(np.transpose(xy_lobs.squeeze(), (2, 0, 1)), [hdl0, hdl1]):
             plt.plot(xy_lob[0], xy_lob[1], color=hdl.get_edgecolor())
 
-        plt.xlabel('E [km]')
-        plt.ylabel('N [km]')
+        plt.xlabel('East [km]')
+        plt.ylabel('North [km]')
         return this_fig
 
     # Make the first figure; just the laydown
@@ -115,6 +115,7 @@ def example1(do_mod_cov: bool=False):
     plt.ylabel('Error [km]')
     plt.xlim([0, 100])
     plt.legend()
+    plt.yscale('log')
 
     # Do it again with LS
     x_ls, x_ls_full = aoa.least_square(**gd_args)
@@ -342,8 +343,8 @@ def example3():
 
         # Add a target scatterer, legend, and axis labels
         this_ax.scatter(x_tgt[0]/1e3, x_tgt[1]/1e3, color='k', facecolors='k', marker='^', label='Target')
-        this_ax.set_xlabel('E [km]')
-        this_ax.set_ylabel('N [km]')
+        this_ax.set_xlabel('East [km]')
+        this_ax.set_ylabel('North [km]')
         this_ax.set_title(this_title)
         this_ax.legend(loc='upper left')
 

@@ -280,8 +280,8 @@ def example2(colors=None):
                   color=hdl3.get_edgecolor(), label=None, zorder=3)
     plt.grid(True)
 
-    plt.xlabel('E [km]')
-    plt.ylabel('N [km]')
+    plt.xlabel('East [km]')
+    plt.ylabel('North [km]')
 
     return fig,
 

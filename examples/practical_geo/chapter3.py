@@ -319,7 +319,7 @@ def example4(rng=np.random.default_rng(), mc_params=None):
 
     # Set up sensor and target coordinates
     x_source_ctr = np.array([3, 4]) * 1e3
-    num_monte_carlo = 200
+    num_monte_carlo = 100 # todo: restore to 200? 1000?
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     offset = 1e2   # Maximum distance from center to a single instance of the source position (per dimension)
@@ -408,15 +408,18 @@ def example4(rng=np.random.default_rng(), mc_params=None):
 
     fig_err = plt.figure()
     x_arr = np.arange(gd_ls_args['max_num_iterations'])
-    plt.plot(x_arr, rmse_avg_ml * np.ones_like(x_arr), label='Maximum Likelihood')
-    plt.plot(x_arr, rmse_avg_gd, label='Gradient Descent')
-    plt.plot(x_arr, rmse_avg_ls, label='Least Square')
+    ml_hdl = plt.plot(x_arr, rmse_avg_ml * np.ones_like(x_arr), label='Maximum Likelihood',
+                      marker='x', markevery=10)
     plt.plot(x_arr, rmse_avg_ml_full * np.ones_like(x_arr), '--', label='Maximum Likelihood (full)',
-             marker='o', markevery=10)
+             marker='o', markevery=10, color=ml_hdl[0].get_color(), markerfacecolor=None)
+    gd_hdl = plt.plot(x_arr, rmse_avg_gd, label='Gradient Descent',
+                      marker='+', markevery=10)
     plt.plot(x_arr, rmse_avg_gd_full, '-.', label='Gradient Descent (full)',
-             marker='o', markevery=10)
+             marker='^', markevery=10, color=gd_hdl[0].get_color(), markerfacecolor=None)
+    ls_hdl = plt.plot(x_arr, rmse_avg_ls, label='Least Square',
+                      marker='*', markevery=10)
     plt.plot(x_arr, rmse_avg_ls_full, '-.', label='Least Square (full)',
-             marker='o', markevery=10)
+             marker='v', markevery=10, color=ls_hdl[0].get_color(), markerfacecolor=None)
 
     plt.xlabel('Number of Iterations')
     plt.ylabel('RMSE [m]')
@@ -438,8 +441,8 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     rmse_crlb = compute_rmse(crlb_common)
     rmse_crlb_full = compute_rmse(crlb_full)
 
-    plt.plot(x_arr, rmse_crlb * np.ones_like(x_arr), '--', color='k', label='CRLB')
-    plt.plot(x_arr, rmse_crlb_full * np.ones_like(x_arr), '-.', color='k', label='CRLB (full)')
+    plt.plot(x_arr, rmse_crlb * np.ones_like(x_arr), '-', color='k', label='CRLB')
+    plt.plot(x_arr, rmse_crlb_full * np.ones_like(x_arr), '--', color='k', label='CRLB (full)')
     plt.legend(loc='upper right')
 
     # CEP50
@@ -465,21 +468,27 @@ def example4(rng=np.random.default_rng(), mc_params=None):
 
     fig_full = plt.figure()
     plt.scatter(x_source[0, -1]/1e3, x_source[1, -1]/1e3, marker='x', color='k', label='Target', clip_on=False, zorder=3)
-    # plt.scatter(x_tdoa[0], x_tdoa[1], marker='s', color='k', label='Sensors', clip_on=False, zorder=3)
+    plt.scatter(x_tdoa[0], x_tdoa[1], marker='s', color='k', label='Sensors', clip_on=False, zorder=3,
+                markerfacecolor=None)
 
     # Plot Closed-Form Solution
-    plt.scatter(x_ml[0]/1e3, x_ml[1]/1e3, marker='v', label='Maximum Likelihood', zorder=3)
-    plt.scatter(x_ml_full[0]/1e3, x_ml_full[1]/1e3, marker='^', label='Maximum Likelihood (full)', zorder=3)
+    plt.scatter(x_ml[0]/1e3, x_ml[1]/1e3, marker='x', label='Maximum Likelihood', zorder=3, color=ml_hdl[0].get_color())
+    plt.scatter(x_ml_full[0]/1e3, x_ml_full[1]/1e3, marker='o', label='Maximum Likelihood (full)', zorder=3,
+                color=ml_hdl[0].get_color(), markerfacecolor=None)
 
     # Plot Iterative Solutions
     # plt.scatter(x_init[0]/1e3, x_init[1]/1e3, marker='x', color='k', label='Initial Estimate')
-    plt.plot(x_gd[0]/1e3, x_gd[1]/1e3, linestyle='-.', marker='+', markevery=[-1], label='Grad Descent')
-    plt.plot(x_gd_full[0]/1e3, x_gd_full[1]/1e3, linestyle='-.', marker='+', markevery=[-1], label='Grad Descent (full)')
-    plt.plot(x_ls[0]/1e3, x_ls[1]/1e3, linestyle='-.', marker='*', markevery=[-1], label='Least Squares')
-    plt.plot(x_ls_full[0]/1e3, x_ls_full[1]/1e3, linestyle='-.', marker='*', markevery=[-1], label='Least Squares (full)')
+    plt.plot(x_gd[0]/1e3, x_gd[1]/1e3, linestyle='-', marker='+', markevery=[-1], label='Grad Descent',
+             color=gd_hdl[0].get_color())
+    plt.plot(x_gd_full[0]/1e3, x_gd_full[1]/1e3, linestyle='--', marker='^', markevery=[-1],
+             label='Grad Descent (full)', color=gd_hdl[0].get_color(), markerfacecolor=None)
+    plt.plot(x_ls[0]/1e3, x_ls[1]/1e3, linestyle='-', marker='*', markevery=[-1], label='Least Squares',
+             color=ls_hdl[0].get_color())
+    plt.plot(x_ls_full[0]/1e3, x_ls_full[1]/1e3, linestyle='-.', marker='v', markevery=[-1],
+             label='Least Squares (full)', color=ls_hdl[0].get_color(), markerfacecolor=None)
 
     # Overlay Error Ellipse
-    plt.plot(crlb_ellipse[0]/1e3, crlb_ellipse[1]/1e3, linestyle='--', color='k',
+    plt.plot(crlb_ellipse[0]/1e3, crlb_ellipse[1]/1e3, linestyle='-', color='k',
              label='{:d}% Error Ellipse'.format(conf_interval))
     plt.legend(loc='best')
 
