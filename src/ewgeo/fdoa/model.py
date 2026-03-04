@@ -162,7 +162,7 @@ def jacobian_uncertainty(x_sensor: npt.ArrayLike,
                   'ref_idx': ref_idx}
 
     # Gradient w.r.t source position
-    j_source = grad_x(**jacob_args)
+    j_source = grad_source(**jacob_args)
     j_list = [j_source]
 
     # Gradient w.r.t measurement biases
@@ -411,7 +411,7 @@ def draw_isodoppler(x_ref: npt.NDArray[np.float64],
     return x_iso, y_iso
 
 
-def grad_x(x_sensor: npt.ArrayLike,
+def grad_source(x_sensor: npt.ArrayLike,
            x_source: npt.ArrayLike,
            v_sensor: npt.ArrayLike | None=None,
            v_source: npt.ArrayLike | None=None,

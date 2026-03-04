@@ -361,11 +361,11 @@ class PassiveSurveillanceSystem(ABC):
         return ell
 
     @abstractmethod
-    def grad_x(self,
-               x_source: npt.ArrayLike,
-               v_source: npt.ArrayLike | None=None,
-               x_sensor: npt.ArrayLike | None=None,
-               v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
+    def grad_source(self,
+                    x_source: npt.ArrayLike,
+                    v_source: npt.ArrayLike | None=None,
+                    x_sensor: npt.ArrayLike | None=None,
+                    v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
         pass
 
     @abstractmethod
