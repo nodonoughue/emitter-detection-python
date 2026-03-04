@@ -235,19 +235,19 @@ def example1(colors=None):
         return _fig
 
     # Plot AOA Likelihood
-    ell_aoa = pss.aoa.log_likelihood(zeta=psi_act, x_source=x_test_pos).reshape(grid_shape)
+    ell_aoa = pss.aoa.log_likelihood(zeta=psi_act, x_source=x_test_pos).reshape(grid_shape[::-1])
     fig2 = _make_subfigure(ell_aoa, do_aoa=True)
 
     # TDOA
-    ell_tdoa = pss.tdoa.log_likelihood(zeta=range_diff, x_source=x_test_pos).reshape(grid_shape)
+    ell_tdoa = pss.tdoa.log_likelihood(zeta=range_diff, x_source=x_test_pos).reshape(grid_shape[::-1])
     fig3 = _make_subfigure(ell_tdoa, do_tdoa=True)
 
     # FDOA
-    ell_fdoa = pss.fdoa.log_likelihood(zeta=velocity_diff, x_source=x_test_pos).reshape(grid_shape)
+    ell_fdoa = pss.fdoa.log_likelihood(zeta=velocity_diff, x_source=x_test_pos).reshape(grid_shape[::-1])
     fig4 = _make_subfigure(ell_fdoa, do_fdoa=True)
 
     # Hybrid
-    ell_hybrid = pss.log_likelihood(zeta=z, x_source=x_test_pos, v_source=None).reshape(grid_shape)
+    ell_hybrid = pss.log_likelihood(zeta=z, x_source=x_test_pos, v_source=None).reshape(grid_shape[::-1])
     fig5 = _make_subfigure(ell_hybrid, do_aoa=True, do_tdoa=True, do_fdoa=True)
 
     # Package figure handles
