@@ -137,6 +137,8 @@ def example1():
     plt.legend()
     plt.xlim([-500,2000])
     plt.ylim([-500,3000])
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     # Set up the Nearest Neighbor Association Scheme
     associator = NNAssociator(motion_model=transition, gate_probability=.75)
@@ -149,6 +151,8 @@ def example1():
     plt.scatter(*coords, s=25, color='k', label='New States (truth)')
     plt.legend()
     plt.title('Predicted and Updated Track States after NN Association')
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     fig, ax = plt.subplots()
     figs.append(fig)
@@ -158,6 +162,8 @@ def example1():
     plt.title('Updated Trackers after NN Association')
     plt.xlim([-500,2000])
     plt.ylim([-500,3000])
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     return figs
 
@@ -196,6 +202,8 @@ def example2():
     plt.title('Updated Trackers after GNN Association')
     plt.xlim([-500, 2000])
     plt.ylim([-500, 3000])
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     return figs
 
@@ -233,6 +241,8 @@ def example3():
     plt.title('Updated Trackers after PDAF Association')
     plt.xlim([-500, 2000])
     plt.ylim([-500, 3000])
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     return figs
 
@@ -367,15 +377,15 @@ def example4():
 
     # Add axis labels
     [ax.grid(True) for ax in axs.flatten()]
-    axs[0,0].set_xlabel('East (km)', fontsize=8)
-    axs[0,0].set_ylabel('North (km)', fontsize=8)
+    axs[0,0].set_xlabel('East [km]', fontsize=8)
+    axs[0,0].set_ylabel('North [km]', fontsize=8)
     axs[0,0].set_title('Target Trajectories')
-    [ax.set_xlabel('Time (s)', fontsize=8) for ax in axs.flatten()[2:]]
-    axs[0,1].set_ylabel('$\\tau_{0,1}$ (km)', fontsize=8)
+    [ax.set_xlabel('Time [s]', fontsize=8) for ax in axs.flatten()[1:]]
+    axs[0,1].set_ylabel('$\\tau_{0,1}$ [km]', fontsize=8)
     axs[0,1].set_title('TDOA for Sensors 0, 1')
-    axs[1,0].set_ylabel('$\\tau_{0,2}$ (km)', fontsize=8)
+    axs[1,0].set_ylabel('$\\tau_{0,2}$ [km]', fontsize=8)
     axs[1,0].set_title('TDOA for Sensors 0, 2')
-    axs[1,0].set_ylabel('$\\tau_{0,3}$ (km)', fontsize=8)
+    axs[1,0].set_ylabel('$\\tau_{0,3}$ [km]', fontsize=8)
     axs[1,1].set_title('TDOA for Sensors 0, 3')
     plt.tight_layout()
 
