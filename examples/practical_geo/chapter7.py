@@ -100,10 +100,9 @@ def example1(colors=None):
     x_ctr = np.array([0e3, 3e3])
     offset = np.array([5e3, 2e3])
     num_pts = 101
-    grid_res = offset / (num_pts-1)
     search_space = SearchSpace(x_ctr=x_ctr,
                                max_offset=offset,
-                               epsilon=grid_res)
+                               points_per_dim=num_pts)
     x_set, x_grid = search_space.x_set, search_space.x_grid
     extent = search_space.get_extent(multiplier=1/1e3)
     # extent = ((x_ctr[0].item() - offset[0])/1e3,
@@ -170,29 +169,36 @@ def example2():
 
     # Define pulse timing
     pri = 1e-3
+    T = 1
+    num_pulses = np.floor(T/pri)+1
     
     # Compute CRLB
     crlb_single_sample = tdoa.compute_crlb(x_source=x_tgt)
+    crlb_sample_mean = tdoa.compute_crlb(x_source=x_tgt,
+                                         cov=tdoa.cov.multiply(1/num_pulses, overwrite=False))
     cep_single_sample = compute_cep50(crlb_single_sample)
+    cep_sample_mean = compute_cep50(crlb_sample_mean)
     print('CEP50 for a single sample: {:.2f} km'.format(cep_single_sample/1e3))
-    
+    print('CEP50 for sample mean (K=1001): {:.2f} m'.format(cep_sample_mean))
+
+    num_pulses_needed = np.ceil((cep_single_sample / 10) ** 2).astype(int)
+    print(f"Predict {num_pulses_needed} samples needed to achieve 10m CEP.")
+
     # Iterate over observation interval
-    time_vec = np.concatenate((np.arange(start=.1, step=.1, stop=100),
-                               np.arange(start=125, step=25, stop=1000)), axis=None) # seconds
+    sample_vec = np.arange(50e3,step=10)+1
     sigma_t_vec = np.array([.1e-6, 1e-6, 10e-6])
-    cep_vec = np.zeros((len(sigma_t_vec), len(time_vec)))
+    cep_vec = np.zeros((len(sigma_t_vec), len(sample_vec)))
     for idx_s, this_sigma_t in enumerate(sigma_t_vec):
         this_sigma_t = np.array(this_sigma_t)
-        for idx_t, this_time in enumerate(time_vec):
-            this_time = np.array(this_time)
-            this_num_samples = 1 + np.floor(this_time/pri)
+        this_cov_roa = (this_sigma_t**2 * speed_of_light **2) * np.eye(n_sensors)
+        tdoa.cov = this_cov_roa
 
-            this_cov_roa = (this_sigma_t ** 2 * speed_of_light ** 2 / this_num_samples) * np.eye(n_sensors)
-            tdoa.cov = CovarianceMatrix(this_cov_roa)
-            this_crlb = tdoa.compute_crlb(x_source=x_tgt)
-            cep_vec[idx_s, idx_t] = compute_cep50(this_crlb)
+        crlb_vec = [tdoa.compute_crlb(x_source=x_tgt,
+                                      cov=tdoa.cov.multiply(1/k, overwrite=False)) for k in sample_vec]
+        cep_vec[idx_s] = np.asarray([compute_cep50(c) for c in crlb_vec])
 
     fig1=plt.figure()
+    time_vec = sample_vec * pri
     for this_cep, this_sigma_t in zip(cep_vec, sigma_t_vec):
         plt.loglog(time_vec, this_cep, label='$\\sigma_t={:.1f} \\mu s$'.format(this_sigma_t*1e6))
 
@@ -205,25 +211,19 @@ def example2():
 
     # Determine when CEP50 crosses below 10 m
     desired_cep = 10
-    good_samples = cep_vec[0] <= desired_cep  # just compare the 5 deg error case
+    good_samples = cep_vec[1] <= desired_cep  # just compare the 1 microsecond error case
     good_index = next((i for i, val in enumerate(good_samples) if val), -1)  # search for the first True value; return -1 if none
     if good_index < 0:
         print('More than {:.2f} s required to achieve {:.2f} m CEP50.'.format(np.amax(time_vec), desired_cep))
     else:
-        print('{:.2f} s required to achieve {:.2f} m CEP50.'.format(time_vec[good_index], desired_cep))
+        print('{:.2f} s (K={:d}) required to achieve {:.2f} m CEP50.'.format(time_vec[good_index], good_index+1, desired_cep))
 
     int_time = time_vec[good_index]
-    num_pulses = np.astype(np.floor(int_time/pri)+1, int).item()
+    num_pulses_good = np.astype(np.floor(int_time/pri)+1, int).item()
     
-    # Compute CRLB
-    cov = cov_roa.multiply(1/num_pulses, overwrite=False)
-    tdoa.cov = cov
-    crlb_sample_mean = tdoa.compute_crlb(x_source=x_tgt)
-    cep_sample_mean = compute_cep50(crlb_sample_mean)
-    print('CEP50 for the sample mean: {:.2f} km'.format(cep_sample_mean/1e3))
-
     # Reset the covariance matrix
-    tdoa.cov = cov_roa
+    tdoa.cov = (sigma_t**2 * speed_of_light **2) * np.eye(n_sensors) # reset the covariance matrix
+    num_pulses = np.astype(np.floor(1/pri)+1, int).item() # 1 second observation time
 
     # Demonstrate geolocation
     zeta = tdoa.noisy_measurement(x_source=x_tgt, num_samples=num_pulses)
@@ -244,19 +244,21 @@ def example2():
         x_ls_mn[:, idx] = this_x_ls_mn
     
     fig2 = plt.figure()
-    # plt.plot(x_tdoa[0], x_tdoa[1],'o',label='TDOA Sensors')
-    plt.plot(x_tgt[0], x_tgt[1], '^', label='Target')
-    # plt.plot(x_ls[0],x_ls[1], '--', label='LS Soln (single sample)')
-    plt.plot(x_ls_mn[0],x_ls_mn[1], '-.', label='LS Soln (sample mean)')
+    # plt.plot(x_tdoa[0]/1e3, x_tdoa[1]/1e3,'o',label='TDOA Sensors')
+    plt.plot(x_tgt[0]/1e3, x_tgt[1]/1e3, '^', label='Target')
+    # plt.plot(x_ls[0]/1e3,x_ls[1]/1e3, '--', label='LS Soln (single sample)')
+    plt.plot(x_ls_mn[0,:num_pulses_good]/1e3,x_ls_mn[1,:num_pulses_good]/1e3, '-.', label='LS Soln (sample mean)')
     plt.grid(True)
 
     # Overlay error ellipse
     ell = draw_error_ellipse(x_tgt, crlb_single_sample, num_pts=101)
     ell_full = draw_error_ellipse(x_tgt, crlb_sample_mean, num_pts=101)
     
-    plt.plot(ell[0], ell[1], label='Error Ellipse (single sample)')
-    plt.plot(ell_full[0], ell_full[1], label='Error Ellipse (sample mean)')
+    plt.plot(ell[0]/1e3, ell[1]/1e3, label='Error Ellipse (single sample)')
+    plt.plot(ell_full[0]/1e3, ell_full[1]/1e3, label='Error Ellipse (sample mean)')
     plt.legend(loc='upper right')
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     # Plot error as a function of time
     err = np.sqrt(np.sum(np.fabs(x_ls-x_tgt[:, np.newaxis])**2, axis=0))
@@ -310,8 +312,7 @@ def example3():
 
     # Define measurement and Jacobian functions
     z_fun = aoa.measurement
-    def h_fun(x):
-        return np.transpose(aoa.jacobian(x))
+    h_fun = aoa.measurement_gradient
 
     # Estimate position recursively, using EKF Update algorithm
     x_est = np.zeros(shape=(aoa.num_dim, num_pulses))
@@ -342,23 +343,25 @@ def example3():
         prev_p = this_p
 
     fig1=plt.figure()
-    plt.plot(x_est[0], x_est[1], '-.', label='Estimated Position')
-    plt.scatter(x_tgt[0], x_tgt[1], marker='^', label='Target')
+    plt.scatter(x_tgt[0]/1e3, x_tgt[1]/1e3, marker='^', label='Target')
+    plt.plot(x_est[0]/1e3, x_est[1]/1e3, '-.', label='Estimated Position')
     plt.grid(True)
 
     # Draw Error Ellipse from single sample
     crlb = aoa.compute_crlb(x_tgt)
     ell = draw_error_ellipse(x_tgt, crlb, num_pts=101)
-    plt.plot(ell[0], ell[1],'-.', label='Error Ellipse (single msmt.)')
+    plt.plot(ell[0]/1e3, ell[1]/1e3,'-.', label='Error Ellipse (single msmt.)')
 
     crlb_adjust = crlb.multiply(1/np.sqrt(num_pulses), overwrite=False)
     ell_1s = draw_error_ellipse(x_tgt, crlb_adjust, num_pts=101)
-    plt.plot(ell_1s[0], ell_1s[1],'-.', label='Error Ellipse (full observation)')
+    plt.plot(ell_1s[0]/1e3, ell_1s[1]/1e3,'-.', label='Error Ellipse (full observation)')
 
     offset = np.amax(np.amax(ell, axis=1)-np.amin(ell,axis=1), axis=0)
-    plt.xlim(x_tgt[0] + .6*offset*np.array([-1, 1]))
-    plt.ylim(x_tgt[1] + .6*offset*np.array([-1, 1]))
+    plt.xlim(x_tgt[0]/1e3 + .6/1e3*offset*np.array([-1, 1]))
+    plt.ylim(x_tgt[1]/1e3 + .6/1e3*offset*np.array([-1, 1]))
     plt.legend(loc='upper right')
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     # Compute Errors
     err = np.sqrt(np.sum(np.fabs(x_est - x_tgt[:, np.newaxis])**2, axis=0))
@@ -425,14 +428,14 @@ def example4():
     this_p=None
     prev_p=None
     prev_x=None
+    z_fun = aoa.measurement
+    h_fun = aoa.measurement_gradient
+
     for idx in np.arange(num_pulses):
         # Update positions
         this_x_aoa = x_aoa + v_aoa * idx * pri
         aoa.pos = this_x_aoa
 
-        # Update function handles
-        h_fun = lambda x: aoa.jacobian(x).T
-    
         # Generate noisy measurements
         zeta = aoa.noisy_measurement(x_source=x_tgt)
     
@@ -443,7 +446,7 @@ def example4():
         else:
             # EKF Update
             this_x, this_p = tracker.ekf_update(x_prev=prev_x, p_prev=prev_p, zeta=zeta,
-                                            cov=aoa.cov, z_fun=aoa.measurement, h_fun=h_fun)
+                                            cov=aoa.cov, z_fun=z_fun, h_fun=h_fun)
 
         # Store the results and update the variables
         x_est[:, idx] = this_x
@@ -453,21 +456,23 @@ def example4():
         prev_p = this_p
 
     fig1=plt.figure()
-    plt.plot(x_est[0],x_est[1],'-.', label='Estimated Position')
-    plt.plot(x_tgt[0],x_tgt[1],'^', label='Target')
+    plt.plot(x_tgt[0]/1e3,x_tgt[1]/1e3,'^', label='Target')
+    plt.plot(x_est[0]/1e3,x_est[1]/1e3,'-.', label='Estimated Position')
     plt.grid(True)
 
     # Draw Error Ellipse from single sample
     crlb = aoa.compute_crlb(x_tgt)
     ell = draw_error_ellipse(x=x_tgt, covariance=crlb, num_pts=101)
-    plt.plot(ell[0], ell[1],'-.',label='Error Ellipse (single msmt.)')
+    plt.plot(ell[0]/1e3, ell[1]/1e3,'-.',label='Error Ellipse (single msmt.)')
     
     ell_end = draw_error_ellipse(x=x_tgt, covariance=this_p, num_pts=101)
-    plt.plot(ell_end[0], ell_end[1],'-.',label='Error Ellipse (Final EKF Update)')
+    plt.plot(ell_end[0]/1e3, ell_end[1]/1e3,'-.',label='Error Ellipse (Final EKF Update)')
     
     offset = np.amax(np.amax(ell, axis=1)-np.amin(ell,axis=1), axis=None)
-    plt.xlim(x_tgt[0] + .6*offset*np.array([-1, 1]))
-    plt.ylim(x_tgt[1] + .6*offset*np.array([-1, 1]))
+    plt.xlim(x_tgt[0]/1e3 + .6*offset/1e3*np.array([-1, 1]))
+    plt.ylim(x_tgt[1]/1e3 + .6*offset/1e3*np.array([-1, 1]))
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
     plt.legend(loc='upper right')
 
     ## Compute Errors
@@ -475,10 +480,10 @@ def example4():
     time_vec = pri*(1+np.arange(num_pulses))
     
     fig2=plt.figure()
-    plt.semilogy(time_vec,err,label='Measured')
-    plt.plot(time_vec,cep,label='$Predicted (CEP_{50})$')
+    plt.semilogy(time_vec,err/1e3,label='Measured')
+    plt.plot(time_vec,cep/1e3,label='$Predicted (CEP_{50})$')
     plt.xlabel('Time [s]')
-    plt.ylabel('Error [m]')
+    plt.ylabel('Error [km]')
     plt.legend(loc='upper right')
     plt.grid(True)
     

@@ -636,6 +636,13 @@ class PassiveSurveillanceSystem(ABC):
 
         return x_est, th_est, th_est_full
 
+    def measurement_gradient(self, th: npt.ArrayLike):
+        """
+        Wrapper for the Jacobian function. Returns the transpose, which can be used in Kalman-style
+        tracking equations.
+        """
+        return self.jacobian(th).T
+
     def gradient_descent_uncertainty(self, **kwargs)-> tuple[npt.NDArray[np.float64], dict, npt.NDArray[np.float64]]:
         return self.gd_ls_uncertainty(do_gd=True, **kwargs)
 

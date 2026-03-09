@@ -469,23 +469,23 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     fig_full = plt.figure()
     plt.scatter(x_source[0, -1]/1e3, x_source[1, -1]/1e3, marker='x', color='k', label='Target', clip_on=False, zorder=3)
     plt.scatter(x_tdoa[0], x_tdoa[1], marker='s', color='k', label='Sensors', clip_on=False, zorder=3,
-                markerfacecolor=None)
+                facecolor=None)
 
     # Plot Closed-Form Solution
     plt.scatter(x_ml[0]/1e3, x_ml[1]/1e3, marker='x', label='Maximum Likelihood', zorder=3, color=ml_hdl[0].get_color())
     plt.scatter(x_ml_full[0]/1e3, x_ml_full[1]/1e3, marker='o', label='Maximum Likelihood (full)', zorder=3,
-                color=ml_hdl[0].get_color(), markerfacecolor=None)
+                color=ml_hdl[0].get_color(), facecolor=None)
 
     # Plot Iterative Solutions
     # plt.scatter(x_init[0]/1e3, x_init[1]/1e3, marker='x', color='k', label='Initial Estimate')
     plt.plot(x_gd[0]/1e3, x_gd[1]/1e3, linestyle='-', marker='+', markevery=[-1], label='Grad Descent',
              color=gd_hdl[0].get_color())
     plt.plot(x_gd_full[0]/1e3, x_gd_full[1]/1e3, linestyle='--', marker='^', markevery=[-1],
-             label='Grad Descent (full)', color=gd_hdl[0].get_color(), markerfacecolor=None)
+             label='Grad Descent (full)', color=gd_hdl[0].get_color(), facecolor=None)
     plt.plot(x_ls[0]/1e3, x_ls[1]/1e3, linestyle='-', marker='*', markevery=[-1], label='Least Squares',
              color=ls_hdl[0].get_color())
     plt.plot(x_ls_full[0]/1e3, x_ls_full[1]/1e3, linestyle='-.', marker='v', markevery=[-1],
-             label='Least Squares (full)', color=ls_hdl[0].get_color(), markerfacecolor=None)
+             label='Least Squares (full)', color=ls_hdl[0].get_color(), facecolor=None)
 
     # Overlay Error Ellipse
     plt.plot(crlb_ellipse[0]/1e3, crlb_ellipse[1]/1e3, linestyle='-', color='k',

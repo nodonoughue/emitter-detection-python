@@ -719,3 +719,50 @@ def print_matrix(x: npt.NDArray)->None:
             "  0.    ")}):
         print(np.matrix(x/scale))
 
+def compute_sample_mean(zeta: npt.ArrayLike)-> tuple[npt.NDArray, npt.NDArray]:
+    """
+    Computes the sample mean across the second dimension of the input (zeta).
+
+    Any additional dimensions (beyond the second) are assumed to be parallel
+    trials, and are ignored.
+
+    Ported from MATLAB.
+
+    :param zeta: set of samples
+    :return zeta_mean: mean value of samples
+    :return zeta_mean_full: iterative mean value of samples
+    """
+
+    # Parse Input
+    dims = np.shape(zeta)
+    num_samples = dims[1]
+
+    # Compute the cumulative sum
+    cumsum = np.cumsum(zeta, axis=1)
+    zeta_mean_full = cumsum / np.reshape(np.arange(num_samples)+1, shape=(1, num_samples))
+
+    zeta_mean = np.squeeze(zeta_mean_full[:, -1]) # final sample mean is the result
+    return zeta_mean, zeta_mean_full
+
+def compute_sample_mean_update(zeta: npt.ArrayLike, zeta_mean_previous: npt.ArrayLike, num_samples_previous: int)->\
+    tuple[npt.NDArray, int]:
+    """
+    Compute the sample mean iteratively, across the second dimension of zeta.
+
+    Ported from MATLAB.
+
+    :param zeta: new sample
+    :param zeta_mean_previous: previously computed sample mean
+    :param num_samples_previous: number of samples used for previous mean
+    :return zeta_mean_update: new sample mean
+    :return num_samples_new: total number of samples used for new mean
+    """
+
+    # Parse inputs
+    dims = np.shape(zeta)
+    num_samples_curr = dims[1]
+    num_samples = num_samples_previous + num_samples_curr
+
+    # Sample Mean Update
+    zeta_innovation = np.sum(zeta, axis=1)/num_samples
+    return zeta_mean_previous * num_samples_previous/num_samples + zeta_innovation, num_samples
