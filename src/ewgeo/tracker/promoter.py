@@ -24,7 +24,9 @@ class MofNPromoter(Promoter):
             if t.num_updates >= self.num_hits:
                 # The track has the required number of hits; promote it
                 to_promote.append(t)
-            elif len(t.states) >= self.num_chances:
+            elif len(t.states) > self.num_chances:  # t.states has an initial condition, so it's length is one more than
+                                                    # the number of updates. Thus, we should use > instead of >= in this
+                                                    # test.
                 # The track has gotten the required number of chances, and is still tentative.
                 # Delete it
                 to_delete.append(t)
