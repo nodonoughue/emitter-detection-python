@@ -37,6 +37,7 @@ class Hypothesis:
     _distance: float | None = None
     _pred: State | None = None
     _msmt_pred: Measurement | None = None
+    _state_from_msmt: State | None = None
     _innov: npt.ArrayLike | None = None
     _innov_covar: CovarianceMatrix | None = None
     _likelihood: float | None = None
@@ -168,7 +169,15 @@ class Hypothesis:
         self._motion_model = value
         self.clear_dependent_parameters()
 
+    @property
+    def state_from_measurement(self):
+        if self._state_from_msmt is None:
+            self._state_from_msmt = self.measurement_model.state_from_measurement(self.measurement)
+
+        return self._state_from_msmt
+
     def clear_dependent_parameters(self):
+        self._state_from_msmt = None
         self._distance = None
         self._pred = None
         self._msmt_pred = None
@@ -434,6 +443,10 @@ class NNAssociator(Associator):
         # TODO: Test
         hypotheses = {}
         unassociated_measurements = measurements[:]
+        if len(measurements)==0:
+            # No measurements, nothing to do
+            return hypotheses, unassociated_measurements
+
         curr_time = measurements[0].time
 
         if print_table:
@@ -457,6 +470,14 @@ class NNAssociator(Associator):
 
             # Generate a set of candidate hypotheses
             this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=self.motion_model) for m in measurements]
+            for h in this_hypotheses:
+                gate_size = h.compute_gate_size(self.gate_probability)
+                print(f"    Track {track.track_id}: distance={h.distance:.4f}, "
+                      f"gate={gate_size:.4f}")
+
+            if all([h.distance > h.compute_gate_size(self.gate_probability) for h in this_hypotheses]):
+                pass
+
             # print('Generating hypotheses for track ', track.track_id, '...')
             # [print(h) for h in this_hypotheses]
             if print_table:
@@ -500,6 +521,8 @@ class GNNAssociator(Associator):
     def associate(self, measurements: list[Measurement],
                   tracks: list[Track], print_table: bool=False) -> tuple[dict[Track, Hypothesis], list[Measurement]]:
         # TODO: Test
+        if len(measurements)==0:
+            return {}, measurements
         curr_time = measurements[0].time
 
         if print_table:
@@ -541,7 +564,8 @@ class GNNAssociator(Associator):
         unassociated_measurements = measurements[:]
         for r, c in zip(row_ind, col_ind):
             good_hypotheses[tracks[r]] = hypotheses[r][c]
-            unassociated_measurements.remove(hypotheses[r][c].measurement)
+            if hypotheses[r][c].measurement in unassociated_measurements:
+                unassociated_measurements.remove(hypotheses[r][c].measurement)
 
         if print_table:
             pass

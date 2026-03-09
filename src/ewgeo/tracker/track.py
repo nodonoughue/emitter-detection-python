@@ -21,6 +21,7 @@ class Track:
         for key, value in kwargs.items():
             if key == 'initial_state':
                 self.states = [value]
+                self.num_updates = 1
 
             setattr(self, key, value)
 
@@ -57,11 +58,14 @@ class Track:
     def copy(self, **kwargs):
         # Initialize a new track using all the current track's properties
         if 'track_id' not in kwargs:
-            # Make sure we don't copy the track ID
-            kwargs['track_id'] = None
-        new_track = Track(**self.__dict__)
+            kwargs['track_id'] = self.track_id + '_0'
+
+        new_track = object.__new__(Track)
+        new_track.__dict__.update(self.__dict__) # copy all attributes
+        new_track.states = self.states[:] # shallow-copy of list; original state objects preserved
         for key, value in kwargs.items():
             new_track.__setattr__(key, value)
+
         return new_track
 
     def plot(self, ax: plt.Axes, plot_dims: slice= np.s_[:],

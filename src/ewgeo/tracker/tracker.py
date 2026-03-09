@@ -41,7 +41,7 @@ class Tracker:
     plot_state_velocity: bool = False
     plot_is_initialized: bool = False
     plot_measurements: bool = False
-    track_handles: dict[Track, tuple[Line2D | None, Line2D | None, Line2D | None, Quiver | None]] = None
+    track_handles: dict[Track, tuple[Line2D | None, Line2D | None, Line2D | None, Quiver | None]] = {}
     msmt_handle: PathCollection = None
     animator: Animation = None
 
@@ -109,6 +109,8 @@ class Tracker:
         hypothesis_dict, unassoc_msmts = self.associator.associate(tracks=self.tracks, measurements=measurements)
 
         num_coasted_tracks = np.sum([1 for h in hypothesis_dict.values() if isinstance(h,MissedDetectionHypothesis)])
+        if num_coasted_tracks > 0:
+            pass
 
         # Update the hypotheses
         hypotheses = hypothesis_dict.values()
@@ -125,6 +127,9 @@ class Tracker:
         if len(self._tentative_tracks) == 0:
             # Nothing to do
             return measurements
+
+        # for t in self._tentative_tracks:
+        #     print(f"  Track {t.track_id}: P_trace={np.trace(t.curr_state.covar.cov):.4e}")
 
         # Generate hypotheses to match measurements to the tentative tracks
         hypothesis_dict, unassoc_msmt = self.associator.associate(tracks=self._tentative_tracks,
@@ -161,7 +166,7 @@ class Tracker:
             # Nothing to do
             return
 
-        new_tracks = self.initiator.initiate(measurements=measurements)
+        new_tracks, _ = self.initiator.initiate(measurements=measurements)
         self._tentative_tracks.extend(new_tracks)
         if self.print_status:
             print(f"...{len(new_tracks)} new tentative tracks created...")
@@ -179,16 +184,16 @@ class Tracker:
             self.deleted_tracks.extend(tracks_to_delete)
 
         # Repeat with the tentative tracks
-        tentative_tracks_to_delete = self.deleter.delete(tracks=self._tentative_tracks)
+        # tentative_tracks_to_delete = self.deleter.delete(tracks=self._tentative_tracks)
 
         # Remove the tracks by creating a new list that excludes them
-        self._tentative_tracks = [t for t in self._tentative_tracks if t not in tentative_tracks_to_delete]
+        # self._tentative_tracks = [t for t in self._tentative_tracks if t not in tentative_tracks_to_delete]
 
-        if self.keep_all_tracks:
-            self.deleted_tracks.extend(tentative_tracks_to_delete)
+        # if self.keep_all_tracks:
+        #     self.deleted_tracks.extend(tentative_tracks_to_delete)
 
-        if self.print_status:
-            print(f"...{len(tracks_to_delete)+len(tentative_tracks_to_delete)} tracks dropped...")
+        # if self.print_status:
+        #     print(f"...{len(tracks_to_delete)+len(tentative_tracks_to_delete)} tracks dropped...")
 
         return
 

@@ -7,7 +7,7 @@ from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.tracker import StateSpace, State, Track, Tracker
 from ewgeo.tracker.association import NNAssociator, GNNAssociator, PDAAssociator
 from ewgeo.tracker.deleter import MissedDetectionDeleter
-from ewgeo.tracker.initiator import SinglePointMeasurementInitiator
+from ewgeo.tracker.initiator import SinglePointMeasurementInitiator, TwoPointInitiator, ThreePointInitiator
 from ewgeo.tracker.measurement import Measurement, MeasurementModel
 from ewgeo.tracker.promoter import MofNPromoter
 from ewgeo.tracker.transition import MotionModel, ConstantVelocityMotionModel, ConstantAccelerationMotionModel
@@ -338,6 +338,11 @@ def _make_tgt_3(max_time: float = 600):
 
 
 def example4():
+    # TODO: Debug
+    # TODO: Why are tracks being initiated near the origin???
+    # TODO: Is the process noise reasonable for the motion model???
+    # TODO: Make a 3-point initiator and test with CA motion model
+
     # Make the targets
     max_time = 900 # seconds
     tgt_1 = _make_tgt_1(max_time)
@@ -350,7 +355,8 @@ def example4():
 
     # Plot the geometry
     scale=1000
-    tgt_hdls = [axs[0, 0].plot(t[1][0]/scale, t[1][1]/scale, label=f"Target {idx}")[0] for idx, t in enumerate([tgt_1, tgt_2, tgt_3])]
+    labels = ['Targets', None, None]
+    tgt_hdls = [axs[0, 0].plot(t[1][0]/scale, t[1][1]/scale, label=l)[0] for t, l in zip([tgt_1, tgt_2, tgt_3],labels)]
     tgt_colors = [h.get_color() for h in tgt_hdls]
 
     # Initialize the PSS
@@ -359,7 +365,7 @@ def example4():
                        [30, 60, 30, 60]])
     num_dims, n_tdoa = np.shape(x_tdoa)
     ref_idx = 0
-    sigma_toa = 10e-9
+    sigma_toa = 1e-8 # 10e-9
     cov_toa = (sigma_toa ** 2) * np.eye(n_tdoa)
     cov_roa = CovarianceMatrix(speed_of_light ** 2 * cov_toa)
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx, variance_is_toa=False)
@@ -377,36 +383,54 @@ def example4():
 
     # Add axis labels
     [ax.grid(True) for ax in axs.flatten()]
+    axs[0,0].set_title('Target Trajectories', fontsize=10)
+    axs[0, 1].set_title('TDOA for Sensors 0, 1', fontsize=10)
+    axs[1, 0].set_title('TDOA for Sensors 0, 2', fontsize=10)
+    axs[1, 1].set_title('TDOA for Sensors 0, 3', fontsize=10)
     axs[0,0].set_xlabel('East [km]', fontsize=8)
-    axs[0,0].set_ylabel('North [km]', fontsize=8)
-    axs[0,0].set_title('Target Trajectories')
     [ax.set_xlabel('Time [s]', fontsize=8) for ax in axs.flatten()[1:]]
+    axs[0,0].set_ylabel('North [km]', fontsize=8)
     axs[0,1].set_ylabel('$\\tau_{0,1}$ [km]', fontsize=8)
-    axs[0,1].set_title('TDOA for Sensors 0, 1')
     axs[1,0].set_ylabel('$\\tau_{0,2}$ [km]', fontsize=8)
-    axs[1,0].set_title('TDOA for Sensors 0, 2')
     axs[1,0].set_ylabel('$\\tau_{0,3}$ [km]', fontsize=8)
-    axs[1,1].set_title('TDOA for Sensors 0, 3')
+
+    [ax.tick_params(labelsize=8) for ax in axs.flatten()]
     plt.tight_layout()
 
     # Initialize the Tracker
     # plot_dims = np.s_[:2] # x/y are the plot axes
-    transition = ConstantAccelerationMotionModel(num_dims=3,process_covar=0.1**2)
+    transition = ConstantAccelerationMotionModel(num_dims=3,process_covar=5**2)
     msmt_model = MeasurementModel(state_space=transition.state_space, pss=tdoa)
+    associator = GNNAssociator(motion_model=transition, gate_probability=.7)
     tracker = Tracker(transition=transition, msmt_model=msmt_model,
-                      initiator=SinglePointMeasurementInitiator(msmt_model=msmt_model),
-                      associator=NNAssociator(motion_model=transition, gate_probability=.9),
+                      initiator=ThreePointInitiator(msmt_model=msmt_model, associator=associator),
+                      associator=associator,
                       deleter=MissedDetectionDeleter(num_missed_detections=3),
                       promoter=MofNPromoter(num_hits=3, num_chances=5),
-                      do_plotting=False, keep_all_tracks=True, print_status=True)
+                      do_plotting=True, keep_all_tracks=True, print_status=True)
 
     # Make truth state objects; we'll update their states over time
     truth_states = [State(state_space=transition.state_space, state=None, time=0, covar=None) for _ in tgts]
+
+    # Q_mat = transition.make_process_covariance_matrix(time_delta=10.0)
+    # R_mat = tdoa.cov
+    # print(f"Innovation Covar trace ={np.trace(Q_mat.cov)}")
+    # print(Q_mat)
+    # print(f"Measurement Covar trace ={np.trace(R_mat.cov)}")
+    # print(R_mat)
+    # s = truth_states[0] # use the first truth state
+    # s.position = tgt_1[1][:,0]
+    # s.time = tgt_1[0][0]
+    # H_mat = msmt_model.jacobian(s)
+    # hqh = H_mat @ Q_mat.cov @ H_mat.T
+    # print(f"Innovation Covar in msmt space trace = {np.trace(hqh)}")
+    # print(CovarianceMatrix(hqh))
 
     # Run the tracker, one step at a time
     time_vec = tgts[0][0]
     truth_label = 'Noisy Truth Measurements'
     fa_label = 'False Alarm Measurements'
+
     num_fa_per_step = 0
 
     # Print progress
@@ -427,23 +451,27 @@ def example4():
         truth_msmts = [msmt_model.measurement(s, noise=False) for s in truth_states]
 
         # Add the truth measurements to the plots
-        axs[0, 1].scatter(time_vec[idx]*np.ones(len(truth_msmts)), [m.zeta[0]/scale for m in truth_msmts],
-                          marker = 'v', color = 'b', alpha=0.5, label = truth_label)
-        axs[1, 0].scatter(time_vec[idx]*np.ones(len(truth_msmts)), [m.zeta[1]/scale for m in truth_msmts],
-                          marker = 'v', color = 'b', alpha=0.5, label = truth_label)
-        axs[1, 1].scatter(time_vec[idx]*np.ones(len(truth_msmts)), [m.zeta[2]/scale for m in truth_msmts],
-                          marker = 'v', color = 'b', alpha=0.5, label = truth_label)
+        [ax.scatter(time_vec[idx]*np.ones(len(truth_msmts)), [m.zeta[ii]/scale for m in truth_msmts], 3,
+                    marker='v', color = 'b', alpha=0.5, label = truth_label) for ii, ax in enumerate(axs.flatten()[1:])]
+        # axs[0, 1].plot(time_vec[idx]*np.ones(len(truth_msmts)), [m.zeta[0]/scale for m in truth_msmts],
+        #                   linestyle = '-', marker='v', markevery=10, color = 'b', alpha=0.5, label = truth_label)
+        # axs[1, 0].plot(time_vec[idx]*np.ones(len(truth_msmts)), [m.zeta[1]/scale for m in truth_msmts],
+        #                   linestyle = '-', marker='v', markevery=10, color = 'b', alpha=0.5, label = truth_label)
+        # axs[1, 1].plot(time_vec[idx]*np.ones(len(truth_msmts)), [m.zeta[2]/scale for m in truth_msmts],
+        #                   linestyle = '-', marker='v', markevery=10, color = 'b', alpha=0.5, label = truth_label)
 
         # Generate false alarm measurements
         fa_msmt = msmt_model.false_alarm(max_val=4.5e3, num=num_fa_per_step, time=time_vec[idx].item())
 
         # Add the false alarms to the plots
-        axs[0, 1].scatter(time_vec[idx]*np.ones(num_fa_per_step),
-                          [m.zeta[0]/scale for m in fa_msmt], marker = '^', color = 'gray', alpha=0.1, label = fa_label)
-        axs[1, 0].scatter(time_vec[idx]*np.ones(num_fa_per_step),
-                          [m.zeta[1]/scale for m in fa_msmt], marker = '^', color = 'gray', alpha=0.1, label = fa_label)
-        axs[1, 1].scatter(time_vec[idx]*np.ones(num_fa_per_step),
-                          [m.zeta[2]/scale for m in fa_msmt], marker = '^', color = 'gray', alpha=0.1, label = fa_label)
+        [ax.scatter(time_vec[idx]*np.ones(num_fa_per_step), [m.zeta[ii]/scale for m in fa_msmt], 3,
+                    marker = '^', color = 'gray', alpha=0.1, label = fa_label) for ii, ax in enumerate(axs.flatten()[1:])]
+        # axs[0, 1].scatter(time_vec[idx]*np.ones(num_fa_per_step),
+        #                   [m.zeta[0]/scale for m in fa_msmt], marker = '^', color = 'gray', alpha=0.1, label = fa_label)
+        # axs[1, 0].scatter(time_vec[idx]*np.ones(num_fa_per_step),
+        #                   [m.zeta[1]/scale for m in fa_msmt], marker = '^', color = 'gray', alpha=0.1, label = fa_label)
+        # axs[1, 1].scatter(time_vec[idx]*np.ones(num_fa_per_step),
+        #                   [m.zeta[2]/scale for m in fa_msmt], marker = '^', color = 'gray', alpha=0.1, label = fa_label)
 
         # Feed them to the tracker; shuffle the measurements
         measurements = truth_msmts[:] + fa_msmt[:]
@@ -465,9 +493,13 @@ def example4():
         trk_label = None
 
     print('done.')
+    print(f"A total of {len(tracker.all_tracks)} of tracks were created, {len(tracker.deleted_tracks)} were rejected and {len(tracker.tracks)} were active at the end of the simulation.")
+    print(f"A total of {len(tracker.all_tentative_tracks)} tentative tracks were created but failed to promote.")
     print_elapsed(time.perf_counter()-t_start)
 
-    [ax.legend() for ax in axs.flatten()]
+    axs[0, 0].set_xlim([-100, 100])
+    axs[0, 0].set_ylim([-50, 150])
+    [ax.legend(fontsize=8) for ax in axs.flatten()]
 
     return [fig]
 

@@ -126,8 +126,17 @@ class MeasurementModel:
         if not truth_state:
             # Compute the CRLB and put it on top of the covariance matrix object
             crlb = self.pss.compute_crlb(x_source=s.pos_vel)
+            # Note: if the PSS system has no velocity information, the CRLB calculation
+            # will return a matrix of zeros for those elements.
             init_covar = 1e6*np.eye(self.state_space.num_states)
             init_covar[:crlb.size, :crlb.size] = crlb.cov
+
+            # Check for a velocity component
+            eps_vel_trace = .001 # if it's better than .001 m/s, let's assume it's actually a numerical
+                                 # error
+            vel_slice = self.state_space.vel_slice
+            if np.trace(init_covar[vel_slice, vel_slice]) <= eps_vel_trace:
+                init_covar[vel_slice, vel_slice] = 1e6*np.eye(self.state_space.num_dims)
 
             s.covar = CovarianceMatrix(init_covar)
 
