@@ -121,7 +121,7 @@ class TwoPointInitiator(Initiator):
         # Start from the CRLB-based covariance but use a
         # conservative (larger) value
         n = state.state_space.num_states
-        num_dim = state.state_space.num_dim
+        num_dim = state.state_space.num_dims
         init_covar = np.eye(n)
         pos_covar_multiplier = 10.0
 

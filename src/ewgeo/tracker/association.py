@@ -521,8 +521,12 @@ class GNNAssociator(Associator):
     def associate(self, measurements: list[Measurement],
                   tracks: list[Track], print_table: bool=False) -> tuple[dict[Track, Hypothesis], list[Measurement]]:
         # TODO: Test
-        if len(measurements)==0:
+        num_tracks = len(tracks)
+        num_measurements = len(measurements)
+        if num_measurements==0 or num_tracks==0:
+            # Nothing to associate
             return {}, measurements
+
         curr_time = measurements[0].time
 
         if print_table:
@@ -533,7 +537,10 @@ class GNNAssociator(Associator):
 
         # Generate the full set of hypotheses and record their distances
         hypotheses = []
-        distance = np.zeros((len(tracks), len(measurements)+1))
+        null_hypotheses = []
+        large_value = 1e10 # mahalanobis distance for detections that are outside the gate
+        distance = np.full((num_tracks, num_measurements + num_tracks), large_value)
+
         for index, track in enumerate(tracks):
             this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=self.motion_model) for m in measurements]
 
@@ -541,19 +548,18 @@ class GNNAssociator(Associator):
                 pass
                 # table.add_row([track.__str__()] + [h.distance for h in this_hypotheses])
             [h.apply_distance_gate(self.gate_probability) for h in this_hypotheses]
-            this_distance = [h.distance for h in this_hypotheses]
+            for j, h in enumerate(this_hypotheses):
+                distance[index, j] = h.distance if np.isfinite(h.distance) else large_value
 
-            # Add a null hypothesis, set its distance to 1 more than the max (finite) value in the array
-            this_hypotheses.append(MissedDetectionHypothesis(track=track,
-                                                             motion_model=self.motion_model,
-                                                             sensor=measurements[0].sensor,
-                                                             distance=1.0 - self.gate_probability,
-                                                             time=curr_time))
-            this_distance.append(1+np.max(this_distance, initial=0.0, where=np.isfinite(this_distance)))
+            # Null hypothesis
+            null_hyp = MissedDetectionHypothesis(track=track, motion_model=self.motion_model,
+                                                 sensor=measurements[0].sensor, distance=1.0 - self.gate_probability,
+                                                 time=curr_time)
+            null_hypotheses.append(null_hyp)
+            distance[index, num_measurements + index] = null_hyp.distance
 
             # Add to the nested list and distance array
             hypotheses.append(this_hypotheses)
-            distance[index] = np.asarray(this_distance)
 
         # Convert to a 2D matrix and apply the Munkres Algorithm via scipy.optimize
         row_ind, col_ind = linear_sum_assignment(distance)
@@ -563,9 +569,13 @@ class GNNAssociator(Associator):
         good_hypotheses = {}
         unassociated_measurements = measurements[:]
         for r, c in zip(row_ind, col_ind):
-            good_hypotheses[tracks[r]] = hypotheses[r][c]
-            if hypotheses[r][c].measurement in unassociated_measurements:
+            if c < num_measurements:
+                # Assigned to a real measurement
+                good_hypotheses[tracks[r]] = hypotheses[r][c]
                 unassociated_measurements.remove(hypotheses[r][c].measurement)
+            else:
+                # Assigned to a null hypothesis
+                good_hypotheses[tracks[r]] = null_hypotheses[r]
 
         if print_table:
             pass

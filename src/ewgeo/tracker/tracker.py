@@ -13,8 +13,7 @@ from .measurement import Measurement
 from .promoter import Promoter
 from .track import Track
 
-
-
+pause_interval=0.1 # seconds per frame update
 
 class Tracker:
     # Parameters
@@ -36,6 +35,8 @@ class Tracker:
 
     # Plotting properties
     do_plotting: bool = False
+    _fig = None
+    _ax = None
     plot_tentative_tracks: bool = False
     plot_state_error: bool = False
     plot_state_velocity: bool = False
@@ -60,6 +61,11 @@ class Tracker:
         self._tentative_tracks = []
         self._failed_tracks = []
         self._latest_measurements = []
+
+        # Plotting variables
+        self.track_handles = {}
+        self._fig = None
+        self._ax = None
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -99,6 +105,16 @@ class Tracker:
 
         # Delete tracks
         self.delete()
+
+        # ---- Live plot update
+        if self.do_plotting:
+            if self._ax is None:
+                raise RunTimeError("Plotting is enabled, but no axes exist."
+                                   "Call tracker.setup_plot() before starting the update loop.")
+            self.plot(ax=self._ax)
+            plt.draw()
+            plt.pause(pause_interval)
+        return
 
     def update_existing_tracks(self, measurements: list[Measurement]) -> list[Measurement]:
         if len(self.tracks) == 0:
@@ -197,6 +213,15 @@ class Tracker:
 
         return
 
+    def setup_plot(self, ax: Axes = None, **kwargs) -> Axes:
+        if ax is not None:
+            self._ax = ax
+            self._fig = ax.get_figure()
+        else:
+            self._fig, self._ax = plt.subplots(**kwargs)
+        self.plot_is_initialized=True
+        return self._ax
+
     def plot(self, ax: Axes=None, plot_dims: slice=np.s_[:], hypotheses: dict[Track, Hypothesis]=None,
              scale: float=1)-> Axes:
         """
@@ -222,7 +247,7 @@ class Tracker:
             if track not in self.track_handles:
                 # Need a new plot
                 handles = track.plot(ax=ax, plot_dims=plot_dims, predicted_state=predicted_state, scale=scale,
-                                     do_vel=self.plot_state_velocity, do_err=self.plot_state_error)
+                                     do_vel=self.plot_state_velocity, do_cov=self.plot_state_error)
                 self.track_handles[track] = handles
             else:
                 # Update the plot

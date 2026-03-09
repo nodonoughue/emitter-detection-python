@@ -248,7 +248,7 @@ def example3():
 
 def _make_tgt_1(max_time: float = 600):
     # ===  Define target trajectory
-    x_tgt_init = np.array([-50e3, 100e3, 20e3 * _ft2m])
+    x_tgt_init = np.array([-50e3, 50e3, 20e3 * _ft2m])
     vel = 200
 
     t_e_leg = 3 * 60  # turn at 3 min
@@ -285,7 +285,7 @@ def _make_tgt_1(max_time: float = 600):
 
 def _make_tgt_2(max_time: float = 600):
     # ===  Define target trajectory
-    x_tgt_init = np.array([-50e3, 50e3, 20e3 * _ft2m])
+    x_tgt_init = np.array([-50e3, 150e3, 20e3 * _ft2m])
     vel = 210
 
     t_ne_leg = 3 * 60  # turn at 3 min
@@ -324,7 +324,7 @@ def _make_tgt_2(max_time: float = 600):
 
 def _make_tgt_3(max_time: float = 600):
     # ===  Define target trajectory
-    x_tgt_init = np.array([-50e3, 150e3, 20e3 * _ft2m])
+    x_tgt_init = np.array([-50e3, 125e3, 20e3 * _ft2m])
     vel = 170
 
     t_se_leg = max_time  # turn at 3 min
@@ -339,9 +339,9 @@ def _make_tgt_3(max_time: float = 600):
 
 def example4():
     # TODO: Debug
-    # TODO: Why are tracks being initiated near the origin???
     # TODO: Is the process noise reasonable for the motion model???
-    # TODO: Make a 3-point initiator and test with CA motion model
+    # TODO: Run twice, with CA and with CV models.
+    # TODO: Redo graphics: 2x2 with truth data only (and FA measurements). Separate 1x1 with truth/tracks for both CA and CV motion models.
 
     # Make the targets
     max_time = 900 # seconds
@@ -365,7 +365,7 @@ def example4():
                        [30, 60, 30, 60]])
     num_dims, n_tdoa = np.shape(x_tdoa)
     ref_idx = 0
-    sigma_toa = 1e-8 # 10e-9
+    sigma_toa = 1e-7 # 10e-9
     cov_toa = (sigma_toa ** 2) * np.eye(n_tdoa)
     cov_roa = CovarianceMatrix(speed_of_light ** 2 * cov_toa)
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx, variance_is_toa=False)
@@ -399,15 +399,18 @@ def example4():
 
     # Initialize the Tracker
     # plot_dims = np.s_[:2] # x/y are the plot axes
-    transition = ConstantAccelerationMotionModel(num_dims=3,process_covar=5**2)
+    transition = ConstantVelocityMotionModel(num_dims=3,process_covar=1**2)
+    # transition = ConstantAccelerationMotionModel(num_dims=3,process_covar=1**2)
     msmt_model = MeasurementModel(state_space=transition.state_space, pss=tdoa)
     associator = GNNAssociator(motion_model=transition, gate_probability=.7)
+    initiator = TwoPointInitiator(msmt_model=msmt_model, associator=associator)
+    # initiator = ThreePointInitiator(msmt_model=msmt_model, associator=associator)
+
     tracker = Tracker(transition=transition, msmt_model=msmt_model,
-                      initiator=ThreePointInitiator(msmt_model=msmt_model, associator=associator),
-                      associator=associator,
+                      initiator=initiator, associator=associator,
                       deleter=MissedDetectionDeleter(num_missed_detections=3),
                       promoter=MofNPromoter(num_hits=3, num_chances=5),
-                      do_plotting=True, keep_all_tracks=True, print_status=True)
+                      do_plotting=False, keep_all_tracks=True, print_status=True)
 
     # Make truth state objects; we'll update their states over time
     truth_states = [State(state_space=transition.state_space, state=None, time=0, covar=None) for _ in tgts]
@@ -431,7 +434,13 @@ def example4():
     truth_label = 'Noisy Truth Measurements'
     fa_label = 'False Alarm Measurements'
 
-    num_fa_per_step = 0
+    num_fa_per_step = 5
+
+    # Setup interactive plotting
+    # plt.ion()
+    # tracker.setup_plot()
+    # tracker._ax.set_xlim(-50e3, 75e3)
+    # tracker._ax.set_ylim(-25e3, 150e3)
 
     # Print progress
     iterations_per_marker = 1
@@ -481,15 +490,19 @@ def example4():
         truth_label = None
         fa_label = None
 
+    # Interactive plot cleanup
+    # plt.ioff()
+    # plt.show()
+
     # Print all the tracks, including tentative ones
     trk_label = 'Firm Tracks'
     for t in tracker.all_tracks:
-        t.plot(axs[0,0], do_cov=False, do_vel=False, linestyle='--', label=trk_label, scale=scale)
+        t.plot(axs[0,0], do_cov=False, do_vel=False, linestyle='--', label=trk_label, scale=scale, plot_dims=np.s_[:2])
         trk_label = None
 
     trk_label = 'Tentative Tracks'
     for t in tracker.all_tentative_tracks:
-        t.plot(axs[0,0], do_cov=False, do_vel=False, linestyle=':', linewidth=0.25, label=trk_label, scale=scale)
+        t.plot(axs[0,0], do_cov=False, do_vel=False, linestyle=':', linewidth=0.25, label=trk_label, scale=scale, plot_dims=np.s_[:2])
         trk_label = None
 
     print('done.')
@@ -497,8 +510,8 @@ def example4():
     print(f"A total of {len(tracker.all_tentative_tracks)} tentative tracks were created but failed to promote.")
     print_elapsed(time.perf_counter()-t_start)
 
-    axs[0, 0].set_xlim([-100, 100])
-    axs[0, 0].set_ylim([-50, 150])
+    axs[0, 0].set_xlim([-50, 125])
+    axs[0, 0].set_ylim([-50, 200])
     [ax.legend(fontsize=8) for ax in axs.flatten()]
 
     return [fig]
