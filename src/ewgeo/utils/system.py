@@ -535,13 +535,13 @@ class PassiveSurveillanceSystem(ABC):
         else:
             return x, x_full
 
-    def gradient_descent(self, **kwargs)-> tuple[npt.NDArray, npt.NDArray] |\
+    def gradient_descent(self, zeta, **kwargs)-> tuple[npt.NDArray, npt.NDArray] |\
                                            tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
-        return self.gd_ls_solver(do_gd=True, **kwargs)
+        return self.gd_ls_solver(zeta, do_gd=True, **kwargs)
 
-    def least_square(self, **kwargs)-> tuple[npt.NDArray, npt.NDArray] |\
+    def least_square(self, zeta, **kwargs)-> tuple[npt.NDArray, npt.NDArray] |\
                                            tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
-        return self.gd_ls_solver(do_gd=False, **kwargs)
+        return self.gd_ls_solver(zeta, do_gd=False, **kwargs)
 
     def gd_ls_uncertainty(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, do_gd: bool,
                           do_sensor_pos: bool=False, x_sensor: npt.ArrayLike=None,
