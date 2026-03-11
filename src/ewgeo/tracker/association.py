@@ -429,8 +429,8 @@ class Associator(ABC):
             self.gate_probability = gate_probability
 
     @abstractmethod
-    def associate(self, measurements: list[Measurement],
-                  tracks: list[Track])-> tuple[dict[Track, Hypothesis], list[Measurement]]:
+    def associate(self, tracks: list[Track],
+                  measurements: list[Measurement])-> tuple[dict[Track, Hypothesis], list[Measurement]]:
         pass
 
 
@@ -518,8 +518,8 @@ class NNAssociator(Associator):
 
 class GNNAssociator(Associator):
 
-    def associate(self, measurements: list[Measurement],
-                  tracks: list[Track], print_table: bool=False) -> tuple[dict[Track, Hypothesis], list[Measurement]]:
+    def associate(self, tracks: list[Track],
+                  measurements: list[Measurement], print_table: bool=False) -> tuple[dict[Track, Hypothesis], list[Measurement]]:
         # TODO: Test
         num_tracks = len(tracks)
         num_measurements = len(measurements)

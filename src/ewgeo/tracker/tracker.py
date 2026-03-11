@@ -109,7 +109,7 @@ class Tracker:
         # ---- Live plot update
         if self.do_plotting:
             if self._ax is None:
-                raise RunTimeError("Plotting is enabled, but no axes exist."
+                raise RuntimeError("Plotting is enabled, but no axes exist."
                                    "Call tracker.setup_plot() before starting the update loop.")
             self.plot(ax=self._ax)
             plt.draw()
@@ -200,16 +200,16 @@ class Tracker:
             self.deleted_tracks.extend(tracks_to_delete)
 
         # Repeat with the tentative tracks
-        # tentative_tracks_to_delete = self.deleter.delete(tracks=self._tentative_tracks)
+        tentative_tracks_to_delete = self.deleter.delete(tracks=self._tentative_tracks)
 
         # Remove the tracks by creating a new list that excludes them
-        # self._tentative_tracks = [t for t in self._tentative_tracks if t not in tentative_tracks_to_delete]
+        self._tentative_tracks = [t for t in self._tentative_tracks if t not in tentative_tracks_to_delete]
 
-        # if self.keep_all_tracks:
-        #     self.deleted_tracks.extend(tentative_tracks_to_delete)
+        if self.keep_all_tracks:
+            self.deleted_tracks.extend(tentative_tracks_to_delete)
 
-        # if self.print_status:
-        #     print(f"...{len(tracks_to_delete)+len(tentative_tracks_to_delete)} tracks dropped...")
+        if self.print_status:
+            print(f"...{len(tracks_to_delete)+len(tentative_tracks_to_delete)} tracks dropped...")
 
         return
 
@@ -267,7 +267,7 @@ class Tracker:
             # Plot
             if self.msmt_handle is None:
                 # Need a new plot
-                self.msmt_handle = plt.scatter(ax)
+                self.msmt_handle = ax.scatter(msmt_coords)
             else:
                 # Update the plot
                 self.msmt_handle.set_offsets(msmt_coords)

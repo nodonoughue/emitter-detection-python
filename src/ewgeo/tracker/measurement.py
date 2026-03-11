@@ -83,7 +83,7 @@ class MeasurementModel:
         if self.state_space.has_vel and j.shape[0] > self.pss.num_dim:
             # The state space has velocity components, and the pss returned rows for
             # the jacobian w.r.t. velocity.
-            h[: self.state_space.vel_slice] = np.transpose(j[self.pss.num_dim:, :])
+            h[:, self.state_space.vel_slice] = np.transpose(j[self.pss.num_dim:, :])
 
         return h
 
