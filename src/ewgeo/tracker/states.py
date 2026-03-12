@@ -61,17 +61,10 @@ class State:
             self.state = np.zeros((state_space.num_states,))
         else:
             self.state = np.array(state, dtype=np.float64)
-        if covar is not None:
-            self.covar = CovarianceMatrix(covar)
+        self.covar = CovarianceMatrix(covar) if covar is not None else None
 
     def __str__(self):
         return f"State at t={self.time}: {self.state}"
-
-    def copy(self, **kwargs)->Self:
-        new_state=State(self.state_space, self.time, self.state, self.covar)
-        for key, value in kwargs.items():
-            new_state.__setattr__(key, value)
-        return new_state
 
     @property
     def size(self) -> int:

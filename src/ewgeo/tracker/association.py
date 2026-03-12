@@ -214,7 +214,7 @@ class Hypothesis:
         new_state_covar = (np.eye(t.curr_state.size) - kalman_gain @ measurement_jacobian) @ prediction_state_covar
 
         # Make a new State object and add it to the track
-        new_state = t.curr_state.copy(state=new_state_vec, covar=CovarianceMatrix(new_state_covar), time=self.measurement.time)
+        new_state = State(t.curr_state.state_space, self.measurement.time, new_state_vec, CovarianceMatrix(new_state_covar))
         if ax is not None:
             # Plot a dashed line from the current state to the new one
             plt.plot(*zip(t.curr_state.position[plot_dims], new_state.position[plot_dims]),
@@ -292,8 +292,8 @@ class MissedDetectionHypothesis(Hypothesis):
         if ax is not None:
             hdl = t.plot(ax=ax, do_vel=False, do_cov=True, predicted_state=self.predicted_state, marker='^')
 
-        # Make a copy of the predicted state, and add it to the track
-        new_state = self.predicted_state.copy()
+        # Add the predicted state to the track
+        new_state = self.predicted_state
 
         if ax is not None:
             # Plot a dashed line from the current state to the new one
@@ -345,7 +345,7 @@ class GMMHypothesis(Hypothesis):
             updated_state_covar = CovarianceMatrix(covar)
 
             # Wrap it in a new state
-            new_state = states[0].copy(state=updated_state_vec, covar=updated_state_covar)
+            new_state = State(states[0].state_space, states[0].time, updated_state_vec, updated_state_covar)
 
 
             # Append the state

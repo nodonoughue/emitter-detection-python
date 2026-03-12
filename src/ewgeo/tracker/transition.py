@@ -59,7 +59,7 @@ class MotionModel(ABC):
 
         if time_delta == 0:
             # We already have a state at this time; nothing to predict forward
-            return s.copy()
+            return s
 
         if time_delta is not None and time_delta != self.time_delta:
             # Generate new ones
@@ -75,7 +75,7 @@ class MotionModel(ABC):
             new_covar = CovarianceMatrix(self.f @ s.covar.cov @ np.transpose(self.f) + self.q.cov)
 
         # Make a new State object
-        return s.copy(state=new_state, covar=new_covar, time=new_time)
+        return State(s.state_space, new_time, new_state, new_covar)
 
     def update_time_step(self, time_delta):
         if time_delta is None:

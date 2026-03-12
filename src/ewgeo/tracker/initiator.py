@@ -85,10 +85,9 @@ class TwoPointInitiator(Initiator):
                         vel_est = (s2.position - s1.position) / dt
 
                         # Build a proper initial state with velocity estimate
-                        init_state = s2.copy(
-                            state=self._build_state_with_velocity(s2, vel_est),
-                            covar=self._build_initial_covariance(s2, dt)
-                        )
+                        init_state = State(s2.state_space, s2.time,
+                                           self._build_state_with_velocity(s2, vel_est),
+                                           self._build_initial_covariance(s2, dt))
                         confirmed_tracks.append(
                             Track(initial_state=init_state, track_id=track.track_id)
                         )
@@ -263,7 +262,7 @@ class ThreePointInitiator(Initiator):
         pos_var = np.mean([pos_covar_multiplier * s.covar.cov[:num_dim, :num_dim] for s in [s1, s2, s3]], axis=0)
 
         init_covar = self._propagate_covariance(pos_var, dt, s3.state_space)
-        init_state = s3.copy(state=init_state_vec, covar=CovarianceMatrix(init_covar))
+        init_state = State(s3.state_space, s3.time, init_state_vec, CovarianceMatrix(init_covar))
 
         return Track(initial_state=init_state)
 
