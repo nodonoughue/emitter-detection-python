@@ -460,7 +460,7 @@ class CovarianceMatrix:
 
         return CovarianceMatrix(new_cov)
 
-    def resample_hybrid(self, num_aoa: int=0, num_tdoa: int=None, num_fdoa: int=None,
+    def resample_hybrid(self, num_aoa: int=0, num_tdoa: int=0, num_fdoa: int=0,
                         tdoa_ref_idx=None, fdoa_ref_idx=None) -> Self:
         """
         Resample a block-diagonal covariance matrix representing AOA, TDOA, and FDOA measurements errors. Original
@@ -485,8 +485,16 @@ class CovarianceMatrix:
         # First, we generate the test and reference index vectors
         test_idx_vec_aoa = np.arange(num_aoa)
         ref_idx_vec_aoa = np.nan * np.ones((num_aoa,))
-        test_idx_vec_tdoa, ref_idx_vec_tdoa = parse_reference_sensor(tdoa_ref_idx, num_tdoa)
-        test_idx_vec_fdoa, ref_idx_vec_fdoa = parse_reference_sensor(fdoa_ref_idx, num_fdoa)
+        if num_tdoa > 0:
+            test_idx_vec_tdoa, ref_idx_vec_tdoa = parse_reference_sensor(tdoa_ref_idx, num_tdoa)
+        else:
+            test_idx_vec_tdoa = np.array([])
+            ref_idx_vec_tdoa = np.array([])
+        if num_fdoa > 0:
+            test_idx_vec_fdoa, ref_idx_vec_fdoa = parse_reference_sensor(fdoa_ref_idx, num_fdoa)
+        else:
+            test_idx_vec_fdoa = np.array([])
+            ref_idx_vec_fdoa = np.array([])
 
         # Second, we assemble them into a single vector
         test_idx_vec = np.concatenate((test_idx_vec_aoa, num_aoa + test_idx_vec_tdoa,
