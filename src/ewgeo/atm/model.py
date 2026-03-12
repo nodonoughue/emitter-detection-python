@@ -65,15 +65,12 @@ def calc_zenith_loss(freq_hz: npt.ArrayLike,
                      alt_start_m: npt.ArrayLike=np.array([0.]),
                      zenith_angle_deg: npt.ArrayLike=np.array([0.])):
     """
-    # Computes the cumulative loss from alt_start [m] to zenith (100 km
-    # altitude), for the given frequencies (freq) in Hz and angle from zenith
-    # zenith_angle, in degrees.
-    #
-    # Does not account for refraction of the signal as it travels through the
-    # atmosphere; assumes a straight line propagation at the given zenith
-    # angle.
+    Compute the cumulative atmospheric loss from alt_start [m] to zenith (100 km altitude),
+    for the given frequencies and angle from zenith.
 
-    Ported from MATLAB Code
+    Does not account for refraction; assumes straight-line propagation at the given zenith angle.
+
+    Ported from MATLAB Code.
 
     Nicholas O'Donoughue
     17 March 2021

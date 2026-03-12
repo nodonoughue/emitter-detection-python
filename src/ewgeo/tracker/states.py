@@ -23,22 +23,29 @@ class StateSpace:
     accel_slice: slice | None
 
     def __init__(self, **kwargs):
+        """Initialize a StateSpace from keyword arguments mapping attribute names to values."""
         for key, value in kwargs.items():
             setattr(self, key, value)
 
     def pos_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        """Return the position sub-vector of state vector x."""
         return x[self.pos_slice]
 
     def vel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        """Return the velocity sub-vector of state vector x, or None if this state space has no velocity."""
         return x[self.vel_slice] if self.has_vel else None
 
     def pos_vel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        """Return the combined position+velocity sub-vector of state vector x. Falls back to position-only
+        if this state space has no velocity."""
         return x[self.pos_vel_slice] if self.has_vel else self.pos_component(x)
 
     def accel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        """Return the acceleration sub-vector of state vector x, or None if this state space has no acceleration."""
         return x[self.accel_slice] if self.has_accel else None
 
     def copy(self, **kwargs)-> Self:
+        """Return a copy of this StateSpace, optionally overriding specific attributes via kwargs."""
         new_state_space = StateSpace(**self.__dict__)
         for key, value in kwargs.items():
             new_state_space.__setattr__(key, value)
@@ -55,6 +62,12 @@ class State:
     covar: CovarianceMatrix
 
     def __init__(self, state_space: StateSpace, time: float, state: npt.ArrayLike, covar: CovarianceMatrix=None):
+        """
+        :param state_space: StateSpace object describing the layout of the state vector
+        :param time: Timestamp of this state [seconds]
+        :param state: State vector array of shape (num_states,); zeros used if None
+        :param covar: Optional CovarianceMatrix (or array-like) for the state estimate error
+        """
         self.state_space = state_space
         self.time = time
         if state is None:
@@ -76,6 +89,7 @@ class State:
 
     @position.setter
     def position(self, value: npt.ArrayLike):
+        """Set the position sub-vector of the state vector."""
         self.state[self.state_space.pos_slice] = np.array(value)
 
     @property
@@ -84,6 +98,7 @@ class State:
 
     @velocity.setter
     def velocity(self, value: npt.ArrayLike):
+        """Set the velocity sub-vector of the state vector. Raises ValueError if state space has no velocity."""
         if self.has_vel:
             self.state[self.state_space.vel_slice] = np.array(value)
         else:
@@ -95,6 +110,8 @@ class State:
 
     @pos_vel.setter
     def pos_vel(self, value: npt.ArrayLike):
+        """Set the position+velocity sub-vector of the state vector. Falls back to setting position-only
+        if this state space has no velocity."""
         if self.has_vel:
             self.state[self.state_space.pos_vel_slice] = np.array(value)
         else:
@@ -107,6 +124,7 @@ class State:
 
     @acceleration.setter
     def acceleration(self, value: npt.ArrayLike):
+        """Set the acceleration sub-vector of the state vector. Raises ValueError if state space has no acceleration."""
         if self.has_accel:
             self.state[self.state_space.accel_slice] = np.array(value)
         else:
@@ -156,6 +174,19 @@ class State:
              do_pos: bool=True, do_vel: bool=False, do_cov: bool=False,
              scale: float=1, cov_ellipse_confidence: float=0.75,
              **kwargs)-> tuple[Line2D, Line2D, Quiver] | None:
+        """
+        Plot this state on the provided axes.
+
+        :param ax: Matplotlib Axes to plot on
+        :param plot_dims: Slice selecting which spatial dimensions to include (default: all)
+        :param do_pos: If True, plot the position as a point (default: True)
+        :param do_vel: If True, draw a velocity arrow at the position (default: False)
+        :param do_cov: If True, draw a covariance error ellipse around the position (default: False)
+        :param scale: Divide all coordinates by this factor before plotting (e.g., 1e3 for km) (default: 1)
+        :param cov_ellipse_confidence: Confidence interval for the covariance ellipse (default: 0.75)
+        :param kwargs: Additional keyword arguments forwarded to ax.plot()
+        :return: Tuple of (position handle, error ellipse handle, velocity quiver handle); any may be None
+        """
 
         coords = self.position[plot_dims]/scale
 
@@ -188,6 +219,19 @@ class State:
                     trk_hdl: Line2D | None, trk_err_hdl: Line2D | None, trk_vel_hdl: Quiver | None,
                     plot_dims: slice = np.s_[:], do_pos: bool=True, do_vel: bool=False, do_cov: bool=False,
                     scale: float=1, cov_ellipse_confidence: float=0.75):
+        """
+        Update existing plot handles with the current state data (for animation).
+
+        :param trk_hdl: Existing position Line2D handle to update, or None
+        :param trk_err_hdl: Existing covariance ellipse Line2D handle to update, or None
+        :param trk_vel_hdl: Existing velocity Quiver handle to update, or None
+        :param plot_dims: Slice selecting which spatial dimensions to include (default: all)
+        :param do_pos: If True, update the position handle (default: True)
+        :param do_vel: If True, update the velocity arrow (default: False)
+        :param do_cov: If True, update the covariance ellipse (default: False)
+        :param scale: Divide all coordinates by this factor before plotting (default: 1)
+        :param cov_ellipse_confidence: Confidence interval for the covariance ellipse (default: 0.75)
+        """
 
         # Plot Position
         coords = self.position[plot_dims]/scale

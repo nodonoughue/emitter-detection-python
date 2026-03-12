@@ -7,6 +7,7 @@ from .track import Track, State, StateSpace
 from ..utils.covariance import CovarianceMatrix
 
 class Initiator(ABC):
+    """Abstract base class for track initiation logic."""
     next_track_id: int = 0
 
     @abstractmethod
@@ -27,9 +28,19 @@ class SinglePointMeasurementInitiator(Initiator):
     msmt_model: MeasurementModel
 
     def __init__(self, msmt_model: MeasurementModel):
+        """
+        :param msmt_model: MeasurementModel used to convert each measurement into an initial State
+        """
         self.msmt_model = msmt_model
 
     def initiate(self, measurements: list[Measurement], next_track_id: int=None) -> tuple[list[Track], int]:
+        """
+        Create one tentative track per measurement.
+
+        :param measurements: New unassociated measurements from the current scan
+        :param next_track_id: Starting track ID counter; uses and updates self.next_track_id if None
+        :return: Tuple of (list of newly created Track objects, updated next_track_id)
+        """
         tracks = []
         if next_track_id is None:
             next_track_id = self.next_track_id
@@ -58,12 +69,24 @@ class TwoPointInitiator(Initiator):
     _buffer_tracks: list          # single-point tentative tracks for association
 
     def __init__(self, msmt_model: MeasurementModel, associator: Associator):
+        """
+        :param msmt_model: MeasurementModel used to convert each measurement into a State
+        :param associator: Associator used to pair new measurements with buffered single-point tracks
+        """
         self.msmt_model = msmt_model
         self.associator = associator
         self._buffered_measurements = {}
         self._buffer_tracks = []
 
     def initiate(self, measurements: list[Measurement], next_track_id: int=None) -> tuple[list[Track], int]:
+        """
+        Process one scan of measurements. Pairs new measurements with buffered single-point tracks to
+        produce velocity estimates; unmatched new measurements are buffered for the next scan.
+
+        :param measurements: New unassociated measurements from the current scan
+        :param next_track_id: Starting track ID counter; uses and updates self.next_track_id if None
+        :return: Tuple of (list of newly confirmed Track objects with velocity estimates, updated next_track_id)
+        """
         confirmed_tracks = []
         if next_track_id is None:
             next_track_id = self.next_track_id
@@ -111,6 +134,7 @@ class TwoPointInitiator(Initiator):
 
     @staticmethod
     def _build_state_with_velocity(state: State, vel_est) -> np.ndarray:
+        """Return a copy of ``state``'s state vector with the velocity sub-vector replaced by ``vel_est``."""
         new_state_vec = state.state.copy()
         new_state_vec[state.state_space.vel_slice] = vel_est
         return new_state_vec
@@ -160,12 +184,24 @@ class ThreePointInitiator(Initiator):
     _stage2_tracks: list[Track]   # two-point buffer (t1, t2)
 
     def __init__(self, msmt_model: MeasurementModel, associator: Associator):
+        """
+        :param msmt_model: MeasurementModel used to convert measurements into States
+        :param associator: Associator used to link measurements across the three buffered stages
+        """
         self.msmt_model = msmt_model
         self.associator = associator
         self._stage1_tracks = []
         self._stage2_tracks = []
 
     def initiate(self, measurements: list[Measurement], next_track_id: int=None) -> tuple[list[Track], int]:
+        """
+        Process one scan. Attempts to advance stage-2 tracks to full confirmed tracks,
+        then advances stage-1 tracks to stage-2, then buffers any remaining measurements.
+
+        :param measurements: New unassociated measurements from the current scan
+        :param next_track_id: Starting track ID counter; uses and updates self.next_track_id if None
+        :return: Tuple of (list of newly confirmed Track objects, updated next_track_id)
+        """
         confirmed_tracks = []
         if next_track_id is None:
             next_track_id = self.next_track_id
@@ -227,6 +263,17 @@ class ThreePointInitiator(Initiator):
         return confirmed_tracks, next_track_id
 
     def _build_track(self, s1: State, s2: State, s3: State) -> Track | None:
+        """
+        Construct a confirmed Track from three geolocated States using central finite differences.
+
+        Returns None if the time steps between the three states differ by more than 10%.
+
+        :param s1: State at the first observation time
+        :param s2: State at the second observation time
+        :param s3: State at the third observation time (used as the initial state of the new track)
+        :return: Initialized Track with position, velocity, and (if available) acceleration estimates,
+                 or None if the time steps are inconsistent
+        """
         dt1 = s2.time - s1.time
         dt2 = s3.time - s2.time
 

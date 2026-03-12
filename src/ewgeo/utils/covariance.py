@@ -23,6 +23,12 @@ class CovarianceMatrix:
     _do_inverse: bool = True        # Control whether _inv will be filled
 
     def __init__(self, cov: npt.ArrayLike, do_cholesky: bool=True, do_inverse: bool=True):
+        """
+        :param cov: Square covariance matrix as an ndarray, or an existing CovarianceMatrix to deep-copy.
+                    A 1-D input is interpreted as a diagonal and expanded via ``np.diag``.
+        :param do_cholesky: If True (default), compute and cache the lower Cholesky factor on first access
+        :param do_inverse: If True (default), compute and cache the matrix inverse on first access
+        """
         if isinstance(cov, CovarianceMatrix):
             # Copy it instead (this is a deepcopy), then set all the
             # attributes of the current object to point to those of the copy.
@@ -347,11 +353,13 @@ class CovarianceMatrix:
 
     def solve_acb(self, a: npt.NDArray[np.float64], b: npt.NDArray[np.float64])-> npt.NDArray[np.float64]:
         """
-        Solve the matrix problem res = A @ C^{-1} @ B
+        Solve the matrix problem res = A @ C^{-1} @ B.
 
-        If self._inv is defined, this will be computed directly. If it is not defined, this will be
-        computed via the Cholesky decomposition.
+        Uses the cached matrix inverse when available; falls back to the Cholesky decomposition.
 
+        :param a: Left factor, shape (m, n)
+        :param b: Right factor, shape (n, k)
+        :return: Result of A @ C^{-1} @ B, shape (m, k)
         """
 
         # Make sure we've parsed the covariance
@@ -507,10 +515,12 @@ class CovarianceMatrix:
 
     def multiply(self, val, overwrite=True)-> Self | None:
         """
-        Multiply the covariance matrix by a given value. val must be a finite number.
+        Multiply the covariance matrix (and its cached decompositions) by a finite scalar.
 
-        Nicholas O'Donoughue
-        28 February 2025
+        :param val: Finite scalar multiplier
+        :param overwrite: If True (default), modify in place and return None;
+                          if False, return a new CovarianceMatrix and leave self unchanged
+        :return: None when overwrite=True; new CovarianceMatrix when overwrite=False
         """
 
         assert np.isfinite(val) and (np.isscalar(val) or np.size(val) <= 1), \

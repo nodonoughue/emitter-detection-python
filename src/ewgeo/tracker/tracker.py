@@ -52,6 +52,14 @@ class Tracker:
                  promoter: Promoter,
                  deleter: Deleter,
                  **kwargs):
+        """
+        :param associator: Associator that matches measurements to tracks (NN, GNN, or PDA)
+        :param initiator: Initiator that seeds new tentative tracks from unassociated measurements
+        :param promoter: Promoter that decides when tentative tracks become firm tracks
+        :param deleter: Deleter that decides when firm or tentative tracks are dropped
+        :param kwargs: Additional keyword arguments set as instance attributes (e.g., ``keep_all_tracks``,
+                       ``print_status``, ``do_plotting``, ``plot_tentative_tracks``, etc.)
+        """
         self.associator = associator
         self.initiator = initiator
         self.promoter = promoter
@@ -79,6 +87,15 @@ class Tracker:
         return self._tentative_tracks + self._failed_tracks
 
     def update(self, measurements, curr_time: float = None, reuse_measurements: bool=False):
+        """
+        Process one scan of measurements through the full tracker pipeline:
+        associate → promote → initiate → delete.
+
+        :param measurements: List of Measurement objects from the current scan
+        :param curr_time: Timestamp of the current scan [seconds]; inferred from measurements[0].time if None
+        :param reuse_measurements: If True, pass the full measurement set to tentative tracks even if
+                                   those measurements were already used to update firm tracks
+        """
         if curr_time is None and measurements:
             curr_time = measurements[0].time
 
@@ -120,6 +137,13 @@ class Tracker:
         return
 
     def update_existing_tracks(self, measurements: list[Measurement], curr_time: float = None) -> list[Measurement]:
+        """
+        Associate measurements with firm tracks and apply Kalman filter updates.
+
+        :param measurements: New measurements from the current scan
+        :param curr_time: Current scan timestamp [seconds]; forwarded to the associator for missed-detection coasting
+        :return: List of measurements that were not associated with any firm track
+        """
         if len(self.tracks) == 0:
             # Nothing to do
             return measurements
@@ -143,6 +167,14 @@ class Tracker:
         return unassoc_msmts
 
     def promote(self, measurements: list[Measurement], curr_time: float = None) -> list[Measurement]:
+        """
+        Associate measurements with tentative tracks, update them, and run the promoter to move
+        qualifying tentative tracks to the firm track list (or discard failing ones).
+
+        :param measurements: Measurements available for tentative track association
+        :param curr_time: Current scan timestamp [seconds]; forwarded to the associator for coasting
+        :return: List of measurements that were not associated with any tentative track
+        """
         if len(self._tentative_tracks) == 0:
             # Nothing to do
             return measurements
@@ -182,6 +214,11 @@ class Tracker:
         return unassoc_msmt
 
     def initiate(self, measurements: list[Measurement]):
+        """
+        Seed new tentative tracks from measurements that were not associated with any existing track.
+
+        :param measurements: Unassociated measurements from the current scan
+        """
         if len(measurements) == 0:
             # Nothing to do
             return
@@ -194,6 +231,11 @@ class Tracker:
         return
 
     def delete(self):
+        """
+        Run the deleter against all firm and tentative tracks, removing those that exceed the
+        missed-detection threshold. Deleted tracks are moved to ``deleted_tracks`` if
+        ``keep_all_tracks`` is True.
+        """
         # Test the firm tracks
         tracks_to_delete = self.deleter.delete(tracks=self.tracks)
 
@@ -218,6 +260,13 @@ class Tracker:
         return
 
     def setup_plot(self, ax: Axes = None, **kwargs) -> Axes:
+        """
+        Initialize the live-plot axes. Must be called before the update loop when ``do_plotting=True``.
+
+        :param ax: Existing Axes to draw on; a new figure and axes are created if None
+        :param kwargs: Keyword arguments forwarded to ``plt.subplots()`` when creating a new axes
+        :return: The Axes object used for plotting
+        """
         if ax is not None:
             self._ax = ax
             self._fig = ax.get_figure()

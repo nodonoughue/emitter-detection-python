@@ -4,19 +4,37 @@ from ewgeo.tracker import Track
 
 
 class Promoter(ABC):
+    """Abstract base class for track promotion logic."""
+
     @abstractmethod
     def promote(self, tracks: list[Track]) -> tuple[list[Track], list[Track]]:
         pass
 
 class MofNPromoter(Promoter):
+    """
+    M-of-N promoter: promotes a tentative track to firm status once it accumulates
+    at least ``num_hits`` confirmed updates, and drops it if it reaches ``num_chances``
+    total states without achieving enough hits.
+    """
     num_hits: int
     num_chances: int
 
     def __init__(self, num_hits: int, num_chances: int):
+        """
+        :param num_hits: Minimum number of confirmed measurement updates required to promote a track
+        :param num_chances: Maximum number of state updates (hits + misses) allowed before a
+                            tentative track is discarded if it has not yet been promoted
+        """
         self.num_hits = num_hits
         self.num_chances = num_chances
 
     def promote(self, tracks: list[Track]) -> tuple[list[Track], list[Track]]:
+        """
+        Evaluate each tentative track and classify it.
+
+        :param tracks: Tentative tracks to evaluate
+        :return: Tuple of (tracks to promote to firm status, tracks to discard)
+        """
         to_promote = []
         to_delete = []
 

@@ -18,6 +18,12 @@ class Track:
     num_updates: int = 0
 
     def __init__(self, **kwargs):
+        """
+        Initialize a Track. Pass ``initial_state`` as a keyword argument to seed the state list.
+
+        :param initial_state: (keyword) Initial State object; sets states=[initial_state] and num_updates=1
+        :param track_id: (keyword) Optional identifier string for the track (default: "")
+        """
         for key, value in kwargs.items():
             if key == 'initial_state':
                 self.states = [value]
@@ -47,7 +53,14 @@ class Track:
     def curr_state(self)->State:
         return self.states[-1]
 
-    def append(self, state:State, missed_detection: bool=False) -> None:
+    def append(self, state: State, missed_detection: bool=False) -> None:
+        """
+        Append a new state to this track.
+
+        :param state: New State to append
+        :param missed_detection: If True, increments the consecutive missed-detection counter and does not
+                                 increment num_updates. If False, resets the counter and increments num_updates.
+        """
         self.states.append(state)
         if missed_detection:
             self.num_missed_detections += 1
@@ -56,6 +69,11 @@ class Track:
             self.num_updates += 1
 
     def copy(self, **kwargs):
+        """
+        Return a shallow copy of this track, optionally overriding attributes via kwargs.
+        The states list is shallow-copied so the original State objects are shared.
+        A '_0' suffix is appended to the track_id unless track_id is provided in kwargs.
+        """
         # Initialize a new track using all the current track's properties
         if 'track_id' not in kwargs:
             kwargs['track_id'] = self.track_id + '_0'
@@ -138,15 +156,18 @@ class Track:
                     do_vel: bool=False, do_cov: bool=True,
                     scale: float=1, cov_ellipse_confidence: float=.75):
         """
-        Plot the states on the provided axis, with an optional scale factor (for converting from m to km, etc.).
+        Update existing plot handles with the current track history (for animation).
 
-        :param plot_dims: Slice representing which spatial axes to plot (optional)
-        :param predicted_state: Optional predicted state to append to the track plot.
-        :param do_vel: (default=False) If true, then a velocity arrow will be appended to the final (or predicted) state
-        :param do_cov: (default=False) If true, then a covariance ellipse will be plotted around the final (or
-        predicted) state
-        :param scale: (default=1) Scale the track plot by this factor
-        :param cov_ellipse_confidence: (default=0.75) Confidence interval for covariance ellipse visualization
+        :param trk_hdl: Existing track history Line2D handle to update
+        :param trk_pred_hdl: Existing predicted-state Line2D handle to update, or None
+        :param trk_err_hdl: Existing covariance ellipse Line2D handle to update, or None
+        :param trk_vel_hdl: Existing velocity Quiver handle to update, or None
+        :param plot_dims: Slice representing which spatial axes to plot (default: all)
+        :param predicted_state: Optional predicted state to draw as a dashed extension of the track
+        :param do_vel: If True, update the velocity arrow (default: False)
+        :param do_cov: If True, update the covariance ellipse (default: True)
+        :param scale: Divide all coordinates by this factor before plotting (default: 1)
+        :param cov_ellipse_confidence: Confidence interval for covariance ellipse visualization (default: 0.75)
         """
 
         # Pull the appropriate state dimensions from each state

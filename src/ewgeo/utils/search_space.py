@@ -21,6 +21,16 @@ class SearchSpace:
                  epsilon:npt.NDArray[np.float64] | float | None=None,
                  points_per_dim:npt.NDArray[np.int64] | int | None=None,
                  max_offset:npt.NDArray[np.float64] | float | None=None):
+        """
+        Define a multi-dimensional brute-force search grid. Two of the three grid parameters
+        (``epsilon``, ``points_per_dim``, ``max_offset``) must be provided; the third is
+        derived automatically.
+
+        :param x_ctr: Grid center, shape (n_dim,) or scalar; all axes share the same center when scalar
+        :param epsilon: Grid spacing in each dimension (step size between adjacent grid points)
+        :param points_per_dim: Number of grid points per dimension
+        :param max_offset: Half-extent of the grid in each dimension (distance from center to edge)
+        """
         self._x_ctr = np.array(x_ctr, dtype=np.float64)
         if epsilon is not None: self._epsilon = np.array(epsilon, dtype=np.float64)
         if points_per_dim is not None: self._points_per_dim = np.array(points_per_dim, dtype=np.int64)
@@ -31,11 +41,13 @@ class SearchSpace:
 
     @property
     def num_parameters(self)-> int:
+        """Number of search dimensions (length of the ``x_ctr`` vector)."""
         self.broadcast()
         return np.prod(np.shape(self.x_ctr)).astype(np.int64).item()
 
     @property
     def x_ctr(self)-> npt.NDArray[np.float64]:
+        """Grid center vector, shape (n_dim,)."""
         self.broadcast()
         return self._x_ctr
 
@@ -46,6 +58,7 @@ class SearchSpace:
 
     @property
     def epsilon(self)-> npt.NDArray[np.float64]:
+        """Grid spacing (step size) in each dimension; derived from max_offset/points_per_dim if not set directly."""
         self.broadcast()
         if self._epsilon is None:
             # Build epsilon from max_offset and points_per_dim
@@ -63,6 +76,7 @@ class SearchSpace:
 
     @property
     def max_offset(self)-> npt.NDArray[np.float64]:
+        """Half-extent of the grid (distance from center to edge) in each dimension."""
         self.broadcast()
         if self._max_offset is None:
             # Build max_offset from epsilon and points_per_dim
@@ -78,6 +92,7 @@ class SearchSpace:
 
     @property
     def points_per_dim(self)-> npt.NDArray[np.int64]:
+        """Number of grid points in each dimension; derived from max_offset/epsilon if not set directly."""
         if self._points_per_dim is None:
             # Build points_per_dim from max_offset and epsilon
             self._points_per_dim = np.where(self.epsilon != 0, np.floor(1 + 2 * self.max_offset / self.epsilon), 1).astype(int)
@@ -92,24 +107,28 @@ class SearchSpace:
 
     @property
     def x_vec(self)-> tuple[npt.NDArray[np.float64], ...]:
+        """Tuple of 1-D coordinate vectors, one per dimension (the axes used to build the meshgrid)."""
         if self._x_vec is None:
             self.make_nd_grid()
         return self._x_vec
 
     @property
     def x_set(self)-> npt.NDArray[np.float64]:
+        """All grid points as a (n_dim, N) array where N is the total number of grid points."""
         if self._x_set is None:
             self.make_nd_grid()
         return np.array(self._x_set)
 
     @property
     def x_grid(self)-> tuple[npt.NDArray[np.float64], ...]:
+        """Tuple of n_dim-dimensional meshgrid arrays (one per dimension), as returned by np.meshgrid."""
         if self._x_grid is None:
             self.make_nd_grid()
         return self._x_grid
 
     @property
     def grid_shape(self)-> tuple[int, ...]:
+        """Shape of the grid, excluding singleton (fixed) dimensions."""
         self.broadcast()
         return tuple([i for i in self.points_per_dim if i > 1])
 
@@ -138,6 +157,10 @@ class SearchSpace:
             return np.sqrt(np.sum(np.abs(err)**2, axis=None)) < .001 * np.sqrt(np.sum(np.abs(self.epsilon)**2, axis=None))
 
     def broadcast(self)-> bool:
+        """
+        Broadcast all defined grid parameters to a common shape so that per-dimension
+        operations work correctly. Returns True on success, False if the shapes are incompatible.
+        """
         # Verify that all variable sizes are compatible
         attrs = ['_x_ctr', '_epsilon', '_points_per_dim', '_max_offset']
         try:
@@ -231,6 +254,16 @@ class SearchSpace:
         return x0-o0, x0+o0, x1-o1, x1+o1
 
     def zoom_in(self, new_ctr: npt.ArrayLike, zoom: float=2.0, overwrite: bool=False)-> Self | None:
+        """
+        Refine the search grid by halving (or otherwise reducing) the grid spacing while keeping
+        the same number of grid points, recentered on ``new_ctr``.
+
+        :param new_ctr: New grid center, must have the same dimensionality as the current center
+        :param zoom: Factor by which to divide ``epsilon`` (default: 2.0)
+        :param overwrite: If True, modify this object in place and return None;
+                          if False (default), return a new SearchSpace
+        :return: New SearchSpace when overwrite=False; None when overwrite=True
+        """
         if np.size(new_ctr) != np.size(self.x_ctr):
             raise ValueError('New center must have the same dimensionality as the existing center.')
 

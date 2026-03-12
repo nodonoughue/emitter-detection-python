@@ -60,8 +60,8 @@ The **examples/** folder contains the code to execute each of the examples in th
 A number of utilities are provided in this repository, under the following modules:
 
 + **ewgeo.aoa** Code to execute angle-of-arrival estimation, as discussed in Chapter 7
-+ **ewgeo.array** Code to execute array-based angle-of-arrival estimation, as discussed in Chapter 8
-+ **ewgeo.atm** Code to model atmospheric loss, as discussed in Appendix Carlo
++ **ewgeo.array_df** Code to execute array-based direction-finding and angle-of-arrival estimation, as discussed in Chapter 8
++ **ewgeo.atm** Code to model atmospheric loss, as discussed in Appendix C
 + **ewgeo.detector** Code to model detection performance, as discussed in Chapter 3-4
 + **ewgeo.fdoa** Code to execute Frequency Difference of Arrival (FDOA) geolocation processing, as discussed in Chapter 12.
 + **ewgeo.hybrid** Code to execute hybrid geolocation processing, as discussed in Chapter 13.
@@ -69,6 +69,7 @@ A number of utilities are provided in this repository, under the following modul
 + **ewgeo.prop** Code to model propagation losses, as discussed in Appendix B.
 + **ewgeo.tdoa** Code to execute Time Difference of Arrival (TDOA) geolocation processing, as discussed in Chapter 11.
 + **ewgeo.triang** Code to model triangulation from multiple AOA measurements, as discussed in Chapter 10.
++ **ewgeo.tracker** Code to track emitter position over time using a Kalman filter, as discussed in Chapter 9.
 + **ewgeo.utils** Generic utilities, including numerical solvers used in geolocation algorithms.
 
 ## Feedback

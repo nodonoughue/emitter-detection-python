@@ -289,7 +289,7 @@ def find_intersect(x0: npt.NDArray[np.float64], psi0: float,
     :param x0: 2-D position of the first sensor
     :param psi0: Bearing of the first line, which begins at x0
     :param x1: 2-D position of the second sensor
-    :param psi1: Bearing of the second line, which begins at x0
+    :param psi1: Bearing of the second line, which begins at x1
     :return x_int: 2-D position of the intersection point
     """
 

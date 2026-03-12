@@ -368,6 +368,15 @@ def resample_noise(noise: npt.NDArray[np.float64],
 def parse_ref_vec_output_size(test_idx_vec: npt.NDArray[np.int64],
                               ref_idx_vec: npt.NDArray[np.int64],
                               n_sensor: int)-> tuple[int, int, int]:
+    """
+    Validate test/reference index vectors and return their sizes.
+
+    :param test_idx_vec: 1-D integer array of test sensor indices
+    :param ref_idx_vec: 1-D integer array of reference sensor indices (same length as test_idx_vec)
+    :param n_sensor: Total number of sensors (used for bounds checking)
+    :return: Tuple of (n_test, n_ref, n_pair_out) where n_pair_out = max(n_test, n_ref)
+    :raises TypeError: if the vectors have mismatched lengths or indices are out of range
+    """
     n_test = np.size(test_idx_vec)
     n_ref = np.size(ref_idx_vec)
     n_pair_out = np.fmax(n_test, n_ref)
@@ -435,8 +444,8 @@ def make_prior(pdf_type: str, mean: npt.NDArray[np.float64], covariance: npt.NDA
     :param covariance: CovarianceMatrix object (with size n_dim) of the prior
     :return prior: function handle for the statistical prior; accepts (n_dim, ) or (num_batch, n_dim) inputs and returns
                    a (num_batch, ) array of probabilities.
-    :return fim_prior: function handle for the Fisher Information Matrix; accepts (n_dim, ) or (num_batch, n_dim) inputs 
-                   and returns a (num_batch, ) array of CovarianceMatrix objects. 
+    :return fim_prior: the Fisher Information Matrix of the prior as a constant (n_dim x n_dim) array; for a Gaussian
+                   prior this equals the inverse of the covariance matrix and is independent of the input position.
     """
     if pdf_type.lower() == 'gaussian':
         rv = stats.multivariate_normal(mean=mean, cov=covariance)
@@ -536,11 +545,15 @@ def print_progress(num_total: int,
 def broadcast_backwards(arrs: list[npt.NDArray, ], start_dim: int=0, do_broadcast: bool=False)\
         -> tuple[list[npt.NDArray, ], tuple]:
     """
-    Ensure all inputs are broadcastable, with an optional starting dimension. Return extended arrays that have the same
-    number of dimensions so that numpy broadcasting works correctly.
+    Ensure all inputs have compatible shapes for trailing-dimension broadcasting (MATLAB-style).
+    New singleton dimensions are appended to the end rather than the front.
 
-    In this utility, new dimensions are added to the end of the array, not the beginning, to align with the behavior
-    in MATLAB.
+    :param arrs: List of arrays to align
+    :param start_dim: Dimensions before this index are left untouched; broadcasting is computed
+                      only from ``start_dim`` onward
+    :param do_broadcast: If True, call ``np.broadcast_to`` on each array to fully expand them;
+                         if False (default), only append singleton dimensions
+    :return: Tuple of (list of reshaped/broadcast arrays, broadcast output shape from start_dim onward)
     """
 
     # Parse the input shapes
