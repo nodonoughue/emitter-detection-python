@@ -430,7 +430,8 @@ class Associator(ABC):
 
     @abstractmethod
     def associate(self, tracks: list[Track],
-                  measurements: list[Measurement])-> tuple[dict[Track, Hypothesis], list[Measurement]]:
+                  measurements: list[Measurement],
+                  curr_time: float = None)-> tuple[dict[Track, Hypothesis], list[Measurement]]:
         pass
 
 
@@ -439,12 +440,21 @@ class NNAssociator(Associator):
 
     def associate(self, tracks: list[Track],
                   measurements: list[Measurement],
+                  curr_time: float = None,
                   print_table: bool=False)-> tuple[dict[Track, Hypothesis], list[Measurement]]:
         # TODO: Test
         hypotheses = {}
         unassociated_measurements = measurements[:]
-        if len(measurements)==0:
-            # No measurements, nothing to do
+        if len(measurements) == 0:
+            if curr_time is None or not tracks:
+                return hypotheses, unassociated_measurements
+            # No measurements: coast every track via a missed-detection hypothesis
+            for track in tracks:
+                hypotheses[track] = MissedDetectionHypothesis(track=track,
+                                                              motion_model=self.motion_model,
+                                                              sensor=None,
+                                                              distance=1.0 - self.gate_probability,
+                                                              time=curr_time)
             return hypotheses, unassociated_measurements
 
         curr_time = measurements[0].time
@@ -519,13 +529,26 @@ class NNAssociator(Associator):
 class GNNAssociator(Associator):
 
     def associate(self, tracks: list[Track],
-                  measurements: list[Measurement], print_table: bool=False) -> tuple[dict[Track, Hypothesis], list[Measurement]]:
+                  measurements: list[Measurement],
+                  curr_time: float = None,
+                  print_table: bool=False) -> tuple[dict[Track, Hypothesis], list[Measurement]]:
         # TODO: Test
         num_tracks = len(tracks)
         num_measurements = len(measurements)
-        if num_measurements==0 or num_tracks==0:
-            # Nothing to associate
+        if num_tracks == 0:
             return {}, measurements
+        if num_measurements == 0:
+            if curr_time is None:
+                return {}, measurements
+            # No measurements: coast every track via a missed-detection hypothesis
+            hypotheses = {}
+            for track in tracks:
+                hypotheses[track] = MissedDetectionHypothesis(track=track,
+                                                              motion_model=self.motion_model,
+                                                              sensor=None,
+                                                              distance=1.0 - self.gate_probability,
+                                                              time=curr_time)
+            return hypotheses, []
 
         curr_time = measurements[0].time
 
@@ -594,6 +617,7 @@ class PDAAssociator(Associator):
         
     def associate(self, tracks: list[Track],
                   measurements: list[Measurement],
+                  curr_time: float = None,
                   print_table: bool=False)-> tuple[dict[Track, GMMHypothesis], list[Measurement]]:
 
         if print_table:

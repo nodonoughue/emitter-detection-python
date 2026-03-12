@@ -78,7 +78,10 @@ class Tracker:
     def all_tentative_tracks(self):
         return self._tentative_tracks + self._failed_tracks
 
-    def update(self, measurements, reuse_measurements: bool=False):
+    def update(self, measurements, curr_time: float = None, reuse_measurements: bool=False):
+        if curr_time is None and measurements:
+            curr_time = measurements[0].time
+
         if self.print_status:
             print(f"Updating tracker with {len(measurements)} measurements...")
 
@@ -87,7 +90,7 @@ class Tracker:
 
         # Associate measurements with existing tracks
         # Returns any unused measurements
-        unassociated_measurements = self.update_existing_tracks(measurements=measurements)
+        unassociated_measurements = self.update_existing_tracks(measurements=measurements, curr_time=curr_time)
 
         # Associate measurements with tentative tracks, look for any that can be promoted
         if reuse_measurements:
@@ -96,7 +99,7 @@ class Tracker:
         else:
             # Only pass those measurements that were not used to update firm tracks
             measurements_for_tentative_tracks = unassociated_measurements[:]
-        unassociated_measurements_2 = self.promote(measurements=measurements_for_tentative_tracks)
+        unassociated_measurements_2 = self.promote(measurements=measurements_for_tentative_tracks, curr_time=curr_time)
 
         # Create new tracks with unused measurements; only include those that did not get used for either
         # firm or tentative tracks
@@ -116,13 +119,13 @@ class Tracker:
             plt.pause(pause_interval)
         return
 
-    def update_existing_tracks(self, measurements: list[Measurement]) -> list[Measurement]:
+    def update_existing_tracks(self, measurements: list[Measurement], curr_time: float = None) -> list[Measurement]:
         if len(self.tracks) == 0:
             # Nothing to do
             return measurements
 
         # Generate hypotheses
-        hypothesis_dict, unassoc_msmts = self.associator.associate(tracks=self.tracks, measurements=measurements)
+        hypothesis_dict, unassoc_msmts = self.associator.associate(tracks=self.tracks, measurements=measurements, curr_time=curr_time)
 
         num_coasted_tracks = np.sum([1 for h in hypothesis_dict.values() if isinstance(h,MissedDetectionHypothesis)])
         if num_coasted_tracks > 0:
@@ -139,7 +142,7 @@ class Tracker:
         # Return the unused measurements
         return unassoc_msmts
 
-    def promote(self, measurements: list[Measurement]) -> list[Measurement]:
+    def promote(self, measurements: list[Measurement], curr_time: float = None) -> list[Measurement]:
         if len(self._tentative_tracks) == 0:
             # Nothing to do
             return measurements
@@ -149,7 +152,8 @@ class Tracker:
 
         # Generate hypotheses to match measurements to the tentative tracks
         hypothesis_dict, unassoc_msmt = self.associator.associate(tracks=self._tentative_tracks,
-                                                                  measurements=measurements)
+                                                                  measurements=measurements,
+                                                                  curr_time=curr_time)
 
         # Update the tracks associated with these hypotheses
         tentative_hypotheses = hypothesis_dict.values()

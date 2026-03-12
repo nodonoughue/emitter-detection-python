@@ -406,8 +406,7 @@ def example4():
     initiator = TwoPointInitiator(msmt_model=msmt_model, associator=associator)
     # initiator = ThreePointInitiator(msmt_model=msmt_model, associator=associator)
 
-    tracker = Tracker(transition=transition, msmt_model=msmt_model,
-                      initiator=initiator, associator=associator,
+    tracker = Tracker(initiator=initiator, associator=associator,
                       deleter=MissedDetectionDeleter(num_missed_detections=3),
                       promoter=MofNPromoter(num_hits=3, num_chances=5),
                       do_plotting=False, keep_all_tracks=True, print_status=True)

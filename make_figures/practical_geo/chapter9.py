@@ -396,7 +396,7 @@ def make_figure_8(prefix=None):
     time = np.arange(len(state_vecs)) * time_step
     states = [State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
     states[-1].covar = CovarianceMatrix(np.diag([2.0, 0.75, 0.4, 0.4]) * 1e4)
-    track = Track(states=states,id='0')
+    track = Track(states=states, track_id='0')
 
     num_missed_detections = 3
 
