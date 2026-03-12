@@ -12,12 +12,18 @@ class Measurement:
     zeta: npt.NDArray[np.float64]
 
     def __init__(self, time: float, sensor: PassiveSurveillanceSystem | None, zeta: npt.NDArray[np.float64]):
+        """
+        :param time: Timestamp of the measurement [seconds]
+        :param sensor: PassiveSurveillanceSystem that produced this measurement, or None
+        :param zeta: Measurement vector
+        """
         self.time = time
         self.sensor = sensor
         self.zeta = zeta
 
     @property
     def size(self)->int:
+        """Number of scalar elements in the measurement vector."""
         return self.zeta.size
 
     def __str__(self):
@@ -33,18 +39,32 @@ class MeasurementModel:
     pss: PassiveSurveillanceSystem
 
     def __init__(self, state_space: StateSpace, pss: PassiveSurveillanceSystem):
+        """
+        :param state_space: StateSpace describing the tracker state vector layout
+        :param pss: PassiveSurveillanceSystem used to generate and evaluate measurements
+        """
         self.state_space = state_space
         self.pss = pss
 
     @property
     def num_measurement_dimensions(self)->int:
+        """Number of scalar elements produced by one call to the underlying PSS measurement function."""
         return self.pss.num_measurements
 
     @property
     def num_state_dimensions(self)->int:
+        """Total number of scalar elements in the tracker state vector."""
         return self.state_space.num_states
 
     def false_alarm(self, max_val: float, num: int, time: float = None)-> list[Measurement]:
+        """
+        Generate a list of uniformly-distributed false-alarm measurements.
+
+        :param max_val: Measurements are drawn uniformly from [-max_val, max_val] in each dimension
+        :param num: Number of false-alarm measurements to generate
+        :param time: Timestamp to assign to each measurement (default: None)
+        :return: List of Measurement objects
+        """
         return [Measurement(time=time,
                             sensor=self.pss,
                             zeta=np.random.uniform(low=-max_val,
@@ -71,6 +91,15 @@ class MeasurementModel:
         return Measurement(zeta=z, sensor=self.pss, time=state.time)
 
     def jacobian(self, state: State) -> npt.NDArray:
+        """
+        Compute the H matrix (measurement Jacobian) for the Kalman filter update at the given state.
+
+        The PSS Jacobian is evaluated at the state's position (and velocity, if available), then mapped
+        into the full tracker state vector shape via the state space slices.
+
+        :param state: State at which to evaluate the Jacobian
+        :return: H matrix of shape (num_measurements, num_states)
+        """
         j = self.pss.jacobian(x_source=self.state_space.pos_component(state.state),
                               v_source=self.state_space.vel_component(state.state))
 
@@ -83,7 +112,7 @@ class MeasurementModel:
         if self.state_space.has_vel and j.shape[0] > self.pss.num_dim:
             # The state space has velocity components, and the pss returned rows for
             # the jacobian w.r.t. velocity.
-            h[: self.state_space.vel_slice] = np.transpose(j[self.pss.num_dim:, :])
+            h[:, self.state_space.vel_slice] = np.transpose(j[self.pss.num_dim:, :])
 
         return h
 
@@ -99,6 +128,13 @@ class MeasurementModel:
         return self.log_likelihood_from_measurement(state=state2, measurement=m)
 
     def log_likelihood_from_measurement(self, state: State, measurement: Measurement) -> float:
+        """
+        Compute the log-likelihood of an existing Measurement given a candidate State.
+
+        :param state: Candidate state (the hypothesized truth)
+        :param measurement: Measurement to score
+        :return: Log-likelihood scalar
+        """
         return self.pss.log_likelihood(x_source=self.state_space.pos_component(state.state),
                                        v_source=self.state_space.vel_component(state.state),
                                        zeta=measurement.zeta)
@@ -126,8 +162,17 @@ class MeasurementModel:
         if not truth_state:
             # Compute the CRLB and put it on top of the covariance matrix object
             crlb = self.pss.compute_crlb(x_source=s.pos_vel)
+            # Note: if the PSS system has no velocity information, the CRLB calculation
+            # will return a matrix of zeros for those elements.
             init_covar = 1e6*np.eye(self.state_space.num_states)
             init_covar[:crlb.size, :crlb.size] = crlb.cov
+
+            # Check for a velocity component
+            eps_vel_trace = .001 # if it's better than .001 m/s, let's assume it's actually a numerical
+                                 # error
+            vel_slice = self.state_space.vel_slice
+            if np.trace(init_covar[vel_slice, vel_slice]) <= eps_vel_trace:
+                init_covar[vel_slice, vel_slice] = 1e6*np.eye(self.state_space.num_dims)
 
             s.covar = CovarianceMatrix(init_covar)
 

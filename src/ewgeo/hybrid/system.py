@@ -422,11 +422,11 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         return result
 
-    def grad_x(self,
-               x_source: npt.ArrayLike,
-               v_source: npt.ArrayLike | None=None,
-               x_sensor: npt.ArrayLike | None=None,
-               v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
+    def grad_source(self,
+                    x_source: npt.ArrayLike,
+                    v_source: npt.ArrayLike | None=None,
+                    x_sensor: npt.ArrayLike | None=None,
+                    v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
 
         # Break apart the sensor position, velocity, and bias measurement inputs into their AOA, TDOA, and FDOA
         # components
@@ -441,9 +441,9 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
 
         # Call each subordinate PSS and compute its gradient (w.r.t source position)
         grads = [
-            pss.grad_x(x_source=x_source, x_sensor=sensor,
-                       v_sensor=v_fdoa if pss is self.fdoa else None,
-                       v_source=v_source if pss is self.fdoa else None)
+            pss.grad_source(x_source=x_source, x_sensor=sensor,
+                            v_sensor=v_fdoa if pss is self.fdoa else None,
+                            v_source=v_source if pss is self.fdoa else None)
             for pss, sensor in [
                 (self.aoa, x_aoa),
                 (self.tdoa, x_tdoa),

@@ -4,6 +4,16 @@ import numpy as np
 class Atmosphere:
     def __init__(self, alt, temp, press, water_vapor_dens, water_vapor_press, alt_geopotential=None, rainfall=None,
                  cloud_dens=None):
+        """
+        :param alt: Geometric altitude [m], scalar or array
+        :param temp: Temperature [K]
+        :param press: Atmospheric pressure [hPa]
+        :param water_vapor_dens: Water vapor density [g/m³]
+        :param water_vapor_press: Water vapor partial pressure [hPa]
+        :param alt_geopotential: Geopotential altitude [km'] (optional)
+        :param rainfall: Rainfall rate [mm/hr] (optional)
+        :param cloud_dens: Cloud liquid water density [g/m³] (optional)
+        """
         self.alt = alt
         self.alt_geopotential = alt_geopotential
         self.temp = temp

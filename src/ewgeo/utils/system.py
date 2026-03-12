@@ -361,11 +361,11 @@ class PassiveSurveillanceSystem(ABC):
         return ell
 
     @abstractmethod
-    def grad_x(self,
-               x_source: npt.ArrayLike,
-               v_source: npt.ArrayLike | None=None,
-               x_sensor: npt.ArrayLike | None=None,
-               v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
+    def grad_source(self,
+                    x_source: npt.ArrayLike,
+                    v_source: npt.ArrayLike | None=None,
+                    x_sensor: npt.ArrayLike | None=None,
+                    v_sensor: npt.ArrayLike | None=None)-> npt.NDArray:
         pass
 
     @abstractmethod
@@ -535,13 +535,13 @@ class PassiveSurveillanceSystem(ABC):
         else:
             return x, x_full
 
-    def gradient_descent(self, **kwargs)-> tuple[npt.NDArray, npt.NDArray] |\
+    def gradient_descent(self, zeta, **kwargs)-> tuple[npt.NDArray, npt.NDArray] |\
                                            tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
-        return self.gd_ls_solver(do_gd=True, **kwargs)
+        return self.gd_ls_solver(zeta, do_gd=True, **kwargs)
 
-    def least_square(self, **kwargs)-> tuple[npt.NDArray, npt.NDArray] |\
+    def least_square(self, zeta, **kwargs)-> tuple[npt.NDArray, npt.NDArray] |\
                                            tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
-        return self.gd_ls_solver(do_gd=False, **kwargs)
+        return self.gd_ls_solver(zeta, do_gd=False, **kwargs)
 
     def gd_ls_uncertainty(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, do_gd: bool,
                           do_sensor_pos: bool=False, x_sensor: npt.ArrayLike=None,
@@ -635,6 +635,13 @@ class PassiveSurveillanceSystem(ABC):
                   'vel': th_est[vel_slice] if do_sensor_vel else None}
 
         return x_est, th_est, th_est_full
+
+    def measurement_gradient(self, th: npt.ArrayLike):
+        """
+        Wrapper for the Jacobian function. Returns the transpose, which can be used in Kalman-style
+        tracking equations.
+        """
+        return self.jacobian(th).T
 
     def gradient_descent_uncertainty(self, **kwargs)-> tuple[npt.NDArray[np.float64], dict, npt.NDArray[np.float64]]:
         return self.gd_ls_uncertainty(do_gd=True, **kwargs)
@@ -957,14 +964,16 @@ class PassiveSurveillanceSystem(ABC):
         # ==================== Sensor Position and Velocity Search ========================
         if do_pos_cal or do_vel_cal:
             x_shp = np.shape(x_sensor)
+            x_shp_rev = np.shape(x_sensor.T)
             v_shp = np.shape(v_sensor)
+            v_shp_rev = np.shape(v_sensor.T)
             num_pos = np.size(x_sensor)
             num_vel = np.size(v_sensor)
 
             def y_posvel(pos_vel: npt.ArrayLike)-> npt.NDArray:
                 pos_vel = np.array(pos_vel)
-                xx = np.reshape(pos_vel[:num_pos], shape=x_shp)
-                vv = np.reshape(pos_vel[num_pos:], shape=v_shp)
+                xx = np.reshape(pos_vel[:num_pos], shape=x_shp_rev).T
+                vv = np.reshape(pos_vel[num_pos:], shape=v_shp_rev).T
 
                 # shape: (self.num_measurements, num_cal)
                 z = self.measurement(x_sensor=xx, v_sensor=vv, bias=bias, x_source=x_cal, v_source=v_cal)
@@ -981,8 +990,8 @@ class PassiveSurveillanceSystem(ABC):
                 If do_vel_cal is False, then we set those columns to zero to ensure no change in sensor velocity is made.
                 """
                 pos_vel = np.array(pos_vel)
-                xx = np.reshape(pos_vel[:num_pos], shape=x_shp)
-                vv = np.reshape(pos_vel[num_pos:], shape=v_shp)
+                xx = np.reshape(pos_vel[:num_pos], shape=x_shp_rev).T
+                vv = np.reshape(pos_vel[num_pos:], shape=v_shp_rev).T
 
                 j = np.zeros((num_pos + num_vel, self.num_measurements*num_cal))
 
@@ -1000,12 +1009,12 @@ class PassiveSurveillanceSystem(ABC):
                 return j
 
             posvel_est, _ = solver(y=y_posvel, jacobian=jacobian_posvel,
-                                     x_init=np.concatenate((x_sensor.ravel(), v_sensor.ravel()), axis=0),
+                                     x_init=np.concatenate((x_sensor.T.ravel(), v_sensor.T.ravel()), axis=0),
                                      cov=cov_cal, **gd_kwargs)
             if do_pos_cal:
-                x_sensor = np.reshape(posvel_est[:num_pos], x_shp)
+                x_sensor = np.reshape(posvel_est[:num_pos], x_shp_rev).T
             if do_vel_cal:
-                v_sensor = np.reshape(posvel_est[num_pos:], v_shp)
+                v_sensor = np.reshape(posvel_est[num_pos:], v_shp_rev).T
 
         return x_sensor, v_sensor, bias
 
@@ -1165,7 +1174,12 @@ class PassiveSurveillanceSystem(ABC):
         def this_jacobian(pos_vel):
             return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_source=v_source, v_sensor=v_sensor)
 
-        return compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian, cov=self.cov,
+        if 'cov' not in kwargs.keys():
+            # If the user didn't manually specify a covariance matrix, use this object's current covariance matrix
+            # as the default.
+            kwargs['cov'] = self.cov
+
+        return compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian,
                                      **kwargs)
 
     # ==================== Helper Methods =====================

@@ -74,8 +74,17 @@ def convert(value, from_unit, to_unit):
 
 def parse_units(from_unit, to_unit):
     """
-    Attempt to determine what type of conversion this is, and use the appropriate factor
-    dictionary.
+    Determine the scalar multiplier to convert from ``from_unit`` to ``to_unit``.
+
+    Supported unit categories (case-insensitive):
+    - Length: m, km, ft, kft, yd, mi, nmi
+    - Angle: deg, rad
+    - Speed: m/s, kph, knot
+
+    :param from_unit: String name of the source unit
+    :param to_unit: String name of the target unit
+    :return: Scalar float such that ``result = value * factor``
+    :raises ValueError: if either unit is unrecognised or the two units belong to different categories
     """
 
     # Make sure the units are lower-case, our dictionaries are case-insensitive
@@ -118,8 +127,8 @@ def kft_to_km(kft_value):
     """
     Convert altitude from kft (thousands of feet) to km.
 
-    :param kft_value:
-    :return:
+    :param kft_value: Altitude in thousands of feet (scalar or array)
+    :return: Altitude in kilometers
     """
     # return kft_value * _ft2m
     return convert(kft_value, "kft", "km")
@@ -127,10 +136,10 @@ def kft_to_km(kft_value):
 
 def km_to_kft(km_value):
     """
-    Convert altitude from km to kft (thousands of feet)
+    Convert altitude from km to kft (thousands of feet).
 
-    :param km_value:
-    :return:
+    :param km_value: Altitude in kilometers (scalar or array)
+    :return: Altitude in thousands of feet
     """
     # return km_value * _m2ft
     return convert(km_value, "km", "kft")
@@ -138,10 +147,10 @@ def km_to_kft(km_value):
 
 def kph_to_mps(kph_value):
     """
-    Convert speed from kph to m/s
+    Convert speed from kph to m/s.
 
-    :param kph_value:
-    :return:
+    :param kph_value: Speed in kilometers per hour (scalar or array)
+    :return: Speed in meters per second
     """
     # return kph_value * 1e3 / 3600
     return convert(kph_value, "kph", "m/s")
@@ -149,10 +158,10 @@ def kph_to_mps(kph_value):
 
 def mps_to_kph(mps_value):
     """
-    Convert speed from m/s to kph
+    Convert speed from m/s to kph.
 
-    :param mps_value:
-    :return:
+    :param mps_value: Speed in meters per second (scalar or array)
+    :return: Speed in kilometers per hour
     """
     # return mps_value * 3.6
     return convert(mps_value, "m/s", "kph")

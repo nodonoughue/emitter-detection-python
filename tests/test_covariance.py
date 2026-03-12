@@ -257,14 +257,89 @@ def test_resample():
 
 def test_resample_hybrid():
     """
-    Resample a covariance matrix from a hybrid PSS sytem
+    Resample a block-diagonal covariance matrix representing hybrid AOA/TDOA/FDOA
+    measurement errors, using CovarianceMatrix.resample_hybrid().
 
-    1. AOA/TDOA
-    2. AOA/FDOA
-    3. TDOA/FDOA
-    4. AOA/TDOA/FDOA
+    The ground truth for each case is constructed by manually assembling the same
+    test/ref index vectors that resample_hybrid builds internally, then calling
+    resample() directly — mirroring the logic in resample_hybrid().
+
+    Cases:
+      1. AOA + TDOA (no FDOA), default TDOA reference
+      2. AOA + FDOA (no TDOA), default FDOA reference
+      3. TDOA + FDOA (no AOA), default references
+      4. AOA + TDOA + FDOA, default references
+      5. AOA + TDOA + FDOA, explicit (non-default) reference indices
     """
-    # TODO: Implement test
+    from scipy.linalg import block_diag
+    from ewgeo.utils import parse_reference_sensor
+
+    rng = np.random.default_rng(seed=0)
+
+    def rand_spd(n):
+        """Generate a random symmetric positive-definite matrix of size n."""
+        a = rng.standard_normal((n, n))
+        return a @ a.T + n * np.eye(n)
+
+    def make_hybrid_cov(num_aoa, num_tdoa, num_fdoa):
+        """Build a block-diagonal covariance from per-type sub-matrices."""
+        blocks = []
+        if num_aoa  > 0: blocks.append(rand_spd(num_aoa))
+        if num_tdoa > 0: blocks.append(rand_spd(num_tdoa))
+        if num_fdoa > 0: blocks.append(rand_spd(num_fdoa))
+        return CovarianceMatrix(block_diag(*blocks))
+
+    def ground_truth(cov, num_aoa, num_tdoa, num_fdoa, tdoa_ref_idx=None, fdoa_ref_idx=None):
+        """Replicate the index assembly done inside resample_hybrid, then call resample()."""
+        test_aoa = np.arange(num_aoa)
+        ref_aoa  = np.full(num_aoa, np.nan)
+        test_tdoa, ref_tdoa = (parse_reference_sensor(tdoa_ref_idx, num_tdoa)
+                               if num_tdoa else (np.array([]), np.array([])))
+        test_fdoa, ref_fdoa = (parse_reference_sensor(fdoa_ref_idx, num_fdoa)
+                               if num_fdoa else (np.array([]), np.array([])))
+        test_idx = np.concatenate([test_aoa,
+                                   num_aoa + test_tdoa,
+                                   num_aoa + num_tdoa + test_fdoa])
+        ref_idx  = np.concatenate([ref_aoa,
+                                   num_aoa + ref_tdoa,
+                                   num_aoa + num_tdoa + ref_fdoa])
+        return cov.resample(test_idx_vec=test_idx, ref_idx_vec=ref_idx)
+
+    # Case 1: AOA + TDOA
+    num_aoa, num_tdoa, num_fdoa = 2, 3, 0
+    cov = make_hybrid_cov(num_aoa, num_tdoa, num_fdoa)
+    result   = cov.resample_hybrid(num_aoa=num_aoa, num_tdoa=num_tdoa)
+    expected = ground_truth(cov, num_aoa, num_tdoa, num_fdoa)
+    assert equal_to_tolerance(result.cov, expected.cov)
+
+    # Case 2: AOA + FDOA
+    num_aoa, num_tdoa, num_fdoa = 2, 0, 3
+    cov = make_hybrid_cov(num_aoa, num_tdoa, num_fdoa)
+    result   = cov.resample_hybrid(num_aoa=num_aoa, num_fdoa=num_fdoa)
+    expected = ground_truth(cov, num_aoa, num_tdoa, num_fdoa)
+    assert equal_to_tolerance(result.cov, expected.cov)
+
+    # Case 3: TDOA + FDOA
+    num_aoa, num_tdoa, num_fdoa = 0, 3, 3
+    cov = make_hybrid_cov(num_aoa, num_tdoa, num_fdoa)
+    result   = cov.resample_hybrid(num_tdoa=num_tdoa, num_fdoa=num_fdoa)
+    expected = ground_truth(cov, num_aoa, num_tdoa, num_fdoa)
+    assert equal_to_tolerance(result.cov, expected.cov)
+
+    # Case 4: AOA + TDOA + FDOA, all default references
+    num_aoa, num_tdoa, num_fdoa = 2, 3, 3
+    cov = make_hybrid_cov(num_aoa, num_tdoa, num_fdoa)
+    result   = cov.resample_hybrid(num_aoa=num_aoa, num_tdoa=num_tdoa, num_fdoa=num_fdoa)
+    expected = ground_truth(cov, num_aoa, num_tdoa, num_fdoa)
+    assert equal_to_tolerance(result.cov, expected.cov)
+
+    # Case 5: AOA + TDOA + FDOA, explicit reference indices
+    tdoa_ref, fdoa_ref = 0, 2
+    result   = cov.resample_hybrid(num_aoa=num_aoa, num_tdoa=num_tdoa, num_fdoa=num_fdoa,
+                                   tdoa_ref_idx=tdoa_ref, fdoa_ref_idx=fdoa_ref)
+    expected = ground_truth(cov, num_aoa, num_tdoa, num_fdoa,
+                            tdoa_ref_idx=tdoa_ref, fdoa_ref_idx=fdoa_ref)
+    assert equal_to_tolerance(result.cov, expected.cov)
 
 def test_multiply():
     """

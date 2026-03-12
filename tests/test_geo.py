@@ -48,7 +48,6 @@ def test_calc_range_diff():
                          [0.64733925, 0.52567484, 0.47434988, 0.44642356]]])
     res = calc_range_diff(x_source, x_ref, x_test)
     assert res.shape == res_shape
-    print(res-res_val)
     assert equal_to_tolerance(res, res_val, tol=1e-4)
 
 def test_calc_doppler():

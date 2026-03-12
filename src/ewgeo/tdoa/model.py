@@ -158,7 +158,7 @@ def jacobian_uncertainty(x_sensor: npt.ArrayLike,
                   'ref_idx': ref_idx}
 
     # Gradient w.r.t source position
-    j_source = grad_x(**jacob_args)
+    j_source = grad_source(**jacob_args)
     j_list = [j_source]
 
     # Gradient w.r.t measurement biases
@@ -425,7 +425,7 @@ def draw_isochrone(x_ref: npt.NDArray[np.float64],
     return x_iso, y_iso
 
 
-def grad_x(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
+def grad_source(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     """
     Return the gradient of TDOA measurements, with sensor uncertainties, with respect to target position, x.
     Equation 6.27. The sensor uncertainties don't impact the gradient for TDOA, so this reduces to the previously
@@ -493,8 +493,7 @@ def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
 def grad_sensor_pos(x_sensor: npt.NDArray[np.float64], x_source: npt.NDArray[np.float64],
                     ref_idx=None)-> npt.NDArray[np.float64]:
     """
-    Compute the gradient of TDOA measurements, with sensor uncertainties, with respect to sensor position,
-    equation 6.31.
+
 
     Ported from MATLAB code.
 

@@ -173,7 +173,7 @@ def jacobian_uncertainty(x_source: npt.ArrayLike,
                   'fdoa_ref_idx': fdoa_ref_idx}
 
     # Gradient w.r.t source position
-    j_source = grad_x(**jacob_args)
+    j_source = grad_source(**jacob_args)
     j_list = [j_source]
 
     # Gradient w.r.t measurement biases
@@ -361,7 +361,7 @@ def error(x_source: npt.ArrayLike,
     return np.reshape(epsilon_list, search_space.grid_shape), x_vec, y_vec
 
 
-def grad_x(x_source: npt.ArrayLike,
+def grad_source(x_source: npt.ArrayLike,
            x_aoa: npt.ArrayLike=None,
            x_tdoa: npt.ArrayLike=None,
            x_fdoa: npt.ArrayLike=None,
@@ -372,7 +372,7 @@ def grad_x(x_source: npt.ArrayLike,
            fdoa_ref_idx=None):
     """
     Return the gradient of Hybrid measurements, with sensor uncertainties, with respect to target position, x.
-    Equation 6.43. This function calls grad_x for each sensor type in succession, then concatenates the results.
+    Equation 6.43. This function calls grad_source for each sensor type in succession, then concatenates the results.
 
     Ported from MATLAB code.
 
@@ -394,13 +394,13 @@ def grad_x(x_source: npt.ArrayLike,
 
     gradients = []
     if x_aoa is not None:
-        gradients.append(triang.model.grad_x(x_source=x_source, x_sensor=x_aoa, do_2d_aoa=do_2d_aoa))
+        gradients.append(triang.model.grad_source(x_source=x_source, x_sensor=x_aoa, do_2d_aoa=do_2d_aoa))
 
     if x_tdoa is not None:
-        gradients.append(tdoa.model.grad_x(x_source=x_source, x_sensor=x_tdoa, ref_idx=tdoa_ref_idx))
+        gradients.append(tdoa.model.grad_source(x_source=x_source, x_sensor=x_tdoa, ref_idx=tdoa_ref_idx))
 
     if x_fdoa is not None:
-        gradients.append(fdoa.model.grad_x(x_source=x_source, x_sensor=x_fdoa, v_sensor=v_fdoa, v_source=v_source,
+        gradients.append(fdoa.model.grad_source(x_source=x_source, x_sensor=x_fdoa, v_sensor=v_fdoa, v_source=v_source,
                                            ref_idx=fdoa_ref_idx))
 
     grad = np.concatenate(gradients, axis=1)

@@ -140,8 +140,8 @@ def make_figure_2(prefix=None):
         label=None
     plt.grid(True)
     plt.legend()
-    plt.xlabel('x')
-    plt.ylabel('y')
+    plt.xlabel('x [m]')
+    plt.ylabel('y [m]')
     plt.title('Track, Prediction, and Measurements')
 
     # Plot the Measurements and Prediction in Zeta-space
@@ -158,8 +158,8 @@ def make_figure_2(prefix=None):
         ax.scatter(m.zeta[0], m.zeta[1], marker='^', label=label, color=default_colors[3])
         label=None
     plt.grid(True)
-    plt.xlabel('$\\tau_{0,1}$')
-    plt.ylabel('$\\tau_{0,2}$')
+    plt.xlabel('$\\tau_{0,1}$ [m]')
+    plt.ylabel('$\\tau_{0,2}$ [m]')
     plt.legend()
     plt.title('Prediction and Measurements in Zeta-space')
     # ToDo: color-code measurements based on gate acceptance
@@ -247,8 +247,8 @@ def make_figure_3(prefix=None):
     [s.plot(ax=ax, marker='v', color='k', do_pos=True, do_vel=False, do_cov=False, label=None) for s in new_states]
     plt.title('Predicted Track States with new Measurements')
     plt.legend()
-    plt.xlabel('x')
-    plt.ylabel('y')
+    plt.xlabel('x [m]')
+    plt.ylabel('y [m]')
 
     # Measurement Plot
     fig, ax = plt.subplots()
@@ -396,7 +396,7 @@ def make_figure_8(prefix=None):
     time = np.arange(len(state_vecs)) * time_step
     states = [State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
     states[-1].covar = CovarianceMatrix(np.diag([2.0, 0.75, 0.4, 0.4]) * 1e4)
-    track = Track(states=states,id='0')
+    track = Track(states=states, track_id='0')
 
     num_missed_detections = 3
 
@@ -422,6 +422,8 @@ def make_figure_8(prefix=None):
         cov_label=None
         last_state=track.curr_state
     plt.grid(True)
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
     plt.legend()
     plt.title('Error Covariance Growth as Missed Detections Accumulate')
     # Output to file

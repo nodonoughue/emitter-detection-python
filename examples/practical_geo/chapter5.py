@@ -7,7 +7,7 @@ from scipy.stats import multivariate_normal
 from ewgeo.hybrid import HybridPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
-from ewgeo.utils import SearchSpace
+from ewgeo.utils import SearchSpace, print_matrix
 from ewgeo.utils.coordinates import correct_enu, ecef_to_enu, ecef_to_lla, enu_to_ecef, lla_to_ecef
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.constraints import bounded_alt, fixed_alt, fixed_cartesian
@@ -71,6 +71,8 @@ def example1(do_mod_cov: bool=False):
         for xy_lob, hdl in zip(np.transpose(xy_lobs.squeeze(), (2, 0, 1)), [hdl0, hdl1]):
             plt.plot(xy_lob[0], xy_lob[1], color=hdl.get_edgecolor())
 
+        plt.xlabel('East [km]')
+        plt.ylabel('North [km]')
         return this_fig
 
     # Make the first figure; just the laydown
@@ -90,13 +92,30 @@ def example1(do_mod_cov: bool=False):
 
     # Report Output and Generate Figure
     print('Gradient Descent Solvers...')
-    print('Unconstrained Solution: ({:.2f}, {:.2f})'.format(x_gd[0], x_gd[1]))
-    print('Constrained Solution: ({:.2f}, {:.2f})'.format(x_gd_const[0], x_gd_const[1]))
+    print('Unconstrained Solution: ({:.2f}, {:.2f}) km'.format(x_gd[0], x_gd[1]))
+    print('Constrained Solution: ({:.2f}, {:.2f}) km'.format(x_gd_const[0], x_gd_const[1]))
 
     figs.append(_make_laydown())
-    plt.plot(x_gd_full[0], x_gd_full[1], '--o', markevery=[-1], label='GD (Unconstrained)')
+    hdl=plt.plot(x_gd_full[0], x_gd_full[1], '--o', markevery=[-1], label='GD (Unconstrained)')
+    plt.scatter(x_gd_full[0, :10], x_gd_full[1, :10], marker='+', label=None, color=hdl[0].get_color())
     plt.plot(x_gd_full_const[0], x_gd_full_const[1], '--s', markevery=[-1], label='GD (Constrained')
+    plt.scatter(x_gd_full_const[0, :10], x_gd_full_const[1, :10], marker='x', label=None, color=hdl[0].get_color())
     plt.legend()
+
+    # Plot error
+    x_tgt = np.array([2.9, 25])
+    err_gd = np.linalg.norm((x_gd_full - x_tgt[:, np.newaxis]), axis=0)
+    err_gd_const = np.linalg.norm((x_gd_full_const - x_tgt[:, np.newaxis]), axis=0)
+
+    figs.append(plt.figure())
+    plt.plot(range(len(err_gd)), err_gd, label='GD (unconstrained)')
+    plt.plot(range(len(err_gd_const)), err_gd_const, label='GD (constrained)')
+    plt.grid(True)
+    plt.xlabel('Iteration Number')
+    plt.ylabel('Error [km]')
+    plt.xlim([0, 100])
+    plt.legend()
+    plt.yscale('log')
 
     # Do it again with LS
     x_ls, x_ls_full = aoa.least_square(**gd_args)
@@ -104,8 +123,8 @@ def example1(do_mod_cov: bool=False):
 
     # Report Output and Generate Figure
     print('Least Squares Solvers...')
-    print('Unconstrained Solution: ({:.2f}, {:.2f})'.format(x_ls[0], x_ls[1]))
-    print('Constrained Solution: ({:.2f}, {:.2f})'.format(x_ls_const[0], x_ls_const[1]))
+    print('Unconstrained Solution: ({:.2f}, {:.2f}) km'.format(x_ls[0], x_ls[1]))
+    print('Constrained Solution: ({:.2f}, {:.2f}) km'.format(x_ls_const[0], x_ls_const[1]))
 
     figs.append(_make_laydown())
     plt.plot(x_gd_full[0], x_gd_full[1], '--o', markevery=[-1], label='GD (Unconstrained)')
@@ -280,10 +299,11 @@ def example3():
     _, a_grad = fixed_alt(tgt_alt, geo_type='flat')
     crlb_fix = hybrid.compute_crlb(x_source=x_tgt, eq_constraints_grad=[a_grad])
 
+    # with np.printoptions(formatter={'all': lambda x: f"{x:11.5g}"}):
     print('CRLB (unconstrained):')
-    print(np.matrix(crlb_raw.cov))
+    print_matrix(crlb_raw.cov)
     print('CRLB (constrained):')
-    print(np.matrix(crlb_fix.cov))
+    print_matrix(crlb_fix.cov)
 
     # Plot for x/y grid
     # Initialize grid
@@ -324,8 +344,8 @@ def example3():
 
         # Add a target scatterer, legend, and axis labels
         this_ax.scatter(x_tgt[0]/1e3, x_tgt[1]/1e3, color='k', facecolors='k', marker='^', label='Target')
-        this_ax.set_xlabel('E [km]')
-        this_ax.set_ylabel('N [km]')
+        this_ax.set_xlabel('East [km]')
+        this_ax.set_ylabel('North [km]')
         this_ax.set_title(this_title)
         this_ax.legend(loc='upper left')
 

@@ -75,8 +75,8 @@ def example1(mc_params=None):
 
     # plt.plot Geometry
     fig1 = plt.figure()
-    plt.scatter(x_tdoa[0], x_tdoa[1], marker='o', label='Sensors')
-    plt.plot(x_tgt_full[0],x_tgt_full[1], marker='v', markevery=[-1], label='Aircraft')
+    plt.scatter(x_tdoa[0]/1e3, x_tdoa[1]/1e3, marker='o', label='Sensors')
+    plt.plot(x_tgt_full[0]/1e3,x_tgt_full[1]/1e3, marker='v', markevery=[-1], label='Aircraft')
     plt.grid(True)
 
     # ===  Measurement Statistics
@@ -176,10 +176,12 @@ def example1(mc_params=None):
     t_elapsed = time.perf_counter() - t_start
     print_elapsed(t_elapsed)
 
-    plt.scatter(x_init[0], x_init[1], marker='+',label='Initial Position Estimate')
-    plt.plot(x_ekf_est[0],x_ekf_est[1],'--',label='EKF (est.)')
-    plt.plot(x_ekf_pred[0],x_ekf_pred[1],'--',label='EKF (pred.)')
+    plt.scatter(x_init[0]/1e3, x_init[1]/1e3, marker='+',label='Initial Position Estimate')
+    plt.plot(x_ekf_est[0]/1e3,x_ekf_est[1]/1e3,'--',label='EKF (est.)')
+    plt.plot(x_ekf_pred[0]/1e3,x_ekf_pred[1]/1e3,'--',label='EKF (pred.)')
     plt.grid(True)
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
     plt.legend(loc='lower left')
 
     # ===  Compute Error
@@ -190,13 +192,13 @@ def example1(mc_params=None):
     rmse_est = np.sqrt(np.sum(np.fabs(err_est)**2,axis=0))
 
     fig2=plt.figure()
-    plt.plot(t_vec,rmse_cov_est, label='RMSE (est. cov.)')
-    plt.plot(t_vec[2:], rmse_cov_pred[:-2], label='RMSE (pred. cov)')
-    plt.plot(t_vec,rmse_est, '--', label='RMSE (est. act.)')
-    plt.plot(t_vec[2:], rmse_pred, '--',label='RMSE (pred. act.)')
+    plt.plot(t_vec,rmse_cov_est/1e3, label='RMSE (est. cov.)')
+    plt.plot(t_vec[2:], rmse_cov_pred[:-2]/1e3, label='RMSE (pred. cov)')
+    plt.plot(t_vec,rmse_est/1e3, '--', label='RMSE (est. act.)')
+    plt.plot(t_vec[2:], rmse_pred/1e3, '--',label='RMSE (pred. act.)')
     plt.grid(True)
     plt.xlabel('Time [sec]')
-    plt.ylabel('Error [m]')
+    plt.ylabel('Error [km]')
     plt.yscale('log')
     plt.legend(loc='upper right')
 
@@ -275,13 +277,13 @@ def example1(mc_params=None):
     rmse_cov_pred = np.sqrt(np.mean(sse_cov_pred, axis=0))
 
     fig3=plt.figure()
-    hdl_est = plt.plot(t_vec, rmse_cov_est, label='RMSE (est. cov.)')
-    hdl_pred = plt.plot(t_vec[1:], rmse_cov_pred[:-1], label='RMSE (pred. cov)')
-    plt.plot(t_vec, rmse_est, '--', label='RMSE (est. act.)', color=hdl_est[0].get_color())
-    plt.plot(t_vec[1:], rmse_pred, '--', label='RMSE (pred. act.)', color=hdl_pred[0].get_color())
+    hdl_est = plt.plot(t_vec, rmse_cov_est/1e3, label='RMSE (est. cov.)')
+    hdl_pred = plt.plot(t_vec[1:], rmse_cov_pred[:-1]/1e3, label='RMSE (pred. cov)')
+    plt.plot(t_vec, rmse_est/1e3, '--', label='RMSE (est. act.)', color=hdl_est[0].get_color())
+    plt.plot(t_vec[1:], rmse_pred/1e3, '--', label='RMSE (pred. act.)', color=hdl_pred[0].get_color())
     plt.grid(True)
     plt.xlabel('Time [sec]')
-    plt.ylabel('Error [m]')
+    plt.ylabel('Error [km]')
     plt.yscale('log')
 
     plt.legend(loc='upper right')
@@ -324,10 +326,12 @@ def example2(rng=np.random.default_rng()):
 
     beam_plot_times = [0,1,2,np.floor(num_time/2).astype(int),num_time-1]
     fig1=plt.figure()
-    plt.plot(x_aoa_full[0], x_aoa_full[1], '-^', markevery=beam_plot_times, label='AOA Sensor Trajectory')
-    plt.plot(x_tgt_full[0], x_tgt_full[1], '-<', markevery=beam_plot_times, label='Target Trajectory')
+    plt.plot(x_aoa_full[0]/1e3, x_aoa_full[1]/1e3, '-^', markevery=beam_plot_times, label='AOA Sensor Trajectory')
+    plt.plot(x_tgt_full[0]/1e3, x_tgt_full[1]/1e3, '-<', markevery=beam_plot_times, label='Target Trajectory')
     plt.grid(True)
     plt.legend(loc='upper right')
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     # ===  Measurement Statistics
     sigma_theta = 1 # deg
@@ -357,13 +361,13 @@ def example2(rng=np.random.default_rng()):
         lob_plus = np.squeeze(lobs[:, :, 0, 0])
         lob_minus = np.squeeze(lobs[:, :, 0, 1])
         lob_fill = np.concatenate((lob_plus,lob_minus[:, [-1]]), axis=1)
-        fill_patch = plt.Polygon(lob_fill.T, linestyle='--', edgecolor='k', facecolor=fill_color, alpha=.3,
+        fill_patch = plt.Polygon(lob_fill.T/1e3, linestyle='--', edgecolor='k', facecolor=fill_color, alpha=.3,
                                  label=label_fill)
         fig1.gca().add_patch(fill_patch)
         label_fill = None
 
-    plt.xlim([-5e3,55e3])
-    plt.ylim([-5e3,105e3])
+    plt.xlim([-5,55])
+    plt.ylim([-5,105])
 
     # ===  Generate Measurements
     do2daoa = aoa.do_2d_aoa
@@ -509,21 +513,23 @@ def example2(rng=np.random.default_rng()):
     t_elapsed = time.perf_counter() - t_start
     print_elapsed(t_elapsed)
         
-    plt.plot(x_init[0], x_init[1], '+',label='Initial Position Estimate')
-    plt.plot(x_ekf_est[0],x_ekf_est[1],'-',label='EKF (est.)')
-    plt.plot(x_ekf_pred[0],x_ekf_pred[1],'-',label='EKF (pred.)')
+    plt.plot(x_init[0]/1e3, x_init[1]/1e3, '+',label='Initial Position Estimate')
+    plt.plot(x_ekf_est[0]/1e3,x_ekf_est[1]/1e3,'-',label='EKF (est.)')
+    plt.plot(x_ekf_pred[0]/1e3,x_ekf_pred[1]/1e3,'-',label='EKF (pred.)')
     plt.grid(True)
     plt.legend()
 
     # ===  Zoomed plt.plot on Target
     fig2=plt.figure()
-    plt.plot(x_tgt_full[0], x_tgt_full[1],'-<', markevery=[-1], label='Target Trajectory')
-    plt.plot(x_init[0], x_init[1], '+',label='Initial Position Estimate')
-    plt.plot(x_ekf_est[0],x_ekf_est[1],'-',label='EKF (est.)')
-    plt.plot(x_ekf_pred[0],x_ekf_pred[1],'-',label='EKF (pred.)')
+    plt.plot(x_tgt_full[0]/1e3, x_tgt_full[1]/1e3,'-<', markevery=[-1], label='Target Trajectory')
+    plt.plot(x_init[0]/1e3, x_init[1]/1e3, '+',label='Initial Position Estimate')
+    plt.plot(x_ekf_est[0]/1e3,x_ekf_est[1]/1e3,'-',label='EKF (est.)')
+    plt.plot(x_ekf_pred[0]/1e3,x_ekf_pred[1]/1e3,'-',label='EKF (pred.)')
     plt.grid(True)
-    plt.xlim([30e3,50e3])
+    plt.xlim([30,50])
     plt.legend(loc='lower left')
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     ## Compute Error
     err_pred = x_ekf_pred[:, :-1] - x_tgt_full[:num_dims, 1:]
@@ -533,15 +539,15 @@ def example2(rng=np.random.default_rng()):
     rmse_est = np.sqrt(np.sum(np.fabs(err_est)**2, axis=0))
 
     fig3=plt.figure()
-    hdl0 =plt.plot(t_vec,rmse_cov_est,label='RMSE (est. cov.)')
+    hdl0 =plt.plot(t_vec,rmse_cov_est/1e3,label='RMSE (est. cov.)')
 
-    hdl1 =plt.plot(t_vec[1:], rmse_cov_pred[:-1], label='RMSE (pred. cov)')
+    hdl1 =plt.plot(t_vec[1:], rmse_cov_pred[:-1]/1e3, label='RMSE (pred. cov)')
     # set(gca,'ColorOrderIndex',1)
-    plt.plot(t_vec,rmse_est,'--',label='RMSE (est. act.)', color=hdl0[0].get_color())
-    plt.plot(t_vec[1:], rmse_pred, '--', label='RMSE (pred. act.)', color=hdl1[0].get_color())
+    plt.plot(t_vec,rmse_est/1e3,'--',label='RMSE (est. act.)', color=hdl0[0].get_color())
+    plt.plot(t_vec[1:], rmse_pred/1e3, '--', label='RMSE (pred. act.)', color=hdl1[0].get_color())
     plt.grid(True)
     plt.xlabel('Time [sec]')
-    plt.ylabel('Error [m]')
+    plt.ylabel('Error [km]')
     plt.legend(loc='upper right')
     plt.yscale('log')
 

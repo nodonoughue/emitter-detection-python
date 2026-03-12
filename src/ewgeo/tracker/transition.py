@@ -50,6 +50,16 @@ class MotionModel(ABC):
         return self.state_space.num_states
 
     def predict(self, s: State | Track, new_time: float):
+        """
+        Predict the state forward to new_time using this motion model.
+
+        If s is a Track, its current state (s.curr_state) is used. The transition matrix F and
+        process noise matrix Q are recomputed whenever time_delta changes.
+
+        :param s: Current State (or Track whose curr_state will be used)
+        :param new_time: Target time to predict to [seconds]
+        :return: Predicted State at new_time
+        """
         # If a track is provided as the current state, parse its current state
         if isinstance(s, Track):
             s = s.curr_state
@@ -59,7 +69,7 @@ class MotionModel(ABC):
 
         if time_delta == 0:
             # We already have a state at this time; nothing to predict forward
-            return s.copy()
+            return s
 
         if time_delta is not None and time_delta != self.time_delta:
             # Generate new ones
@@ -75,9 +85,15 @@ class MotionModel(ABC):
             new_covar = CovarianceMatrix(self.f @ s.covar.cov @ np.transpose(self.f) + self.q.cov)
 
         # Make a new State object
-        return s.copy(state=new_state, covar=new_covar, time=new_time)
+        return State(s.state_space, new_time, new_state, new_covar)
 
     def update_time_step(self, time_delta):
+        """
+        Update the cached transition matrix F and process noise matrix Q for a new time_delta.
+        Clears F and Q when time_delta is None.
+
+        :param time_delta: New time step [seconds], or None to clear cached matrices
+        """
         if time_delta is None:
             # Clear everything
             self.time_delta = None
@@ -96,6 +112,14 @@ class MotionModel(ABC):
         return
 
     def validate_process_covar_input(self, process_covar: npt.ArrayLike)-> npt.NDArray:
+        """
+        Normalize process_covar to a (num_dims x num_dims) array. Accepts scalar, 1-D vector (used
+        as diagonal), or full matrix. Falls back to self.process_covar when input is None.
+
+        :param process_covar: Scalar, 1-D array of length num_dims, or (num_dims x num_dims) matrix; or None
+        :return: (num_dims x num_dims) ndarray
+        :raises SyntaxError: if the input shape is not recognized
+        """
         if process_covar is None:
             process_covar = self.process_covar
 
@@ -236,7 +260,8 @@ class ConstantAccelerationMotionModel(MotionModel):
 
 class ConstantJerkMotionModel(MotionModel):
     """
-
+    Position, Velocity, Acceleration, and Jerk are tracked states.
+    Jerk is assumed to have a non-zero-mean Gaussian distribution.
     """
     def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: float = None):
         super().__init__()
@@ -261,7 +286,7 @@ class ConstantJerkMotionModel(MotionModel):
 
     def make_transition_matrix(self, time_delta: float=None):
         """
-        Implement the transition matrix F for a constant acceleration motion model
+        Implement the transition matrix F for a constant jerk motion model
         """
         if time_delta is None:
             time_delta = self.time_delta
@@ -279,7 +304,7 @@ class ConstantJerkMotionModel(MotionModel):
 
     def make_process_covariance_matrix(self, process_covar: npt.ArrayLike=None, time_delta: float=None):
         """
-        Implement the process noise covariance Q for a constant acceleration motion model
+        Implement the process noise covariance Q for a constant jerk motion model
         """
         process_covar = self.validate_process_covar_input(process_covar)
         if time_delta is None:

@@ -196,7 +196,7 @@ def jacobian_uncertainty(x_sensor, x_source, do_2d_aoa=False, do_bias=False, do_
         raise TypeError('Input variables must match along first dimension.')
 
     # Gradient w.r.t source position
-    j_source = grad_x(x_sensor, x_source, do_2d_aoa)
+    j_source = grad_source(x_sensor, x_source, do_2d_aoa)
     j_list = [j_source]
 
     # Gradient w.r.t measurement biases
@@ -363,7 +363,7 @@ def draw_lob(x_sensor, psi, x_source=None, scale=1):
     return xy_lob
 
 
-def grad_x(x_sensor, x_source, do_2d_aoa=False):
+def grad_source(x_sensor, x_source, do_2d_aoa=False):
     """
     Return the gradient of AOA measurements, with sensor uncertainties, with respect to target position, x.
     Equation 6.16. The sensor uncertainties don't impact the gradient for AOA, so this reduces to the previously
@@ -451,20 +451,20 @@ def grad_sensor_pos(x_sensor, x_source, do_2d_aoa=False):
     # Equation 6.22 and 6.23 show that the gradient with respect to sensor position is the negative of the gradient
     # with respect to target position for both azimuth and elevation angle measurements, but resampled to be on a block
     # diagonal.
-    _grad_x = grad_x(x_sensor, x_source, do_2d_aoa)
+    _grad_source = grad_source(x_sensor, x_source, do_2d_aoa)
 
     grad = np.zeros((n_dim*n_sensor, n_sensor, n_source))
     for i in range(n_sensor):
         start = n_dim * i
         end = start + n_dim
-        grad[start:end, i, :] = _grad_x[:, i, :]  # The first n_sensor columns are J_az
+        grad[start:end, i, :] = _grad_source[:, i, :]  # The first n_sensor columns are J_az
 
     if do_2d_aoa:
         grad_el = np.zeros_like(grad)
         for i in range(n_sensor):
             start = n_dim * i
             end = start + n_dim
-            grad_el[start:end, i, :] = _grad_x[:, n_sensor + i, :]  # The second n_sensor columns are J_el
+            grad_el[start:end, i, :] = _grad_source[:, n_sensor + i, :]  # The second n_sensor columns are J_el
 
         grad = np.concatenate((grad, grad_el), axis=1)
 

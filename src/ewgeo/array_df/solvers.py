@@ -5,21 +5,20 @@ from ewgeo.utils.covariance import CovarianceMatrix
 
 def beamscan(x, v, psi_max=np.pi/2, num_points=101):
     """
-    # Generates a beamscan image for N_pts equally spaced angular coordinates
-    # from -psi_max to psi_max (in radians), given the input data x, and array
-    # steering vector v
+    Generate a beamscan image for ``num_points`` equally spaced angular coordinates
+    from -psi_max to psi_max (in radians), given the input data x and array steering vector v.
 
-    Ported from MATLAB Code
+    Ported from MATLAB Code.
 
     Nicholas O'Donoughue
     18 January 2021
 
-    :param x: N x M data vector
-    :param v: Steering vector function that returns N point steering vector for each input (in radians).
-    :param psi_max: Maximum steering angle (radians)
-    :param num_points: Number of steering angles to compute
-    :return p: Power image (1 x N_pimts) in linear units
-    :return psi_vec: Vector of scan angles computed (in radians)
+    :param x: N x M data vector (N array elements, M snapshots)
+    :param v: Steering vector function that returns an N-element steering vector for each input angle (radians)
+    :param psi_max: Maximum steering angle [radians] (default: π/2)
+    :param num_points: Number of steering angles to evaluate (default: 101)
+    :return p: Power image of length ``num_points`` in linear units
+    :return psi_vec: Vector of scan angles [radians]
     """
 
     # Generate scan vector

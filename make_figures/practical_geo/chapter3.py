@@ -68,29 +68,33 @@ def make_figure_1(prefix=None):
 
     # Define source and sensor positions
     x_source = np.array([2, 3])
-    x_sensor = np.array([[0, -1, 0, 1], [0, -.5, 1, -.5]])
+    x_sensor = np.array([[0, -1, 0, 1], [0, -.5, 1, -.5]]).T
+
+    ref_idx = 0
+    x_ref = x_sensor[ref_idx]
+    test_indices = np.setdiff1d(np.arange(x_sensor.shape[0]),ref_idx)
+    x_test = x_sensor[test_indices].T
 
     # Plot sensor / source positions
     fig = plt.figure()
-    plt.scatter(x_source[0], x_source[1], marker='^', label='Source', clip_on=False, zorder=3)
-    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensor', clip_on=False, zorder=3)
+    plt.scatter(x_source[0], x_source[1], marker='^', color='k', label='Source', clip_on=False, zorder=3)
+    plt.scatter(x_ref[0], x_ref[1], marker='v', color='k', label='Reference Sensor', clip_on=False, zorder=3)
+    plt.scatter(x_test[0], x_test[1], marker='o', color='k', label='Sensor', clip_on=False, zorder=3)
 
     # Generate Isochrones
+    pair_label = 'Sensor Pairs'
     isochrone_label = 'Isochrones'
-    ref_idx = 0
-    x_ref = x_sensor[:, ref_idx]
 
-    for test_idx in np.arange(start=ref_idx+1, stop=4):
-        x_test = x_sensor[:, test_idx]
-
-        rdiff = calc_range_diff(x0=x_source, x1=x_ref, x2=x_test)  # range_diff is R(x0,x2) - R(x0,x1)
+    for this_x_test in x_test.T:
+        rdiff = calc_range_diff(x0=x_source, x1=x_ref, x2=this_x_test)  # range_diff is R(x0,x2) - R(x0,x1)
         # draw_isochrone operates on an assumption that rdiff is R(x0,x_test)-R(x0-x_ref)
-        xy_iso = tdoa.model.draw_isochrone(x_ref=x_ref, x_test=x_test,
+        xy_iso = tdoa.model.draw_isochrone(x_ref=x_ref, x_test=this_x_test,
                                            range_diff=rdiff, num_pts=10000, max_ortho=5)
 
-
-        plt.plot(xy_iso[0], xy_iso[1], '--', label=isochrone_label)
+        hdl=plt.plot([x_ref[0], this_x_test[0]], [x_ref[1], this_x_test[1]], '-.', label=pair_label)
+        plt.plot(xy_iso[0], xy_iso[1], color=hdl[0].get_color(), label=isochrone_label)
         isochrone_label = None  # set the label to none after first use, so only one shows up in the plot legend
+        pair_label = None
 
     plt.xlim([-1, 3])
     plt.ylim([-1, 3])
@@ -119,10 +123,11 @@ def make_figure_2(prefix=None):
 
     # Plot sensor / source positions
     fig = plt.figure()
-    plt.scatter(x_source[0], x_source[1], marker='^', label='Source', clip_on=False, zorder=3)
-    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='Sensor', clip_on=False, zorder=3)
+    plt.scatter(x_source[0], x_source[1], marker='^', color='k', label='Source', clip_on=False, zorder=3)
+    plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', color='k', label='Sensor', clip_on=False, zorder=3)
 
     # Generate Isochrones
+    pair_label = 'Sensor Pairs'
     isochrone_label = 'Isochrones'
     for ref_idx in np.arange(3):
         x_ref = x_sensor[:, ref_idx]
@@ -133,8 +138,10 @@ def make_figure_2(prefix=None):
             rdiff = calc_range_diff(x0=x_source, x1=x_ref, x2=x_test)
             xy_iso = tdoa.model.draw_isochrone(x_ref=x_ref, x_test=x_test, range_diff=rdiff, num_pts=10000, max_ortho=5)
 
-            plt.plot(xy_iso[0], xy_iso[1], '--', label=isochrone_label)
+            hdl = plt.plot([x_ref[0], x_test[0]], [x_ref[1], x_test[1]], '-.', label=pair_label)
+            plt.plot(xy_iso[0], xy_iso[1], color=hdl[0].get_color(), label=isochrone_label)
             isochrone_label = None  # set label to none after first use, so only one shows up in the plot legend
+            pair_label = None
 
     plt.xlim([-1, 3])
     plt.ylim([-1, 3])

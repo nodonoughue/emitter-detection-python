@@ -175,16 +175,18 @@ def make_figure_7(prefix=None):
 
     # Plot Geometry
     fig7a = plt.figure()
-    plt.plot(x_tgt[0], x_tgt[1], '^', label='Target')
+    plt.plot(x_tgt[0]/1e3, x_tgt[1]/1e3, '^', label='Target')
     tdoa_label='TDOA Sensor'
     for idx in range(num_sensors):
         this_x = np.squeeze(x_tdoa[:, idx])
         this_x_full = np.squeeze(x_tdoa_full[:, idx, :])
-        hdl=plt.plot(this_x_full[0], this_x_full[1], label=tdoa_label)
+        hdl=plt.plot(this_x_full[0]/1e3, this_x_full[1]/1e3, label=tdoa_label)
         tdoa_label = None  # clear the label; only the first one gets a legend entry
-        plt.scatter(this_x[0], this_x[1], marker='o', color=hdl[0].get_color(), label=None)
+        plt.scatter(this_x[0]/1e3, this_x[1]/1e3, marker='o', color=hdl[0].get_color(), label=None)
     plt.legend(loc='upper left')
     plt.axis('equal')
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     # Compute TDOA as a function of time
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, ref_idx=None, cov=CovarianceMatrix(np.eye(num_sensors)))
@@ -195,11 +197,11 @@ def make_figure_7(prefix=None):
         zeta[:, idx] = tdoa.measurement(x_source=x_tgt)
 
     fig7b=plt.figure()
-    plt.plot(t, zeta.T)
+    plt.plot(t, zeta.T/1e3)
     plt.legend(['$TDOA_{1,2}$','$TDOA_{1,3}$'])
     plt.grid(True)
     plt.xlabel('Time [s]')
-    plt.ylabel('Range Difference Measurement [m]')
+    plt.ylabel('Range Difference Measurement [km]')
 
     # Output to file
     figs = [fig7a, fig7b]
@@ -233,7 +235,7 @@ def make_figure_8(prefix=None, mc_params=None):
     if prefix is not None:
         labels = ['fig8a', 'fig8b']
         if len(labels) != len(figs):
-            print('**Error saving figure 7.7; unexpected number of figures returned from Example 7.4.')
+            print('**Error saving figure 7.8; unexpected number of figures returned from Example 7.4.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')
@@ -270,7 +272,7 @@ def make_figure_10(prefix=None):
     aoa = DirectionFinder(x=x_aoa, do_2d_aoa=False, cov=cov_df)
 
     fig10a=plt.figure()
-    hdl_traj = plt.plot(x_aoa[0], x_aoa[1], label='Sensor Trajectory')
+    hdl_traj = plt.plot(x_aoa[0]/1e3, x_aoa[1]/1e3, label='Sensor Trajectory')
 
     # Draw bearings at time markers
     idx_set = [1, np.floor(len(t_vec)/2).astype(int), len(t_vec)]
@@ -291,7 +293,7 @@ def make_figure_10(prefix=None):
         marker_y = this_x[1] + marker_radius*np.sin(vertex_theta)
 
         # Draw Icon
-        plt.fill(marker_x, marker_y, edgecolor='k', facecolor=color, label=None)
+        plt.fill(marker_x/1e3, marker_y/1e3, edgecolor='k', facecolor=color, label=None)
 
         # Draw LOB with uncertainty
         aoa.pos = this_x
@@ -309,18 +311,19 @@ def make_figure_10(prefix=None):
 
         # Make a patch; unlike MATLAB, we don't have to close it
         lob_fill = np.concatenate((xy_lob_high,xy_lob_low[:, [-1]]), axis=1)
-        fill_patch = plt.Polygon(lob_fill.T, linestyle='--', edgecolor='k', facecolor=color, alpha=.2,
+        fill_patch = plt.Polygon(lob_fill.T/1e3, linestyle='--', edgecolor='k', facecolor=color, alpha=.2,
                                  label=label_fill)
         fig10a.gca().add_patch(fill_patch)
-        plt.plot(xy_lob[0], xy_lob[1], '-.', label=label_lob,color=color)
+        plt.plot(xy_lob[0]/1e3, xy_lob[1]/1e3, '-.', label=label_lob,color=color)
         label_fill = None
         label_lob = None
 
-    plt.plot(x_tgt[0], x_tgt[1],'o', label='Target')
+    plt.plot(x_tgt[0]/1e3, x_tgt[1]/1e3,'o', label='Target')
     plt.legend(loc='lower right')
-    plt.ylim([-1e3, 11e3])
-    plt.xlim([-7.5e3, 13.5e3])
-
+    plt.ylim([-1, 11])
+    plt.xlim([-7.5, 13.5])
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
     # Model CEP over time
 
     # Since we can't do geolocation with the first measurement, let's
@@ -328,13 +331,13 @@ def make_figure_10(prefix=None):
     x_prev = np.array([0, 1e3])
     p_prev = CovarianceMatrix(np.diag([1e3, 10e3])**2)
 
+    z_fun = aoa.measurement
+    h_fun = aoa.measurement_gradient
+
     cep_vec = np.zeros_like(t_vec)
     for idx in np.arange(t_vec.size):
         this_x_aoa = x_aoa[:,idx]
         aoa.pos = this_x_aoa
-
-        z_fun = aoa.measurement
-        h_fun = lambda x: aoa.jacobian(x).T
 
         this_psi = aoa.noisy_measurement(x_tgt)
 

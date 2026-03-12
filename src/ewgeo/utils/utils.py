@@ -368,6 +368,15 @@ def resample_noise(noise: npt.NDArray[np.float64],
 def parse_ref_vec_output_size(test_idx_vec: npt.NDArray[np.int64],
                               ref_idx_vec: npt.NDArray[np.int64],
                               n_sensor: int)-> tuple[int, int, int]:
+    """
+    Validate test/reference index vectors and return their sizes.
+
+    :param test_idx_vec: 1-D integer array of test sensor indices
+    :param ref_idx_vec: 1-D integer array of reference sensor indices (same length as test_idx_vec)
+    :param n_sensor: Total number of sensors (used for bounds checking)
+    :return: Tuple of (n_test, n_ref, n_pair_out) where n_pair_out = max(n_test, n_ref)
+    :raises TypeError: if the vectors have mismatched lengths or indices are out of range
+    """
     n_test = np.size(test_idx_vec)
     n_ref = np.size(ref_idx_vec)
     n_pair_out = np.fmax(n_test, n_ref)
@@ -435,8 +444,8 @@ def make_prior(pdf_type: str, mean: npt.NDArray[np.float64], covariance: npt.NDA
     :param covariance: CovarianceMatrix object (with size n_dim) of the prior
     :return prior: function handle for the statistical prior; accepts (n_dim, ) or (num_batch, n_dim) inputs and returns
                    a (num_batch, ) array of probabilities.
-    :return fim_prior: function handle for the Fisher Information Matrix; accepts (n_dim, ) or (num_batch, n_dim) inputs 
-                   and returns a (num_batch, ) array of CovarianceMatrix objects. 
+    :return fim_prior: the Fisher Information Matrix of the prior as a constant (n_dim x n_dim) array; for a Gaussian
+                   prior this equals the inverse of the covariance matrix and is independent of the input position.
     """
     if pdf_type.lower() == 'gaussian':
         rv = stats.multivariate_normal(mean=mean, cov=covariance)
@@ -536,11 +545,15 @@ def print_progress(num_total: int,
 def broadcast_backwards(arrs: list[npt.NDArray, ], start_dim: int=0, do_broadcast: bool=False)\
         -> tuple[list[npt.NDArray, ], tuple]:
     """
-    Ensure all inputs are broadcastable, with an optional starting dimension. Return extended arrays that have the same
-    number of dimensions so that numpy broadcasting works correctly.
+    Ensure all inputs have compatible shapes for trailing-dimension broadcasting (MATLAB-style).
+    New singleton dimensions are appended to the end rather than the front.
 
-    In this utility, new dimensions are added to the end of the array, not the beginning, to align with the behavior
-    in MATLAB.
+    :param arrs: List of arrays to align
+    :param start_dim: Dimensions before this index are left untouched; broadcasting is computed
+                      only from ``start_dim`` onward
+    :param do_broadcast: If True, call ``np.broadcast_to`` on each array to fully expand them;
+                         if False (default), only append singleton dimensions
+    :return: Tuple of (list of reshaped/broadcast arrays, broadcast output shape from start_dim onward)
     """
 
     # Parse the input shapes
@@ -719,3 +732,50 @@ def print_matrix(x: npt.NDArray)->None:
             "  0.    ")}):
         print(np.matrix(x/scale))
 
+def compute_sample_mean(zeta: npt.ArrayLike)-> tuple[npt.NDArray, npt.NDArray]:
+    """
+    Computes the sample mean across the second dimension of the input (zeta).
+
+    Any additional dimensions (beyond the second) are assumed to be parallel
+    trials, and are ignored.
+
+    Ported from MATLAB.
+
+    :param zeta: set of samples
+    :return zeta_mean: mean value of samples
+    :return zeta_mean_full: iterative mean value of samples
+    """
+
+    # Parse Input
+    dims = np.shape(zeta)
+    num_samples = dims[1]
+
+    # Compute the cumulative sum
+    cumsum = np.cumsum(zeta, axis=1)
+    zeta_mean_full = cumsum / np.reshape(np.arange(num_samples)+1, shape=(1, num_samples))
+
+    zeta_mean = np.squeeze(zeta_mean_full[:, -1]) # final sample mean is the result
+    return zeta_mean, zeta_mean_full
+
+def compute_sample_mean_update(zeta: npt.ArrayLike, zeta_mean_previous: npt.ArrayLike, num_samples_previous: int)->\
+    tuple[npt.NDArray, int]:
+    """
+    Compute the sample mean iteratively, across the second dimension of zeta.
+
+    Ported from MATLAB.
+
+    :param zeta: new sample
+    :param zeta_mean_previous: previously computed sample mean
+    :param num_samples_previous: number of samples used for previous mean
+    :return zeta_mean_update: new sample mean
+    :return num_samples_new: total number of samples used for new mean
+    """
+
+    # Parse inputs
+    dims = np.shape(zeta)
+    num_samples_curr = dims[1]
+    num_samples = num_samples_previous + num_samples_curr
+
+    # Sample Mean Update
+    zeta_innovation = np.sum(zeta, axis=1)/num_samples
+    return zeta_mean_previous * num_samples_previous/num_samples + zeta_innovation, num_samples

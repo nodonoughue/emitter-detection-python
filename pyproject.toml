@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ewgeo"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
   { name="Nicholas O'Donoughue", email="nodonoug@rand.org" },
 ]
@@ -20,8 +20,15 @@ dependencies = [
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 
+[project.optional-dependencies]
+dev = ["pytest"]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -120,6 +120,8 @@ def _make_plot(pss: HybridPassiveSurveillanceSystem, x_ml, x_ls, x_gd, x_init, c
         plt.plot(crlb_ellipse[0], crlb_ellipse[1], linestyle='--', color='k',
                  label='{:d}% Error Ellipse'.format(conf_interval))
 
+    plt.xlabel('x [m]')
+    plt.ylabel('y [m]')
     plt.legend(loc='best')
 
     return fig
@@ -186,6 +188,8 @@ def example1(colors=None):
     # Adjust Plot Display
     plt.ylim([-0.5e3, 4e3])
     plt.xlim([-.5e3, 5.5e3])
+    plt.xlabel('x [m]')
+    plt.ylabel('y [m]')
     plt.legend(loc='upper right')
 
     # Remove the axes for a clean image
@@ -223,25 +227,27 @@ def example1(colors=None):
 
         plt.ylim([0, 4e3])
         plt.xlim([-.5e3, 5.5e3])
+        plt.xlabel('x [m]')
+        plt.ylabel('y [m]')
         plt.clim(-20, 0)
         plt.legend(loc='upper right')
 
         return _fig
 
     # Plot AOA Likelihood
-    ell_aoa = pss.aoa.log_likelihood(zeta=psi_act, x_source=x_test_pos).reshape(grid_shape)
+    ell_aoa = pss.aoa.log_likelihood(zeta=psi_act, x_source=x_test_pos).reshape(grid_shape[::-1])
     fig2 = _make_subfigure(ell_aoa, do_aoa=True)
 
     # TDOA
-    ell_tdoa = pss.tdoa.log_likelihood(zeta=range_diff, x_source=x_test_pos).reshape(grid_shape)
+    ell_tdoa = pss.tdoa.log_likelihood(zeta=range_diff, x_source=x_test_pos).reshape(grid_shape[::-1])
     fig3 = _make_subfigure(ell_tdoa, do_tdoa=True)
 
     # FDOA
-    ell_fdoa = pss.fdoa.log_likelihood(zeta=velocity_diff, x_source=x_test_pos).reshape(grid_shape)
+    ell_fdoa = pss.fdoa.log_likelihood(zeta=velocity_diff, x_source=x_test_pos).reshape(grid_shape[::-1])
     fig4 = _make_subfigure(ell_fdoa, do_fdoa=True)
 
     # Hybrid
-    ell_hybrid = pss.log_likelihood(zeta=z, x_source=x_test_pos, v_source=None).reshape(grid_shape)
+    ell_hybrid = pss.log_likelihood(zeta=z, x_source=x_test_pos, v_source=None).reshape(grid_shape[::-1])
     fig5 = _make_subfigure(ell_hybrid, do_aoa=True, do_tdoa=True, do_fdoa=True)
 
     # Package figure handles

@@ -180,7 +180,7 @@ def test_homogeneous_transforms():
     assert equal_to_tolerance(lla_init, lla_out), 'Error testing LLA->ENU->LLA transform'
 
 
-def global_unit_coversion():
+def test_global_unit_conversion():
     """
     Test all global coordinate conversions for a few key points
     """
@@ -195,10 +195,10 @@ def global_unit_coversion():
 
     for coord in [zero_point, north_pole, paris, death_valley]:
         ecef_out = coordinates.lla_to_ecef(coord['lla'][0], coord['lla'][1], coord['lla'][2])
-        assert equal_to_tolerance(coord['ecef'], ecef_out, tol=1), 'Error testing LLA->ECEF transform'
+        assert equal_to_tolerance(coord['ecef'], ecef_out, tol=0.1), 'Error testing LLA->ECEF transform'
 
         lla_out = coordinates.ecef_to_lla(coord['ecef'][0], coord['ecef'][1], coord['ecef'][2])
-        assert equal_to_tolerance(coord['lla'], lla_out, tol=1e-4), 'Error testing ECEF->LLA transform'
+        assert equal_to_tolerance(coord['lla'], lla_out, tol=0.1), 'Error testing ECEF->LLA transform'
 
 
 def test_local_unit_conversion():

@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from . import reference, model
+import ewgeo.atm.reference as reference
+import ewgeo.atm.model as model
 
 
 def plot_itu_ref_figs():

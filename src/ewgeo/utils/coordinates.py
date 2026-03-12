@@ -290,7 +290,13 @@ def ecef_to_lla(x, y, z, angle_units='deg', dist_units='m'):
 
     # Compute Height
     n = a / np.sqrt(1 - e1_sq * np.sin(lat_rad)**2)
-    alt_m = p / np.cos(lat_rad) - n
+    cos_lat = np.cos(lat_rad)
+    sin_lat = np.sin(lat_rad)
+    alt_m = np.where(
+        np.abs(cos_lat) > np.abs(sin_lat),
+        p / cos_lat - n,
+        z / sin_lat - n * (1 - e1_sq)
+    )
 
     # Format Outputs
     lat = convert(lat_rad, from_unit="rad", to_unit=angle_units)

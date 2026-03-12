@@ -82,6 +82,8 @@ def example1():
     plt.legend(loc='upper left')
     plt.xlim(-1, 6)
     plt.ylim(-1, 5)
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     return [fig]
 
@@ -117,8 +119,8 @@ def example2():
     zeta_unc = tdoa.measurement(x_sensor=x_tdoa_actual, x_source=x_tgt)  # manually specify actual sensor pos.
 
     print('Measurements from sensors 1-2 (w.r.t sensor 0):')
-    print('Nominal Positions: {:.2f} m, {:.2f} m'.format(zeta[0], zeta[1]))
-    print('Random Positions:  {:.2f} m, {:.2f} m'.format(zeta_unc[0], zeta_unc[1]))
+    print('Nominal Positions: {:.2f} km, {:.2f} km'.format(zeta[0], zeta[1]))
+    print('Random Positions:  {:.2f} km, {:.2f} km'.format(zeta_unc[0], zeta_unc[1]))
 
     # Plot Scenario
     fig = plt.figure()
@@ -143,6 +145,8 @@ def example2():
     plt.legend(loc='lower right')
     plt.xlim(-1, 8)
     plt.ylim(-3, 4)
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     return [fig]
 
@@ -231,6 +235,8 @@ def example3():
     plt.scatter(x_tdoa_true[0], x_tdoa_true[1], marker='o', label='TDOA Sensors (true positions)')
     plt.scatter(x_tgt[0], x_tgt[1],marker='^', color='k', label='Target')
     plt.grid(True)
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     # Draw the Isochrones and LOBs -- Truth
     xy_lobs = aoa.draw_lobs(zeta=zeta_unc_bias[:n_aoa], x_source=x_tgt, scale=1.5)
@@ -255,7 +261,7 @@ def example3():
     return [fig]
 
 
-def example4(do_iterative=False):
+def example4(do_iterative=True):
     """
     Executes Example 6.4.
 
@@ -299,10 +305,6 @@ def example4(do_iterative=False):
                                epsilon=grid_res)
     x_set, x_grid = search_space.x_set, search_space.x_grid
     extent = search_space.get_extent(multiplier=1/1e3)
-    # extent = (x_ctr[0].item()/1e3 - search_size/1e3,
-    #           x_ctr[0].item()/1e3 + search_size/1e3,
-    #           x_ctr[1].item()/1e3 - search_size/1e3,
-    #           x_ctr[1].item()/1e3 + search_size/1e3)
 
     ell = tdoa.log_likelihood(zeta=zeta, x_source=x_set)
     ell_true = tdoa.log_likelihood(zeta=zeta_true, x_source=x_set)
@@ -326,13 +328,15 @@ def example4(do_iterative=False):
 
         # Scatter plots
         for this_x, this_label in zip(x_plot, label_set):
-            plt.scatter(this_x[0]/1e3, this_x[1]/1e3, label=this_label, clip_on=False)
+            plt.scatter(this_x[0]/1e3, this_x[1]/1e3, label=this_label, clip_on=False, zorder=3)
 
         plt.grid(True)
         plt.legend(loc='upper left')
 
         plt.xlim([0, 10])
         plt.ylim([0, 10])
+        plt.xlabel('x [km]')
+        plt.ylabel('y [km]')
 
         if title is not None:
             plt.title(title)
@@ -397,14 +401,14 @@ def example4(do_iterative=False):
                             'do_sensor_vel': False}
         # TODO: Debug
         # Iterative Solvers
-        x_est_gd, bias_est_gd, th_est_gd_full = tdoa.gradient_descent_uncertainty(zeta=zeta, **iter_solver_args)
-        x_est_ls, bias_est_ls , th_est_ls_full= tdoa.least_square_uncertainty(zeta=zeta, **iter_solver_args)
+        x_est_gd, th_est_gd, th_est_gd_full = tdoa.gradient_descent_uncertainty(zeta=zeta, **iter_solver_args)
+        x_est_ls, th_est_ls, th_est_ls_full = tdoa.least_square_uncertainty(zeta=zeta, **iter_solver_args)
 
         with np.printoptions(precision=3, suppress=True):
             print('GD Est. range bias: (', end='')
-            print(*bias_est_gd, sep=', ', end=') m\n')
-            print('LS Est. range bias: (', end='')
-            print(*bias_est_ls, sep=', ', end=') m\n')
+            print(*th_est_gd['bias'], sep=', ', end=') m\n')
+            # print('LS Est. range bias: (', end='')
+            # print(*th_est_ls['bias'], sep=', ', end=') m\n')
 
         figs.append(_make_plot(ell_plot, [x_tdoa, x_tgt, x_est_true, x_est_bias, x_est_gd, x_est_ls],
                                ['Sensors', 'Target', 'ML Est.', 'ML Est. w/unc.', 'GD Est.', 'LS Est.']))
@@ -463,39 +467,19 @@ def example5(do_vel_only_cal=True):
 
     zeta = hybrid.noisy_measurement(x_source=x_source, v_sensor=v_fdoa_actual)
 
-    # Generate calibration data; assume that the noise power is 1%, due to repeated measurements
+    # Generate calibration data
     num_cal_samples = 1
     zeta_cal = hybrid.noisy_measurement(x_source=x_cal, v_sensor=v_fdoa_actual, num_samples=num_cal_samples)
 
     # Estimate Position
     x_init = np.array([0, 5])*1e3
-    pos_search = SearchSpace(x_ctr=hybrid.pos,
-                             epsilon=1,
-                             max_offset=200)
-    pos_search.points_per_dim[:, tdoa.num_sensors-1] = 1
-    pos_search.points_per_dim[:, -1] = 1
-    pos_search.max_offset = None
-    cov_pos = CovarianceMatrix(np.tile(np.eye(n_tdoa), (2, 2))) # The TDOA/FDOA sensors are at the same positions
-                                                                     # Tiling the covariance matrix enforces this.
-    cov_pos.multiply(val=10**2, overwrite=True)   # Multiply the position covariance by the square of the max offset
-                                                  # of our search space to provide a weak prior
-    vel_search = SearchSpace(x_ctr=v_fdoa,
-                             epsilon=1,       # Desired velocity resolution is 5 m/s
-                             max_offset=200)  # Max allowable offset is 200 m/s
-    vel_search.points_per_dim[:, -1] = 1
-    vel_search.max_offset = None
-
-    cov_vel = CovarianceMatrix(np.eye(n_dim * n_fdoa))
-    cov_vel.multiply(val=100**2, overwrite=True)
     cal_data = {'zeta_cal': zeta_cal,
                 'x_cal': x_cal,
                 'do_pos_cal': True,
                 'do_vel_cal': True,
                 'do_bias_cal': False,
-                'pos_search': pos_search,
-                'vel_search': vel_search,
-                'solver_type': 'ml',
-                'epsilon': 1}  # don't bother calibrating across measurement biases; let's just do pos/vel
+                'solver_type': 'gd',
+                'epsilon': 1}
     _, x_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init, epsilon=.01)
     _, x_est_cal, x_sensor_est, v_sensor_est, bias_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init, epsilon=1,
                                                                                  cal_data=cal_data)
@@ -509,14 +493,14 @@ def example5(do_vel_only_cal=True):
 
     # Plot Scenario
     fig = plt.figure()
-    tdoa.plot_sensors(marker='^', label='Sensors', clip_on=False, zorder=3)
-    plt.scatter(x_source[0], x_source[1], marker='o', label='Target', clip_on=False, zorder=3)
-    plt.scatter(x_cal[0], x_cal[1], marker='v', label='Calibration Sources', clip_on=False, zorder=3)
+    tdoa.plot_sensors(scale=1e3, marker='^', label='Sensors', clip_on=False, zorder=3)
+    plt.scatter(x_source[0]/1e3, x_source[1]/1e3, marker='o', label='Target', clip_on=False, zorder=3)
+    plt.scatter(x_cal[0]/1e3, x_cal[1]/1e3, marker='v', label='Calibration Sources', clip_on=False, zorder=3)
 
     # Plot Iterative Solutions
-    plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
-    plt.plot(x_est[0], x_est[1], linestyle='--', marker='s', markevery=[-1], label='Solution (w/o cal)')
-    plt.plot(x_est_cal[0], x_est_cal[1], linestyle='--', marker='s', markevery=[-1], label='Solution (w/pos & vel cal)')
+    plt.scatter(x_init[0]/1e3, x_init[1]/1e3, marker='x', color='k', label='Initial Estimate')
+    plt.plot(x_est[0]/1e3, x_est[1]/1e3, linestyle='--', marker='s', markevery=[-1], label='Solution (w/o cal)')
+    plt.plot(x_est_cal[0]/1e3, x_est_cal[1]/1e3, linestyle='--', marker='s', markevery=[-1], label='Solution (w/pos & vel cal)')
 
     # Bonus: FDOA-only Cal
     if do_vel_only_cal:
@@ -525,22 +509,26 @@ def example5(do_vel_only_cal=True):
         _, x_est_fdoa_cal, x_sensor_est, v_sensor_est, bias_est = hybrid.gradient_descent(zeta=zeta, x_init=x_init, cal_data=cal_data)
 
         # Plot the scenario
-        plt.plot(x_est_fdoa_cal[0], x_est_fdoa_cal[1], linestyle='-.', marker='s', markevery=[-1],
+        plt.plot(x_est_fdoa_cal[0]/1e3, x_est_fdoa_cal[1]/1e3, linestyle='-.', marker='s', markevery=[-1],
                  label='Solution (w/velocity cal)')
 
     plt.legend(loc='lower left')
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
-    # ToDo: Get working, and add to text
     print('Testing the impact of repeated calibration measurements...')
     iterations_per_tic=1
     tics_per_row=10
     iterations_per_row=iterations_per_tic*tics_per_row
     t_start=time.perf_counter()
-    num_cal_vec = [1, 3, 5, 10, 30, 50, 100, 300, 500, 1000, 3000, 5000, 10000, 30000, 50000]
+    num_cal_vec = [1, 3, 5, 10, 30, 50, 100, 500, 1000, 3000, 5000]
     cal_rmse_gd = np.zeros((len(num_cal_vec), ))
-    cal_rmse_ls = np.zeros_like(cal_rmse_gd)
     cal_rmse_ml = np.zeros_like(cal_rmse_gd)
-    cal_data['epsilon'] = 1
+    cal_rmse_ls = np.zeros_like(cal_rmse_gd)
+    cal_data['epsilon'] = 0.1
+    # cal_data['vel_search'] = SearchSpace(x_ctr=hybrid.vel,
+    #                                      epsilon=0.01,
+    #                                      max_offset=200.0)
     for idx, this_num_cal in enumerate(num_cal_vec):
         print_progress(len(num_cal_vec), idx, iterations_per_tic, iterations_per_row, t_start)
         this_cov = hybrid.cov.multiply(1/this_num_cal, overwrite=False)
@@ -552,10 +540,9 @@ def example5(do_vel_only_cal=True):
         _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
         cal_rmse_gd[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
 
-        # TODO: LS Cal doesn't seem to work
-        # cal_data['solver_type'] = 'ls'
-        # _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
-        # cal_rmse_ls[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
+        cal_data['solver_type'] = 'ls'
+        _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
+        cal_rmse_ls[idx] = np.sqrt(np.mean(np.abs(v_sensor_est-v_fdoa_actual)**2, axis=None))
 
         cal_data['solver_type'] = 'ml'
         _, v_sensor_est, _ = hybrid.sensor_calibration(**cal_data)
@@ -565,7 +552,7 @@ def example5(do_vel_only_cal=True):
 
     fig2 = plt.figure()
     plt.semilogy(num_cal_vec, cal_rmse_gd, label='GD')
-    # plt.semilogy(num_cal_vec, cal_rmse_ls, label='LS')
+    plt.semilogy(num_cal_vec, cal_rmse_ls, label='LS')
     plt.semilogy(num_cal_vec, cal_rmse_ml, label='ML')
     plt.xlabel('Number of Calibration Samples')
     plt.ylabel('RMSE (m/s)')

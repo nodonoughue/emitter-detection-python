@@ -31,7 +31,7 @@ def test_gain_vectorized():
     assert equal_to_tolerance(g_adcock_test, g_adcock_ref)
     g_adcock_dot_ref = -2*np.pi*d_lam*np.sin(psi)*np.cos(np.pi*d_lam*np.cos(psi))
     assert equal_to_tolerance(g_adcock_dot_test, g_adcock_dot_ref)
-    g_rect_ref = np.abs(np.sinc(psi*d_lam/(2*np.pi)))
+    g_rect_ref = np.abs(np.sinc(psi*d_lam/np.pi))
     assert equal_to_tolerance(g_rect_test, g_rect_ref)
     g_rect_dot_ref = utils.sinc_derivative(psi * d_lam) * d_lam
     assert equal_to_tolerance(g_rect_dot_test, g_rect_dot_ref)

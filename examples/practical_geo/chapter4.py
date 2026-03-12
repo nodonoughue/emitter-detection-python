@@ -167,14 +167,16 @@ def example1(mc_params=None):
 
     # Plot Result
     fig1 = plt.figure()
-    plt.scatter(x_source_enu[0], x_source_enu[1], marker='x', label='Target', zorder=3)
-    plt.scatter(x_sensor_enu[0], x_sensor_enu[1], marker='s', label='Sensor', zorder=3)
+    plt.scatter(x_source_enu[0]/1e3, x_source_enu[1]/1e3, marker='x', label='Target', zorder=3)
+    plt.scatter(x_sensor_enu[0]/1e3, x_sensor_enu[1]/1e3, marker='s', label='Sensor', zorder=3)
 
-    plt.plot(x_ls_iters[0], x_ls_iters[1], '-', markevery=[-1], marker='*', label='LS Solution')
-    plt.plot(crlb_ellipse[0], crlb_ellipse[1], '--', label='CRLB')
+    plt.plot(x_ls_iters[0]/1e3, x_ls_iters[1]/1e3, '-', markevery=[-1], marker='*', label='LS Solution')
+    plt.plot(crlb_ellipse[0]/1e3, crlb_ellipse[1]/1e3, '--', label='CRLB')
 
     plt.grid(True)
     plt.legend(loc='upper right')
+    plt.xlabel('East [km]')
+    plt.ylabel('North [km]')
 
     # Package figure handles
     return fig1, fig2
@@ -278,8 +280,8 @@ def example2(colors=None):
                   color=hdl3.get_edgecolor(), label=None, zorder=3)
     plt.grid(True)
 
-    plt.xlabel('E [km]')
-    plt.ylabel('N [km]')
+    plt.xlabel('East [km]')
+    plt.ylabel('North [km]')
 
     return fig,
 

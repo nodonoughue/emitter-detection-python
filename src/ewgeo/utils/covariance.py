@@ -6,7 +6,7 @@ from scipy.linalg import pinvh, solve_triangular, block_diag
 from typing import Self
 import warnings
 
-from . import parse_reference_sensor, resample_covariance_matrix
+from . import parse_reference_sensor, resample_covariance_matrix, print_matrix
 
 class CovarianceMatrix:
     # Covariance Matrix and it's Decompositions
@@ -23,6 +23,12 @@ class CovarianceMatrix:
     _do_inverse: bool = True        # Control whether _inv will be filled
 
     def __init__(self, cov: npt.ArrayLike, do_cholesky: bool=True, do_inverse: bool=True):
+        """
+        :param cov: Square covariance matrix as an ndarray, or an existing CovarianceMatrix to deep-copy.
+                    A 1-D input is interpreted as a diagonal and expanded via ``np.diag``.
+        :param do_cholesky: If True (default), compute and cache the lower Cholesky factor on first access
+        :param do_inverse: If True (default), compute and cache the matrix inverse on first access
+        """
         if isinstance(cov, CovarianceMatrix):
             # Copy it instead (this is a deepcopy), then set all the
             # attributes of the current object to point to those of the copy.
@@ -30,7 +36,9 @@ class CovarianceMatrix:
             for key, value in new_cov.__dict__.items():
                 setattr(self, key, value)
         else:
-            self.cov = np.asarray(cov)  # Store the covariance matrix; use copy to make sure it's a fresh copy
+            if np.ndim(cov) == 1:
+                cov = np.diag(cov)
+            self.cov = np.asarray(cov, dtype=float)  # Store the covariance matrix; use copy to make sure it's a fresh copy
             self._inv = None
             self._lower = None
             self._do_cholesky = do_cholesky
@@ -181,6 +189,9 @@ class CovarianceMatrix:
 
         :param tolerance: numerical precision term (the smallest eigenvalue must be >= tolerance) [Default = 1e-10]
         """
+
+        # Error-prevention -- this loop will fail if self._cov is an integer type, let's force it to be a float
+        self._cov = np.asarray(self._cov, dtype=float)
 
         # Eigen-decomposition
         lam, v = np.linalg.eigh(self.cov)
@@ -342,11 +353,13 @@ class CovarianceMatrix:
 
     def solve_acb(self, a: npt.NDArray[np.float64], b: npt.NDArray[np.float64])-> npt.NDArray[np.float64]:
         """
-        Solve the matrix problem res = A @ C^{-1} @ B
+        Solve the matrix problem res = A @ C^{-1} @ B.
 
-        If self._inv is defined, this will be computed directly. If it is not defined, this will be
-        computed via the Cholesky decomposition.
+        Uses the cached matrix inverse when available; falls back to the Cholesky decomposition.
 
+        :param a: Left factor, shape (m, n)
+        :param b: Right factor, shape (n, k)
+        :return: Result of A @ C^{-1} @ B, shape (m, k)
         """
 
         # Make sure we've parsed the covariance
@@ -455,7 +468,7 @@ class CovarianceMatrix:
 
         return CovarianceMatrix(new_cov)
 
-    def resample_hybrid(self, num_aoa: int=0, num_tdoa: int=None, num_fdoa: int=None,
+    def resample_hybrid(self, num_aoa: int=0, num_tdoa: int=0, num_fdoa: int=0,
                         tdoa_ref_idx=None, fdoa_ref_idx=None) -> Self:
         """
         Resample a block-diagonal covariance matrix representing AOA, TDOA, and FDOA measurements errors. Original
@@ -480,8 +493,16 @@ class CovarianceMatrix:
         # First, we generate the test and reference index vectors
         test_idx_vec_aoa = np.arange(num_aoa)
         ref_idx_vec_aoa = np.nan * np.ones((num_aoa,))
-        test_idx_vec_tdoa, ref_idx_vec_tdoa = parse_reference_sensor(tdoa_ref_idx, num_tdoa)
-        test_idx_vec_fdoa, ref_idx_vec_fdoa = parse_reference_sensor(fdoa_ref_idx, num_fdoa)
+        if num_tdoa > 0:
+            test_idx_vec_tdoa, ref_idx_vec_tdoa = parse_reference_sensor(tdoa_ref_idx, num_tdoa)
+        else:
+            test_idx_vec_tdoa = np.array([])
+            ref_idx_vec_tdoa = np.array([])
+        if num_fdoa > 0:
+            test_idx_vec_fdoa, ref_idx_vec_fdoa = parse_reference_sensor(fdoa_ref_idx, num_fdoa)
+        else:
+            test_idx_vec_fdoa = np.array([])
+            ref_idx_vec_fdoa = np.array([])
 
         # Second, we assemble them into a single vector
         test_idx_vec = np.concatenate((test_idx_vec_aoa, num_aoa + test_idx_vec_tdoa,
@@ -494,10 +515,12 @@ class CovarianceMatrix:
 
     def multiply(self, val, overwrite=True)-> Self | None:
         """
-        Multiply the covariance matrix by a given value. val must be a finite number.
+        Multiply the covariance matrix (and its cached decompositions) by a finite scalar.
 
-        Nicholas O'Donoughue
-        28 February 2025
+        :param val: Finite scalar multiplier
+        :param overwrite: If True (default), modify in place and return None;
+                          if False, return a new CovarianceMatrix and leave self unchanged
+        :return: None when overwrite=True; new CovarianceMatrix when overwrite=False
         """
 
         assert np.isfinite(val) and (np.isscalar(val) or np.size(val) <= 1), \

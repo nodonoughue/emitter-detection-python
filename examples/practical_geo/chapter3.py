@@ -53,11 +53,19 @@ def example1(colors=None):
     plt.imshow(cov_first.cov, vmin=0, vmax=c_max, cmap=colors)
     plt.colorbar()
     plt.title('Ref Index = 0')
+    plt.xticks(range(cov_first.size))
+    plt.yticks(range(cov_first.size))
+    plt.xlabel('Sensor Pair Indices')
+    plt.ylabel('Sensor Pair Indices')
 
     fig_b = plt.figure()
     plt.imshow(cov_last.cov, vmin=0, vmax=c_max, cmap=colors)
     plt.colorbar()
     plt.title('Ref Index = 4')
+    plt.xticks(range(cov_last.size))
+    plt.yticks(range(cov_last.size))
+    plt.xlabel('Sensor Pair Indices')
+    plt.ylabel('Sensor Pair Indices')
 
     # Generate a full measurement set example
     cov_full = cov.resample(ref_idx='full')
@@ -66,6 +74,10 @@ def example1(colors=None):
     plt.imshow(cov_full.cov, vmin=0, vmax=c_max, cmap=colors)
     plt.colorbar()
     plt.title('Ref Index = ''full''')
+    plt.xticks(range(cov_full.size))
+    plt.yticks(range(cov_full.size))
+    plt.xlabel('Sensor Pair Indices')
+    plt.ylabel('Sensor Pair Indices')
 
     # Package figure handles
     return fig_a, fig_b, fig_c
@@ -106,8 +118,10 @@ def example2(colors=None, do_video_example=False):
 
     # Plot geometry
     fig = plt.figure()
-    plt.scatter(x_sensors[0, :], x_sensors[1, :], marker='s', label='Sensors', clip_on=False)
+    plt.scatter(x_sensors[0]/1e3, x_sensors[1]/1e3, marker='s', label='Sensors', clip_on=False)
     plt.legend(loc='upper left')
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     # Define Sensor Pairs, wrap figure handle in a list
     ref_set = [0, 1, 2, 3, 'full']
@@ -117,7 +131,7 @@ def example2(colors=None, do_video_example=False):
     x_ctr = np.array([0., 0.])
     max_offset = 100e3
     search_size = max_offset * np.ones((2,))
-    num_grid_points_per_axis = 101
+    num_grid_points_per_axis = 201
     grid_res = 2*max_offset / num_grid_points_per_axis
     # 3D Version -- from video
     # alt = 5e3
@@ -128,14 +142,10 @@ def example2(colors=None, do_video_example=False):
                                epsilon=grid_res)
     x_source, x_grid = search_space.x_set, search_space.x_grid
 
-    extent = search_space.get_extent()
-    # extent = (x_ctr[0].item() - max_offset,
-    #           x_ctr[0].item() + max_offset,
-    #           x_ctr[1].item() - max_offset,
-    #           x_ctr[1].item() + max_offset)
+    extent = search_space.get_extent(multiplier=1/1e3)  # scale extent to km
 
     # Use a squeeze operation to ensure that the individual dimension indices in x_grid are 2D
-    x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
+    x_grid = [np.squeeze(this_dim)/1e3 for this_dim in x_grid] # convert to km
 
     # Pre-define contour-levels, for consistency
     levels = [.01, 1, 5, 10, 25, 50, 100, 200]
@@ -154,7 +164,7 @@ def example2(colors=None, do_video_example=False):
         # this_cep = compute_rmse(this_crlb)  # Compute the trace along the spatial axes
 
         # Plot this Result
-        this_fig = _plot_contourf(x_grid, extent, search_space.grid_shape, this_cep/1e3, x_sensors, None, levels, colors)
+        this_fig = _plot_contourf(x_grid, extent, search_space.grid_shape, this_cep/1e3, x_sensors/1e3, None, levels, colors, units='km')
         figs.append(this_fig)
 
     if do_video_example:
@@ -177,7 +187,7 @@ def example2(colors=None, do_video_example=False):
             this_cep = compute_cep50(this_crlb)
 
             # Plot this Result
-            this_fig = _plot_contourf(x_grid, extent, search_space.grid_shape, this_cep/1e3, x_sensors, None, levels, colors)
+            this_fig = _plot_contourf(x_grid, extent, search_space.grid_shape, this_cep/1e3, x_sensors/1e3, None, levels, colors, units='km')
             figs.append(this_fig)
 
     return figs
@@ -234,14 +244,16 @@ def example3(colors=None):
 
     # Plot geometry
     fig = plt.figure()
-    hdl = plt.scatter(x_sensors[0, :], x_sensors[1, :], marker='o', label='Sensors', clip_on=False, zorder=3)
+    hdl = plt.scatter(x_sensors[0]/1e3, x_sensors[1]/1e3, marker='o', label='Sensors', clip_on=False, zorder=3)
     for this_x, this_v in zip(x_sensors.T, v_sensors.T):  # transpose so the loop steps over sensors, not dimensions
-        plt.arrow(x=this_x[0], y=this_x[1],
-                  dx=this_v[0] * 10, dy=this_v[1] * 10,
-                  width=.05e3, head_width=.2e3,
+        plt.arrow(x=this_x[0]/1e3, y=this_x[1]/1e3,
+                  dx=this_v[0]/100, dy=this_v[1]/100,
+                  width=.05, head_width=.2,
                   color=hdl.get_edgecolor(), label=None)
     plt.legend(loc='upper left')
-    plt.ylim([-10e3, 10e3])
+    plt.ylim([-10, 10])
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     # Define Sensor Pairs
     ref_set = (np.array([[0, 2], [1, 3]]), np.array([[0, 1, 2], [1, 2, 3]]), 'full')
@@ -259,7 +271,7 @@ def example3(colors=None):
                                max_offset=search_size,
                                epsilon=grid_res)
     x_source, x_grid = search_space.x_set, search_space.x_grid
-    extent = search_space.get_extent()
+    extent = search_space.get_extent(multiplier=1/1e3) # convert to km for plotting
     # extent = (x_ctr[0].item() - max_offset,
     #           x_ctr[0].item() + max_offset,
     #           x_ctr[1].item() - max_offset,
@@ -267,7 +279,7 @@ def example3(colors=None):
 
     # Use a squeeze operation to ensure that the individual dimension
     # indices in x_grid are 2D
-    x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
+    x_grid = [np.squeeze(this_dim)/1e3 for this_dim in x_grid]
 
     # Loop over Sensor Pairs and compute CRLB
     figs = [fig]
@@ -285,7 +297,7 @@ def example3(colors=None):
 
         this_rmse = compute_rmse(this_crlb)
 
-        this_fig = _plot_contourf(x_grid, extent, search_space.grid_shape, this_rmse/1e3, x_sensors, v_sensors, levels, colors)
+        this_fig = _plot_contourf(x_grid, extent, search_space.grid_shape, this_rmse/1e3, x_sensors/1e3, v_sensors/100, levels, colors, units='km')
         figs.append(this_fig)
 
     return figs
@@ -307,7 +319,7 @@ def example4(rng=np.random.default_rng(), mc_params=None):
 
     # Set up sensor and target coordinates
     x_source_ctr = np.array([3, 4]) * 1e3
-    num_monte_carlo = 200
+    num_monte_carlo = 100 # todo: restore to 200? 1000?
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     offset = 1e2   # Maximum distance from center to a single instance of the source position (per dimension)
@@ -396,15 +408,18 @@ def example4(rng=np.random.default_rng(), mc_params=None):
 
     fig_err = plt.figure()
     x_arr = np.arange(gd_ls_args['max_num_iterations'])
-    plt.plot(x_arr, rmse_avg_ml * np.ones_like(x_arr), label='Maximum Likelihood')
-    plt.plot(x_arr, rmse_avg_gd, label='Gradient Descent')
-    plt.plot(x_arr, rmse_avg_ls, label='Least Square')
+    ml_hdl = plt.plot(x_arr, rmse_avg_ml * np.ones_like(x_arr), label='Maximum Likelihood',
+                      marker='x', markevery=10)
     plt.plot(x_arr, rmse_avg_ml_full * np.ones_like(x_arr), '--', label='Maximum Likelihood (full)',
-             marker='o', markevery=10)
+             marker='o', markevery=10, color=ml_hdl[0].get_color(), markerfacecolor=None)
+    gd_hdl = plt.plot(x_arr, rmse_avg_gd, label='Gradient Descent',
+                      marker='+', markevery=10)
     plt.plot(x_arr, rmse_avg_gd_full, '-.', label='Gradient Descent (full)',
-             marker='o', markevery=10)
+             marker='^', markevery=10, color=gd_hdl[0].get_color(), markerfacecolor=None)
+    ls_hdl = plt.plot(x_arr, rmse_avg_ls, label='Least Square',
+                      marker='*', markevery=10)
     plt.plot(x_arr, rmse_avg_ls_full, '-.', label='Least Square (full)',
-             marker='o', markevery=10)
+             marker='v', markevery=10, color=ls_hdl[0].get_color(), markerfacecolor=None)
 
     plt.xlabel('Number of Iterations')
     plt.ylabel('RMSE [m]')
@@ -426,8 +441,8 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     rmse_crlb = compute_rmse(crlb_common)
     rmse_crlb_full = compute_rmse(crlb_full)
 
-    plt.plot(x_arr, rmse_crlb * np.ones_like(x_arr), '--', color='k', label='CRLB')
-    plt.plot(x_arr, rmse_crlb_full * np.ones_like(x_arr), '-.', color='k', label='CRLB (full)')
+    plt.plot(x_arr, rmse_crlb * np.ones_like(x_arr), '-', color='k', label='CRLB')
+    plt.plot(x_arr, rmse_crlb_full * np.ones_like(x_arr), '--', color='k', label='CRLB (full)')
     plt.legend(loc='upper right')
 
     # CEP50
@@ -452,27 +467,35 @@ def example4(rng=np.random.default_rng(), mc_params=None):
     x_gd_full = res_full['gd']
 
     fig_full = plt.figure()
-    plt.scatter(x_source[0, -1], x_source[1, -1], marker='x', color='k', label='Target', clip_on=False, zorder=3)
-    # plt.scatter(x_tdoa[0], x_tdoa[1], marker='s', color='k', label='Sensors', clip_on=False, zorder=3)
+    plt.scatter(x_source[0, -1]/1e3, x_source[1, -1]/1e3, marker='x', color='k', label='Target', clip_on=False, zorder=3)
+    plt.scatter(x_tdoa[0], x_tdoa[1], marker='s', color='k', label='Sensors', clip_on=False, zorder=3,
+                facecolor=None)
 
     # Plot Closed-Form Solution
-    plt.scatter(x_ml[0], x_ml[1], marker='v', label='Maximum Likelihood', zorder=3)
-    plt.scatter(x_ml_full[0], x_ml_full[1], marker='^', label='Maximum Likelihood (full)', zorder=3)
+    plt.scatter(x_ml[0]/1e3, x_ml[1]/1e3, marker='x', label='Maximum Likelihood', zorder=3, color=ml_hdl[0].get_color())
+    plt.scatter(x_ml_full[0]/1e3, x_ml_full[1]/1e3, marker='o', label='Maximum Likelihood (full)', zorder=3,
+                color=ml_hdl[0].get_color(), facecolor=None)
 
     # Plot Iterative Solutions
-    # plt.scatter(x_init[0], x_init[1], marker='x', color='k', label='Initial Estimate')
-    plt.plot(x_gd[0], x_gd[1], linestyle='-.', marker='+', markevery=[-1], label='Grad Descent')
-    plt.plot(x_gd_full[0], x_gd_full[1], linestyle='-.', marker='+', markevery=[-1], label='Grad Descent (full)')
-    plt.plot(x_ls[0], x_ls[1], linestyle='-.', marker='*', markevery=[-1], label='Least Squares')
-    plt.plot(x_ls_full[0], x_ls_full[1], linestyle='-.', marker='*', markevery=[-1], label='Least Squares (full)')
+    # plt.scatter(x_init[0]/1e3, x_init[1]/1e3, marker='x', color='k', label='Initial Estimate')
+    plt.plot(x_gd[0]/1e3, x_gd[1]/1e3, linestyle='-', marker='+', markevery=[-1], label='Grad Descent',
+             color=gd_hdl[0].get_color())
+    plt.plot(x_gd_full[0]/1e3, x_gd_full[1]/1e3, linestyle='--', marker='^', markevery=[-1],
+             label='Grad Descent (full)', color=gd_hdl[0].get_color(), facecolor=None)
+    plt.plot(x_ls[0]/1e3, x_ls[1]/1e3, linestyle='-', marker='*', markevery=[-1], label='Least Squares',
+             color=ls_hdl[0].get_color())
+    plt.plot(x_ls_full[0]/1e3, x_ls_full[1]/1e3, linestyle='-.', marker='v', markevery=[-1],
+             label='Least Squares (full)', color=ls_hdl[0].get_color(), facecolor=None)
 
     # Overlay Error Ellipse
-    plt.plot(crlb_ellipse[0], crlb_ellipse[1], linestyle='--', color='k',
+    plt.plot(crlb_ellipse[0]/1e3, crlb_ellipse[1]/1e3, linestyle='-', color='k',
              label='{:d}% Error Ellipse'.format(conf_interval))
     plt.legend(loc='best')
 
-    plt.xlim([0.5e3, 5.5e3])
-    plt.ylim([3.2e3, 4.8e3])
+    plt.xlim([0.5, 5.5])
+    plt.ylim([2.6, 4.6])
+    plt.xlabel('x [km]')
+    plt.ylabel('y [km]')
 
     return fig_err, fig_full
 
@@ -503,7 +526,7 @@ def _mc_iteration(pss:TDOAPassiveSurveillanceSystem, zeta, ml_search: SearchSpac
     return {'ml': x_ml, 'ls': x_ls, 'gd': x_gd}
 
 
-def _plot_contourf(x_grid, extent, grid_shape, z, x_sensors, v_sensors, levels, colors):
+def _plot_contourf(x_grid, extent, grid_shape, z, x_sensors, v_sensors, levels, colors, units='m'):
     this_fig = plt.figure()
     hdl = plt.imshow(np.reshape(z, grid_shape), origin='lower', cmap=colors, extent=extent,
                      norm=matplotlib.colors.LogNorm(vmin=levels[0], vmax=levels[-1]))
@@ -514,15 +537,17 @@ def _plot_contourf(x_grid, extent, grid_shape, z, x_sensors, v_sensors, levels, 
                        origin='lower', colors='k')
     plt.clabel(hdl2, fontsize=10, colors='w')
 
-    hdl3 = plt.scatter(x_sensors[0, :], x_sensors[1, :], color='w', facecolors='none', marker='o', label='Sensors',
+    hdl3 = plt.scatter(x_sensors[0], x_sensors[1], color='w', facecolors='none', marker='o', label='Sensors',
                        zorder=3)
     if v_sensors is not None:
         for this_x, this_v in zip(x_sensors.T, v_sensors.T):  # transpose so the loop steps over sensors, not dimensions
             plt.arrow(x=this_x[0], y=this_x[1],
                       dx=this_v[0]*10, dy=this_v[1]*10,
-                      width=.05e3, head_width=.2e3,
+                      width=.05, head_width=.4,
                       color=hdl3.get_edgecolor(), label=None)
     plt.grid(False)
+    plt.xlabel(f"x [{units}]")
+    plt.ylabel(f"y [{units}]")
 
     return this_fig
 
