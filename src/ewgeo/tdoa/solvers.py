@@ -54,6 +54,12 @@ def chan_ho(x_sensor: npt.NDArray[np.float64],
         # the following code block will handle its resampling to account
         # for the test and reference indices.
 
+    # Shift to a coordinate frame centred on the reference sensor.
+    # Stage 2 of Chan-Ho requires r² = x² + y², which only holds when the
+    # reference sensor is at the origin.  We shift, solve, then shift back.
+    x_ref_offset = x_sensor[:, -1].copy()
+    x_sensor = x_sensor - x_ref_offset[:, np.newaxis]
+
     # Stage 1: Initial Position Estimate
     # Compute system matrix overline(A) according to 11.23
 
@@ -121,7 +127,7 @@ def chan_ho(x_sensor: npt.NDArray[np.float64],
     #     x = x_prime2;
     # end
 
-    x = np.sign(np.diag(th1[:-1])).dot(np.sqrt(th2)) + x_sensor[:, -1]
+    x = np.sign(np.diag(th1[:-1])).dot(np.sqrt(th2)) + x_sensor[:, -1] + x_ref_offset
 
     return x
 

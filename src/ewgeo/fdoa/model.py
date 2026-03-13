@@ -117,8 +117,9 @@ def jacobian(x_sensor: npt.ArrayLike,
 
     result = np.concatenate((result_pos, result_vel), axis=0)  # 2*n_dim x nPair x n_source
 
-    # strip any singleton dimensions off the end
-    return np.squeeze(result, axis=tuple(range(2,np.ndim(result))))
+    # strip any singleton dimensions off the end (only axes that are actually size 1)
+    squeeze_axes = tuple(i for i in range(2, result.ndim) if result.shape[i] == 1)
+    return np.squeeze(result, axis=squeeze_axes) if squeeze_axes else result
 
 
 def jacobian_uncertainty(x_sensor: npt.ArrayLike,
