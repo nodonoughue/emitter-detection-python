@@ -272,11 +272,11 @@ def error(x_sensor: npt.ArrayLike,
         cov = cov.resample(ref_idx=ref_idx)
 
     # Set up test points
-    xx_vec = x_max.flatten() * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))
+    xx_vec = x_max.flatten()[:, np.newaxis] * np.reshape(np.linspace(start=-1, stop=1, num=num_pts), (1, num_pts))
     x_vec = xx_vec[0, :]
     y_vec = xx_vec[1, :]
     xx, yy = np.meshgrid(x_vec, y_vec)
-    x_plot = np.vstack((xx.flatten(), yy.flatten())).T  # 2 x numPts^2
+    x_plot = np.vstack((xx.flatten(), yy.flatten()))  # 2 x numPts^2
 
     # TODO: debug
     rr = measurement(x_sensor, x_plot, ref_idx)
@@ -531,13 +531,14 @@ def grad_sensor_pos(x_sensor: npt.NDArray[np.float64], x_source: npt.NDArray[np.
         # Gradient w.r.t. sensor pos, eq 6.38
         start_test = n_dim * test
         end_test = start_test + n_dim  # add +1 because of the way python indexing works
-        grad_pos[start_test:end_test, i, :] = -dx_norm[:, test, :]
+        grad_pos[start_test:end_test, i, :] = dx_norm[:, test, :]
 
         start_ref = n_dim * ref
         end_ref = start_ref + n_dim
-        grad_pos[start_ref:end_ref, i, :] = dx_norm[:, ref, :]
+        grad_pos[start_ref:end_ref, i, :] = -dx_norm[:, ref, :]
 
-    return grad_pos
+    squeeze_axes = tuple(i for i in range(2, grad_pos.ndim) if grad_pos.shape[i] == 1)
+    return np.squeeze(grad_pos, axis=squeeze_axes) if squeeze_axes else grad_pos
 
 
 def generate_parameter_indices(x_sensor: npt.ArrayLike, do_bias: bool=True):

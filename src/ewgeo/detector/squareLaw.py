@@ -25,8 +25,8 @@ def det_test(z, noise_var, prob_fa):
     m = shp[0] if len(shp) > 0 else 1
     # n = shp[1] if len(shp) > 1 else 1
 
-    # Compute the sufficient statistic
-    suff_stat = np.sum(np.absolute(z)**2, axis=0)/noise_var
+    # Compute the sufficient statistic; atleast_1d ensures putmask works for 1-D z input
+    suff_stat = np.atleast_1d(np.sum(np.absolute(z)**2, axis=0)/noise_var)
     
     # Compute the threshold
     eta = stats.chi2.ppf(q=1-prob_fa, df=2*m)

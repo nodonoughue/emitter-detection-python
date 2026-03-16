@@ -79,7 +79,7 @@ def ls_solver(y: Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]],
 
         # Evaluate Residual and Jacobian Matrix
         y_i = y(x_prev)
-        jacobian_i = np.squeeze(jacobian(x_prev))  # Use the squeeze command to drop the third dim (n_source = 1)
+        jacobian_i = np.atleast_2d(np.squeeze(jacobian(x_prev)))  # drop the third dim (n_source = 1); atleast_2d guards against 1×1 collapse
 
         # Compute delta_x^(i), according to 10.20
         delta_x = cov.solve_lstsq(y_i, jacobian_i)
@@ -216,7 +216,7 @@ def gd_solver(y,
     
         # Evaluate Residual and Jacobian Matrix
         y_i = y(x_prev)
-        jacobian_i = np.squeeze(jacobian(x_prev))  # Use squeeze to remove third dimension (n_source=1)
+        jacobian_i = np.atleast_2d(np.squeeze(jacobian(x_prev)))  # remove third dimension (n_source=1); atleast_2d guards against 1×1 collapse
 
         # If y_i is zero, gradient descent will fail because we're at the bottom. Skip to the next iteration without
         # changing anything

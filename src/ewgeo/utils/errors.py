@@ -101,7 +101,7 @@ def compute_cep50_fast(covariance: list[CovarianceMatrix], print_warnings: bool=
     # use the circular approximation when eigenvalues are approximately equal,
     # or when one or both are NaN (avoid dividing by nan)
     mask = np.logical_or(lam_min > .25 * lam_max, np.logical_or(np.isnan(lam_min), np.isnan(lam_max)))
-    cep[mask] = .59 * np.sqrt(lam_min[mask]) + np.sqrt(lam_max[mask])
+    cep[mask] = .59 * (np.sqrt(lam_min[mask]) + np.sqrt(lam_max[mask]))
     cep[~mask] = np.sqrt(lam_max[~mask]) * (0.67 + 0.8 * lam_min[~mask] / lam_max[~mask])
 
     # Replace invalid with inf if desired

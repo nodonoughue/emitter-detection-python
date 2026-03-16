@@ -386,3 +386,86 @@ def test_pda_measurement_outside_gate_only_null_hypothesis():
     gmm = hypotheses[track]
     assert len(gmm._hypotheses) == 1
     assert isinstance(gmm._hypotheses[0], MissedDetectionHypothesis)
+
+
+# ---------------------------------------------------------------------------
+# GMMHypothesis.update_track
+# ---------------------------------------------------------------------------
+
+class _FixedUpdateHypothesis(Hypothesis):
+    """
+    Hypothesis stub whose update_track always appends a caller-supplied state,
+    avoiding the need for a real motion model or measurement.
+    """
+    def __init__(self, track, fixed_state_vec, fixed_covar_diag):
+        super().__init__(track, measurement=None)
+        self._fixed_state_vec = np.array(fixed_state_vec, dtype=float)
+        self._fixed_covar = CovarianceMatrix(np.diag(np.array(fixed_covar_diag, dtype=float)))
+
+    def update_track(self, spawn_new_track=False, **kwargs):
+        t = self.track.copy() if spawn_new_track else self.track
+        new_state = State(t.curr_state.state_space,
+                          t.curr_time + 1.0,
+                          self._fixed_state_vec,
+                          self._fixed_covar)
+        t.append(new_state)
+        return t
+
+
+def test_gmm_update_track_single_missed_detection_appends_state():
+    """
+    A GMMHypothesis wrapping a single MissedDetectionHypothesis coasts the track
+    and increments the missed-detection counter.
+    """
+    track = make_track(10, 5, t=0.0, track_id='T0')
+    mdh = MissedDetectionHypothesis(track=track, motion_model=make_cv_model(),
+                                    sensor=None, distance=0.1, time=1.0)
+    gmm = GMMHypothesis(hypotheses=[mdh])
+    updated = gmm.update_track(spawn_new_track=False)
+
+    assert len(updated.states) == 2
+    assert updated.num_missed_detections == 1
+
+
+def test_gmm_update_track_weighted_mean_position():
+    """
+    With two symmetric updated states and equal weights, the resulting
+    position should equal the weighted mean = (10 + 20) / 2 = 15.
+    """
+    track = make_track(0.0, 0.0, t=0.0)
+    h1 = _FixedUpdateHypothesis(track, fixed_state_vec=[10., 0.], fixed_covar_diag=[1., 1.])
+    h2 = _FixedUpdateHypothesis(track, fixed_state_vec=[20., 0.], fixed_covar_diag=[1., 1.])
+    gmm = GMMHypothesis(hypotheses=[h1, h2], weights=np.array([0.5, 0.5]))
+
+    updated = gmm.update_track(spawn_new_track=True)
+
+    assert equal_to_tolerance(updated.curr_state.position, [15.0])
+
+
+def test_gmm_update_track_covariance_includes_spread():
+    """
+    The position variance must include the between-hypothesis spread term.
+    With states at x=10 and x=20, equal weights, and per-hypothesis
+    position variance=1, the combined position variance = 1 + 25 = 26.
+    """
+    track = make_track(0.0, 0.0, t=0.0)
+    h1 = _FixedUpdateHypothesis(track, fixed_state_vec=[10., 0.], fixed_covar_diag=[1., 1.])
+    h2 = _FixedUpdateHypothesis(track, fixed_state_vec=[20., 0.], fixed_covar_diag=[1., 1.])
+    gmm = GMMHypothesis(hypotheses=[h1, h2], weights=np.array([0.5, 0.5]))
+
+    updated = gmm.update_track(spawn_new_track=True)
+
+    pos_var = updated.curr_state.covar.cov[0, 0]
+    assert equal_to_tolerance(pos_var, 26.0, tol=1e-9), \
+        f"Expected position variance 26.0, got {pos_var:.6f}"
+
+
+def test_gmm_update_track_returns_track():
+    """update_track must return a Track instance."""
+    track = make_track(0.0, 0.0, t=0.0)
+    h1 = _FixedUpdateHypothesis(track, [10., 0.], [1., 1.])
+    h2 = _FixedUpdateHypothesis(track, [20., 0.], [1., 1.])
+    gmm = GMMHypothesis(hypotheses=[h1, h2], weights=np.array([0.5, 0.5]))
+
+    from ewgeo.tracker.track import Track as _Track
+    assert isinstance(gmm.update_track(spawn_new_track=True), _Track)

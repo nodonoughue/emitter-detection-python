@@ -1,4 +1,6 @@
+import numpy as np
 import ewgeo.utils.coordinates as coordinates
+from ewgeo.utils.coordinates import correct_enu, reckon_sphere_enu
 
 
 def test_homogeneous_transforms():
@@ -270,8 +272,84 @@ def test_relative_unit_conversion():
         # print(coord['ecef'])
         assert equal_to_tolerance(coord['ecef'], ecef_out, tol=1e-1), 'Error testing ENU->ECEF transform'
 
-# TODO: Unit test for correct_enu
-# TODO: Unit test for reckon_sphere_enu
+# ---------------------------------------------------------------------------
+# reckon_sphere_enu
+# ---------------------------------------------------------------------------
+
+def test_reckon_sphere_enu_zero_ground_range():
+    """At zero ground range, en_range is 0 and up equals the input altitude."""
+    en_range, up = reckon_sphere_enu(0., 1000.)
+    assert np.fabs(en_range) < 1e-9
+    assert np.fabs(up - 1000.) < 1e-9
+
+
+def test_reckon_sphere_enu_zero_inputs():
+    """Both inputs zero → both outputs zero."""
+    en_range, up = reckon_sphere_enu(0., 0.)
+    assert en_range == 0.
+    assert up == 0.
+
+
+def test_reckon_sphere_enu_returns_two_values():
+    """Function returns a 2-tuple."""
+    result = reckon_sphere_enu(1000., 500.)
+    assert len(result) == 2
+
+
+def test_reckon_sphere_enu_positive_ground_range():
+    """Positive ground range yields positive en_range."""
+    en_range, _ = reckon_sphere_enu(5000., 0.)
+    assert en_range > 0
+
+
+def test_reckon_sphere_enu_en_increases_with_range():
+    """en_range grows monotonically with ground_range."""
+    ranges = np.linspace(0., 50_000., 20)
+    en_ranges = np.array([reckon_sphere_enu(r, 0.)[0] for r in ranges])
+    assert np.all(np.diff(en_ranges) >= 0)
+
+
+def test_reckon_sphere_enu_flat_earth_approx():
+    """For small ground range and zero alt, en_range ≈ ground_range."""
+    gr = 100.   # 100 m — Earth curvature effect is tiny
+    en_range, _ = reckon_sphere_enu(gr, 0.)
+    assert np.fabs(en_range - gr) / gr < 1e-6
+
+
+# ---------------------------------------------------------------------------
+# correct_enu
+# ---------------------------------------------------------------------------
+
+def test_correct_enu_pure_north():
+    """Pure northward displacement: e=0, n≈ground_range, small u correction."""
+    d = 1000.
+    e, n, u = correct_enu(0., d, 0.)
+    assert np.fabs(e) < 1e-9
+    assert n > 0
+    assert np.fabs(u) < 1.0   # curvature correction is ~0.08 m over 1 km
+
+
+def test_correct_enu_pure_east():
+    """Pure eastward displacement: n=0, e≈ground_range, u≈0."""
+    d = 1000.
+    e, n, u = correct_enu(d, 0., 0.)
+    assert np.fabs(n) < 1e-9
+    assert e > 0
+
+
+def test_correct_enu_zero_horizontal():
+    """No horizontal displacement: e=0, n=0, u=alt."""
+    e, n, u = correct_enu(0., 0., 500.)
+    assert np.fabs(e) < 1e-9
+    assert np.fabs(n) < 1e-9
+    assert np.fabs(u - 500.) < 1e-9
+
+
+def test_correct_enu_returns_three_values():
+    """Function returns a 3-tuple."""
+    result = correct_enu(100., 200., 50.)
+    assert len(result) == 3
+
 
 def equal_to_tolerance(x, y, tol=1e-6)->bool:
     """

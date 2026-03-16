@@ -117,8 +117,9 @@ def jacobian(x_sensor: npt.ArrayLike,
 
     result = np.concatenate((result_pos, result_vel), axis=0)  # 2*n_dim x nPair x n_source
 
-    # strip any singleton dimensions off the end
-    return np.squeeze(result, axis=tuple(range(2,np.ndim(result))))
+    # strip any singleton dimensions off the end (only axes that are actually size 1)
+    squeeze_axes = tuple(i for i in range(2, result.ndim) if result.shape[i] == 1)
+    return np.squeeze(result, axis=squeeze_axes) if squeeze_axes else result
 
 
 def jacobian_uncertainty(x_sensor: npt.ArrayLike,
@@ -167,7 +168,7 @@ def jacobian_uncertainty(x_sensor: npt.ArrayLike,
 
     # Gradient w.r.t measurement biases
     if do_bias:
-        j_bias = grad_bias(**jacob_args)
+        j_bias = grad_bias(x_sensor=x_sensor, x_source=x_source, ref_idx=ref_idx)
         j_list.append(j_bias)
 
     # Gradient w.r.t sensor position
@@ -528,13 +529,14 @@ def grad_sensor_pos(x_sensor: npt.ArrayLike,
         # Gradient w.r.t. sensor pos, eq 6.38
         start_test = n_dim * test
         end_test = start_test + n_dim  # add +1 because of the way python indexing works
-        grad_pos[start_test:end_test, i, :] = nabla_rn[:, test, :]
+        grad_pos[start_test:end_test, i, :] = -nabla_rn[:, test, :]
 
         start_ref = n_dim * ref
         end_ref = start_ref + n_dim
-        grad_pos[start_ref:end_ref, i, :] = -nabla_rn[:, ref, :]
+        grad_pos[start_ref:end_ref, i, :] = nabla_rn[:, ref, :]
 
-    return grad_pos
+    squeeze_axes = tuple(i for i in range(2, grad_pos.ndim) if grad_pos.shape[i] == 1)
+    return np.squeeze(grad_pos, axis=squeeze_axes) if squeeze_axes else grad_pos
 
 
 def grad_sensor_vel(x_sensor: npt.ArrayLike,
@@ -584,7 +586,8 @@ def grad_sensor_vel(x_sensor: npt.ArrayLike,
         grad_vel[start_test:end_test, i, :] = -dx_norm[:, test, :]
         grad_vel[start_ref:end_ref, i, :] = dx_norm[:, ref, :]
 
-    return grad_vel
+    squeeze_axes = tuple(i for i in range(2, grad_vel.ndim) if grad_vel.shape[i] == 1)
+    return np.squeeze(grad_vel, axis=squeeze_axes) if squeeze_axes else grad_vel
 
 def _check_inputs(x_source: npt.NDArray[np.float64], v_source: npt.NDArray[np.float64] | None,
                   x_sensor: npt.NDArray[np.float64], v_sensor: npt.NDArray[np.float64] | None)\

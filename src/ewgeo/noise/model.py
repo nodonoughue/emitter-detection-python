@@ -147,7 +147,7 @@ def get_cosmic_noise_temp(freq_hz, rx_alt_m=0, alpha_c=0.95, gain_sun_dbi=-np.in
     # Above 2 GHz, the only contribution is from cosmic background radiation
     # (2.7 K), which is essentially negligible.
     high_freq_mask = freq_hz >= 2e9
-    np.place(temp_cosmic, high_freq_mask, 2.7)
+    temp_cosmic = np.where(high_freq_mask, 2.7, temp_cosmic)
 
     # Apply Antenna Patterns
     gain_sun_lin = db_to_lin(gain_sun_dbi)
