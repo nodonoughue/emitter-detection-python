@@ -278,7 +278,6 @@ def error(x_sensor: npt.ArrayLike,
     xx, yy = np.meshgrid(x_vec, y_vec)
     x_plot = np.vstack((xx.flatten(), yy.flatten()))  # 2 x numPts^2
 
-    # TODO: debug
     rr = measurement(x_sensor, x_plot, ref_idx)
     err = r[:, np.newaxis] - rr
     epsilon = cov.solve_aca(err.T)
@@ -442,8 +441,6 @@ def grad_source(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     :param ref_idx:     Reference index (optional)
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
-
     # Sensor uncertainties don't impact the gradient with respect to target position; this is the same as the previously
     # defined function tdoa.model.jacobian.
     return jacobian(x_sensor=x_sensor, x_source=x_source, ref_idx=ref_idx)
@@ -464,8 +461,6 @@ def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     :param ref_idx:     Reference index (optional)
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
-
     # Parse the reference index
     shp = np.shape(x_sensor)
     # n_dim1 = shp[0] if len(shp) > 0 else 1
@@ -505,8 +500,6 @@ def grad_sensor_pos(x_sensor: npt.NDArray[np.float64], x_source: npt.NDArray[np.
     :param ref_idx:     Reference index (optional)
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
-
     # Parse inputs
     shp = np.shape(x_sensor)
     n_dim = shp[0] if len(shp) > 0 else 1

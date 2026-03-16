@@ -390,8 +390,6 @@ def grad_source(x_source: npt.ArrayLike,
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
-
     gradients = []
     if x_aoa is not None:
         gradients.append(triang.model.grad_source(x_source=x_source, x_sensor=x_aoa, do_2d_aoa=do_2d_aoa))
@@ -441,8 +439,6 @@ def grad_bias(x_source: npt.ArrayLike,
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
-
     gradients = []
     if x_aoa is not None:
         gradients.append(triang.model.grad_bias(x_source=x_source, x_sensor=x_aoa, do_2d_aoa=do_2d_aoa))
@@ -507,8 +503,6 @@ def grad_sensor_pos(x_source: npt.ArrayLike,
     :param fdoa_ref_idx: Scalar index of reference sensor, or nDim x nPair matrix of sensor pairings for FDOA
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
-
     # Each sub-gradient block is assembled as (2*n_dim*n_k, n_meas_k):
     #   rows 0..n_dim*n_k-1     → gradient w.r.t. sensor position
     #   rows n_dim*n_k..end     → gradient w.r.t. sensor velocity (zeros for AOA/TDOA)

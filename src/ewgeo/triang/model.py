@@ -380,8 +380,6 @@ def grad_source(x_sensor, x_source, do_2d_aoa=False):
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
-
     # Sensor uncertainties don't impact the gradient with respect to target position; this is the same as the previously
     # defined function triang.model.jacobian.
     return jacobian(x_sensor=x_sensor, x_source=x_source, do_2d_aoa=do_2d_aoa)
@@ -402,8 +400,6 @@ def grad_bias(x_sensor, x_source, do_2d_aoa=False):
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
-
     # Parse the reference index
     shp = np.shape(x_sensor)
     # num_dim = shp[0] if len(shp) > 0 else 1
@@ -438,8 +434,6 @@ def grad_sensor_pos(x_sensor, x_source, do_2d_aoa=False):
     :param do_2d_aoa: Optional boolean parameter specifying whether 1D (az-only) or 2D (az/el) AOA is being performed
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
-
     # Parse inputs
     shp = np.shape(x_sensor)
     n_dim = shp[0] if len(shp) > 0 else 1

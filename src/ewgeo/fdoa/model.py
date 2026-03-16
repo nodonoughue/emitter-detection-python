@@ -456,8 +456,6 @@ def grad_bias(x_sensor: npt.ArrayLike, x_source: npt.ArrayLike, ref_idx=None):
     :param ref_idx:     Reference index (optional)
     :return jacobian:   Jacobian matrix representing the desired gradient
     """
-    # TODO: Debug
-
     # Parse the reference index
     shp = np.shape(x_sensor)
     num_sensors = shp[1] if len(shp) > 1 else 1
