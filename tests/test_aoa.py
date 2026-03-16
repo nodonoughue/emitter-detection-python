@@ -231,3 +231,56 @@ def test_directional_crlb_omni_smaller_than_adcock_few_samples():
                                    g=_g_adcock, g_dot=_g_dot_adcock,
                                    psi_samples=_PSI_SAMPLES, psi_true=_PSI_TRUE)
     assert np.isfinite(crlb_adcock)
+
+
+# ===========================================================================
+# directional.compute_df
+# ===========================================================================
+
+_PSI_RES = 1e-4  # resolution for iterative search in compute_df tests
+
+
+def _make_s(g, psi_samples, psi_true, n_temporal=1):
+    """Noiseless gain measurements at each steering angle, shape (num_angles, n_temporal)."""
+    return np.tile(g(psi_samples - psi_true)[:, np.newaxis], (1, n_temporal))
+
+
+def test_directional_compute_df_returns_scalar():
+    s = _make_s(_g_adcock, _PSI_SAMPLES, _PSI_TRUE)
+    psi_est = directional.compute_df(s, _PSI_SAMPLES, _g_adcock, psi_res=_PSI_RES)
+    assert np.size(psi_est) == 1
+
+
+def test_directional_compute_df_at_45_degrees():
+    """Noiseless adcock measurements at π/4 should be recovered to within psi_res."""
+    s = _make_s(_g_adcock, _PSI_SAMPLES, _PSI_TRUE)
+    psi_est = directional.compute_df(s, _PSI_SAMPLES, _g_adcock, psi_res=_PSI_RES)
+    assert abs(psi_est - _PSI_TRUE) < 3 * _PSI_RES, \
+        f"Estimate {np.rad2deg(float(psi_est)):.4f}°, expected {np.rad2deg(_PSI_TRUE):.4f}°"
+
+
+def test_directional_compute_df_at_negative_angle():
+    """Noiseless adcock measurements at -π/6 should be recovered accurately."""
+    psi_true = -np.pi / 6
+    s = _make_s(_g_adcock, _PSI_SAMPLES, psi_true)
+    psi_est = directional.compute_df(s, _PSI_SAMPLES, _g_adcock, psi_res=_PSI_RES)
+    assert abs(psi_est - psi_true) < 3 * _PSI_RES, \
+        f"Estimate {np.rad2deg(float(psi_est)):.4f}°, expected {np.rad2deg(psi_true):.4f}°"
+
+
+def test_directional_compute_df_rectangular_aperture():
+    """Works with a rectangular-aperture gain function."""
+    g_rect, _ = make_gain_functions('rectangular', d_lam=5.0, psi_0=0.0)
+    psi_true = np.pi / 8
+    s = _make_s(g_rect, _PSI_SAMPLES, psi_true)
+    psi_est = directional.compute_df(s, _PSI_SAMPLES, g_rect, psi_res=_PSI_RES)
+    assert abs(psi_est - psi_true) < 3 * _PSI_RES, \
+        f"Estimate {np.rad2deg(float(psi_est)):.4f}°, expected {np.rad2deg(psi_true):.4f}°"
+
+
+def test_directional_compute_df_multi_temporal_sample():
+    """Noiseless repeated temporal samples should give the same result as one sample."""
+    s = _make_s(_g_adcock, _PSI_SAMPLES, _PSI_TRUE, n_temporal=5)
+    psi_est = directional.compute_df(s, _PSI_SAMPLES, _g_adcock, psi_res=_PSI_RES)
+    assert abs(psi_est - _PSI_TRUE) < 3 * _PSI_RES, \
+        f"Estimate {np.rad2deg(float(psi_est)):.4f}°, expected {np.rad2deg(_PSI_TRUE):.4f}°"

@@ -1,7 +1,7 @@
 import numpy as np
 
 from ewgeo.array_df.model import make_steering_vector, compute_array_factor_ula
-from ewgeo.array_df.perf import crlb_det
+from ewgeo.array_df.perf import crlb_det, crlb_stochastic
 from ewgeo.array_df.solvers import beamscan, beamscan_mvdr, music
 
 
@@ -143,6 +143,51 @@ def test_crlb_det_increases_with_fewer_elements():
     c4  = float(np.squeeze(crlb_det(SIGNAL_POWER, NOISE_POWER, psi, NUM_SNAPSHOTS, v4,  vd4)))
     c16 = float(np.squeeze(crlb_det(SIGNAL_POWER, NOISE_POWER, psi, NUM_SNAPSHOTS, v16, vd16)))
     assert c16 < c4, f"CRLB should decrease with more elements: {c16} vs {c4}"
+
+
+# ===========================================================================
+# crlb_stochastic
+# ===========================================================================
+
+def test_crlb_stochastic_single_source_positive():
+    """Single-source stochastic CRLB must be a positive scalar."""
+    v, v_dot = make_steering_vector(D_LAM, N_ELEMENTS)
+    c = crlb_stochastic(SIGNAL_POWER, NOISE_POWER, PSI_TRUE, NUM_SNAPSHOTS, v, v_dot)
+    assert float(np.squeeze(c)) > 0
+
+
+def test_crlb_stochastic_multi_source_positive_definite():
+    """Multi-source path (the bug path): result must be a 2x2 positive-definite matrix."""
+    v, v_dot = make_steering_vector(D_LAM, N_ELEMENTS)
+    psi_two = np.array([np.pi / 6, -np.pi / 6])
+    cov_two = SIGNAL_POWER * np.eye(2)
+    c = crlb_stochastic(cov_two, NOISE_POWER, psi_two, NUM_SNAPSHOTS, v, v_dot)
+    assert c.shape == (2, 2), f"Expected (2, 2), got {c.shape}"
+    eigvals = np.linalg.eigvalsh(c)
+    assert np.all(eigvals > 0), f"CRLB matrix not positive definite: eigenvalues={eigvals}"
+
+
+def test_crlb_stochastic_decreases_with_snapshots():
+    v, v_dot = make_steering_vector(D_LAM, N_ELEMENTS)
+    c_few  = float(np.squeeze(crlb_stochastic(SIGNAL_POWER, NOISE_POWER, PSI_TRUE, 10,  v, v_dot)))
+    c_many = float(np.squeeze(crlb_stochastic(SIGNAL_POWER, NOISE_POWER, PSI_TRUE, 100, v, v_dot)))
+    assert c_many < c_few, f"Stochastic CRLB should decrease with more snapshots: {c_many} vs {c_few}"
+
+
+def test_crlb_stochastic_decreases_with_snr():
+    v, v_dot = make_steering_vector(D_LAM, N_ELEMENTS)
+    c_low  = float(np.squeeze(crlb_stochastic(1.0 * NOISE_POWER,   NOISE_POWER, PSI_TRUE, NUM_SNAPSHOTS, v, v_dot)))
+    c_high = float(np.squeeze(crlb_stochastic(100.0 * NOISE_POWER, NOISE_POWER, PSI_TRUE, NUM_SNAPSHOTS, v, v_dot)))
+    assert c_high < c_low, f"Stochastic CRLB should decrease with higher SNR: {c_high} vs {c_low}"
+
+
+def test_crlb_stochastic_geq_deterministic():
+    """Stochastic CRLB >= deterministic CRLB (stochastic is a looser bound)."""
+    v, v_dot = make_steering_vector(D_LAM, N_ELEMENTS)
+    c_det  = float(np.squeeze(crlb_det(SIGNAL_POWER, NOISE_POWER, PSI_TRUE, NUM_SNAPSHOTS, v, v_dot)))
+    c_stoc = float(np.squeeze(crlb_stochastic(SIGNAL_POWER, NOISE_POWER, PSI_TRUE, NUM_SNAPSHOTS, v, v_dot)))
+    assert c_stoc >= c_det - 1e-12, \
+        f"Stochastic CRLB ({c_stoc:.6g}) should be >= deterministic ({c_det:.6g})"
 
 
 # ===========================================================================

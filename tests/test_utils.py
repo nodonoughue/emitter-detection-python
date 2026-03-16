@@ -8,6 +8,11 @@ from ewgeo.utils.utils import (
     remove_outliers,
     ensure_iterable,
     atleast_nd_trailing,
+    compute_sample_mean,
+    compute_sample_mean_update,
+    broadcast_backwards,
+    sinc_derivative,
+    make_taper,
 )
 
 
@@ -246,3 +251,198 @@ def test_atleast_nd_adds_multiple_dims():
     result = atleast_nd_trailing(x, 4)
     assert result.ndim == 4
     assert result.shape == (2, 1, 1, 1)
+
+
+# ===========================================================================
+# compute_sample_mean
+# ===========================================================================
+
+def test_compute_sample_mean_shape():
+    rng = np.random.default_rng(0)
+    zeta = rng.standard_normal((3, 10))
+    zeta_mean, zeta_mean_full = compute_sample_mean(zeta)
+    assert zeta_mean.shape == (3,)
+    assert zeta_mean_full.shape == (3, 10)
+
+
+def test_compute_sample_mean_final_equals_last_column():
+    rng = np.random.default_rng(1)
+    zeta = rng.standard_normal((2, 20))
+    zeta_mean, zeta_mean_full = compute_sample_mean(zeta)
+    assert np.allclose(zeta_mean, zeta_mean_full[:, -1])
+
+
+def test_compute_sample_mean_known_constant():
+    """For constant rows the mean must equal that constant."""
+    zeta = np.array([[3.0] * 5, [7.0] * 5])
+    zeta_mean, _ = compute_sample_mean(zeta)
+    assert np.allclose(zeta_mean, [3.0, 7.0])
+
+
+def test_compute_sample_mean_first_column_equals_first_sample():
+    zeta = np.array([[1., 2., 3., 4.], [5., 6., 7., 8.]])
+    _, zeta_mean_full = compute_sample_mean(zeta)
+    assert np.allclose(zeta_mean_full[:, 0], zeta[:, 0])
+
+
+def test_compute_sample_mean_converges_to_true_mean():
+    rng = np.random.default_rng(2)
+    true_mean = np.array([5.0, -2.0])
+    zeta = true_mean[:, np.newaxis] + rng.standard_normal((2, 2000))
+    zeta_mean, _ = compute_sample_mean(zeta)
+    assert np.allclose(zeta_mean, true_mean, atol=0.1)
+
+
+# ===========================================================================
+# compute_sample_mean_update
+# ===========================================================================
+
+def test_compute_sample_mean_update_matches_batch():
+    """Incremental update must agree with the batch mean over all samples."""
+    rng = np.random.default_rng(3)
+    zeta1 = rng.standard_normal((2, 10))
+    zeta2 = rng.standard_normal((2, 5))
+    mean1, _ = compute_sample_mean(zeta1)
+    mean_update, _ = compute_sample_mean_update(zeta2, mean1, 10)
+    all_samples = np.concatenate([zeta1, zeta2], axis=1)
+    mean_batch, _ = compute_sample_mean(all_samples)
+    assert np.allclose(mean_update, mean_batch, atol=1e-10)
+
+
+def test_compute_sample_mean_update_count():
+    zeta = np.ones((2, 5))
+    mean_prev = np.array([1.0, 1.0])
+    _, n_new = compute_sample_mean_update(zeta, mean_prev, 10)
+    assert n_new == 15
+
+
+def test_compute_sample_mean_update_single_new_sample():
+    """Adding one sample by update must equal batch mean over all."""
+    rng = np.random.default_rng(4)
+    zeta_prev = rng.standard_normal((3, 9))
+    new_sample = rng.standard_normal((3, 1))
+    mean_prev, _ = compute_sample_mean(zeta_prev)
+    mean_update, n = compute_sample_mean_update(new_sample, mean_prev, 9)
+    all_data = np.concatenate([zeta_prev, new_sample], axis=1)
+    mean_batch, _ = compute_sample_mean(all_data)
+    assert n == 10
+    assert np.allclose(mean_update, mean_batch, atol=1e-10)
+
+
+# ===========================================================================
+# broadcast_backwards
+# ===========================================================================
+
+def test_broadcast_backwards_pads_trailing():
+    """Shorter array should get singleton trailing dimensions appended."""
+    a = np.ones((3,))    # (3,)
+    b = np.ones((3, 4))  # (3, 4)
+    out, _ = broadcast_backwards([a, b])
+    assert out[0].shape == (3, 1)
+    assert out[1].shape == (3, 4)
+
+
+def test_broadcast_backwards_out_shape():
+    a = np.ones((3,))
+    b = np.ones((3, 4))
+    _, out_shp = broadcast_backwards([a, b])
+    assert out_shp == (3, 4)
+
+
+def test_broadcast_backwards_do_broadcast_expands():
+    """With do_broadcast=True both arrays should be fully broadcast."""
+    a = np.ones((3, 1))
+    b = np.ones((1, 4))
+    out, _ = broadcast_backwards([a, b], do_broadcast=True)
+    assert out[0].shape == (3, 4)
+    assert out[1].shape == (3, 4)
+
+
+def test_broadcast_backwards_same_shape_unchanged():
+    a = np.ones((3, 4))
+    b = np.ones((3, 4))
+    out, out_shp = broadcast_backwards([a, b])
+    assert out[0].shape == (3, 4)
+    assert out[1].shape == (3, 4)
+    assert out_shp == (3, 4)
+
+
+def test_broadcast_backwards_start_dim_preserves_leading():
+    """Leading dims before start_dim must be left untouched."""
+    a = np.ones((2, 3))      # (batch, meas)
+    b = np.ones((2, 3, 4))   # (batch, meas, sources)
+    out, out_shp = broadcast_backwards([a, b], start_dim=2)
+    assert out[0].shape == (2, 3, 1)   # singleton appended at trailing
+    assert out_shp == (4,)             # broadcast shape starts at dim 2
+
+
+# ===========================================================================
+# sinc_derivative
+# ===========================================================================
+
+def test_sinc_derivative_at_zero():
+    assert equal_to_tolerance(sinc_derivative(0.0), 0.0)
+
+
+def test_sinc_derivative_finite_difference():
+    """Analytic sinc_derivative should match numerical finite difference of sin(x)/x."""
+    x = np.array([0.5, 1.0, 2.0, 3.0])
+    dx = 1e-7
+    def sinc_rad(xx):
+        return np.sin(xx) / xx
+    fd = (sinc_rad(x + dx) - sinc_rad(x - dx)) / (2 * dx)
+    analytic = sinc_derivative(x)
+    assert np.allclose(analytic, fd, atol=1e-6)
+
+
+def test_sinc_derivative_vectorized():
+    x = np.linspace(-3, 3, 61)
+    result = sinc_derivative(x)
+    assert result.shape == x.shape
+
+
+def test_sinc_derivative_negative_input():
+    """sinc_derivative should be defined (and finite) for negative x."""
+    result = sinc_derivative(-1.5)
+    assert np.isfinite(result)
+
+
+# ===========================================================================
+# make_taper
+# ===========================================================================
+
+def test_make_taper_uniform_all_ones():
+    w, _ = make_taper(10, 'uniform')
+    assert np.allclose(w, 1.0)
+
+
+def test_make_taper_uniform_snr_loss_zero():
+    _, snr_loss = make_taper(16, 'uniform')
+    assert np.isclose(snr_loss, 0.0)
+
+
+def test_make_taper_hann_shape():
+    w, _ = make_taper(32, 'hann')
+    assert w.shape == (32,)
+
+
+def test_make_taper_hann_peak_is_one():
+    w, _ = make_taper(32, 'hann')
+    assert np.isclose(np.max(np.fabs(w)), 1.0)
+
+
+def test_make_taper_hann_snr_loss_negative():
+    """Non-uniform tapers should incur SNR loss (< 0 dB)."""
+    _, snr_loss = make_taper(32, 'hann')
+    assert snr_loss < 0.0
+
+
+def test_make_taper_hamming_length():
+    n = 25
+    w, _ = make_taper(n, 'hamming')
+    assert len(w) == n
+
+
+def test_make_taper_invalid_type_raises():
+    with pytest.raises(KeyError):
+        make_taper(16, 'triangular')

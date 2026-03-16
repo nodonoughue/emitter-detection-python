@@ -4,7 +4,7 @@ import numpy as np
 from ewgeo import aoa
 from ewgeo.prop.model import get_path_loss
 from ewgeo.utils.constants import kT, speed_of_light
-from ewgeo.utils.unit_conversions import lin_to_db
+from ewgeo.utils.unit_conversions import db_to_lin, lin_to_db
 
 
 def run_all_examples():
@@ -256,6 +256,226 @@ def example4(fig=None):
     plt.loglog(params['range_m'] / 1e3, rmse_th_interf2, linestyle='-', marker='x',
                label=r'Interferometer ($d=2\lambda$)')
     plt.legend(loc='upper left')
+
+    return fig
+
+
+def directional_df_monte_carlo(mc_params=None):
+    """
+    Monte Carlo simulation of Adcock and rectangular-aperture DF receivers:
+    compares empirical RMSE against the CRLB across a range of SNR values
+    and sample counts.
+
+    Ported from MATLAB code (aoa/directional.py run_example).
+
+    Nicholas O'Donoughue
+    14 January 2021
+
+    :param mc_params: Optional dict with keys 'monte_carlo_decimation' and 'min_num_monte_carlo'
+                      to reduce the number of trials (useful for quick testing).
+    :return figs: list of two figure handles [fig_adcock, fig_rectangular]
+    """
+
+    num_samples_vec = np.array([1, 10, 100])
+    snr_db_vec      = np.arange(start=-20, step=2, stop=22)
+    num_monte_carlo = 1000
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo / mc_params['monte_carlo_decimation']),
+                              mc_params['min_num_monte_carlo'])
+
+    out_shp = (np.size(num_samples_vec), np.size(snr_db_vec))
+
+    figs = []
+
+    # ======================== Adcock ========================
+    g_adcock, g_dot_adcock = aoa.make_gain_functions(aperture_type='adcock', d_lam=0.25, psi_0=0.0)
+
+    th_true   = 5.0
+    psi_true  = np.deg2rad(th_true)
+    psi_res   = 0.001
+    num_angles = 10
+    psi       = np.deg2rad(np.linspace(-180.0, 180.0, num_angles, endpoint=False))
+    x_adcock  = g_adcock(psi - psi_true)
+
+    rmse_psi = np.zeros(out_shp)
+    crlb_psi = np.zeros(out_shp)
+
+    print('Executing Adcock Monte Carlo sweep...')
+    for idx_m, num_samples in enumerate(num_samples_vec.tolist()):
+        this_num_mc = int(num_monte_carlo // num_samples)
+        print('\tM={}'.format(num_samples))
+        noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in range(this_num_mc)]
+        for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):
+            noise_amp = db_to_lin(-snr_db / 2)
+            y = [x_adcock[:, np.newaxis] + noise_amp * n for n in noise_base]
+            psi_est = np.array([aoa.directional.compute_df(this_y, psi, g_adcock, psi_res,
+                                                           psi.min(), psi.max()) for this_y in y])
+            rmse_psi[idx_m, idx_snr] = np.sqrt(np.mean((psi_est - psi_true) ** 2))
+            crlb_psi[idx_m, idx_snr] = aoa.directional.crlb(snr_db, num_samples,
+                                                             g_adcock, g_dot_adcock, psi, psi_true)
+    print('done.')
+
+    fig_adcock = plt.figure()
+    for idx_m, this_num_samples in enumerate(num_samples_vec.tolist()):
+        handle1 = plt.semilogy(snr_db_vec, np.rad2deg(np.sqrt(crlb_psi[idx_m, :])),
+                               label='CRLB, M={}'.format(this_num_samples))
+        plt.semilogy(snr_db_vec, np.rad2deg(rmse_psi[idx_m, :]),
+                     color=handle1[0].get_color(), linestyle='--',
+                     label='Simulation Result, M={}'.format(this_num_samples))
+    plt.xlabel(r'$\xi$ [dB]')
+    plt.ylabel('RMSE [deg]')
+    plt.title('Adcock DF Performance')
+    plt.legend(loc='lower left')
+    figs.append(fig_adcock)
+
+    # ======================== Rectangular Aperture ========================
+    g_rect, g_dot_rect = aoa.make_gain_functions(aperture_type='rectangular',
+                                                  d_lam=5, psi_0=0.0)
+
+    th_true    = 5.0
+    psi_true   = np.deg2rad(th_true)
+    psi_res    = 0.001
+    num_angles = 36
+    psi        = np.deg2rad(np.linspace(-180.0, 180.0, num_angles, endpoint=False))
+    x_rect     = g_rect(psi - psi_true)
+
+    rmse_psi = np.zeros(out_shp)
+    crlb_psi = np.zeros(out_shp)
+
+    print('Executing Rectangular Aperture Monte Carlo sweep...')
+    for idx_m, num_samples in enumerate(num_samples_vec.tolist()):
+        this_num_mc = int(num_monte_carlo // num_samples)
+        print('\tM={}'.format(num_samples))
+        noise_base = [np.random.normal(size=(num_angles, num_samples)) for _ in range(this_num_mc)]
+        for idx_snr, snr_db in enumerate(snr_db_vec.tolist()):
+            noise_amp = db_to_lin(-snr_db / 2)
+            y = [x_rect[:, np.newaxis] + noise_amp * n for n in noise_base]
+            psi_est = np.array([aoa.directional.compute_df(this_y, psi, g_rect, psi_res,
+                                                           psi.min(), psi.max()) for this_y in y])
+            rmse_psi[idx_m, idx_snr] = np.sqrt(np.mean((psi_est - psi_true) ** 2))
+            crlb_psi[idx_m, idx_snr] = aoa.directional.crlb(snr_db, num_samples,
+                                                             g_rect, g_dot_rect, psi, psi_true)
+    print('done.')
+
+    fig_rect = plt.figure()
+    for idx_m, this_num_samples in enumerate(num_samples_vec.tolist()):
+        handle1 = plt.semilogy(snr_db_vec, np.rad2deg(np.sqrt(crlb_psi[idx_m, :])),
+                               label='CRLB, M={}'.format(this_num_samples))
+        plt.semilogy(snr_db_vec, np.rad2deg(rmse_psi[idx_m, :]),
+                     color=handle1[0].get_color(), linestyle='--',
+                     label='Simulation Result, M={}'.format(this_num_samples))
+    plt.xlabel(r'$\xi$ [dB]')
+    plt.ylabel('RMSE [deg]')
+    plt.title('Rectangular Aperture DF Performance')
+    plt.legend(loc='lower left')
+    figs.append(fig_rect)
+
+    return figs
+
+
+def doppler_df_monte_carlo(mc_params=None):
+    """
+    Monte Carlo simulation of a Doppler DF receiver: compares empirical RMSE against the
+    CRLB across a range of SNR values and sample counts.
+
+    Ported from MATLAB code.
+
+    Nicholas O'Donoughue
+    14 January 2021
+
+    :param mc_params: Optional dict with keys 'monte_carlo_decimation' and 'min_num_monte_carlo'
+                      to reduce the number of trials (useful for quick testing).
+    :return fig: figure handle to the generated RMSE vs SNR plot
+    """
+
+    # Signal parameters
+    th_true   = 45.0
+    psi_true  = np.deg2rad(th_true)
+    amplitude = 1.0
+    phi0      = 2 * np.pi * np.random.uniform()   # random starting phase
+    f         = 1.0e9                              # carrier frequency [Hz]
+    ts        = 1.0 / (5.0 * f)                   # sampling period [s]
+
+    # Doppler antenna parameters
+    c      = speed_of_light
+    lam    = c / f
+    radius = lam / 2.0      # half-wavelength rotation radius [m]
+    psi_res = 1e-4           # desired DF resolution [rad]
+
+    # Parameter sweep
+    num_samples_vec  = np.asarray([10, 100, 1000])
+    snr_db_vec       = np.arange(start=-10, stop=22, step=2)
+    num_monte_carlo  = int(1e6)
+    if mc_params is not None:
+        num_monte_carlo = max(int(num_monte_carlo / mc_params['monte_carlo_decimation']),
+                              mc_params['min_num_monte_carlo'])
+
+    # Output arrays
+    out_shp  = (np.size(num_samples_vec), np.size(snr_db_vec))
+    rmse_psi = np.zeros(shape=out_shp)
+    crlb_psi = np.zeros(shape=out_shp)
+
+    print('Executing Doppler Monte Carlo sweep...')
+    for idx_num_samples, this_num_samples in enumerate(num_samples_vec.tolist()):
+        this_num_monte_carlo = int(num_monte_carlo / this_num_samples)
+        print('\t M={}'.format(this_num_samples))
+
+        # Reference signal (noiseless)
+        t_vec = ts * np.arange(this_num_samples)
+        r0 = amplitude * np.exp(1j * phi0) * np.exp(1j * 2 * np.pi * f * t_vec)
+
+        # Doppler signal (noiseless) — one rotation per M samples
+        fr = 1.0 / (ts * this_num_samples)
+        x0 = amplitude * np.exp(1j * phi0) * np.exp(1j * 2 * np.pi * f * t_vec) \
+             * np.exp(1j * 2 * np.pi * f * radius / c * np.cos(2 * np.pi * fr * t_vec - psi_true))
+
+        # Pre-generate unit-amplitude complex noise bases
+        noise_base_r = [np.random.normal(size=(this_num_samples, 2)).view(np.complex128).ravel()
+                        for _ in range(this_num_monte_carlo)]
+        noise_base_x = [np.random.normal(size=(this_num_samples, 2)).view(np.complex128).ravel()
+                        for _ in range(this_num_monte_carlo)]
+
+        # Loop over SNR levels
+        for idx_snr, snr_db in enumerate(snr_db_vec):
+            if np.mod(idx_snr, 10) == 0:
+                print('.', end='')
+
+            # Scale noise to achieve desired SNR  (sigma = amplitude / sqrt(SNR_lin))
+            noise_amp = db_to_lin(-snr_db / 2)
+
+            # Generate noisy signals
+            r = [r0 + n * noise_amp for n in noise_base_r]
+            x = [x0 + n * noise_amp for n in noise_base_x]
+
+            # Compute the DF estimate for each trial
+            psi_est = np.asarray([aoa.doppler.compute_df(this_r, this_x, ts, f, radius, fr,
+                                                         psi_res, -np.pi, np.pi)
+                                  for this_r, this_x in zip(r, x)])
+
+            # Empirical RMSE and CRLB
+            rmse_psi[idx_num_samples, idx_snr] = np.sqrt(np.mean((psi_est - psi_true) ** 2))
+            crlb_psi[idx_num_samples, idx_snr] = aoa.doppler.crlb(snr_db, this_num_samples,
+                                                                   amplitude, ts, f, radius, fr,
+                                                                   psi_true)
+
+    print('done.')
+
+    fig = plt.figure()
+    for idx_num_samples, this_num_samples in enumerate(num_samples_vec.tolist()):
+        crlb_label = 'CRLB, M={}'.format(this_num_samples)
+        mc_label   = 'Simulation Result, M={}'.format(this_num_samples)
+
+        handle1 = plt.semilogy(snr_db_vec,
+                               np.rad2deg(np.sqrt(crlb_psi[idx_num_samples, :])),
+                               label=crlb_label)
+        plt.semilogy(snr_db_vec,
+                     np.rad2deg(rmse_psi[idx_num_samples, :]),
+                     color=handle1[0].get_color(), linestyle='--', label=mc_label)
+
+    plt.xlabel(r'$\xi$ [dB]')
+    plt.ylabel('RMSE [deg]')
+    plt.title('Doppler DF Performance')
+    plt.legend(loc='lower left')
 
     return fig
 
