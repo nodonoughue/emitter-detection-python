@@ -545,8 +545,11 @@ class PassiveSurveillanceSystem(ABC):
 
     def gd_ls_uncertainty(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, do_gd: bool,
                           do_sensor_pos: bool=False, x_sensor: npt.ArrayLike=None,
+                          cov_pos: CovarianceMatrix=None,
                           do_sensor_vel: bool=False, v_sensor: npt.ArrayLike=None,
-                          do_sensor_bias: bool=False, bias: npt.ArrayLike=None, **kwargs)->\
+                          cov_vel: CovarianceMatrix=None,
+                          do_sensor_bias: bool=False, bias: npt.ArrayLike=None,
+                          cov_bias: CovarianceMatrix=None, **kwargs)->\
             tuple[npt.NDArray[np.float64], dict, npt.NDArray[np.float64]]:
 
         x_init = np.array(x_init)
@@ -556,43 +559,76 @@ class PassiveSurveillanceSystem(ABC):
 
         if do_sensor_bias:
             if bias is None:
-                bias = self.bias if self.bias is not None else np.zeros(self.num_measurements, )
+                bias = self.bias if self.bias is not None else np.zeros(self.num_measurements_raw, )
             th_init = np.append(th_init, bias)
             num_bias = np.size(bias)
-            bias_slice = np.s_[num_source_vars:num_source_vars+num_bias]  # one for each measurement
-
+            bias_slice = np.s_[num_source_vars:num_source_vars+num_bias]
+            if cov_bias is None:
+                cov_bias = self.cov_bias
+            if cov_bias is None:
+                raise ValueError(
+                    "do_sensor_bias=True requires a bias prior covariance to regularize the joint "
+                    "position+bias estimation. Pass cov_bias= to this method or assign self.cov_bias "
+                    "on the PSS object."
+                )
+            bias_nominal = np.array(bias)  # prior mean; residual is zero when estimate equals this
         else:
             num_bias = 0
             bias_slice = None
 
         if do_sensor_pos:
             num_pos = self.num_dim*self.num_sensors
-            pos_slice = np.s_[num_bias:num_bias+num_pos]
+            pos_slice = np.s_[num_source_vars+num_bias:num_source_vars+num_bias+num_pos]
             if x_sensor is None: x_sensor = self.pos.ravel()
             th_init = np.append(th_init, x_sensor)
+            if cov_pos is None:
+                cov_pos = self.cov_pos  # property has a default identity fallback
+            pos_nominal = self.pos.ravel()  # prior mean = nominal sensor positions
         else:
             num_pos = 0
             pos_slice = None
 
         if do_sensor_vel:
             num_vel = self.num_dim*self.num_sensors
-            vel_slice = np.s_[num_bias+num_pos:num_bias+num_pos+num_vel]
+            vel_slice = np.s_[num_source_vars+num_bias+num_pos:num_source_vars+num_bias+num_pos+num_vel]
             if v_sensor is None: v_sensor = self.vel.ravel()
             th_init = np.append(th_init, v_sensor)
+            if cov_vel is None:
+                cov_vel = self.cov_vel  # property has a default identity fallback
+            vel_nominal = self.vel.ravel()  # prior mean = nominal sensor velocities
         else:
+            num_vel = 0
             vel_slice = None
+
+        # Build the augmented block-diagonal covariance: measurement block + one prior block per
+        # active nuisance parameter group. The prior blocks regularise the otherwise rank-deficient
+        # normal equations that arise when n_params > n_measurements.
+        active_covs = [self.cov]
+        if do_sensor_bias: active_covs.append(cov_bias)
+        if do_sensor_pos:  active_covs.append(cov_pos)
+        if do_sensor_vel:  active_covs.append(cov_vel)
+        cov_aug = CovarianceMatrix.block_diagonal(*active_covs) if len(active_covs) > 1 else self.cov
+
+        # n_params is fixed once th_init is fully assembled
+        n_params = th_init.size
 
         # ==================== Measurement Wrapper Function ================
         pos_shape = (self.num_dim, self.num_sensors)
         def y(th: npt.ArrayLike):
-            # The theta vector contains both measurement biases and sensor position/velocity errors
+            # The theta vector contains source position, and optionally: measurement biases,
+            # sensor positions, and sensor velocities.
             th = np.array(th)
             x_source, v_source = self.parse_source_pos_vel(th[source_slice], default_vel=np.zeros_like(x_init))
             this_bias = th[bias_slice] if bias_slice is not None else None
             this_x_sensor = np.reshape(th[pos_slice], shape=pos_shape) if pos_slice is not None else None
             this_v_sensor = np.reshape(th[vel_slice], shape=pos_shape) if vel_slice is not None else None
-            return np.ravel(zeta - self.measurement(x_sensor=this_x_sensor, v_sensor=this_v_sensor, bias=this_bias,
-                                                    x_source=x_source, v_source=v_source))
+            parts = [np.ravel(zeta - self.measurement(x_sensor=this_x_sensor, v_sensor=this_v_sensor,
+                                                       bias=this_bias, x_source=x_source, v_source=v_source))]
+            # Prior pseudo-residuals: zero when the estimate equals the nominal/prior-mean value
+            if do_sensor_bias: parts.append(bias_nominal - th[bias_slice])
+            if do_sensor_pos:  parts.append(pos_nominal  - th[pos_slice])
+            if do_sensor_vel:  parts.append(vel_nominal  - th[vel_slice])
+            return np.concatenate(parts)
 
         def jacobian(th: npt.ArrayLike):
             th = np.array(th)
@@ -618,12 +654,34 @@ class PassiveSurveillanceSystem(ABC):
                                            x_source=x_source, v_source=v_source)
                 arrs.append(j_c)
 
-            return np.concatenate(arrs, axis=0)
+            # Measurement block: rows = parameters, cols = measurements, shape (n_params, n_meas)
+            j_meas = np.concatenate(arrs, axis=0)
+
+            # Prior blocks: identity columns for each active nuisance group.
+            # Each block has shape (n_params, n_group); the identity appears at the rows
+            # corresponding to that group's slice in the parameter vector.
+            prior_cols = []
+            if do_sensor_bias:
+                col = np.zeros((n_params, num_bias))
+                col[bias_slice, :] = np.eye(num_bias)
+                prior_cols.append(col)
+            if do_sensor_pos:
+                col = np.zeros((n_params, num_pos))
+                col[pos_slice, :] = np.eye(num_pos)
+                prior_cols.append(col)
+            if do_sensor_vel:
+                col = np.zeros((n_params, num_vel))
+                col[vel_slice, :] = np.eye(num_vel)
+                prior_cols.append(col)
+
+            if prior_cols:
+                return np.concatenate([j_meas] + prior_cols, axis=1)
+            return j_meas
 
         if do_gd:
-            result = gd_solver(x_init=th_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+            result = gd_solver(x_init=th_init, y=y, jacobian=jacobian, cov=cov_aug, **kwargs)
         else:
-            result = ls_solver(x_init=th_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+            result = ls_solver(x_init=th_init, y=y, jacobian=jacobian, cov=cov_aug, **kwargs)
 
         th_est = result[0]
         th_est_full = result[1]
