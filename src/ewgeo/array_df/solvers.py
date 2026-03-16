@@ -1,7 +1,5 @@
 import numpy as np
 
-from ewgeo.utils.covariance import CovarianceMatrix
-
 
 def beamscan(x, v, psi_max=np.pi/2, num_points=101):
     """
@@ -62,19 +60,22 @@ def beamscan_mvdr(x, v, psi_max=np.pi/2, num_points=101):
     # Generate scan vector
     psi_vec = np.linspace(start=-1, stop=1, num=num_points) * psi_max
 
-    # Compute the sample covariance matrix
+    # Parse inputs
     shp = np.shape(x)
     num_array_elements = shp[0] if len(shp) > 0 else 1
-    # num_samples = shp[1] if len(shp) > 1 else 1
-    covariance = CovarianceMatrix(np.cov(x), do_inverse=True)
+
+    # Compute the complex Hermitian sample covariance and its pseudo-inverse directly.
+    # CovarianceMatrix only supports real-valued matrices and would discard imaginary
+    # parts of np.cov(x), losing the phase information needed to resolve angle sign.
+    r_inv = np.linalg.pinv(np.cov(x))  # N x N complex Hermitian pseudo-inverse
 
     # Steer each of the M data samples
     p = np.zeros(shape=(num_points, ))
     for idx_psi in np.arange(num_points):
         this_v = v(psi_vec[idx_psi])/np.sqrt(num_array_elements)  # N x 1
 
-        # p[idx_psi] = 1/np.abs(np.conj(this_v).T @ covariance.inv @ this_v)
-        p[idx_psi] = 1/np.abs(covariance.solve_aca(np.conj(this_v.T)))
+        # MVDR output power: 1 / (v^H R^{-1} v)
+        p[idx_psi] = float(np.squeeze(1/np.abs(np.conj(this_v.T) @ r_inv @ this_v)))
 
     return p, psi_vec
 

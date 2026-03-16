@@ -61,6 +61,7 @@ def compute_array_factor_ula(d_lam, num_elements, psi, psi_0=np.pi / 2, el_patte
     # Look for grating lobes
     epsilon = 1e-6
     mask = np.less(np.fabs(np.mod(d_lam*(np.sin(psi)-np.sin(psi_0)) + .5, 1) - .5), epsilon)
+    af = np.atleast_1d(af)  # putmask requires an array; guard against scalar psi input
     np.putmask(af, mask=mask, values=1)
 
     # Apply the element pattern
@@ -92,6 +93,6 @@ def make_steering_vector(d_lam, num_elements):
         return np.exp(1j * 2 * np.pi * d_lam * element_idx_vec * np.sin(np.atleast_1d(psi)[np.newaxis, :]))
 
     def steer_grad(psi):
-        return (-1j * 2 * np.pi * d_lam * element_idx_vec * np.cos(np.atleast_1d(psi)[np.newaxis, :])) * steer(psi)
+        return (1j * 2 * np.pi * d_lam * element_idx_vec * np.cos(np.atleast_1d(psi)[np.newaxis, :])) * steer(psi)
 
     return steer, steer_grad

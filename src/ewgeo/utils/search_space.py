@@ -62,7 +62,7 @@ class SearchSpace:
         self.broadcast()
         if self._epsilon is None:
             # Build epsilon from max_offset and points_per_dim
-            out_shape = np.amax(np.shape(self.points_per_dim), np.shape(self.max_offset))
+            out_shape = np.maximum(np.shape(self.points_per_dim), np.shape(self.max_offset))
             self._epsilon = np.divide(self.max_offset, self.points_per_dim - 1,
                                       out=np.ones(out_shape), where=self.points_per_dim > 1)
         return self._epsilon
@@ -197,9 +197,9 @@ class SearchSpace:
             max_offset = self.max_offset.ravel()
 
         if np.size(self.points_per_dim) == 1:
-            points_per_dim = self.points_per_dim * np.ones((n_dim, ))
+            points_per_dim = (self.points_per_dim * np.ones((n_dim, ))).astype(int)
         else:
-            points_per_dim = self.points_per_dim.ravel()
+            points_per_dim = self.points_per_dim.ravel().astype(int)
 
         assert n_dim == np.size(max_offset) and n_dim == np.size(points_per_dim), \
                'Search space dimensions do not match across specification of the center, search_size, and epsilon.'
