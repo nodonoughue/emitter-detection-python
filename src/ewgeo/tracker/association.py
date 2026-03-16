@@ -545,8 +545,8 @@ class NNAssociator(Associator):
             this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=self.motion_model) for m in measurements]
             for h in this_hypotheses:
                 gate_size = h.compute_gate_size(self.gate_probability)
-                print(f"    Track {track.track_id}: distance={h.distance:.4f}, "
-                      f"gate={gate_size:.4f}")
+                # print(f"    Track {track.track_id}: distance={h.distance:.4f}, "
+                #       f"gate={gate_size:.4f}")
 
             if all([h.distance > h.compute_gate_size(self.gate_probability) for h in this_hypotheses]):
                 pass
