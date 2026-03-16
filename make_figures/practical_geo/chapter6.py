@@ -214,7 +214,7 @@ def make_figures_8_9(prefix=None, mc_params=None):
 
     print('Generating Figures 6.8 and 6.9, from Example 6.4...')
 
-    figs = chapter6.example4()
+    figs = chapter6.example4(do_iterative=False)
 
     # Output to file
     if prefix is not None:

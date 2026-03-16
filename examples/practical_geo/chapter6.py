@@ -393,22 +393,25 @@ def example4(do_iterative=True):
                            ['Sensors', 'Target', 'ML Est.', 'ML Est. w/uncertainty']))
 
     if do_iterative:
+        # cov_bias: prior covariance on per-sensor range biases.  One sigma = 80 m matches the
+        # search range used by the ML solver above, providing consistent regularization strength.
+        bias_sigma = 80  # meters
         iter_solver_args = {'x_init': x_ctr,
                             'epsilon': grid_res,
                             'do_sensor_bias': True,
                             'bias': np.zeros((tdoa.num_sensors, )),
+                            'cov_bias': CovarianceMatrix((bias_sigma**2) * np.eye(tdoa.num_sensors)),
                             'do_sensor_pos': False,
                             'do_sensor_vel': False}
-        # TODO: Debug
         # Iterative Solvers
         x_est_gd, th_est_gd, th_est_gd_full = tdoa.gradient_descent_uncertainty(zeta=zeta, **iter_solver_args)
         x_est_ls, th_est_ls, th_est_ls_full = tdoa.least_square_uncertainty(zeta=zeta, **iter_solver_args)
 
         with np.printoptions(precision=3, suppress=True):
             print('GD Est. range bias: (', end='')
-            print(*th_est_gd['bias'], sep=', ', end=') m\n')
-            # print('LS Est. range bias: (', end='')
-            # print(*th_est_ls['bias'], sep=', ', end=') m\n')
+            print(*th_est_gd['bias'][:n_tdoa], sep=', ', end=') m\n')
+            print('LS Est. range bias: (', end='')
+            print(*th_est_ls['bias'][:n_tdoa], sep=', ', end=') m\n')
 
         figs.append(_make_plot(ell_plot, [x_tdoa, x_tgt, x_est_true, x_est_bias, x_est_gd, x_est_ls],
                                ['Sensors', 'Target', 'ML Est.', 'ML Est. w/unc.', 'GD Est.', 'LS Est.']))
@@ -427,7 +430,6 @@ def example5(do_vel_only_cal=True):
 
     :return: figure handle to generated graphic
     """
-    # TODO: Debug; the plots don't appear to function properly
 
     # Set up sensors
     x_tdoa = np.array([[-1, 0, 1],
