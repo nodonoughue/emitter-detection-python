@@ -3,6 +3,7 @@ import pytest
 
 from ewgeo.fdoa import model, perf, FDOAPassiveSurveillanceSystem
 from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils import SearchSpace
 
 
 def equal_to_tolerance(x, y, tol=1e-6):
@@ -230,3 +231,35 @@ def test_fdoa_pss_log_likelihood_peaks_at_source():
     ll_true  = pss.log_likelihood(zeta=zeta, x_source=X_SOURCE)
     ll_wrong = pss.log_likelihood(zeta=zeta, x_source=X_SOURCE + np.array([500.0, 500.0]))
     assert ll_true > ll_wrong
+
+
+# ===========================================================================
+# FDOAPassiveSurveillanceSystem iterative and grid solvers
+# ===========================================================================
+
+def test_fdoa_pss_least_square_near_source():
+    """LS solver should converge close to the source given noiseless measurements."""
+    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=True)
+    zeta = pss.measurement(X_SOURCE)
+    x_est, _ = pss.least_square(zeta, x_init=X_SOURCE + np.array([50., 50.]))
+    assert np.linalg.norm(x_est - X_SOURCE) < 1.0, \
+        f"LS estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"
+
+
+def test_fdoa_pss_gradient_descent_near_source():
+    """GD solver should converge close to the source given noiseless measurements."""
+    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=True)
+    zeta = pss.measurement(X_SOURCE)
+    x_est, _ = pss.gradient_descent(zeta, x_init=X_SOURCE + np.array([50., 50.]))
+    assert np.linalg.norm(x_est - X_SOURCE) < 1.0, \
+        f"GD estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"
+
+
+def test_fdoa_pss_max_likelihood_near_source():
+    """ML grid search should locate the source within one grid-diagonal of the truth."""
+    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=True)
+    zeta = pss.measurement(X_SOURCE)
+    ss = SearchSpace(x_ctr=X_SOURCE, epsilon=10., max_offset=300.)
+    x_est, _, _ = pss.max_likelihood(zeta, search_space=ss)
+    assert np.linalg.norm(x_est - X_SOURCE) < 15., \
+        f"ML estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"

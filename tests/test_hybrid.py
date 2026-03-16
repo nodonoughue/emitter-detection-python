@@ -9,6 +9,7 @@ from ewgeo.triang import DirectionFinder
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils import SearchSpace
 
 
 def equal_to_tolerance(x, y, tol=1e-6):
@@ -234,3 +235,35 @@ def test_hybrid_pss_aoa_measurement_idx_correct():
     assert h.num_aoa_measurements == 3
     assert h.num_tdoa_measurements == 2
     assert h.num_fdoa_measurements == 0
+
+
+# ===========================================================================
+# HybridPassiveSurveillanceSystem iterative and grid solvers
+# ===========================================================================
+
+def test_hybrid_pss_least_square_near_source():
+    """LS solver should converge close to the source given noiseless measurements."""
+    h = _make_hybrid_aoa_tdoa()
+    zeta = h.measurement(X_SOURCE)
+    x_est, _ = h.least_square(zeta, x_init=X_SOURCE + np.array([50., 50.]))
+    assert np.linalg.norm(x_est - X_SOURCE) < 1.0, \
+        f"LS estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"
+
+
+def test_hybrid_pss_gradient_descent_near_source():
+    """GD solver should converge close to the source given noiseless measurements."""
+    h = _make_hybrid_aoa_tdoa()
+    zeta = h.measurement(X_SOURCE)
+    x_est, _ = h.gradient_descent(zeta, x_init=X_SOURCE + np.array([50., 50.]))
+    assert np.linalg.norm(x_est - X_SOURCE) < 1.0, \
+        f"GD estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"
+
+
+def test_hybrid_pss_max_likelihood_near_source():
+    """ML grid search should locate the source within one grid-diagonal of the truth."""
+    h = _make_hybrid_aoa_tdoa()
+    zeta = h.measurement(X_SOURCE)
+    ss = SearchSpace(x_ctr=X_SOURCE, epsilon=10., max_offset=300.)
+    x_est, _, _ = h.max_likelihood(zeta, search_space=ss)
+    assert np.linalg.norm(x_est - X_SOURCE) < 15., \
+        f"ML estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"

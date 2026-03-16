@@ -3,6 +3,7 @@ import pytest
 
 from ewgeo.triang import model, perf, solvers, DirectionFinder
 from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils import SearchSpace
 
 
 def equal_to_tolerance(x, y, tol=1e-6):
@@ -339,3 +340,35 @@ def test_direction_finder_angle_bisector_method():
     psi = model.measurement(X_SENSOR, X_SOURCE)
     x_est = df.angle_bisector(psi)
     assert np.linalg.norm(x_est - X_SOURCE) < 1e-6
+
+
+# ===========================================================================
+# DirectionFinder iterative and grid solvers
+# ===========================================================================
+
+def test_direction_finder_least_square_near_source():
+    """LS solver should converge close to the source given noiseless measurements."""
+    df = DirectionFinder(x=X_SENSOR, cov=COV_1DEG)
+    zeta = df.measurement(X_SOURCE)
+    x_est, _ = df.least_square(zeta, x_init=X_SOURCE + np.array([50., 50.]))
+    assert np.linalg.norm(x_est - X_SOURCE) < 1.0, \
+        f"LS estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"
+
+
+def test_direction_finder_gradient_descent_near_source():
+    """GD solver should converge close to the source given noiseless measurements."""
+    df = DirectionFinder(x=X_SENSOR, cov=COV_1DEG)
+    zeta = df.measurement(X_SOURCE)
+    x_est, _ = df.gradient_descent(zeta, x_init=X_SOURCE + np.array([50., 50.]))
+    assert np.linalg.norm(x_est - X_SOURCE) < 1.0, \
+        f"GD estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"
+
+
+def test_direction_finder_max_likelihood_near_source():
+    """ML grid search should locate the source within one grid-diagonal of the truth."""
+    df = DirectionFinder(x=X_SENSOR, cov=COV_1DEG)
+    zeta = df.measurement(X_SOURCE)
+    ss = SearchSpace(x_ctr=X_SOURCE, epsilon=10., max_offset=300.)
+    x_est, _, _ = df.max_likelihood(zeta, search_space=ss)
+    assert np.linalg.norm(x_est - X_SOURCE) < 15., \
+        f"ML estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"
