@@ -23,11 +23,17 @@ X_SOURCE = np.array([500.0, 300.0])
 # Default ref_idx=None → last sensor (index 2) as reference → 2 RDOA measurements
 
 # Covariance already in range units (m^2), variance_is_toa=False throughout
-COV_10M = CovarianceMatrix(100.0 * np.eye(2))   # 10 m std dev
+COV_10M = CovarianceMatrix(100.0 * np.eye(3))   # 10 m std dev per sensor (3x3, resampled to pair space)
 
 # Chan-Ho source: X_SOURCE sits on the x=500 symmetry axis between sensors 0 and 1,
 # making zeta[0]=zeta[1] (degenerate for x-estimation).  Use an off-axis position.
 X_SOURCE_CH = np.array([400.0, 200.0])
+
+# Chan-Ho requires n_sensors >= n_dims + 2 for Stage 1 to be fully determined
+# (3 RDOA equations, 3 unknowns [x, y, r_ref]).  Add a 4th sensor.
+X_SENSOR_CH = np.array([[0.0, 1000.0, 500.0,    0.0],
+                         [0.0,    0.0, 866.0, 1000.0]])   # 4th sensor is reference
+COV_CH = CovarianceMatrix(np.eye(4))   # 4x4 per-sensor, resampled to 3x3 pair space
 
 
 # Two-sensor geometry where source lies on the perpendicular bisector → RDOA = 0
@@ -145,38 +151,38 @@ def test_tdoa_jacobian_finite_difference():
 
 def test_tdoa_crlb_returns_covariance_matrix():
     crlb = perf.compute_crlb(X_SENSOR, X_SOURCE, COV_10M,
-                             variance_is_toa=False, do_resample=False)
+                             variance_is_toa=False, do_resample=True)
     assert isinstance(crlb, CovarianceMatrix)
 
 
 def test_tdoa_crlb_is_positive_definite():
     crlb = perf.compute_crlb(X_SENSOR, X_SOURCE, COV_10M,
-                             variance_is_toa=False, do_resample=False)
+                             variance_is_toa=False, do_resample=True)
     eigenvalues = np.linalg.eigvalsh(crlb.cov)
     assert np.all(eigenvalues > 0), f"CRLB not positive definite: {eigenvalues}"
 
 
 def test_tdoa_crlb_shape():
     crlb = perf.compute_crlb(X_SENSOR, X_SOURCE, COV_10M,
-                             variance_is_toa=False, do_resample=False)
+                             variance_is_toa=False, do_resample=True)
     assert crlb.cov.shape == (2, 2)
 
 
 def test_tdoa_crlb_decreases_with_tighter_noise():
     """Halving range error (quarter variance) should reduce CRLB trace."""
-    cov_10m = CovarianceMatrix(100.0 * np.eye(2))
-    cov_1m  = CovarianceMatrix(1.0   * np.eye(2))
+    cov_10m = CovarianceMatrix(100.0 * np.eye(3))
+    cov_1m  = CovarianceMatrix(1.0   * np.eye(3))
     crlb_10 = perf.compute_crlb(X_SENSOR, X_SOURCE, cov_10m,
-                                variance_is_toa=False, do_resample=False)
+                                variance_is_toa=False, do_resample=True)
     crlb_1  = perf.compute_crlb(X_SENSOR, X_SOURCE, cov_1m,
-                                variance_is_toa=False, do_resample=False)
+                                variance_is_toa=False, do_resample=True)
     assert np.trace(crlb_1.cov) < np.trace(crlb_10.cov)
 
 
 def test_tdoa_crlb_multi_source_returns_list():
     x_sources = np.column_stack([X_SOURCE, X_SOURCE + np.array([300, 0])])
     result = perf.compute_crlb(X_SENSOR, x_sources, COV_10M,
-                               variance_is_toa=False, do_resample=False)
+                               variance_is_toa=False, do_resample=True)
     assert isinstance(result, list) and len(result) == 2
     for item in result:
         assert isinstance(item, CovarianceMatrix)
@@ -187,17 +193,17 @@ def test_tdoa_crlb_multi_source_returns_list():
 # ===========================================================================
 
 def test_tdoa_chan_ho_output_shape():
-    zeta = model.measurement(X_SENSOR, X_SOURCE_CH)
-    x_est = solvers.chan_ho(X_SENSOR, zeta, CovarianceMatrix(np.eye(2)),
-                           variance_is_toa=False)
+    zeta = model.measurement(X_SENSOR_CH, X_SOURCE_CH)
+    x_est = solvers.chan_ho(X_SENSOR_CH, zeta, COV_CH,
+                           variance_is_toa=False, do_resample=True)
     assert x_est.shape == (2,), f"Expected (2,), got {x_est.shape}"
 
 
 def test_tdoa_chan_ho_exact_measurements_near_source():
     """With exact (noiseless) inputs, Chan-Ho should recover the source position."""
-    zeta = model.measurement(X_SENSOR, X_SOURCE_CH)
-    x_est = solvers.chan_ho(X_SENSOR, zeta, CovarianceMatrix(np.eye(2)),
-                           variance_is_toa=False)
+    zeta = model.measurement(X_SENSOR_CH, X_SOURCE_CH)
+    x_est = solvers.chan_ho(X_SENSOR_CH, zeta, COV_CH,
+                           variance_is_toa=False, do_resample=True)
     error = np.linalg.norm(x_est - X_SOURCE_CH)
     assert error < 1.0, f"Chan-Ho estimate too far from source: {error:.4f} m"
 
@@ -207,31 +213,31 @@ def test_tdoa_chan_ho_exact_measurements_near_source():
 # ===========================================================================
 
 def test_tdoa_pss_measurement_matches_model():
-    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=False)
+    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=True)
     assert equal_to_tolerance(pss.measurement(X_SOURCE),
                               model.measurement(X_SENSOR, X_SOURCE))
 
 
 def test_tdoa_pss_jacobian_matches_model():
-    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=False)
+    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=True)
     assert equal_to_tolerance(pss.jacobian(X_SOURCE),
                               model.jacobian(X_SENSOR, X_SOURCE))
 
 
 def test_tdoa_pss_num_measurements():
-    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=False)
+    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=True)
     assert pss.num_measurements == 2
 
 
 def test_tdoa_pss_noisy_measurement_shape():
-    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=False)
+    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=True)
     zeta = pss.noisy_measurement(X_SOURCE, num_samples=50)
     assert zeta.shape == (2, 50), f"Expected (2, 50), got {zeta.shape}"
 
 
 def test_tdoa_pss_log_likelihood_peaks_at_source():
     """Noiseless measurement evaluated at the true source should have higher LL."""
-    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=False)
+    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=True)
     zeta = pss.measurement(X_SOURCE)
     ll_true  = pss.log_likelihood(zeta=zeta, x_source=X_SOURCE)
     ll_wrong = pss.log_likelihood(zeta=zeta, x_source=X_SOURCE + np.array([500.0, 500.0]))
@@ -239,7 +245,7 @@ def test_tdoa_pss_log_likelihood_peaks_at_source():
 
 
 def test_tdoa_pss_chan_ho_method():
-    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_10M, variance_is_toa=False, do_resample=False)
+    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR_CH, cov=COV_CH, variance_is_toa=False, do_resample=True)
     zeta = pss.measurement(X_SOURCE_CH)
     x_est = pss.chan_ho(zeta)
     assert np.linalg.norm(x_est - X_SOURCE_CH) < 1.0

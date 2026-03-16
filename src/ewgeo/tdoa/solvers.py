@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import numpy.typing as npt
 from scipy.linalg import pinvh
@@ -41,6 +43,17 @@ def chan_ho(x_sensor: npt.NDArray[np.float64],
     shp = np.shape(x_sensor)
     n_dims = shp[0] if len(shp) > 0 else 1
     n_sensor = shp[1] if len(shp) > 1 else 1
+
+    # Stage 1 has n_sensor-1 equations and n_dims+1 unknowns [x..., r_ref].
+    # At least n_dims+2 sensors are needed for the system to be fully determined.
+    if n_sensor < n_dims + 2:
+        warnings.warn(
+            f"chan_ho: {n_sensor} sensors provided for a {n_dims}-D problem. "
+            f"At least {n_dims + 2} sensors are required for Stage 1 to be fully "
+            f"determined; results may be unreliable.",
+            stacklevel=2,
+        )
+
     if ref_idx is not None and ref_idx != n_sensor-1:
         # Throw an error if there are multiple reference sensors
         assert np.size(ref_idx) == 1, 'The Chan-Ho solver currently requires a single reference sensor.'

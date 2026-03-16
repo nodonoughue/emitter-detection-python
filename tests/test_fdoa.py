@@ -28,7 +28,7 @@ X_SOURCE = np.array([500.0, 300.0])            # stationary source
 # Default ref_idx=None → last sensor (index 2) is reference → 2 RRDOA measurements
 
 # Covariance in (m/s)^2 units; already in range-rate domain
-COV_1MS = CovarianceMatrix(1.0 * np.eye(2))    # 1 m/s std dev
+COV_1MS = CovarianceMatrix(1.0 * np.eye(3))    # 1 m/s std dev per sensor (3x3, resampled to pair space)
 
 # Two-sensor symmetric geometry where both sensors have the same velocity
 # component along the source LOS → RRDOA = 0
@@ -162,35 +162,35 @@ def test_fdoa_jacobian_finite_difference():
 
 def test_fdoa_crlb_returns_covariance_matrix():
     crlb = perf.compute_crlb(X_SENSOR, V_SENSOR, X_SOURCE, COV_1MS,
-                             do_resample=False)
+                             do_resample=True)
     assert isinstance(crlb, CovarianceMatrix)
 
 
 def test_fdoa_crlb_is_positive_definite():
     crlb = perf.compute_crlb(X_SENSOR, V_SENSOR, X_SOURCE, COV_1MS,
-                             do_resample=False)
+                             do_resample=True)
     eigenvalues = np.linalg.eigvalsh(crlb.cov)
     assert np.all(eigenvalues > 0), f"CRLB not positive definite: {eigenvalues}"
 
 
 def test_fdoa_crlb_shape():
     crlb = perf.compute_crlb(X_SENSOR, V_SENSOR, X_SOURCE, COV_1MS,
-                             do_resample=False)
+                             do_resample=True)
     assert crlb.cov.shape == (2, 2)
 
 
 def test_fdoa_crlb_decreases_with_tighter_noise():
-    cov_1ms  = CovarianceMatrix(1.0   * np.eye(2))
-    cov_01ms = CovarianceMatrix(0.01  * np.eye(2))
-    crlb_1   = perf.compute_crlb(X_SENSOR, V_SENSOR, X_SOURCE, cov_1ms,  do_resample=False)
-    crlb_01  = perf.compute_crlb(X_SENSOR, V_SENSOR, X_SOURCE, cov_01ms, do_resample=False)
+    cov_1ms  = CovarianceMatrix(1.0   * np.eye(3))
+    cov_01ms = CovarianceMatrix(0.01  * np.eye(3))
+    crlb_1   = perf.compute_crlb(X_SENSOR, V_SENSOR, X_SOURCE, cov_1ms,  do_resample=True)
+    crlb_01  = perf.compute_crlb(X_SENSOR, V_SENSOR, X_SOURCE, cov_01ms, do_resample=True)
     assert np.trace(crlb_01.cov) < np.trace(crlb_1.cov)
 
 
 def test_fdoa_crlb_multi_source_returns_list():
     x_sources = np.column_stack([X_SOURCE, X_SOURCE + np.array([300, 0])])
     result = perf.compute_crlb(X_SENSOR, V_SENSOR, x_sources, COV_1MS,
-                               do_resample=False)
+                               do_resample=True)
     assert isinstance(result, list) and len(result) == 2
     for item in result:
         assert isinstance(item, CovarianceMatrix)
@@ -201,31 +201,31 @@ def test_fdoa_crlb_multi_source_returns_list():
 # ===========================================================================
 
 def test_fdoa_pss_measurement_matches_model():
-    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=False)
+    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=True)
     assert equal_to_tolerance(pss.measurement(X_SOURCE),
                               model.measurement(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR))
 
 
 def test_fdoa_pss_jacobian_matches_model():
-    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=False)
+    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=True)
     assert equal_to_tolerance(pss.jacobian(X_SOURCE),
                               model.jacobian(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR))
 
 
 def test_fdoa_pss_num_measurements():
-    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=False)
+    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=True)
     assert pss.num_measurements == 2
 
 
 def test_fdoa_pss_noisy_measurement_shape():
-    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=False)
+    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=True)
     zeta = pss.noisy_measurement(X_SOURCE, num_samples=50)
     assert zeta.shape == (2, 50), f"Expected (2, 50), got {zeta.shape}"
 
 
 def test_fdoa_pss_log_likelihood_peaks_at_source():
     """Noiseless measurement should yield higher LL at the true source."""
-    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=False)
+    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_1MS, do_resample=True)
     zeta = pss.measurement(X_SOURCE)
     ll_true  = pss.log_likelihood(zeta=zeta, x_source=X_SOURCE)
     ll_wrong = pss.log_likelihood(zeta=zeta, x_source=X_SOURCE + np.array([500.0, 500.0]))

@@ -31,17 +31,17 @@ X_SOURCE = np.array([500.0, 300.0])
 V_SENSOR = np.array([[100.0, -100.0,   0.0],
                      [  0.0,    0.0, 100.0]])  # shape (2, 3)
 
-# Per-subsystem covariance matrices (in measurement units, already resampled)
+# Per-subsystem covariance matrices (per-sensor, resampled to pair space at runtime)
 _sig_rad = np.deg2rad(1.0)
 COV_AOA  = CovarianceMatrix(_sig_rad**2 * np.eye(3))   # 3 AOA measurements
-COV_TDOA = CovarianceMatrix(100.0 * np.eye(2))          # 2 RDOA measurements (m²)
-COV_FDOA = CovarianceMatrix(1.0   * np.eye(2))          # 2 RRDOA measurements ((m/s)²)
+COV_TDOA = CovarianceMatrix(100.0 * np.eye(3))          # 3 TDOA sensors (m²), resampled to 2 pairs
+COV_FDOA = CovarianceMatrix(1.0   * np.eye(3))          # 3 FDOA sensors ((m/s)²), resampled to 2 pairs
 
-# Block-diagonal covariance for the AOA+TDOA hybrid (5×5)
-COV_AOA_TDOA = CovarianceMatrix.block_diagonal(COV_AOA, COV_TDOA)  # shape (5, 5)
+# Block-diagonal covariance for the AOA+TDOA hybrid (6×6 per-sensor, resampled to 5×5)
+COV_AOA_TDOA = CovarianceMatrix.block_diagonal(COV_AOA, COV_TDOA)  # shape (6, 6)
 
-# Block-diagonal for the full AOA+TDOA+FDOA hybrid (7×7)
-COV_ALL = CovarianceMatrix.block_diagonal(COV_AOA, COV_TDOA, COV_FDOA)  # shape (7, 7)
+# Block-diagonal for the full AOA+TDOA+FDOA hybrid (9×9 per-sensor, resampled to 7×7)
+COV_ALL = CovarianceMatrix.block_diagonal(COV_AOA, COV_TDOA, COV_FDOA)  # shape (9, 9)
 
 
 def _make_aoa_pss():
@@ -49,11 +49,11 @@ def _make_aoa_pss():
 
 
 def _make_tdoa_pss():
-    return TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_TDOA, variance_is_toa=False, do_resample=False)
+    return TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=COV_TDOA, variance_is_toa=False, do_resample=True)
 
 
 def _make_fdoa_pss():
-    return FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_FDOA, do_resample=False)
+    return FDOAPassiveSurveillanceSystem(x=X_SENSOR, vel=V_SENSOR, cov=COV_FDOA, do_resample=True)
 
 
 def _make_hybrid_aoa_tdoa():
@@ -152,14 +152,14 @@ def test_hybrid_jacobian_tdoa_block_matches_tdoa():
 def test_hybrid_crlb_returns_covariance_matrix():
     crlb = hybrid_perf.compute_crlb(X_SOURCE, COV_AOA_TDOA,
                                     x_aoa=X_SENSOR, x_tdoa=X_SENSOR,
-                                    do_resample=False)
+                                    do_resample=True)
     assert isinstance(crlb, CovarianceMatrix)
 
 
 def test_hybrid_crlb_is_positive_definite():
     crlb = hybrid_perf.compute_crlb(X_SOURCE, COV_AOA_TDOA,
                                     x_aoa=X_SENSOR, x_tdoa=X_SENSOR,
-                                    do_resample=False)
+                                    do_resample=True)
     eigenvalues = np.linalg.eigvalsh(crlb.cov)
     assert np.all(eigenvalues > 0), f"CRLB not positive definite: {eigenvalues}"
 
@@ -167,7 +167,7 @@ def test_hybrid_crlb_is_positive_definite():
 def test_hybrid_crlb_shape():
     crlb = hybrid_perf.compute_crlb(X_SOURCE, COV_AOA_TDOA,
                                     x_aoa=X_SENSOR, x_tdoa=X_SENSOR,
-                                    do_resample=False)
+                                    do_resample=True)
     assert crlb.cov.shape == (2, 2)
 
 
@@ -176,17 +176,17 @@ def test_hybrid_crlb_smaller_than_aoa_alone():
     crlb_aoa    = triang.perf.compute_crlb(X_SENSOR, X_SOURCE, COV_AOA)
     crlb_hybrid = hybrid_perf.compute_crlb(X_SOURCE, COV_AOA_TDOA,
                                            x_aoa=X_SENSOR, x_tdoa=X_SENSOR,
-                                           do_resample=False)
+                                           do_resample=True)
     assert np.trace(crlb_hybrid.cov) < np.trace(crlb_aoa.cov)
 
 
 def test_hybrid_crlb_smaller_than_tdoa_alone():
     """Combining AOA+TDOA should yield a smaller position uncertainty than TDOA alone."""
     crlb_tdoa   = tdoa.perf.compute_crlb(X_SENSOR, X_SOURCE, COV_TDOA,
-                                         variance_is_toa=False, do_resample=False)
+                                         variance_is_toa=False, do_resample=True)
     crlb_hybrid = hybrid_perf.compute_crlb(X_SOURCE, COV_AOA_TDOA,
                                            x_aoa=X_SENSOR, x_tdoa=X_SENSOR,
-                                           do_resample=False)
+                                           do_resample=True)
     assert np.trace(crlb_hybrid.cov) < np.trace(crlb_tdoa.cov)
 
 
