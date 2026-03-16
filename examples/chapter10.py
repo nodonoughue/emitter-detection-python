@@ -307,8 +307,8 @@ def example2():
     print('Maximum cross range position at 100 km downrange that satisfies CEP < 25 km is {:.2f} km'
           .format(max_cross_range/1e3))
 
-    x_max = 100
-    grid_res = 0.5
+    x_max = 100     # km
+    grid_res = 0.2  # km
     search_space = SearchSpace(x_ctr=np.array([0., 0.]),
                                max_offset=x_max,
                                epsilon=grid_res)
@@ -322,7 +322,6 @@ def example2():
     nan_mask = np.abs(x_grid[1]) < 1e-6  # x_grid is a list of meshgrid outputs; search the y-dimension
     cep50[nan_mask] = np.nan
 
-    # TODO: Debug; fig 10.6 doesn't look right; the close in CRLB contour has a weird cut at top/bottom that matches what is seen in FDOA plots
     # Plot
     fig = plt.figure()
     plt.scatter(x_sensor[0, :], x_sensor[1, :], marker='o', label='AOA Sensors')
