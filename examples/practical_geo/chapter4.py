@@ -8,7 +8,7 @@ from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils import print_elapsed, print_progress, SearchSpace, remove_outliers
 from ewgeo.utils.constants import speed_of_light
-from ewgeo.utils.coordinates import lla_to_enu
+from ewgeo.utils.coordinates import lla_to_enu, enu_to_lla
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.errors import compute_cep50, draw_error_ellipse, compute_rmse
 from ewgeo.utils.unit_conversions import convert, kph_to_mps
@@ -25,7 +25,7 @@ def run_all_examples():
     :return figs: list of figure handles
     """
 
-    return list(example1()) + list(example2())
+    return list(example1()) + list(example2()) + list(example2_globe()) + list(example2_globe_3d())
 
 
 def example1(mc_params=None):
@@ -224,7 +224,7 @@ def example2(colors=None):
     v_source_enu = np.zeros(shape=(3, ))  # source is stationary
     search_space = SearchSpace(x_ctr=np.zeros((3, )),
                                max_offset=500e3 * np.array([1., 1., 0.]),
-                               points_per_dim=201)
+                               points_per_dim=np.array([201, 201, 1]))
     x_source_enu, x_grid = search_space.x_set, search_space.x_grid
     extent = search_space.get_extent(axes=(0, 1), multiplier=1/1e3)
 
@@ -285,8 +285,268 @@ def example2(colors=None):
 
     return fig,
 
-# TODO: Make a version of Example 4.2 that plots on a globe. Use basemap?
-# https://jakevdp.github.io/PythonDataScienceHandbook/04.13-geographic-data-with-basemap.html
+def example2_globe(colors=None):
+    """
+    Executes Example 4.2, displaying the CRLB heatmap overlaid on a geographic map
+    using Cartopy with a PlateCarree projection and Lat/Lon axes.
+
+    Requires cartopy: pip install cartopy
+
+    Nicholas O'Donoughue
+    16 March 2026
+
+    :return: figure handle to generated graphic
+    """
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+
+    if colors is None:
+        colors = plt.get_cmap("viridis_r")
+
+    # Set up sensors (identical to example2)
+    num_sensors = 4
+    sensor_lat = np.array([26 + 52/60, 27 + 52/60, 23 + 19/60, 24 + 19/60])
+    sensor_lon = np.array([-(68 + 47/60), -(72 + 36/60), -(69 + 47/60), -(74 + 36/60)])
+    sensor_alt = 500e3 * np.ones((num_sensors,))
+
+    ref_lat = 26
+    ref_lon = -71
+    ref_alt = 0
+
+    e_sensor, n_sensor, u_sensor = lla_to_enu(sensor_lat, sensor_lon, sensor_alt,
+                                              ref_lat, ref_lon, ref_alt,
+                                              angle_units="deg", dist_units="m")
+    x_sensor_enu = np.array([e_sensor, n_sensor, u_sensor])
+
+    v_abs = 7.61e3
+    heading_rad = 60 * _deg2rad
+    v0 = v_abs * np.array([np.sin(heading_rad), np.cos(heading_rad), 0])
+    v_sensor_enu = np.repeat(v0[:, np.newaxis], num_sensors, axis=1)
+
+    v_source_enu = np.zeros(shape=(3,))
+    search_space = SearchSpace(x_ctr=np.zeros((3,)),
+                               max_offset=500e3 * np.array([1., 1., 0.]),
+                               points_per_dim=np.array([201, 201, 1]))
+    x_source_enu, x_grid = search_space.x_set, search_space.x_grid
+    x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
+
+    err_aoa_rad = 3 * _deg2rad
+    err_r = 1e-5 * speed_of_light
+    err_rr = 100 * speed_of_light / 1e9
+
+    _eye = np.eye(num_sensors)
+    _eye2 = np.eye(2 * num_sensors)
+    cov_psi = CovarianceMatrix(err_aoa_rad**2 * _eye2)
+    cov_r = CovarianceMatrix(err_r**2 * _eye)
+    cov_rr = CovarianceMatrix(err_rr**2 * _eye)
+
+    ref_fdoa = ref_tdoa = num_sensors - 1
+    aoa = DirectionFinder(x=x_sensor_enu, do_2d_aoa=True, cov=cov_psi)
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_sensor_enu, cov=cov_r, ref_idx=ref_tdoa, variance_is_toa=False)
+    fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor_enu, vel=v_sensor_enu, cov=cov_rr, ref_idx=ref_fdoa)
+    hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=fdoa)
+
+    crlb = hybrid.compute_crlb(v_source=v_source_enu, x_source=x_source_enu, print_progress=True)
+    rmse_crlb = compute_rmse(crlb)
+    levels = np.arange(15)
+    color_lims = [5, 10]
+
+    # Convert ENU grid to Lat/Lon for geographic axes
+    lat_grid, lon_grid, _ = enu_to_lla(x_grid[0], x_grid[1], np.zeros_like(x_grid[0]),
+                                        ref_lat, ref_lon, ref_alt,
+                                        angle_units='deg', dist_units='m')
+    rmse_grid = np.reshape(rmse_crlb / 1e3, search_space.grid_shape)
+
+    # Build map
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+    ax.add_feature(cfeature.OCEAN, zorder=0)
+    ax.add_feature(cfeature.LAND, zorder=0)
+    ax.add_feature(cfeature.COASTLINE, linewidth=0.5, zorder=1)
+    gl = ax.gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
+    ax.set_extent([lon_grid.min()-7, lon_grid.max()+7, lat_grid.min()-7, lat_grid.max()+7],
+                  crs=ccrs.PlateCarree())
+
+    # CRLB heatmap
+    mesh = ax.pcolormesh(lon_grid, lat_grid, rmse_grid,
+                         cmap=colors, vmin=color_lims[0], vmax=color_lims[-1],
+                         transform=ccrs.PlateCarree(), zorder=2)
+    fig.colorbar(mesh, ax=ax, format=lambda x, _: f"{x:.0f} km")
+
+    # Contours
+    contour_set = ax.contour(lon_grid, lat_grid, rmse_grid,
+                             levels=levels, colors='k',
+                             transform=ccrs.PlateCarree(), zorder=3)
+    ax.clabel(contour_set, fontsize=10, colors='k', fmt='%.0f km')
+
+    # Sensor markers
+    hdl3 = ax.scatter(sensor_lon, sensor_lat, color='w', facecolors='none', marker='o',
+                      label='Sensors', transform=ccrs.PlateCarree(), zorder=5)
+
+    # Velocity arrows: project ENU arrow tip to Lat/Lon, then quiver
+    tip_e = x_sensor_enu[0] + v_sensor_enu[0] / 100
+    tip_n = x_sensor_enu[1] + v_sensor_enu[1] / 100
+    tip_lat, tip_lon, _ = enu_to_lla(tip_e, tip_n, np.zeros(num_sensors),
+                                      ref_lat, ref_lon, ref_alt,
+                                      angle_units='deg', dist_units='m')
+    ax.quiver(sensor_lon, sensor_lat,
+              tip_lon - sensor_lon, tip_lat - sensor_lat,
+              color=hdl3.get_edgecolor()[0],
+              transform=ccrs.PlateCarree(), zorder=5,
+              angles='xy', scale_units='xy', scale=1)
+
+    ax.set_title('Hybrid CRLB RMSE [km]')
+    ax.legend(loc='upper right')
+
+    return fig,
+
+
+def example2_globe_3d(colors=None):
+    """
+    Executes Example 4.2 as a 3D scene: the hybrid CRLB heatmap is drawn as a coloured
+    surface at ground level, Natural Earth coastlines are overlaid at z=0, and the four
+    satellites are rendered as stem plots rising from their sub-satellite footprints to
+    their true orbital altitude (500 km).
+
+    Requires cartopy: pip install cartopy
+
+    Nicholas O'Donoughue
+    16 March 2026
+
+    :return: figure handle to generated graphic
+    """
+    import cartopy.feature as cfeature
+    import matplotlib.colors as mcolors
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 — registers the '3d' projection
+
+    if colors is None:
+        colors = plt.get_cmap("viridis_r")
+
+    # Set up sensors (identical to example2)
+    num_sensors = 4
+    sensor_lat = np.array([26 + 52/60, 27 + 52/60, 23 + 19/60, 24 + 19/60])
+    sensor_lon = np.array([-(68 + 47/60), -(72 + 36/60), -(69 + 47/60), -(74 + 36/60)])
+    sensor_alt = 500e3 * np.ones((num_sensors,))
+
+    ref_lat = 26
+    ref_lon = -71
+    ref_alt = 0
+
+    e_sensor, n_sensor, u_sensor = lla_to_enu(sensor_lat, sensor_lon, sensor_alt,
+                                              ref_lat, ref_lon, ref_alt,
+                                              angle_units="deg", dist_units="m")
+    x_sensor_enu = np.array([e_sensor, n_sensor, u_sensor])
+
+    v_abs = 7.61e3
+    heading_rad = 60 * _deg2rad
+    v0 = v_abs * np.array([np.sin(heading_rad), np.cos(heading_rad), 0])
+    v_sensor_enu = np.repeat(v0[:, np.newaxis], num_sensors, axis=1)
+
+    v_source_enu = np.zeros(shape=(3,))
+    search_space = SearchSpace(x_ctr=np.zeros((3,)),
+                               max_offset=500e3 * np.array([1., 1., 0.]),
+                               points_per_dim=np.array([201, 201, 1]))
+    x_source_enu, x_grid = search_space.x_set, search_space.x_grid
+    x_grid = [np.squeeze(this_dim) for this_dim in x_grid]
+
+    err_aoa_rad = 3 * _deg2rad
+    err_r = 1e-5 * speed_of_light
+    err_rr = 100 * speed_of_light / 1e9
+
+    _eye = np.eye(num_sensors)
+    _eye2 = np.eye(2 * num_sensors)
+    cov_psi = CovarianceMatrix(err_aoa_rad**2 * _eye2)
+    cov_r = CovarianceMatrix(err_r**2 * _eye)
+    cov_rr = CovarianceMatrix(err_rr**2 * _eye)
+
+    ref_fdoa = ref_tdoa = num_sensors - 1
+    aoa = DirectionFinder(x=x_sensor_enu, do_2d_aoa=True, cov=cov_psi)
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_sensor_enu, cov=cov_r, ref_idx=ref_tdoa, variance_is_toa=False)
+    fdoa = FDOAPassiveSurveillanceSystem(x=x_sensor_enu, vel=v_sensor_enu, cov=cov_rr, ref_idx=ref_fdoa)
+    hybrid = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa, fdoa=fdoa)
+
+    crlb = hybrid.compute_crlb(v_source=v_source_enu, x_source=x_source_enu, print_progress=True)
+    rmse_crlb = compute_rmse(crlb)
+    levels = np.arange(15)
+    color_lims = [5, 10]
+
+    # All spatial axes in km
+    e_grid_km = x_grid[0] / 1e3
+    n_grid_km = x_grid[1] / 1e3
+    rmse_grid = np.reshape(rmse_crlb / 1e3, search_space.grid_shape)
+    e_sens_km = x_sensor_enu[0] / 1e3
+    n_sens_km = x_sensor_enu[1] / 1e3
+    alt_km = sensor_alt[0] / 1e3  # 500 km; all sensors share the same orbital altitude
+
+    # Build figure
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection='3d')
+
+    # CRLB surface at z=0
+    # Downsample by 4 for rendering performance (contour lines supply the fine detail).
+    # Face colours are the average of the four surrounding grid-point values.
+    s = 4
+    eg = e_grid_km[::s, ::s]
+    ng = n_grid_km[::s, ::s]
+    rg = rmse_grid[::s, ::s]
+    norm = mcolors.Normalize(vmin=color_lims[0], vmax=color_lims[1])
+    fc = colors(norm(0.25 * (rg[:-1, :-1] + rg[1:, :-1] + rg[:-1, 1:] + rg[1:, 1:])))
+    ax.plot_surface(eg, ng, np.zeros_like(eg),
+                    facecolors=fc, shade=False, alpha=0.9, zorder=1)
+
+    sm = plt.cm.ScalarMappable(cmap=colors, norm=norm)
+    sm.set_array([])
+    fig.colorbar(sm, ax=ax, format=lambda x, _: f"{x:.0f} km", shrink=0.5, pad=0.1)
+
+    # CRLB contour lines floating 0.5 km above the surface for visibility
+    ax.contour(e_grid_km, n_grid_km, rmse_grid,
+               levels=levels, colors='k', linewidths=0.8,
+               zdir='z', offset=0.5, zorder=3)
+
+    # Coastlines: convert Natural Earth lon/lat to ENU (km) and draw at z=0.
+    # Only segments with at least one point within 600 km of the origin are drawn.
+    coast = cfeature.NaturalEarthFeature('physical', 'coastline', '110m')
+    for geom in coast.geometries():
+        for line in (geom.geoms if hasattr(geom, 'geoms') else [geom]):
+            coords = np.array(line.coords)
+            lons_c, lats_c = coords[:, 0], coords[:, 1]
+            e_c, n_c, _ = lla_to_enu(lats_c, lons_c, np.zeros_like(lats_c),
+                                      ref_lat, ref_lon, ref_alt,
+                                      angle_units='deg', dist_units='m')
+            e_c_km, n_c_km = e_c / 1e3, n_c / 1e3
+            if np.any((np.abs(e_c_km) < 600) & (np.abs(n_c_km) < 600)):
+                ax.plot(e_c_km, n_c_km, np.zeros_like(e_c_km),
+                        color='k', linewidth=0.5, alpha=0.7, zorder=2)
+
+    # Sensor stems: vertical stalk from sub-satellite footprint to orbital altitude,
+    # with a '+' marker on the ground and an 'o' marker at the satellite.
+    for e, n in zip(e_sens_km, n_sens_km):
+        ax.plot([e, e], [n, n], [0, alt_km],
+                color='k', linewidth=0.8, zorder=5)
+        ax.scatter([e], [n], [0], color='k', marker='+', s=30, linewidths=0.8, zorder=5)
+    ax.scatter(e_sens_km, n_sens_km, np.full(num_sensors, alt_km),
+               color='k', marker='o', s=40, zorder=5, label='Sensors')
+
+    # Velocity arrows at orbital altitude
+    tip_e_km = (x_sensor_enu[0] + v_sensor_enu[0] / 100) / 1e3
+    tip_n_km = (x_sensor_enu[1] + v_sensor_enu[1] / 100) / 1e3
+    ax.quiver(e_sens_km, n_sens_km, np.full(num_sensors, alt_km),
+              tip_e_km - e_sens_km, tip_n_km - n_sens_km, np.zeros(num_sensors),
+              color='w', arrow_length_ratio=0.3, zorder=5)
+
+    ax.set_xlim([-500, 500])
+    ax.set_ylim([-500, 500])
+    ax.set_zlim([0, 600])
+    ax.set_xlabel('East [km]')
+    ax.set_ylabel('North [km]')
+    ax.set_zlabel('Altitude [km]')
+    ax.set_title('Hybrid CRLB RMSE [km]')
+    ax.legend(loc='upper right')
+
+    return fig,
+
 
 # TODO: Implement the code from book2_vid4_1.m
 
