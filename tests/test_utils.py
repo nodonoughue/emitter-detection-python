@@ -13,6 +13,8 @@ from ewgeo.utils.utils import (
     broadcast_backwards,
     sinc_derivative,
     make_taper,
+    resample_noise,
+    parse_ref_vec_output_size,
 )
 
 
@@ -446,3 +448,94 @@ def test_make_taper_hamming_length():
 def test_make_taper_invalid_type_raises():
     with pytest.raises(KeyError):
         make_taper(16, 'triangular')
+
+
+# ===========================================================================
+# parse_ref_vec_output_size
+# ===========================================================================
+
+def test_parse_ref_vec_equal_length():
+    """Equal-length vectors: n_test = n_ref = n_pair_out = len."""
+    t = np.array([0, 1])
+    r = np.array([2, 2])
+    n_test, n_ref, n_pair_out = parse_ref_vec_output_size(t, r, 3)
+    assert n_test == 2
+    assert n_ref == 2
+    assert n_pair_out == 2
+
+
+def test_parse_ref_vec_single_test():
+    """n_test=1, n_ref=3 → n_pair_out=3."""
+    t = np.array([0])
+    r = np.array([2, 2, 2])
+    n_test, n_ref, n_pair_out = parse_ref_vec_output_size(t, r, 3)
+    assert n_pair_out == 3
+
+
+def test_parse_ref_vec_single_ref():
+    """n_test=3, n_ref=1 → n_pair_out=3."""
+    t = np.array([0, 1, 0])
+    r = np.array([2])
+    n_test, n_ref, n_pair_out = parse_ref_vec_output_size(t, r, 3)
+    assert n_pair_out == 3
+
+
+def test_parse_ref_vec_mismatched_raises():
+    """Both n_test > 1 and n_ref > 1 but unequal → TypeError."""
+    t = np.array([0, 1])
+    r = np.array([2, 2, 2])
+    with pytest.raises(TypeError):
+        parse_ref_vec_output_size(t, r, 3)
+
+
+def test_parse_ref_vec_out_of_range_raises():
+    """Index >= n_sensor → TypeError."""
+    t = np.array([0, 5])   # 5 is out of range for n_sensor=3
+    r = np.array([2, 2])
+    with pytest.raises(TypeError):
+        parse_ref_vec_output_size(t, r, 3)
+
+
+# ===========================================================================
+# resample_noise
+# ===========================================================================
+
+def test_resample_noise_output_shape():
+    """Output shape is (n_pairs, n_samples)."""
+    noise = np.array([[1.], [2.], [3.]])   # 3 sensors × 1 sample
+    test_idx = np.array([0, 1])
+    ref_idx  = np.array([2, 2])
+    result = resample_noise(noise, test_idx=test_idx, ref_idx=ref_idx)
+    assert result.shape == (2, 1)
+
+
+def test_resample_noise_values():
+    """output[i] = noise[ref_idx[i]] - noise[test_idx[i]]."""
+    noise = np.array([[1.], [2.], [3.]])   # sensors 0,1,2
+    test_idx = np.array([0, 1])
+    ref_idx  = np.array([2, 2])
+    result = resample_noise(noise, test_idx=test_idx, ref_idx=ref_idx)
+    # pair 0: noise[2] - noise[0] = 3-1 = 2
+    # pair 1: noise[2] - noise[1] = 3-2 = 1
+    assert equal_to_tolerance(result[0, 0], 2.)
+    assert equal_to_tolerance(result[1, 0], 1.)
+
+
+def test_resample_noise_multi_sample():
+    """Correct differences with multiple samples per sensor."""
+    noise = np.array([[1., 2.], [3., 4.], [5., 6.]])   # 3 sensors × 2 samples
+    test_idx = np.array([0])
+    ref_idx  = np.array([2])
+    result = resample_noise(noise, test_idx=test_idx, ref_idx=ref_idx)
+    # pair 0: noise[2] - noise[0] = [5-1, 6-2] = [4, 4]
+    assert result.shape == (1, 2)
+    assert equal_to_tolerance(result[0, 0], 4.)
+    assert equal_to_tolerance(result[0, 1], 4.)
+
+
+def test_resample_noise_via_ref_idx_only():
+    """Passing ref_idx only (test_idx=None) uses parse_reference_sensor."""
+    noise = np.array([[1.], [2.], [3.]])   # 3 sensors, ref=last
+    # ref_idx=None → default: last sensor is reference, pairs (0,2) and (1,2)
+    result = resample_noise(noise, ref_idx=None)
+    assert result.shape[0] == 2   # 2 pairs from 3 sensors with last as ref

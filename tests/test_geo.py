@@ -1,7 +1,10 @@
 import numpy as np
+import pytest
+import warnings
 
 from ewgeo.utils.constants import speed_of_light
-from ewgeo.utils.geo import calc_range, calc_range_diff, calc_doppler, calc_doppler_diff
+from ewgeo.utils.geo import calc_range, calc_range_diff, calc_doppler, calc_doppler_diff, \
+    compute_slant_range, find_intersect
 
 def test_calc_range():
     """
@@ -132,6 +135,74 @@ def test_calc_doppler_diff():
     x_test2 = np.array([2000., 0., 0.])
     fd = calc_doppler_diff(x_source, v_source, x_ref2, v_common, x_test2, v_common, f0)
     assert equal_to_tolerance(fd, 0., tol=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# compute_slant_range
+# ---------------------------------------------------------------------------
+
+def test_compute_slant_range_90deg():
+    """At 90° elevation, slant range equals the altitude difference."""
+    # sin(90)=1 → R = sqrt(r1² + r2² - r1²) - r1 = r2 - r1 = alt2 - alt1
+    alt1, alt2, el = 0., 10_000., 90.
+    result = compute_slant_range(alt1, alt2, el)
+    assert np.fabs(result - (alt2 - alt1)) < 1.0   # within 1 m
+
+
+def test_compute_slant_range_positive():
+    """Slant range is always positive for valid inputs."""
+    assert compute_slant_range(0., 1000., 30.) > 0
+    assert compute_slant_range(100., 5000., 10.) > 0
+
+
+def test_compute_slant_range_effective_earth_differs():
+    """use_effective_earth=True gives a different result than False."""
+    r_false = compute_slant_range(0., 10_000., 45., use_effective_earth=False)
+    r_true  = compute_slant_range(0., 10_000., 45., use_effective_earth=True)
+    assert r_false != r_true
+
+
+def test_compute_slant_range_vectorized():
+    """Vectorized elevation angle input returns an array with all positive values."""
+    els = np.array([10., 30., 45., 60., 90.])
+    result = compute_slant_range(0., 5000., els)
+    assert result.shape == (5,)
+    assert np.all(result > 0)
+
+
+# ---------------------------------------------------------------------------
+# find_intersect
+# ---------------------------------------------------------------------------
+
+def test_find_intersect_45deg_cross():
+    """Two diagonal lines at ±45° intersect at (1, 1)."""
+    # Line 0 from (0,0), psi=pi/4: slope=1, y=x
+    # Line 1 from (2,0), psi=3pi/4: slope=-1, y=2-x
+    x0 = np.array([0., 0.])
+    x1 = np.array([2., 0.])
+    result = find_intersect(x0, np.pi / 4, x1, 3 * np.pi / 4)
+    assert result.shape == (2,)
+    assert np.all(np.fabs(result - np.array([1., 1.])) < 1e-10)
+
+
+def test_find_intersect_returns_2d():
+    """Result is always a 2-element vector."""
+    x0 = np.array([0., 0.])
+    x1 = np.array([3., 0.])
+    result = find_intersect(x0, np.pi / 3, x1, 2 * np.pi / 3)
+    assert result.shape == (2,)
+
+
+def test_find_intersect_parallel_warns():
+    """Parallel lines trigger a warning and return x0."""
+    x0 = np.array([0., 0.])
+    x1 = np.array([0., 5.])
+    psi = np.pi / 4
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = find_intersect(x0, psi, x1, psi)
+    assert len(caught) == 1
+    assert np.array_equal(result, x0)
 
 
 def equal_to_tolerance(x, y, tol=1e-6) -> bool:

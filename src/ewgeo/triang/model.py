@@ -324,7 +324,7 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, do_2d_aoa=F
         # Evaluate the scaled log likelihood
         # a = solve_triangular(cov_lower, err, lower=True)
         # epsilon[idx_pt] = np.sum(a**2)
-        epsilon[idx_pt] = cov.solve_aca(err)
+        epsilon.flat[idx_pt] = cov.solve_aca(err)
 
     return epsilon
 
@@ -452,20 +452,23 @@ def grad_sensor_pos(x_sensor, x_source, do_2d_aoa=False):
     # with respect to target position for both azimuth and elevation angle measurements, but resampled to be on a block
     # diagonal.
     _grad_source = grad_source(x_sensor, x_source, do_2d_aoa)
+    if _grad_source.ndim == 2:
+        _grad_source = _grad_source[:, :, np.newaxis]
 
     grad = np.zeros((n_dim*n_sensor, n_sensor, n_source))
     for i in range(n_sensor):
         start = n_dim * i
         end = start + n_dim
-        grad[start:end, i, :] = _grad_source[:, i, :]  # The first n_sensor columns are J_az
+        grad[start:end, i, :] = -_grad_source[:, i, :]  # The first n_sensor columns are J_az
 
     if do_2d_aoa:
         grad_el = np.zeros_like(grad)
         for i in range(n_sensor):
             start = n_dim * i
             end = start + n_dim
-            grad_el[start:end, i, :] = _grad_source[:, n_sensor + i, :]  # The second n_sensor columns are J_el
+            grad_el[start:end, i, :] = -_grad_source[:, n_sensor + i, :]  # The second n_sensor columns are J_el
 
         grad = np.concatenate((grad, grad_el), axis=1)
 
-    return grad
+    squeeze_axes = tuple(i for i in range(2, grad.ndim) if grad.shape[i] == 1)
+    return np.squeeze(grad, axis=squeeze_axes) if squeeze_axes else grad

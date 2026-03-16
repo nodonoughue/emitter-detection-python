@@ -1,6 +1,6 @@
 import numpy as np
 
-from ewgeo.array_df.model import make_steering_vector, compute_array_factor_ula
+from ewgeo.array_df.model import make_steering_vector, compute_array_factor, compute_array_factor_ula
 from ewgeo.array_df.perf import crlb_det, crlb_stochastic
 from ewgeo.array_df.solvers import beamscan, beamscan_mvdr, music
 
@@ -72,6 +72,50 @@ def test_steering_gradient_numerical_check():
     fd = (v(psi0 + dpsi) - v(psi0 - dpsi)) / (2 * dpsi)
     analytic = v_dot(psi0)
     assert np.allclose(np.abs(analytic - fd), 0.0, atol=1e-5)
+
+
+# ===========================================================================
+# compute_array_factor
+# ===========================================================================
+
+def test_compute_array_factor_output_shape():
+    """Output should be (len(psi), 1) for an array of angles."""
+    v, _ = make_steering_vector(D_LAM, N_ELEMENTS)
+    h = v(np.array([PSI_TRUE]))[:, 0]          # (N,) matched to steering angle
+    psi = np.linspace(-np.pi / 2, np.pi / 2, 37)
+    af = compute_array_factor(v, h, psi)
+    assert af.shape == (len(psi), 1)
+
+
+def test_compute_array_factor_peak_at_steering_angle():
+    """Matched beamformer h=v(psi_0) must produce its maximum response at psi_0."""
+    v, _ = make_steering_vector(D_LAM, N_ELEMENTS)
+    psi_0 = PSI_TRUE
+    h = v(np.array([psi_0]))[:, 0]
+    psi = np.linspace(-np.pi / 2, np.pi / 2, 181)
+    af = compute_array_factor(v, h, psi)
+    peak_idx = np.argmax(np.abs(af.ravel()))
+    assert abs(psi[peak_idx] - psi_0) < 0.05, \
+        f"Peak at {np.rad2deg(psi[peak_idx]):.2f}°, expected near {np.rad2deg(psi_0):.2f}°"
+
+
+def test_compute_array_factor_amplitude_invariant():
+    """Scaling h should not change the result because h is normalized internally."""
+    v, _ = make_steering_vector(D_LAM, N_ELEMENTS)
+    h = v(np.array([PSI_TRUE]))[:, 0]
+    psi = np.linspace(-np.pi / 2, np.pi / 2, 37)
+    af1 = compute_array_factor(v, h,      psi)
+    af2 = compute_array_factor(v, 5.0 * h, psi)
+    assert np.allclose(af1, af2, atol=1e-12)
+
+
+def test_compute_array_factor_complex_output():
+    """Output should be complex-valued."""
+    v, _ = make_steering_vector(D_LAM, N_ELEMENTS)
+    h = v(np.array([PSI_TRUE]))[:, 0]
+    psi = np.linspace(-np.pi / 2, np.pi / 2, 37)
+    af = compute_array_factor(v, h, psi)
+    assert np.iscomplexobj(af)
 
 
 # ===========================================================================

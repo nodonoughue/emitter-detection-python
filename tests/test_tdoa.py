@@ -4,6 +4,8 @@ import pytest
 from ewgeo.tdoa import model, perf, solvers, TDOAPassiveSurveillanceSystem
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils import SearchSpace
+from ewgeo.utils.unit_conversions import db_to_lin
+from ewgeo.utils.geo import calc_range_diff
 
 
 def equal_to_tolerance(x, y, tol=1e-6):
@@ -147,6 +149,38 @@ def test_tdoa_jacobian_finite_difference():
 
 
 # ===========================================================================
+# model.grad_sensor_pos
+# ===========================================================================
+
+def test_tdoa_grad_sensor_pos_shape():
+    """Shape must be (n_dim * n_sensor, n_measurement) = (6, 2)."""
+    gp = model.grad_sensor_pos(X_SENSOR, X_SOURCE)
+    assert gp.shape == (6, 2), f"Expected (6, 2), got {gp.shape}"
+
+
+def test_tdoa_grad_sensor_pos_finite_diff():
+    """Analytical gradient should match numerical finite differences."""
+    eps = 1e-3
+    n_dim, n_sensor = X_SENSOR.shape
+    n_measurement = n_sensor - 1  # RDOA pairs
+
+    gp_analytic = model.grad_sensor_pos(X_SENSOR, X_SOURCE)
+    gp_numeric = np.zeros((n_dim * n_sensor, n_measurement))
+
+    for k in range(n_dim * n_sensor):
+        sen = k // n_dim
+        dim = k % n_dim
+        x_plus  = X_SENSOR.copy(); x_plus[dim, sen]  += eps
+        x_minus = X_SENSOR.copy(); x_minus[dim, sen] -= eps
+        m_plus  = model.measurement(x_plus,  X_SOURCE)
+        m_minus = model.measurement(x_minus, X_SOURCE)
+        gp_numeric[k, :] = (m_plus - m_minus) / (2 * eps)
+
+    assert np.allclose(gp_analytic, gp_numeric, atol=1e-4), \
+        f"Max error: {np.max(np.abs(gp_analytic - gp_numeric)):.2e}"
+
+
+# ===========================================================================
 # perf.compute_crlb
 # ===========================================================================
 
@@ -282,3 +316,236 @@ def test_tdoa_pss_max_likelihood_near_source():
     x_est, _, _ = pss.max_likelihood(zeta, search_space=ss)
     assert np.linalg.norm(x_est - X_SOURCE) < 15., \
         f"ML estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"
+
+
+# ===========================================================================
+# model.grad_source
+# ===========================================================================
+
+def test_tdoa_grad_source_matches_jacobian():
+    """grad_source is a wrapper for jacobian; results must be identical."""
+    J = model.jacobian(X_SENSOR, X_SOURCE)
+    G = model.grad_source(X_SENSOR, X_SOURCE)
+    assert np.array_equal(G, J), "grad_source should return the same result as jacobian"
+
+
+def test_tdoa_grad_source_shape():
+    """Shape (n_dim, n_measurement) = (2, 2) for 3-sensor 2D geometry."""
+    G = model.grad_source(X_SENSOR, X_SOURCE)
+    assert G.shape == (2, 2), f"Expected (2, 2), got {G.shape}"
+
+
+# ===========================================================================
+# model.grad_bias
+# ===========================================================================
+
+def test_tdoa_grad_bias_shape():
+    """Shape must be (n_sensor, n_measurement) = (3, 2)."""
+    B = model.grad_bias(X_SENSOR, X_SOURCE)
+    assert B.shape == (3, 2), f"Expected (3, 2), got {B.shape}"
+
+
+def test_tdoa_grad_bias_structure():
+    """Pair (i, ref): B[test, col]=+1, B[ref, col]=-1, all others=0."""
+    # Default ref_idx=None → ref=2; pairs (0,2) and (1,2)
+    B = model.grad_bias(X_SENSOR, X_SOURCE)
+    # Column 0: test=0, ref=2
+    assert B[0, 0] == 1,  "B[test=0, col=0] should be +1"
+    assert B[2, 0] == -1, "B[ref=2,  col=0] should be -1"
+    assert B[1, 0] == 0,  "B[1, 0] should be 0"
+    # Column 1: test=1, ref=2
+    assert B[1, 1] == 1,  "B[test=1, col=1] should be +1"
+    assert B[2, 1] == -1, "B[ref=2,  col=1] should be -1"
+    assert B[0, 1] == 0,  "B[0, 1] should be 0"
+
+
+def test_tdoa_grad_bias_multi_source_shape():
+    """For two sources the third axis should be 2."""
+    x_sources = np.column_stack([X_SOURCE, X_SOURCE + 100.0])
+    B = model.grad_bias(X_SENSOR, x_sources)
+    assert B.shape == (3, 2, 2), f"Expected (3, 2, 2), got {B.shape}"
+
+
+# ===========================================================================
+# model.jacobian_uncertainty
+# ===========================================================================
+
+def test_tdoa_jacobian_uncertainty_no_flags_shape():
+    """No optional flags → only grad_source → shape (2, 2)."""
+    J = model.jacobian_uncertainty(X_SENSOR, X_SOURCE)
+    assert J.shape == (2, 2), f"Expected (2, 2), got {J.shape}"
+
+
+def test_tdoa_jacobian_uncertainty_do_bias_shape():
+    """do_bias=True appends grad_bias (3, 2) → shape (5, 2)."""
+    J = model.jacobian_uncertainty(X_SENSOR, X_SOURCE, do_bias=True)
+    assert J.shape == (5, 2), f"Expected (5, 2), got {J.shape}"
+
+
+def test_tdoa_jacobian_uncertainty_do_pos_error_shape():
+    """do_pos_error=True appends grad_sensor_pos (6, 2) → shape (8, 2)."""
+    J = model.jacobian_uncertainty(X_SENSOR, X_SOURCE, do_pos_error=True)
+    assert J.shape == (8, 2), f"Expected (8, 2), got {J.shape}"
+
+
+def test_tdoa_jacobian_uncertainty_both_flags_shape():
+    """Both flags → (2 + 3 + 6, 2) = (11, 2)."""
+    J = model.jacobian_uncertainty(X_SENSOR, X_SOURCE, do_bias=True, do_pos_error=True)
+    assert J.shape == (11, 2), f"Expected (11, 2), got {J.shape}"
+
+
+# ===========================================================================
+# model.toa_error_peak_detection
+# ===========================================================================
+
+def test_toa_error_peak_detection_formula():
+    """At 0 dB SNR (lin=1): error = 1/(2*1) = 0.5 s²."""
+    result = model.toa_error_peak_detection(0.0)
+    assert equal_to_tolerance(result, 0.5, tol=1e-10), \
+        f"Expected 0.5 s², got {result}"
+
+
+def test_toa_error_peak_detection_decreases_with_snr():
+    """Higher SNR → lower timing error."""
+    e_low  = model.toa_error_peak_detection(0.0)
+    e_high = model.toa_error_peak_detection(10.0)
+    assert e_high < e_low, "Timing error should decrease with SNR"
+
+
+def test_toa_error_peak_detection_positive():
+    assert model.toa_error_peak_detection(10.0) > 0
+
+
+def test_toa_error_peak_detection_vectorized():
+    snr_vec = np.array([0.0, 5.0, 10.0])
+    result = model.toa_error_peak_detection(snr_vec)
+    assert np.shape(result) == (3,), f"Expected shape (3,), got {np.shape(result)}"
+    assert np.all(np.diff(result) < 0), "Error should decrease monotonically with SNR"
+
+
+# ===========================================================================
+# model.toa_error_cross_corr
+# ===========================================================================
+
+def test_toa_error_cross_corr_formula():
+    """At 0 dB SNR, bw=1e6, T=1e-3, bw_rms=1e6: error = 1/(8π * 1e9)."""
+    bw, T, bw_rms = 1e6, 1e-3, 1e6
+    expected = 1.0 / (8 * np.pi * db_to_lin(0.0) * bw * T * bw_rms)
+    result = model.toa_error_cross_corr(0.0, bw, T, bw_rms)
+    assert equal_to_tolerance(result, expected, tol=1e-20), \
+        f"Expected {expected:.3e} s², got {result:.3e}"
+
+
+def test_toa_error_cross_corr_positive():
+    assert model.toa_error_cross_corr(10.0, 1e6, 1e-3, 1e6) > 0
+
+
+def test_toa_error_cross_corr_decreases_with_snr():
+    e_low  = model.toa_error_cross_corr(0.0,  1e6, 1e-3, 1e6)
+    e_high = model.toa_error_cross_corr(10.0, 1e6, 1e-3, 1e6)
+    assert e_high < e_low
+
+
+def test_toa_error_cross_corr_decreases_with_bandwidth():
+    e_low  = model.toa_error_cross_corr(0.0, 1e6,  1e-3, 1e6)
+    e_high = model.toa_error_cross_corr(0.0, 10e6, 1e-3, 1e6)
+    assert e_high < e_low
+
+
+def test_toa_error_cross_corr_vectorized():
+    snr_vec = np.array([0.0, 5.0, 10.0])
+    result = model.toa_error_cross_corr(snr_vec, 1e6, 1e-3, 1e6)
+    assert np.shape(result) == (3,)
+    assert np.all(np.diff(result) < 0)
+
+
+# ===========================================================================
+# model.generate_parameter_indices
+# ===========================================================================
+
+def test_generate_parameter_indices_with_bias():
+    """2D, 3 sensors, do_bias=True: target=[0,1], bias=[2,3,4], sensor=[5..10]."""
+    idx = model.generate_parameter_indices(X_SENSOR, do_bias=True)
+    assert list(idx['target_pos']) == [0, 1]
+    assert list(idx['bias'])       == [2, 3, 4]
+    assert list(idx['sensor_pos']) == [5, 6, 7, 8, 9, 10]
+
+
+def test_generate_parameter_indices_without_bias():
+    """do_bias=False: bias=None, sensor_pos starts at n_dim."""
+    idx = model.generate_parameter_indices(X_SENSOR, do_bias=False)
+    assert list(idx['target_pos']) == [0, 1]
+    assert idx['bias'] is None
+    assert list(idx['sensor_pos']) == [2, 3, 4, 5, 6, 7]
+
+
+def test_generate_parameter_indices_no_overlap():
+    """target_pos, bias, and sensor_pos index ranges must not overlap."""
+    idx = model.generate_parameter_indices(X_SENSOR, do_bias=True)
+    all_indices = (list(idx['target_pos']) + list(idx['bias']) + list(idx['sensor_pos']))
+    assert len(all_indices) == len(set(all_indices)), "Index ranges must not overlap"
+
+
+# ===========================================================================
+# model.error
+# ===========================================================================
+
+def test_tdoa_error_minimum_near_source():
+    """Error surface minimum should be close to the true source position."""
+    x_max = np.array([1000.0, 1000.0])
+    num_pts = 11
+    epsilon = model.error(X_SENSOR, COV_10M, X_SOURCE, x_max, num_pts,
+                          variance_is_toa=False, do_resample=True)
+
+    # Reconstruct the grid to find where the minimum lives
+    x_vec = x_max[0] * np.linspace(-1, 1, num_pts)
+    y_vec = x_max[1] * np.linspace(-1, 1, num_pts)
+    xx, yy = np.meshgrid(x_vec, y_vec)
+    idx_min = np.argmin(epsilon)
+    x_min = np.array([xx.flatten()[idx_min], yy.flatten()[idx_min]])
+
+    dist = np.linalg.norm(x_min - X_SOURCE)
+    # Grid spacing is 200 m; allow 2 cells of error
+    assert dist < 400.0, f"Error minimum at {x_min}, source at {X_SOURCE}, dist={dist:.1f} m"
+
+
+def test_tdoa_error_output_length():
+    """Output should have num_pts² elements."""
+    x_max = np.array([1000.0, 1000.0])
+    num_pts = 11
+    epsilon = model.error(X_SENSOR, COV_10M, X_SOURCE, x_max, num_pts,
+                          variance_is_toa=False, do_resample=True)
+    assert np.size(epsilon) == num_pts ** 2, \
+        f"Expected {num_pts**2} elements, got {np.size(epsilon)}"
+
+
+# ===========================================================================
+# model.draw_isochrone
+# ===========================================================================
+
+def test_draw_isochrone_output_shape():
+    """Output arrays should each have 2*num_pts - 1 points."""
+    x_ref  = np.array([0.0,    0.0])
+    x_test = np.array([1000.0, 0.0])
+    num_pts = 5
+    x_iso, y_iso = model.draw_isochrone(x_ref, x_test, range_diff=200.0,
+                                        num_pts=num_pts, max_ortho=500.0)
+    expected_len = 2 * num_pts - 1
+    assert len(x_iso) == expected_len, f"Expected {expected_len} points, got {len(x_iso)}"
+    assert len(y_iso) == expected_len
+
+
+def test_draw_isochrone_midpoint_satisfies_range_diff():
+    """The apex of the isochrone (v=0 point) should satisfy the range difference."""
+    x_ref  = np.array([0.0,    0.0])
+    x_test = np.array([1000.0, 0.0])
+    range_diff = 200.0
+    num_pts = 5
+    x_iso, y_iso = model.draw_isochrone(x_ref, x_test, range_diff=range_diff,
+                                        num_pts=num_pts, max_ortho=500.0)
+
+    # The v=0 point is at index num_pts-1 in the output (after prepending num_pts-1 mirror points)
+    midpt = np.array([[x_iso[num_pts - 1]], [y_iso[num_pts - 1]]])
+    rdiff = float(calc_range_diff(midpt, x_ref[:, np.newaxis], x_test[:, np.newaxis]))
+    assert abs(rdiff - range_diff) < 1.0, \
+        f"Expected range diff {range_diff:.1f} m at apex, got {rdiff:.2f} m"

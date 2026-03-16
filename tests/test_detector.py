@@ -165,3 +165,73 @@ def test_xcorr_min_sinr_higher_pd_needs_higher_snr():
     xi_low  = xcorr.min_sinr(PROB_FA, 0.5, **common)
     xi_high = xcorr.min_sinr(PROB_FA, 0.9, **common)
     assert np.all(xi_high >= xi_low)
+
+
+# ===========================================================================
+# squareLaw.max_range
+# ===========================================================================
+
+# Shared link parameters for max_range tests
+_F0  = 1e9    # 1 GHz
+_HT  = 100.   # transmitter height [m]
+_HR  = 100.   # receiver height [m]
+_SNR0_DB = 120.   # SNR without path loss [dB] — high enough to yield a finite range
+
+
+def test_squarelaw_max_range_positive():
+    """max_range must return a positive distance."""
+    r = squareLaw.max_range(PROB_FA, PROB_D, NUM_SAMPLES, _F0, _HT, _HR, _SNR0_DB)
+    assert float(np.squeeze(r)) > 0
+
+
+def test_squarelaw_max_range_higher_snr0_longer_range():
+    """More transmit power (higher snr0) should extend the maximum range."""
+    r_low  = squareLaw.max_range(PROB_FA, PROB_D, NUM_SAMPLES, _F0, _HT, _HR, _SNR0_DB)
+    r_high = squareLaw.max_range(PROB_FA, PROB_D, NUM_SAMPLES, _F0, _HT, _HR, _SNR0_DB + 20)
+    assert float(np.squeeze(r_high)) > float(np.squeeze(r_low))
+
+
+def test_squarelaw_max_range_higher_pd_shorter_range():
+    """Stricter detection requirement (higher Pd) reduces the maximum range."""
+    r_easy = squareLaw.max_range(PROB_FA, 0.5, NUM_SAMPLES, _F0, _HT, _HR, _SNR0_DB)
+    r_hard = squareLaw.max_range(PROB_FA, 0.9, NUM_SAMPLES, _F0, _HT, _HR, _SNR0_DB)
+    assert float(np.squeeze(r_easy)) > float(np.squeeze(r_hard))
+
+
+def test_squarelaw_max_range_more_samples_longer_range():
+    """More samples lower the required SNR, so the maximum range increases."""
+    r_few  = squareLaw.max_range(PROB_FA, PROB_D, 8,   _F0, _HT, _HR, _SNR0_DB)
+    r_many = squareLaw.max_range(PROB_FA, PROB_D, 128, _F0, _HT, _HR, _SNR0_DB)
+    assert float(np.squeeze(r_many)) > float(np.squeeze(r_few))
+
+
+# ===========================================================================
+# xcorr.max_range
+# ===========================================================================
+
+_XCORR_COMMON = dict(corr_time=1e-3, pulse_duration=1e-3, bw_noise=1e6, bw_signal=1e6)
+
+
+def test_xcorr_max_range_positive():
+    """max_range must return a positive distance."""
+    r = xcorr.max_range(PROB_FA, PROB_D, **_XCORR_COMMON,
+                        f0=_F0, ht=_HT, hr=_HR, snr0=_SNR0_DB)
+    assert float(np.squeeze(r)) > 0
+
+
+def test_xcorr_max_range_higher_snr0_longer_range():
+    """More transmit power should extend the xcorr maximum range."""
+    r_low  = xcorr.max_range(PROB_FA, PROB_D, **_XCORR_COMMON,
+                              f0=_F0, ht=_HT, hr=_HR, snr0=_SNR0_DB)
+    r_high = xcorr.max_range(PROB_FA, PROB_D, **_XCORR_COMMON,
+                              f0=_F0, ht=_HT, hr=_HR, snr0=_SNR0_DB + 20)
+    assert float(np.squeeze(r_high)) > float(np.squeeze(r_low))
+
+
+def test_xcorr_max_range_higher_pd_shorter_range():
+    """Stricter detection requirement reduces the xcorr maximum range."""
+    r_easy = xcorr.max_range(PROB_FA, 0.5, **_XCORR_COMMON,
+                              f0=_F0, ht=_HT, hr=_HR, snr0=_SNR0_DB)
+    r_hard = xcorr.max_range(PROB_FA, 0.9, **_XCORR_COMMON,
+                              f0=_F0, ht=_HT, hr=_HR, snr0=_SNR0_DB)
+    assert float(np.squeeze(r_easy)) > float(np.squeeze(r_hard))

@@ -197,6 +197,38 @@ def test_crlb_shape():
     assert crlb.cov.shape == (2, 2), f"Expected (2, 2), got {crlb.cov.shape}"
 
 
+# ===========================================================================
+# model.grad_sensor_pos
+# ===========================================================================
+
+def test_triang_grad_sensor_pos_shape():
+    """Shape must be (n_dim * n_sensor, n_sensor) = (6, 3)."""
+    gp = model.grad_sensor_pos(X_SENSOR, X_SOURCE)
+    assert gp.shape == (6, 3), f"Expected (6, 3), got {gp.shape}"
+
+
+def test_triang_grad_sensor_pos_finite_diff():
+    """Analytical gradient should match numerical finite differences."""
+    eps = 1e-3
+    n_dim, n_sensor = X_SENSOR.shape
+    n_measurement = n_sensor  # one angle per sensor
+
+    gp_analytic = model.grad_sensor_pos(X_SENSOR, X_SOURCE)
+    gp_numeric = np.zeros((n_dim * n_sensor, n_measurement))
+
+    for k in range(n_dim * n_sensor):
+        sen = k // n_dim
+        dim = k % n_dim
+        x_plus  = X_SENSOR.copy(); x_plus[dim, sen]  += eps
+        x_minus = X_SENSOR.copy(); x_minus[dim, sen] -= eps
+        m_plus  = model.measurement(x_plus,  X_SOURCE)
+        m_minus = model.measurement(x_minus, X_SOURCE)
+        gp_numeric[k, :] = (m_plus - m_minus) / (2 * eps)
+
+    assert np.allclose(gp_analytic, gp_numeric, atol=1e-4), \
+        f"Max error: {np.max(np.abs(gp_analytic - gp_numeric)):.2e}"
+
+
 def test_crlb_decreases_with_tighter_noise():
     """Halving angle error (quarter variance) should reduce CRLB trace."""
     sig_1deg = np.deg2rad(1.0)
@@ -372,3 +404,96 @@ def test_direction_finder_max_likelihood_near_source():
     x_est, _, _ = df.max_likelihood(zeta, search_space=ss)
     assert np.linalg.norm(x_est - X_SOURCE) < 15., \
         f"ML estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"
+
+
+# ===========================================================================
+# model.grad_source
+# ===========================================================================
+
+def test_triang_grad_source_matches_jacobian():
+    """grad_source is a wrapper for jacobian; results must be identical."""
+    J = model.jacobian(X_SENSOR, X_SOURCE)
+    G = model.grad_source(X_SENSOR, X_SOURCE)
+    assert np.array_equal(G, J), "grad_source should return the same result as jacobian"
+
+
+def test_triang_grad_source_shape():
+    """Shape (n_dim, n_measurement) = (2, 3) for 3-sensor 2D geometry."""
+    G = model.grad_source(X_SENSOR, X_SOURCE)
+    assert G.shape == (2, 3), f"Expected (2, 3), got {G.shape}"
+
+
+# ===========================================================================
+# model.grad_bias
+# ===========================================================================
+
+def test_triang_grad_bias_is_identity():
+    """For 1D AOA, grad_bias = I_{n_sensor x n_sensor} = I_3."""
+    B = model.grad_bias(X_SENSOR, X_SOURCE)
+    assert B.shape == (3, 3), f"Expected (3, 3), got {B.shape}"
+    assert equal_to_tolerance(B, np.eye(3)), "grad_bias should be the identity matrix"
+
+
+def test_triang_grad_bias_2d_aoa_shape():
+    """For 2D AOA, n_measurements = 2 * n_sensors → I_{6x6}."""
+    B = model.grad_bias(X_SENSOR, X_SOURCE, do_2d_aoa=True)
+    assert B.shape == (6, 6), f"Expected (6, 6) for 2D AOA, got {B.shape}"
+
+
+# ===========================================================================
+# model.jacobian_uncertainty
+# ===========================================================================
+
+def test_triang_jacobian_uncertainty_no_flags_shape():
+    """No flags → only grad_source → shape (2, 3)."""
+    J = model.jacobian_uncertainty(X_SENSOR, X_SOURCE)
+    assert J.shape == (2, 3), f"Expected (2, 3), got {J.shape}"
+
+
+def test_triang_jacobian_uncertainty_do_bias_shape():
+    """do_bias=True appends grad_bias (3, 3) → shape (5, 3)."""
+    J = model.jacobian_uncertainty(X_SENSOR, X_SOURCE, do_bias=True)
+    assert J.shape == (5, 3), f"Expected (5, 3), got {J.shape}"
+
+
+def test_triang_jacobian_uncertainty_do_pos_error_shape():
+    """do_pos_error=True appends grad_sensor_pos (6, 3) → shape (8, 3)."""
+    J = model.jacobian_uncertainty(X_SENSOR, X_SOURCE, do_pos_error=True)
+    assert J.shape == (8, 3), f"Expected (8, 3), got {J.shape}"
+
+
+def test_triang_jacobian_uncertainty_both_flags_shape():
+    """Both flags → (2 + 3 + 6, 3) = (11, 3)."""
+    J = model.jacobian_uncertainty(X_SENSOR, X_SOURCE, do_bias=True, do_pos_error=True)
+    assert J.shape == (11, 3), f"Expected (11, 3), got {J.shape}"
+
+
+# ===========================================================================
+# model.error
+# ===========================================================================
+
+def test_triang_error_output_shape():
+    """Output should be a 2D array of shape (num_pts, num_pts)."""
+    x_max = np.array([1000.0, 1000.0])
+    num_pts = 11
+    epsilon = model.error(X_SENSOR, COV_1DEG, X_SOURCE, x_max, num_pts)
+    assert epsilon.shape == (num_pts, num_pts), \
+        f"Expected ({num_pts}, {num_pts}), got {epsilon.shape}"
+
+
+def test_triang_error_minimum_near_source():
+    """Error surface minimum should be close to the true source position."""
+    x_max = np.array([1000.0, 1000.0])
+    num_pts = 11
+    epsilon = model.error(X_SENSOR, COV_1DEG, X_SOURCE, x_max, num_pts)
+
+    x_vec = x_max[0] * np.linspace(-1, 1, num_pts)
+    y_vec = x_max[1] * np.linspace(-1, 1, num_pts)
+    xx, yy = np.meshgrid(x_vec, y_vec)
+    idx_min = np.unravel_index(np.argmin(epsilon), epsilon.shape)
+    x_min = np.array([xx[idx_min], yy[idx_min]])
+
+    dist = np.linalg.norm(x_min - X_SOURCE)
+    # Grid spacing is 200 m; allow 2 cells of error
+    assert dist < 400.0, \
+        f"Error minimum at {x_min}, source at {X_SOURCE}, dist={dist:.1f} m"

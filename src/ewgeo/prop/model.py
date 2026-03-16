@@ -110,16 +110,16 @@ def get_knife_edge_path_loss(dist_tx_m, dist_rx_m, ht_above_los):
     """
     
     # Equation (B.5)
-    nu = ht_above_los * np.sqrt(2) / (1 + dist_tx_m / dist_rx_m)
-    
+    nu = np.atleast_1d(np.asarray(ht_above_los * np.sqrt(2) / (1 + dist_tx_m / dist_rx_m), dtype=float))
+
     # Initialize the output loss matrix
-    loss_knife = np.zeros_like(nu)
-    
+    loss_knife = np.zeros(nu.shape)
+
     # First piece-wise component of (B.6)
     np.place(loss_knife, nu <= 0, 0)
-    
+
     # Second piece-wise component of (B.6)
-    mask = nu > 0 & nu <= 2.4
+    mask = (nu > 0) & (nu <= 2.4)
     loss_knife[mask] = 6+9*nu[mask]-1.27*nu[mask]**2
     
     # Third piece-wise component of (B.6)

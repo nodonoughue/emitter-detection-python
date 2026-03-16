@@ -133,3 +133,101 @@ def test_radar_horizon_greater_with_effective_earth():
 
 def test_radar_horizon_zero_height_is_zero():
     assert prop.compute_radar_horizon(0.0, 0.0) == 0.0
+
+
+# ===========================================================================
+# get_knife_edge_path_loss
+# ===========================================================================
+
+def test_knife_edge_below_los_is_zero():
+    """Obstruction below line-of-sight (nu <= 0) produces zero loss."""
+    # ht_above_los negative → nu < 0
+    result = prop.get_knife_edge_path_loss(1000.0, 1000.0, -5.0)
+    assert result[0] == 0.0, f"Expected 0 dB loss, got {result[0]}"
+
+
+def test_knife_edge_mid_range_formula():
+    """For 0 < nu <= 2.4, loss = 6 + 9*nu - 1.27*nu^2."""
+    # Choose dist_tx = dist_rx = 1000 → nu = ht*sqrt(2)/2
+    # Set ht = sqrt(2) → nu = 1.0
+    ht = np.sqrt(2)
+    result = prop.get_knife_edge_path_loss(1000.0, 1000.0, ht)
+    nu = 1.0
+    expected = 6 + 9 * nu - 1.27 * nu ** 2
+    assert equal_to_tolerance(result[0], expected, tol=1e-6), \
+        f"Expected {expected:.4f} dB, got {result[0]:.4f} dB"
+
+
+def test_knife_edge_large_nu_formula():
+    """For nu > 2.4, loss = 13 + 20*log10(nu)."""
+    # Set ht = 3*sqrt(2) → nu = 3.0
+    ht = 3.0 * np.sqrt(2)
+    result = prop.get_knife_edge_path_loss(1000.0, 1000.0, ht)
+    nu = 3.0
+    expected = 13 + 20 * np.log10(nu)
+    assert equal_to_tolerance(result[0], expected, tol=1e-6), \
+        f"Expected {expected:.4f} dB, got {result[0]:.4f} dB"
+
+
+def test_knife_edge_positive_obstruction_raises_loss():
+    """Obstruction above LOS (nu > 0) must produce positive loss."""
+    result = prop.get_knife_edge_path_loss(1000.0, 1000.0, 5.0)
+    assert result[0] > 0, f"Expected positive loss, got {result[0]}"
+
+
+def test_knife_edge_increases_with_obstruction():
+    """Higher obstruction → greater knife-edge loss."""
+    r1 = prop.get_knife_edge_path_loss(1000.0, 1000.0, 1.0)
+    r2 = prop.get_knife_edge_path_loss(1000.0, 1000.0, 5.0)
+    assert r2[0] > r1[0], f"Expected loss to increase with obstruction height"
+
+
+def test_knife_edge_vectorized():
+    """Vectorized ht_above_los input returns array with correct shape."""
+    hts = np.array([-1.0, np.sqrt(2), 3.0 * np.sqrt(2)])
+    result = prop.get_knife_edge_path_loss(1000.0, 1000.0, hts)
+    assert result.shape == (3,), f"Expected shape (3,), got {result.shape}"
+    assert result[0] == 0.0, "Below-LOS region should be 0 dB"
+    assert result[1] > 0, "Mid-range region should be positive"
+    assert result[2] > 0, "Large-nu region should be positive"
+
+
+# ===========================================================================
+# get_path_loss
+# ===========================================================================
+
+def test_path_loss_free_space_below_fresnel():
+    """Below the Fresnel zone, get_path_loss should equal free-space loss."""
+    f, ht, hr = 1e9, 10.0, 10.0
+    # fz = 4π*10*10*1e9/c ≈ 4189 m; use 1000 m (well below fz)
+    r = np.array([1000.0])
+    result = prop.get_path_loss(r, f, ht, hr, include_atm_loss=False)
+    expected = prop.get_free_space_path_loss(r, f, include_atm_loss=False)
+    assert equal_to_tolerance(result[0], expected[0], tol=1e-6), \
+        f"Expected free-space loss {expected[0]:.2f} dB, got {result[0]:.2f} dB"
+
+
+def test_path_loss_two_ray_above_fresnel():
+    """Above the Fresnel zone, get_path_loss should equal two-ray loss."""
+    f, ht, hr = 1e9, 10.0, 10.0
+    # fz ≈ 4189 m; use 10000 m (well above fz)
+    r = np.array([10000.0])
+    result = prop.get_path_loss(r, f, ht, hr, include_atm_loss=False)
+    expected = prop.get_two_ray_path_loss(r, f, ht, hr, include_atm_loss=False)
+    assert equal_to_tolerance(result[0], expected[0], tol=1e-6), \
+        f"Expected two-ray loss {expected[0]:.2f} dB, got {result[0]:.2f} dB"
+
+
+def test_path_loss_positive():
+    """Path loss must be positive."""
+    r = np.array([5000.0])
+    result = prop.get_path_loss(r, 1e9, 10.0, 10.0, include_atm_loss=False)
+    assert result[0] > 0, f"Expected positive path loss, got {result[0]}"
+
+
+def test_path_loss_increases_with_range():
+    """Path loss should increase monotonically with range."""
+    f, ht, hr = 1e9, 10.0, 10.0
+    r = np.array([500.0, 1000.0, 5000.0, 10000.0])
+    result = prop.get_path_loss(r, f, ht, hr, include_atm_loss=False)
+    assert np.all(np.diff(result) > 0), "Path loss should increase with range"

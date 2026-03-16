@@ -263,3 +263,226 @@ def test_fdoa_pss_max_likelihood_near_source():
     x_est, _, _ = pss.max_likelihood(zeta, search_space=ss)
     assert np.linalg.norm(x_est - X_SOURCE) < 15., \
         f"ML estimate error too large: {np.linalg.norm(x_est - X_SOURCE):.2f} m"
+
+
+# ===========================================================================
+# model.grad_source
+# ===========================================================================
+
+def test_fdoa_grad_source_matches_jacobian():
+    """grad_source is a thin wrapper for jacobian; outputs must be identical."""
+    j  = model.jacobian(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR)
+    gs = model.grad_source(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR)
+    assert np.allclose(gs, j)
+
+
+# ===========================================================================
+# model.grad_bias
+# ===========================================================================
+
+def test_fdoa_grad_bias_shape():
+    """grad_bias must be (n_sensor, n_measurement) for a single source."""
+    gb = model.grad_bias(X_SENSOR, X_SOURCE)
+    # 3 sensors, 2 measurement pairs (default ref = last sensor)
+    assert gb.shape == (3, 2), f"Expected (3, 2), got {gb.shape}"
+
+
+def test_fdoa_grad_bias_values():
+    """For default ref_idx: col 0 → test=0 (+1), ref=2 (−1); col 1 → test=1 (+1), ref=2 (−1)."""
+    gb = model.grad_bias(X_SENSOR, X_SOURCE)
+    # Column 0: sensor 0 is test (+1), sensor 2 is ref (−1)
+    assert gb[0, 0] ==  1, f"Expected +1 at [0,0], got {gb[0,0]}"
+    assert gb[2, 0] == -1, f"Expected −1 at [2,0], got {gb[2,0]}"
+    assert gb[1, 0] ==  0, f"Expected  0 at [1,0], got {gb[1,0]}"
+    # Column 1: sensor 1 is test (+1), sensor 2 is ref (−1)
+    assert gb[1, 1] ==  1, f"Expected +1 at [1,1], got {gb[1,1]}"
+    assert gb[2, 1] == -1, f"Expected −1 at [2,1], got {gb[2,1]}"
+    assert gb[0, 1] ==  0, f"Expected  0 at [0,1], got {gb[0,1]}"
+
+
+def test_fdoa_grad_bias_multi_source_shape():
+    n_src = 4
+    x_multi = np.random.default_rng(0).standard_normal((2, n_src))
+    gb = model.grad_bias(X_SENSOR, x_multi)
+    assert gb.shape == (3, 2, n_src), f"Expected (3, 2, {n_src}), got {gb.shape}"
+
+
+# ===========================================================================
+# model.grad_sensor_pos
+# ===========================================================================
+
+def test_fdoa_grad_sensor_pos_shape():
+    """Shape must be (n_dim * n_sensor, n_measurement) = (6, 2)."""
+    gp = model.grad_sensor_pos(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR)
+    assert gp.shape == (6, 2), f"Expected (6, 2), got {gp.shape}"
+
+
+def test_fdoa_grad_sensor_pos_finite_diff():
+    """Analytical gradient should match numerical finite differences."""
+    eps = 1e-3
+    n_dim, n_sensor = X_SENSOR.shape
+    n_measurement = 2
+
+    gp_analytic = model.grad_sensor_pos(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR)
+    gp_numeric = np.zeros((n_dim * n_sensor, n_measurement))
+
+    for k in range(n_dim * n_sensor):
+        sen = k // n_dim
+        dim = k % n_dim
+        x_plus  = X_SENSOR.copy(); x_plus[dim, sen]  += eps
+        x_minus = X_SENSOR.copy(); x_minus[dim, sen] -= eps
+        m_plus  = model.measurement(x_plus,  X_SOURCE, v_sensor=V_SENSOR)
+        m_minus = model.measurement(x_minus, X_SOURCE, v_sensor=V_SENSOR)
+        gp_numeric[k, :] = (m_plus - m_minus) / (2 * eps)
+
+    assert np.allclose(gp_analytic, gp_numeric, atol=1e-4), \
+        f"Max error: {np.max(np.abs(gp_analytic - gp_numeric)):.2e}"
+
+
+# ===========================================================================
+# model.grad_sensor_vel
+# ===========================================================================
+
+def test_fdoa_grad_sensor_vel_shape():
+    """Shape must be (n_dim * n_sensor, n_measurement) = (6, 2)."""
+    gv = model.grad_sensor_vel(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR)
+    assert gv.shape == (6, 2), f"Expected (6, 2), got {gv.shape}"
+
+
+def test_fdoa_grad_sensor_vel_finite_diff():
+    """Analytical gradient should match numerical finite differences w.r.t. sensor velocity."""
+    eps = 1e-3
+    n_dim, n_sensor = V_SENSOR.shape
+    n_measurement = 2
+
+    gv_analytic = model.grad_sensor_vel(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR)
+    gv_numeric = np.zeros((n_dim * n_sensor, n_measurement))
+
+    for k in range(n_dim * n_sensor):
+        sen = k // n_dim
+        dim = k % n_dim
+        v_plus  = V_SENSOR.copy(); v_plus[dim, sen]  += eps
+        v_minus = V_SENSOR.copy(); v_minus[dim, sen] -= eps
+        m_plus  = model.measurement(X_SENSOR, X_SOURCE, v_sensor=v_plus)
+        m_minus = model.measurement(X_SENSOR, X_SOURCE, v_sensor=v_minus)
+        gv_numeric[k, :] = (m_plus - m_minus) / (2 * eps)
+
+    assert np.allclose(gv_analytic, gv_numeric, atol=1e-4), \
+        f"Max error: {np.max(np.abs(gv_analytic - gv_numeric)):.2e}"
+
+
+# ===========================================================================
+# model.jacobian_uncertainty
+# ===========================================================================
+
+def test_fdoa_jacobian_uncertainty_no_flags_shape():
+    """Without optional flags, result equals grad_source (2*n_dim rows): shape (4, 2).
+    grad_source wraps jacobian which stacks pos and vel rows: (n_dim + n_dim, n_meas)."""
+    j = model.jacobian_uncertainty(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR)
+    assert j.shape == (4, 2), f"Expected (4, 2), got {j.shape}"
+
+
+def test_fdoa_jacobian_uncertainty_with_bias_shape():
+    """do_bias=True appends grad_bias (n_sensor rows): shape (2*n_dim + n_sensor, n_meas) = (7, 2)."""
+    j = model.jacobian_uncertainty(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR, do_bias=True)
+    assert j.shape == (7, 2), f"Expected (7, 2), got {j.shape}"
+
+
+def test_fdoa_jacobian_uncertainty_with_pos_error_shape():
+    """do_pos_error=True appends grad_sensor_pos (n_dim*n_sensor rows):
+    shape (2*n_dim + n_dim*n_sensor, n_meas) = (10, 2)."""
+    j = model.jacobian_uncertainty(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR, do_pos_error=True)
+    assert j.shape == (10, 2), f"Expected (10, 2), got {j.shape}"
+
+
+def test_fdoa_jacobian_uncertainty_with_all_flags_shape():
+    """Both flags: shape (2*n_dim + n_sensor + n_dim*n_sensor, n_meas) = (13, 2)."""
+    j = model.jacobian_uncertainty(X_SENSOR, X_SOURCE, v_sensor=V_SENSOR,
+                                   do_bias=True, do_pos_error=True)
+    assert j.shape == (13, 2), f"Expected (13, 2), got {j.shape}"
+
+
+# ===========================================================================
+# model.error
+# ===========================================================================
+
+def test_fdoa_error_shape():
+    """error() should return a (num_pts, num_pts) grid and matching x/y vectors."""
+    num_pts = 11
+    epsilon, x_vec, y_vec = model.error(X_SENSOR, COV_1MS, X_SOURCE,
+                                         x_max=np.array([1000., 1000.]),
+                                         num_pts=num_pts, v_sensor=V_SENSOR,
+                                         do_resample=True)
+    assert epsilon.shape == (num_pts, num_pts)
+    assert x_vec.shape == (num_pts,)
+    assert y_vec.shape == (num_pts,)
+
+
+def test_fdoa_error_minimum_near_source():
+    """The minimum of the error surface should lie close to the true source position."""
+    num_pts = 51
+    x_max = np.array([1000., 1000.])
+    epsilon, x_vec, y_vec = model.error(X_SENSOR, COV_1MS, X_SOURCE,
+                                         x_max=x_max, num_pts=num_pts,
+                                         v_sensor=V_SENSOR, do_resample=True)
+    idx = np.unravel_index(np.argmin(epsilon), epsilon.shape)
+    x_min = np.array([x_vec[idx[1]], y_vec[idx[0]]])
+    grid_spacing = 2 * x_max / (num_pts - 1)
+    assert np.linalg.norm(x_min - X_SOURCE) < 3 * np.linalg.norm(grid_spacing), \
+        f"Error minimum at {x_min}, expected near {X_SOURCE}"
+
+
+# ===========================================================================
+# perf.freq_crlb
+# ===========================================================================
+
+def test_fdoa_freq_crlb_positive():
+    sigma = perf.freq_crlb(sample_time=1e-3, num_samples=100, snr_db=10.0)
+    assert float(sigma) > 0
+
+
+def test_fdoa_freq_crlb_decreases_with_snr():
+    s_low  = perf.freq_crlb(sample_time=1e-3, num_samples=100, snr_db=0.0)
+    s_high = perf.freq_crlb(sample_time=1e-3, num_samples=100, snr_db=20.0)
+    assert float(s_high) < float(s_low)
+
+
+def test_fdoa_freq_crlb_decreases_with_time():
+    s_short = perf.freq_crlb(sample_time=1e-4, num_samples=100, snr_db=10.0)
+    s_long  = perf.freq_crlb(sample_time=1e-2, num_samples=100, snr_db=10.0)
+    assert float(s_long) < float(s_short)
+
+
+def test_fdoa_freq_crlb_known_value():
+    """σ = sqrt(3 / (π² T² M (M²-1) snr_lin)); at T=1, M=2, snr=0dB: σ = sqrt(1/(2π²))."""
+    expected = np.sqrt(1.0 / (2.0 * np.pi**2))
+    sigma = perf.freq_crlb(sample_time=1.0, num_samples=2, snr_db=0.0)
+    assert np.isclose(float(sigma), expected, rtol=1e-9)
+
+
+# ===========================================================================
+# perf.freq_diff_crlb
+# ===========================================================================
+
+def test_fdoa_freq_diff_crlb_positive():
+    sigma = perf.freq_diff_crlb(time_s=1e-3, bw_hz=1e6, snr_db=10.0)
+    assert float(sigma) > 0
+
+
+def test_fdoa_freq_diff_crlb_decreases_with_snr():
+    s_low  = perf.freq_diff_crlb(time_s=1e-3, bw_hz=1e6, snr_db=0.0)
+    s_high = perf.freq_diff_crlb(time_s=1e-3, bw_hz=1e6, snr_db=20.0)
+    assert float(s_high) < float(s_low)
+
+
+def test_fdoa_freq_diff_crlb_decreases_with_bandwidth():
+    s_narrow = perf.freq_diff_crlb(time_s=1e-3, bw_hz=1e5, snr_db=10.0)
+    s_wide   = perf.freq_diff_crlb(time_s=1e-3, bw_hz=1e7, snr_db=10.0)
+    assert float(s_wide) < float(s_narrow)
+
+
+def test_fdoa_freq_diff_crlb_known_value():
+    """σ = sqrt(3 / (4π² T³ B snr_lin)); at T=1, B=1, snr=0dB: σ = sqrt(3)/(2π)."""
+    expected = np.sqrt(3.0) / (2.0 * np.pi)
+    sigma = perf.freq_diff_crlb(time_s=1.0, bw_hz=1.0, snr_db=0.0)
+    assert np.isclose(float(sigma), expected, rtol=1e-9)

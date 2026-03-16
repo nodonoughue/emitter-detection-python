@@ -400,8 +400,12 @@ def grad_source(x_source: npt.ArrayLike,
         gradients.append(tdoa.model.grad_source(x_source=x_source, x_sensor=x_tdoa, ref_idx=tdoa_ref_idx))
 
     if x_fdoa is not None:
-        gradients.append(fdoa.model.grad_source(x_source=x_source, x_sensor=x_fdoa, v_sensor=v_fdoa, v_source=v_source,
-                                           ref_idx=fdoa_ref_idx))
+        # FDOA grad_source wraps fdoa.model.jacobian which stacks position and velocity rows
+        # (shape 2*n_dim x n_meas).  Pad any already-collected AOA/TDOA gradients with zero
+        # velocity rows so all blocks share the same row count before concatenating.
+        gradients = [np.concatenate((g, np.zeros_like(g)), axis=0) for g in gradients]
+        gradients.append(fdoa.model.grad_source(x_source=x_source, x_sensor=x_fdoa, v_sensor=v_fdoa,
+                                                v_source=v_source, ref_idx=fdoa_ref_idx))
 
     grad = np.concatenate(gradients, axis=1)
 
@@ -505,31 +509,40 @@ def grad_sensor_pos(x_source: npt.ArrayLike,
     """
     # TODO: Debug
 
-    gradients = []
+    # Each sub-gradient block is assembled as (2*n_dim*n_k, n_meas_k):
+    #   rows 0..n_dim*n_k-1     → gradient w.r.t. sensor position
+    #   rows n_dim*n_k..end     → gradient w.r.t. sensor velocity (zeros for AOA/TDOA)
+    # The final result is block-diagonal across sub-systems.
+    blocks = []
+
     if x_aoa is not None:
         grad_a = triang.model.grad_sensor_pos(x_source=x_source, x_sensor=x_aoa, do_2d_aoa=do_2d_aoa)
-
-        # Append zeros to reflect lack of dependence on sensor velocity
-        grad_a = np.concatenate((grad_a, np.zeros_like(grad_a)), axis=0)
-
-        # Add to running list of gradients
-        gradients.append(grad_a)
+        # AOA measurements have no velocity dependence; append a zero block for velocity rows
+        blocks.append(np.concatenate((grad_a, np.zeros_like(grad_a)), axis=0))
 
     if x_tdoa is not None:
         grad_t = tdoa.model.grad_sensor_pos(x_source=x_source, x_sensor=x_tdoa, ref_idx=tdoa_ref_idx)
-
-        # Append zeros to reflect lack of dependence on sensor velocity
-        grad_t = np.concatenate((grad_t, np.zeros_like(grad_t)), axis=0)
-
-        # Add to running list of gradients
-        gradients.append(grad_t)
+        # TDOA measurements have no velocity dependence; append a zero block for velocity rows
+        blocks.append(np.concatenate((grad_t, np.zeros_like(grad_t)), axis=0))
 
     if x_fdoa is not None:
-        # No need to append zeros, the FDOA gradient assumes both velocity and position are considered.
-        gradients.append(fdoa.model.grad_sensor_pos(x_source=x_source, x_sensor=x_fdoa, v_sensor=v_fdoa,
-                                                    v_source=v_source, ref_idx=fdoa_ref_idx))
+        # FDOA measurements depend on both position and velocity
+        grad_fp = fdoa.model.grad_sensor_pos(x_source=x_source, x_sensor=x_fdoa, v_sensor=v_fdoa,
+                                             v_source=v_source, ref_idx=fdoa_ref_idx)
+        grad_fv = fdoa.model.grad_sensor_vel(x_source=x_source, x_sensor=x_fdoa, v_sensor=v_fdoa,
+                                             v_source=v_source, ref_idx=fdoa_ref_idx)
+        blocks.append(np.concatenate((grad_fp, grad_fv), axis=0))
 
-    # Concatenate the available gradients along the second dimension (axis=1)
-    grad = np.concatenate(gradients, axis=1)
+    # Assemble as block-diagonal: shape (sum of rows, sum of cols)
+    total_rows = sum(b.shape[0] for b in blocks)
+    total_cols = sum(b.shape[1] for b in blocks)
+    grad = np.zeros((total_rows, total_cols))
+    row_off = 0
+    col_off = 0
+    for b in blocks:
+        nr, nc = b.shape
+        grad[row_off:row_off + nr, col_off:col_off + nc] = b
+        row_off += nr
+        col_off += nc
 
     return grad
