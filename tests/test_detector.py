@@ -30,8 +30,8 @@ def test_squarelaw_det_test_pure_noise_shape():
 
 def test_squarelaw_det_test_returns_bool():
     rng = np.random.default_rng(1)
-    # Use shape (M, 1): M samples, 1 detection trial — avoids scalar putmask issue
-    z = rng.standard_normal((NUM_SAMPLES, 1)) + 1j * rng.standard_normal((NUM_SAMPLES, 1))
+    # 1-D input (single detection event); previously failed due to putmask on scalar
+    z = rng.standard_normal((NUM_SAMPLES,)) + 1j * rng.standard_normal((NUM_SAMPLES,))
     result = squareLaw.det_test(z, NOISE_VAR, PROB_FA)
     assert result.dtype == bool or np.issubdtype(result.dtype, np.bool_)
 

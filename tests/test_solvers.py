@@ -63,6 +63,16 @@ def test_ls_solver_different_init():
         f"LS did not converge from far init: {x_est} vs {X_TRUE}"
 
 
+def test_ls_solver_1d_problem():
+    """1-D test: h(x) = x, zeta = 7. Previously failed due to 1×1 squeeze→scalar."""
+    x_true_1d = np.array([7.0])
+    cov_1d = CovarianceMatrix(np.eye(1))
+    def res_1d(x): return x_true_1d - x
+    def jac_1d(x): return np.eye(1)
+    x_est, _ = ls_solver(res_1d, jac_1d, cov_1d, np.array([0.0]))
+    assert equal_to_tolerance(x_est, x_true_1d, tol=1e-4)
+
+
 # ===========================================================================
 # gd_solver
 # ===========================================================================
