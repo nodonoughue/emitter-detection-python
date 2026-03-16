@@ -394,6 +394,9 @@ def make_figure_5(prefix=None, mc_params=None):
     """
 
     print('Generating Figure 10.5 (a and b)...')
+    if mc_params is not None and 'force_recalc' in mc_params and not mc_params['force_recalc']:
+        print('Skipping Figure 10.5... (re-run with mc_params[\'force_recalc\']=True to generate)')
+        return None,
 
     fig5a, fig5b = chapter10.example1(mc_params)
 
