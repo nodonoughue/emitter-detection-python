@@ -149,20 +149,17 @@ def make_figure_2(prefix=None):
     figs.append(fig)
     ax.scatter(prediction_msmt.zeta[0], prediction_msmt.zeta[1], marker='o', color=default_colors[0], label='Prediction')
     ax.plot(pred_gate[0], pred_gate[1], color=default_colors[0], label='Acceptance Gate')
-    label='Valid Measurements'
-    for m in valid_msmts:
-        ax.scatter(m.zeta[0], m.zeta[1], marker='v', label=label, color=default_colors[2])
-        label=None
-    label='Invalid Measurements'
-    for m in invalid_msmts:
-        ax.scatter(m.zeta[0], m.zeta[1], marker='^', label=label, color=default_colors[3])
-        label=None
+    if valid_msmts:
+        zeta_v = np.array([m.zeta for m in valid_msmts])
+        ax.scatter(zeta_v[:, 0], zeta_v[:, 1], marker='v', label='Valid Measurements', color=default_colors[2])
+    if invalid_msmts:
+        zeta_i = np.array([m.zeta for m in invalid_msmts])
+        ax.scatter(zeta_i[:, 0], zeta_i[:, 1], marker='^', label='Invalid Measurements', color=default_colors[3])
     plt.grid(True)
     plt.xlabel('$\\tau_{0,1}$ [m]')
     plt.ylabel('$\\tau_{0,2}$ [m]')
     plt.legend()
     plt.title('Prediction and Measurements in Zeta-space')
-    # ToDo: color-code measurements based on gate acceptance
 
     # Output to file
     if prefix is not None:
