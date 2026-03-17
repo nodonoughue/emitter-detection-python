@@ -319,7 +319,7 @@ def example4(rng=np.random.default_rng(), mc_params=None):
 
     # Set up sensor and target coordinates
     x_source_ctr = np.array([3, 4]) * 1e3
-    num_monte_carlo = 100 # todo: restore to 200? 1000?
+    num_monte_carlo = 200
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
     offset = 1e2   # Maximum distance from center to a single instance of the source position (per dimension)
