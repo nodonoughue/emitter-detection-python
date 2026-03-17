@@ -7,7 +7,9 @@ from .covariance import CovarianceMatrix
 
 
 def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progress=False,
-                          eq_constraints_grad:list = None)-> CovarianceMatrix | list[CovarianceMatrix]:
+                          eq_constraints_grad:list = None, unobservable_dim_err: float = 1e99,
+                          precision: float = 1e-30) \
+        -> CovarianceMatrix | list[CovarianceMatrix]:
     """
     Computes the CRLB for a Gaussian problem at one or more source positions. The CRLB for Gaussian problems takes the
     general form:
@@ -25,6 +27,8 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
      :param cov: Covariance Matrix object
      :param print_progress: Boolean flag; if true then elapsed/remaining time estimates will be printed to the console
      :param eq_constraints_grad: list of constraint gradients for equality constraints to be applied
+     :param unobservable_dim_err: error value to assume for any unobservable dimensions
+     :param precision: any numbers less than this amount will be rounded to zero.
      :return crlb: n_dim x n_dim x n_source lower bound on the estimate covariance matrix
     """
 
@@ -103,6 +107,14 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
                 # Subtract the Fisher inverse for the constraint from the unconstrained Fisher inverse to yield the
                 # constrained Fisher inverse
                 fisher_inv = fisher_inv - fisher_const_inv
+
+            # Apply precision
+            fisher_inv[np.fabs(fisher_inv) < precision] = 0.0
+
+            # Check for unobservable dimensions, represented by a zero along the diagonal
+            diag_mask = np.diag(fisher_inv) < precision
+            if np.any(diag_mask):
+                fisher_inv[diag_mask, diag_mask] = unobservable_dim_err
 
             crlb.append(CovarianceMatrix(fisher_inv))
 
