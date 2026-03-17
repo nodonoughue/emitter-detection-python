@@ -358,7 +358,7 @@ def draw_lob(x_sensor, psi, x_source=None, scale=1):
     xy_lob_centered = np.hstack([xy_start,
                                  xy_end
                                  ])
-    xy_lob = np.reshape(x_sensor, [2, 1, num_measurements]) + xy_lob_centered
+    xy_lob = np.reshape(np.asarray(x_sensor)[:2], [2, 1, num_measurements]) + xy_lob_centered
 
     return xy_lob
 

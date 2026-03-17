@@ -497,3 +497,129 @@ def test_triang_error_minimum_near_source():
     # Grid spacing is 200 m; allow 2 cells of error
     assert dist < 400.0, \
         f"Error minimum at {x_min}, source at {X_SOURCE}, dist={dist:.1f} m"
+
+
+# ===========================================================================
+# model.draw_lob
+# ===========================================================================
+
+def test_draw_lob_output_shape_single():
+    """Single sensor, single angle -> shape (2, 2, 1)."""
+    lob = model.draw_lob(X_SENSOR_1, psi=0.0)
+    assert lob.shape == (2, 2, 1), f"Expected (2, 2, 1), got {lob.shape}"
+
+
+def test_draw_lob_output_shape_multi():
+    """Three sensors, three angles -> shape (2, 2, 3)."""
+    psi = model.measurement(X_SENSOR, X_SOURCE)
+    lob = model.draw_lob(X_SENSOR, psi)
+    assert lob.shape == (2, 2, 3), f"Expected (2, 2, 3), got {lob.shape}"
+
+
+def test_draw_lob_start_equals_sensor():
+    """First column (start point) of each LOB must equal the sensor position."""
+    psi = model.measurement(X_SENSOR, X_SOURCE)
+    lob = model.draw_lob(X_SENSOR, psi)
+    assert equal_to_tolerance(lob[:, 0, :], X_SENSOR)
+
+
+def test_draw_lob_east_direction():
+    """psi=0 from origin -> end point is directly east (positive x, zero y)."""
+    lob = model.draw_lob(X_SENSOR_1, psi=0.0)
+    end = lob[:, 1, 0]
+    assert end[0] > 0, "End x should be positive (east) for psi=0"
+    assert abs(end[1]) < 1e-10, "End y should be zero for psi=0"
+
+
+def test_draw_lob_north_direction():
+    """psi=pi/2 from origin -> end point is directly north (zero x, positive y)."""
+    lob = model.draw_lob(X_SENSOR_1, psi=np.pi / 2)
+    end = lob[:, 1, 0]
+    assert abs(end[0]) < 1e-10, "End x should be zero for psi=pi/2"
+    assert end[1] > 0, "End y should be positive (north) for psi=pi/2"
+
+
+def test_draw_lob_scale_factor():
+    """scale=2 should double the displacement from sensor to end point."""
+    psi = np.pi / 4
+    lob1 = model.draw_lob(X_SENSOR_1, psi=psi, scale=1)
+    lob2 = model.draw_lob(X_SENSOR_1, psi=psi, scale=2)
+    diff1 = lob1[:, 1, 0] - lob1[:, 0, 0]
+    diff2 = lob2[:, 1, 0] - lob2[:, 0, 0]
+    assert equal_to_tolerance(diff2, 2 * diff1)
+
+
+# ===========================================================================
+# DirectionFinder.draw_lobs  (1D AOA)
+# ===========================================================================
+
+def test_draw_lobs_1d_output_shape_single_case():
+    """1D AOA, single case -> (2, 2, n_sensors, 1)."""
+    df = DirectionFinder(X_SENSOR, COV_1DEG, do_2d_aoa=False)
+    zeta = model.measurement(X_SENSOR, X_SOURCE)   # shape (3,)
+    lobs = df.draw_lobs(zeta)
+    assert lobs.shape == (2, 2, 3, 1), f"Expected (2, 2, 3, 1), got {lobs.shape}"
+
+
+def test_draw_lobs_1d_output_shape_multi_case():
+    """1D AOA, two cases -> fourth dimension is 2."""
+    df = DirectionFinder(X_SENSOR, COV_1DEG, do_2d_aoa=False)
+    x_sources = np.column_stack([X_SOURCE, X_SOURCE + 200.0])
+    zeta = model.measurement(X_SENSOR, x_sources)  # shape (3, 2)
+    lobs = df.draw_lobs(zeta)
+    assert lobs.shape == (2, 2, 3, 2), f"Expected (2, 2, 3, 2), got {lobs.shape}"
+
+
+def test_draw_lobs_1d_starts_at_sensor():
+    """Start points of each LOB must equal the corresponding sensor position."""
+    df = DirectionFinder(X_SENSOR, COV_1DEG, do_2d_aoa=False)
+    zeta = model.measurement(X_SENSOR, X_SOURCE)
+    lobs = df.draw_lobs(zeta)
+    assert equal_to_tolerance(lobs[:, 0, :, 0], X_SENSOR)
+
+
+def test_draw_lobs_1d_direction_toward_source():
+    """For noiseless measurements the LOB bearing must match the azimuth to source."""
+    df = DirectionFinder(X_SENSOR, COV_1DEG, do_2d_aoa=False)
+    zeta = model.measurement(X_SENSOR, X_SOURCE)
+    lobs = df.draw_lobs(zeta)
+    for i in range(3):
+        vec = lobs[:, 1, i, 0] - lobs[:, 0, i, 0]
+        bearing = np.arctan2(vec[1], vec[0])
+        diff = np.mod(bearing - zeta[i] + np.pi, 2 * np.pi) - np.pi
+        assert abs(diff) < 1e-6, \
+            f"Sensor {i}: bearing {np.rad2deg(bearing):.4f}° != expected {np.rad2deg(zeta[i]):.4f}°"
+
+
+# ===========================================================================
+# DirectionFinder.draw_lobs  (2D AOA, 3D sensor positions)
+# ===========================================================================
+
+# 3D sensor positions for 2D AOA tests (az + el both meaningful)
+_X_SENSOR_3D = np.array([[0.,    1000.,  500.],
+                          [0.,       0.,  866.],
+                          [500.,   500.,  500.]])   # shape (3, 3)
+_X_SOURCE_3D = np.array([500., 300., 0.])           # shape (3,)
+_sig_2d = np.deg2rad(1.0)
+_COV_2D = CovarianceMatrix(_sig_2d ** 2 * np.eye(6))  # 2*n_sensors = 6
+
+
+def test_draw_lobs_2d_output_shape():
+    """2D AOA with 3D sensors, single case -> (2, 2, n_sensors, 1)."""
+    df = DirectionFinder(_X_SENSOR_3D, _COV_2D, do_2d_aoa=True)
+    zeta = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=True)  # shape (6,)
+    lobs = df.draw_lobs(zeta)
+    assert lobs.shape == (2, 2, 3, 1), f"Expected (2, 2, 3, 1), got {lobs.shape}"
+
+
+def test_draw_lobs_2d_azimuth_matches_1d():
+    """LOBs from a 2D AOA system should match those from a 1D system (draw_lob
+    is azimuth-only; elevation is ignored until 3D LOB support is added)."""
+    _cov_1d_3d = CovarianceMatrix(_sig_2d ** 2 * np.eye(3))
+    df_1d = DirectionFinder(_X_SENSOR_3D, _cov_1d_3d, do_2d_aoa=False)
+    df_2d = DirectionFinder(_X_SENSOR_3D, _COV_2D,    do_2d_aoa=True)
+    zeta_1d = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=False)
+    zeta_2d = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=True)
+    lobs_1d = df_1d.draw_lobs(zeta_1d)
+    lobs_2d = df_2d.draw_lobs(zeta_2d)
+    assert equal_to_tolerance(lobs_1d, lobs_2d)

@@ -158,7 +158,7 @@ class DirectionFinder(PassiveSurveillanceSystem):
         # Parse the sensors
         if x_sensor is None:
             x_sensor = self.pos
-            num_sensors= self.num_measurements
+            num_sensors = self.num_sensors
         else:
             shp = np.shape(x_sensor)
             # num_dim = shp[0] if len(shp) > 0 else 1
@@ -184,12 +184,10 @@ class DirectionFinder(PassiveSurveillanceSystem):
             this_x = x_sensor[:, idx_sensor]
 
             for idx_case in range(num_cases):
-                if self.do_2d_aoa:
-                    this_zeta = zeta_reshape[idx_sensor:num_sensors, idx_case]
-                else:
-                    this_zeta = zeta_reshape[idx_sensor, idx_case]
-
-                # TODO: Test LOBs with 2D AOA measurements
+                # For 2D AOA the measurement vector is [az_0..az_{N-1}, el_0..el_{N-1}].
+                # draw_lob is azimuth-only (TODO: Expand for 3D LOBs), so we always
+                # extract the azimuth component at index idx_sensor.
+                this_zeta = zeta_reshape[idx_sensor, idx_case]
 
                 this_lob = model.draw_lob(x_sensor=this_x, psi=this_zeta, **kwargs)
                 lobs_out[:, :, idx_sensor, idx_case] = np.asarray(this_lob).squeeze()
