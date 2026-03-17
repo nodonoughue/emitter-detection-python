@@ -96,6 +96,64 @@ def test_gd_solver_x_full_shape():
 
 
 # ===========================================================================
+# ls_solver / gd_solver — constraint tests
+# ===========================================================================
+
+# Constraint helpers (designed for 2-D input, which is what snap_to_constraints
+# always passes to constraint callables)
+
+def _eq_x0_zero(x):
+    """Equality constraint: pin x[0] to zero."""
+    eps = x[0].copy()
+    x_v = x.copy()
+    x_v[0] = 0.
+    return eps, x_v
+
+
+def _ineq_x1_le_10(x):
+    """Inequality constraint: x[1] must not exceed 10."""
+    eps = x[1] - 10.
+    x_v = x.copy()
+    x_v[1] = np.minimum(x_v[1], 10.)
+    return eps, x_v
+
+
+def test_ls_solver_with_eq_constraint():
+    """LS solver satisfies an equality constraint at convergence."""
+    x_est, _ = ls_solver(_residual, _jacobian, COV_ID, X_INIT,
+                          eq_constraints=[_eq_x0_zero])
+    assert abs(x_est[0]) < 1e-3, f"x[0]={x_est[0]:.4f} should be ~0 (eq constraint)"
+
+
+def test_ls_solver_with_both_constraints():
+    """LS solver handles simultaneous eq + ineq constraints without error."""
+    # Equality pins x[0]=0; inequality x[1]<=10 is inactive (X_TRUE[1]=3)
+    x_est, _ = ls_solver(_residual, _jacobian, COV_ID, X_INIT,
+                          eq_constraints=[_eq_x0_zero],
+                          ineq_constraints=[_ineq_x1_le_10])
+    assert abs(x_est[0]) < 1e-3, f"x[0]={x_est[0]:.4f} should be ~0 (eq constraint)"
+    assert abs(x_est[1] - X_TRUE[1]) < 1e-3, \
+        f"x[1]={x_est[1]:.4f} should converge to {X_TRUE[1]} (ineq inactive)"
+
+
+def test_gd_solver_with_eq_constraint():
+    """GD solver satisfies an equality constraint at convergence."""
+    x_est, _ = gd_solver(_residual, _jacobian, COV_ID, X_INIT,
+                          eq_constraints=[_eq_x0_zero])
+    assert abs(x_est[0]) < 1e-3, f"x[0]={x_est[0]:.4f} should be ~0 (eq constraint)"
+
+
+def test_gd_solver_with_both_constraints():
+    """GD solver handles simultaneous eq + ineq constraints without error."""
+    x_est, _ = gd_solver(_residual, _jacobian, COV_ID, X_INIT,
+                          eq_constraints=[_eq_x0_zero],
+                          ineq_constraints=[_ineq_x1_le_10])
+    assert abs(x_est[0]) < 1e-3, f"x[0]={x_est[0]:.4f} should be ~0 (eq constraint)"
+    assert abs(x_est[1] - X_TRUE[1]) < 1e-3, \
+        f"x[1]={x_est[1]:.4f} should converge to {X_TRUE[1]} (ineq inactive)"
+
+
+# ===========================================================================
 # ml_solver
 # ===========================================================================
 

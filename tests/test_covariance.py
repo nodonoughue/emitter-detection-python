@@ -137,6 +137,67 @@ def test_solve_aca():
     assert equal_to_tolerance(res1, res2*np.ones_like(res1))
     assert res1.shape == (2, 3, 4)
 
+def test_solve_aca_do_2d():
+    """
+    Solve A @ C^{-1} @ A.T for a matrix A with do_2d=True.
+
+    Covers the four previously untested branches of solve_aca:
+      Branch 2: matrix inverse,        do_2d=True
+      Branch 3: scalar (1x1) cov,      do_2d=False  (scalar inv path)
+      Branch 4: scalar (1x1) cov,      do_2d=True   (the previously buggy path)
+      Branch 6: Cholesky only,          do_2d=True
+    """
+    c = np.array([[1., .1, .2], [.1, 3., .4], [.2, .4, 3.]])
+    a = np.array([[1., 4., 3.], [2., 1., 5.]])   # shape (m=2, n=3)
+
+    # Reference: A @ C^{-1} @ A^T via Cholesky (the branch we trust from existing tests)
+    cov_chol = CovarianceMatrix(c, do_inverse=False)
+    r = sp.linalg.solve_triangular(cov_chol.lower, a.T, lower=True)  # (n, m)
+    expected = r.T @ r                                                  # (m, m)
+
+    # Branch 2: matrix inverse, do_2d=True
+    cov_inv = CovarianceMatrix(c, do_inverse=True)
+    res = cov_inv.solve_aca(a, do_2d=True)
+    assert res.shape == (2, 2)
+    assert equal_to_tolerance(res, expected)
+
+    # Branch 6: Cholesky only, do_2d=True
+    res = cov_chol.solve_aca(a, do_2d=True)
+    assert res.shape == (2, 2)
+    assert equal_to_tolerance(res, expected)
+
+    # Both branches agree with the explicit formula A @ inv(C) @ A.T
+    assert equal_to_tolerance(cov_inv.solve_aca(a, do_2d=True),
+                               cov_chol.solve_aca(a, do_2d=True))
+
+    # Branch 2 + 6 batch: input shape (k, m, n) -> output shape (k, m, m)
+    a_batch = np.tile(a, (4, 1, 1))                     # shape (4, 2, 3)
+    res_inv_batch  = cov_inv.solve_aca(a_batch, do_2d=True)
+    res_chol_batch = cov_chol.solve_aca(a_batch, do_2d=True)
+    assert res_inv_batch.shape  == (4, 2, 2)
+    assert res_chol_batch.shape == (4, 2, 2)
+    for i in range(4):
+        assert equal_to_tolerance(res_inv_batch[i],  expected)
+        assert equal_to_tolerance(res_chol_batch[i], expected)
+
+    # Branch 3: scalar (1x1) covariance, do_2d=False
+    # CovarianceMatrix._parse uses the scalar path when cov.size <= 1
+    c_scalar = np.array([[4.0]])
+    cov_scalar = CovarianceMatrix(c_scalar)
+    a_1d = np.array([3.0])                  # shape (1,)
+    res_scalar = cov_scalar.solve_aca(a_1d)
+    # Expected: 3 * (1/4) * 3 = 2.25
+    assert equal_to_tolerance(res_scalar, 2.25)
+
+    # Branch 4: scalar (1x1) covariance, do_2d=True  (the previously buggy path)
+    a_col = np.array([[3.0], [2.0]])        # shape (m=2, n=1)
+    res_scalar_2d = cov_scalar.solve_aca(a_col, do_2d=True)
+    # Expected: (1/4) * A @ A^T  =  0.25 * [[9, 6], [6, 4]]
+    expected_scalar_2d = 0.25 * a_col @ a_col.T
+    assert res_scalar_2d.shape == (2, 2)
+    assert equal_to_tolerance(res_scalar_2d, expected_scalar_2d)
+
+
 def test_solve_acb():
     """
     Solve the matrix problem res = A @ C^{-1} @ B

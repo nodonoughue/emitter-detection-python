@@ -4,6 +4,7 @@ import pytest
 from ewgeo.utils import constraints, coordinates, constants
 from ewgeo.utils.constraints import (
     bounded_alt,
+    snap_to_constraints,
     snap_to_equality_constraints,
     snap_to_inequality_constraints,
     constrain_likelihood,
@@ -184,6 +185,162 @@ def test_snap_to_inequality_does_not_mutate_input():
     x_orig = x.copy()
     snap_to_inequality_constraints(x, [always_ok])
     assert np.array_equal(x, x_orig)
+
+
+# ---------------------------------------------------------------------------
+# snap_to_equality_constraints  (violation path)
+# ---------------------------------------------------------------------------
+
+def test_snap_to_equality_snaps_violated_point():
+    """A point that violates the constraint is projected onto the constraint surface."""
+    # Constraint: x[0] must be zero; snap by setting x[0] = 0
+    def snap_x0_zero(x):
+        eps = x[0].copy()
+        x_v = x.copy()
+        x_v[0] = 0.
+        return eps, x_v
+
+    x = np.array([[5.], [3.]])   # x[0] = 5 violates the constraint
+    x_out = snap_to_equality_constraints(x, [snap_x0_zero])
+    assert x_out[0, 0] == pytest.approx(0.0)
+    assert x_out[1, 0] == pytest.approx(3.0)   # unchanged
+
+
+def test_snap_to_equality_1d_input_shape_preserved():
+    """1-D input (n_dim,) is handled correctly and the output shape is preserved."""
+    # Constraint: x[0] must be zero
+    def snap_x0_zero(x):
+        eps = x[0].copy()
+        x_v = x.copy()
+        x_v[0] = 0.
+        return eps, x_v
+
+    x = np.array([7., 4.])       # 1-D input
+    x_out = snap_to_equality_constraints(x, [snap_x0_zero])
+    assert x_out.shape == (2,)
+    assert x_out[0] == pytest.approx(0.0)
+    assert x_out[1] == pytest.approx(4.0)
+
+
+def test_snap_to_equality_recheck_loop():
+    """
+    Snapping constraint B can re-violate constraint A; the re-check loop
+    must iterate until both are satisfied.
+
+    Constraint A: x[0] = x[1]  (snap by setting x[0] <- x[1])
+    Constraint B: x[1] = 0     (snap by setting x[1] <- 0)
+
+    Without the re-check loop a single pass would leave x = [[3.], [0.]],
+    which violates A.  With the re-check loop the result is [[0.], [0.]].
+    """
+    def equalize_x0_x1(x):
+        eps = x[0] - x[1]
+        x_v = x.copy()
+        x_v[0] = x_v[1]
+        return eps, x_v
+
+    def zero_x1(x):
+        eps = x[1].copy()
+        x_v = x.copy()
+        x_v[1] = 0.
+        return eps, x_v
+
+    x = np.array([[5.], [3.]])
+    x_out = snap_to_equality_constraints(x, [equalize_x0_x1, zero_x1])
+    assert x_out[0, 0] == pytest.approx(0.0)
+    assert x_out[1, 0] == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# snap_to_inequality_constraints  (violation path)
+# ---------------------------------------------------------------------------
+
+def test_snap_to_inequality_snaps_violated_point():
+    """A point that violates the inequality is projected to the boundary."""
+    # Constraint: x[0] <= 2; snap by clamping to 2
+    def clip_x0_le_2(x):
+        max_val = 2.
+        eps = x[0] - max_val
+        x_v = x.copy()
+        x_v[0] = np.minimum(x_v[0], max_val)
+        return eps, x_v
+
+    x = np.array([[9.], [3.]])   # x[0] = 9 violates x[0] <= 2
+    x_out = snap_to_inequality_constraints(x, [clip_x0_le_2])
+    assert x_out[0, 0] == pytest.approx(2.0)
+    assert x_out[1, 0] == pytest.approx(3.0)   # unchanged
+
+
+def test_snap_to_inequality_1d_input_shape_preserved():
+    """1-D input is handled correctly and the output shape is preserved."""
+    def clip_x0_le_2(x):
+        max_val = 2.
+        eps = x[0] - max_val
+        x_v = x.copy()
+        x_v[0] = np.minimum(x_v[0], max_val)
+        return eps, x_v
+
+    x = np.array([9., 3.])       # 1-D input
+    x_out = snap_to_inequality_constraints(x, [clip_x0_le_2])
+    assert x_out.shape == (2,)
+    assert x_out[0] == pytest.approx(2.0)
+    assert x_out[1] == pytest.approx(3.0)
+
+
+# ---------------------------------------------------------------------------
+# snap_to_constraints  (combined eq + ineq)
+# ---------------------------------------------------------------------------
+
+def test_snap_to_constraints_eq_only():
+    """snap_to_constraints with only equality constraints matches snap_to_equality_constraints."""
+    def snap_x0_zero(x):
+        eps = x[0].copy()
+        x_v = x.copy()
+        x_v[0] = 0.
+        return eps, x_v
+
+    x = np.array([[5.], [3.]])
+    x_out_combined = snap_to_constraints(x, eq_constraints=[snap_x0_zero])
+    x_out_eq       = snap_to_equality_constraints(x, [snap_x0_zero])
+    assert np.allclose(x_out_combined, x_out_eq)
+
+
+def test_snap_to_constraints_ineq_only():
+    """snap_to_constraints with only inequality constraints matches snap_to_inequality_constraints."""
+    def clip_x0_le_2(x):
+        max_val = 2.
+        eps = x[0] - max_val
+        x_v = x.copy()
+        x_v[0] = np.minimum(x_v[0], max_val)
+        return eps, x_v
+
+    x = np.array([[9.], [3.]])
+    x_out_combined  = snap_to_constraints(x, ineq_constraints=[clip_x0_le_2])
+    x_out_ineq      = snap_to_inequality_constraints(x, [clip_x0_le_2])
+    assert np.allclose(x_out_combined, x_out_ineq)
+
+
+def test_snap_to_constraints_both_types():
+    """Both eq and ineq constraints are satisfied simultaneously in the output."""
+    # Equality: x[0] = 0
+    def snap_x0_zero(x):
+        eps = x[0].copy()
+        x_v = x.copy()
+        x_v[0] = 0.
+        return eps, x_v
+
+    # Inequality: x[1] <= 5
+    def clip_x1_le_5(x):
+        max_val = 5.
+        eps = x[1] - max_val
+        x_v = x.copy()
+        x_v[1] = np.minimum(x_v[1], max_val)
+        return eps, x_v
+
+    x = np.array([[3.], [8.]])   # both violated
+    x_out = snap_to_constraints(x, eq_constraints=[snap_x0_zero], ineq_constraints=[clip_x1_le_5])
+    assert x_out[0, 0] == pytest.approx(0.0)   # equality satisfied
+    assert x_out[1, 0] == pytest.approx(5.0)   # inequality satisfied
 
 
 # ---------------------------------------------------------------------------

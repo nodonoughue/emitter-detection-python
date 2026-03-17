@@ -312,8 +312,9 @@ class CovarianceMatrix:
             if np.isscalar(inv) or np.size(inv) == 1:
                 # a_flat should have shape (*, 1) if do_2d=False, or (*, m, 1) if do_2d=True
                 if do_2d:
-                    # We need to do a matrix multiplication of the last two dimensions, then multiply by the inverse
-                    val = inv * np.expand_dims(a_flat, -1) @ np.conj(np.expand_dims(a_flat, -2)) # shape (*, m, m)
+                    # Mirror the non-scalar path: replace  a_flat @ inv_matrix  with  inv * a_flat
+                    tmp = inv * a_flat                                           # (batch, m, n=1)
+                    val = np.conj(tmp) @ np.swapaxes(a_flat, axis1=1, axis2=2)  # (batch, m, m)
                 else:
                     # Result should be
                     val = np.sum(np.abs(a_flat)**2, axis=1) * inv # shape (*, )

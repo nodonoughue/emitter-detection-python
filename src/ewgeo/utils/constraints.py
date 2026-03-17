@@ -437,88 +437,100 @@ def verify_common_dim(*args: npt.ArrayLike):
     assert np.all(dims == dims[0]), 'Not all inputs have the same number of spatial dimensions'
 
 
+def snap_to_constraints(x: npt.NDArray[np.float64],
+                        eq_constraints: list | None = None,
+                        ineq_constraints: list | None = None,
+                        tol: float = 1e-6,
+                        max_recheck_iters: int = 10) -> npt.NDArray[np.float64]:
+    """
+    Apply equality and/or inequality constraints to position x, iterating until
+    all constraints are satisfied or max_recheck_iters is reached.
+
+    Constraints are applied in sequence within each pass; the loop repeats until
+    no constraint triggers a correction, handling the case where snapping to one
+    constraint re-violates a previous one.
+
+    Works with both 1-D input (n_dim,) and 2-D batch input (n_dim, n); the
+    output shape always matches the input shape.
+
+    :param x:                   Input position, shape (n_dim,) or (n_dim, n).
+    :param eq_constraints:      List of equality constraint callables, or None.
+                                Each accepts (n_dim, n) and returns (eps (n,), x_valid (n_dim, n)).
+    :param ineq_constraints:    List of inequality constraint callables, or None.
+                                Same calling convention as eq_constraints.
+    :param tol:                 Tolerance for equality constraints [default 1e-6].
+    :param max_recheck_iters:   Maximum re-check passes before returning [default 10].
+    :return x_valid:            Constrained position, same shape as input x.
+    """
+    x_in = np.asarray(x)
+    x_2d = x_in.reshape(x_in.shape[0], -1).copy()  # always (n_dim, n)
+
+    for _ in range(max_recheck_iters):
+        all_satisfied = True
+
+        if eq_constraints is not None:
+            for constraint in eq_constraints:
+                eps, x_c = constraint(x_2d)
+                eps = np.atleast_1d(np.asarray(eps, dtype=float))
+                mask = np.fabs(eps) <= tol          # True where already satisfied
+                if not np.all(mask):
+                    all_satisfied = False
+                    x_2d[:, ~mask] = np.reshape(x_c, x_2d.shape)[:, ~mask]
+
+        if ineq_constraints is not None:
+            for constraint in ineq_constraints:
+                eps, x_c = constraint(x_2d)
+                eps = np.atleast_1d(np.asarray(eps, dtype=float))
+                mask = eps <= 0.                    # True where already satisfied
+                if not np.all(mask):
+                    all_satisfied = False
+                    x_2d[:, ~mask] = np.reshape(x_c, x_2d.shape)[:, ~mask]
+
+        if all_satisfied:
+            break
+
+    return x_2d.reshape(x_in.shape)
+
+
 def snap_to_equality_constraints(x: npt.NDArray[np.float64], eq_constraints: list,
-                                 tol: float = 1e-6)->npt.NDArray[np.float64]:
+                                 tol: float = 1e-6) -> npt.NDArray[np.float64]:
     """
-    Apply the equality constraints in the function handle eq_constraints to the position
-    x, subject to a tolerance tol.
+    Apply the equality constraints in eq_constraints to x, iterating until all
+    are satisfied (within tol) or the re-check limit is reached.
 
-    If multiple constraints are provided, then they are applied in order. In
-    this manner, only the final one is guaranteed to be satisfied by the
-    output x_valid, as application of later constraints may violate earlier
-    ones.
+    If multiple constraints are provided they are applied in order and the
+    process repeats until no correction is needed, so that snapping to a later
+    constraint cannot silently re-violate an earlier one.
 
-    If the variable x has non-singleton dimensions (beyond the first), then
-    this operation is repeated across them; the first dimensions is assumed
-    to be used for vector inputs x (such as a 2D or 3D target position).
+    Works with both 1-D input (n_dim,) and 2-D batch input (n_dim, n).
+    Delegates to snap_to_constraints.
 
-    The projection operation is carried out as discussed in equations 5.10
-    and 5.11.  This is intended for use in iterative solvers.
-
-    Ported from MATLAB code.
-
-    :param x:               Input x-coordinates, numpy array of size (n_dim, n)
-    :param eq_constraints:  List containing 1 or more function handles to equality constraints; each must return a
-                            2-tuple with the error and a set of valid coordinates.
-    :param tol:             Tolerance for equality constraints; default = 1e-6
-    :return x_valid:        Valid x-coordinates, numpy array of size (n_dim, n)
+    :param x:               Input x-coordinates, shape (n_dim,) or (n_dim, n).
+    :param eq_constraints:  List of equality constraint callables.
+    :param tol:             Tolerance for equality constraints [default 1e-6].
+    :return x_valid:        Constrained position, same shape as input x.
     """
-
-    x_valid = np.asarray(x).copy()
-    for constraint in eq_constraints:
-        # Apply the constraint
-        this_eps, this_x_valid = constraint(x_valid)
-
-        # Check against tolerance
-        tol_mask = np.fabs(this_eps) <= tol
-
-        if not np.all(tol_mask):
-            # At least one point needs to be updated
-            x_valid[:, not tol_mask] = this_x_valid[:, not tol_mask]
-
-            # TODO: Ensure that the new points satisfy all old constraints, as well.
-
-    return x_valid
+    return snap_to_constraints(x, eq_constraints=eq_constraints, tol=tol)
 
 
-def snap_to_inequality_constraints(x: npt.NDArray[np.float64], ineq_constraints: list)-> npt.NDArray[np.float64]:
+def snap_to_inequality_constraints(x: npt.NDArray[np.float64],
+                                   ineq_constraints: list) -> npt.NDArray[np.float64]:
     """
-    Apply the inequality constraints in the function handle ineq_constraints to the position
-    x.
+    Apply the inequality constraints in ineq_constraints to x, iterating until
+    all are satisfied or the re-check limit is reached.
 
-    If multiple constraints are provided, then they are applied in order. In
-    this manner, only the final one is guaranteed to be satisfied by the
-    output x_valid, as application of later constraints may violate earlier
-    ones.
+    If multiple constraints are provided they are applied in order and the
+    process repeats until no correction is needed, so that snapping to a later
+    constraint cannot silently re-violate an earlier one.
 
-    If the variable x has non-singleton dimensions (beyond the first), then
-    this operation is repeated across them; the first dimensions is assumed
-    to be used for vector inputs x (such as a 2D or 3D target position).
+    Works with both 1-D input (n_dim,) and 2-D batch input (n_dim, n).
+    Delegates to snap_to_constraints.
 
-    The projection operation is carried out as discussed in equations 5.10
-    and 5.11, and Figure 5.6.  This is intended for use in iterative solvers.
-
-    Ported from MATLAB code.
-
-    :param x:               Input x-coordinates, numpy array of size (n_dim, n)
-    :param ineq_constraints:List containing 1 or more function handles to inequality constraints; each must return a
-                            2-tuple with the error and a set of valid coordinates.
-    :return x_valid:        Valid x-coordinates, numpy array of size (n_dim, n)
+    :param x:                   Input x-coordinates, shape (n_dim,) or (n_dim, n).
+    :param ineq_constraints:    List of inequality constraint callables.
+    :return x_valid:            Constrained position, same shape as input x.
     """
-
-    x_valid = np.asarray(x).copy()
-    for constraint in ineq_constraints:
-        # Apply the constraint
-        this_eps, this_x_valid = constraint(x_valid)
-        valid_mask = this_eps <= 0.  # all points with non-positive error are valid; no need to update
-
-        if not np.all(valid_mask):
-            # At least one point needs to be updated
-            x_valid[:, not valid_mask] = this_x_valid[:, not valid_mask]
-
-            # TODO: Ensure that the new points satisfy all old constraints, as well.
-
-    return x_valid
+    return snap_to_constraints(x, ineq_constraints=ineq_constraints)
 
 
 def constrain_likelihood(ell, eq_constraints: list = None, ineq_constraints: list = None, tol: float = 1e-6):

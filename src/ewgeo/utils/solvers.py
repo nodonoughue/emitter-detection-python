@@ -4,7 +4,7 @@ from numpy import typing as npt
 from typing import Callable
 
 from . import ensure_iterable, SearchSpace
-from .constraints import constrain_likelihood, snap_to_equality_constraints, snap_to_inequality_constraints
+from .constraints import constrain_likelihood, snap_to_constraints
 from .covariance import CovarianceMatrix
 
 
@@ -90,16 +90,12 @@ def ls_solver(y: Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]],
         # Update predicted location
         x_update = x_prev + delta_x
 
-        # Apply Equality Constraints
-        if eq_constraints is not None:
-            x_update = snap_to_equality_constraints(x_update, eq_constraints=eq_constraints,
-                                                    tol=constraint_tolerance)
-
-        # Apply Inequality Constraints
-        if ineq_constraints is not None:
-            x_update = snap_to_inequality_constraints(x_update, ineq_constraints=ineq_constraints)
-
-        # TODO: What to do if both ineq and eq constraints are in use?
+        # Apply constraints (equality and/or inequality), re-checking until all are satisfied
+        if eq_constraints is not None or ineq_constraints is not None:
+            x_update = snap_to_constraints(x_update,
+                                           eq_constraints=eq_constraints,
+                                           ineq_constraints=ineq_constraints,
+                                           tol=constraint_tolerance)
 
         # Update variables
         x_full[:, current_iteration] = x_update
@@ -239,16 +235,12 @@ def gd_solver(y,
             # Update x position
             x_update = x_prev + t*del_x
 
-        # Apply Equality Constraints
-        if eq_constraints is not None:
-            x_update = snap_to_equality_constraints(x_update, eq_constraints=eq_constraints,
-                                                    tol=constraint_tolerance)
-
-        # Apply Inequality Constraints
-        if ineq_constraints is not None:
-            x_update = snap_to_inequality_constraints(x_update, ineq_constraints=ineq_constraints)
-
-        # TODO: What to do if both ineq and eq constraints are in use?
+        # Apply constraints (equality and/or inequality), re-checking until all are satisfied
+        if eq_constraints is not None or ineq_constraints is not None:
+            x_update = snap_to_constraints(x_update,
+                                           eq_constraints=eq_constraints,
+                                           ineq_constraints=ineq_constraints,
+                                           tol=constraint_tolerance)
 
         # Update variables
         error = np.linalg.norm(x_update - x_prev)  # how much did we adjust our position
