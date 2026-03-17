@@ -549,6 +549,28 @@ def test_draw_lob_scale_factor():
     assert equal_to_tolerance(diff2, 2 * diff1)
 
 
+def test_draw_lob_3d_azimuth_only():
+    """3-D sensor, no elevation: output shape is (3, 2, 1), z displacement is zero."""
+    x_sensor_3d = np.array([[0.], [0.], [500.]])   # sensor at z=500
+    lob = model.draw_lob(x_sensor_3d, psi=0.0)
+    assert lob.shape == (3, 2, 1)
+    assert lob[2, 0, 0] == pytest.approx(500.)     # z start = sensor z
+    assert lob[2, 1, 0] == pytest.approx(500.)     # z end = sensor z (no z displacement)
+
+
+def test_draw_lob_3d_with_elevation():
+    """3-D sensor + elevation: end point direction matches [cos(az)*cos(el), sin(az)*cos(el), sin(el)]."""
+    x_sensor_3d = np.array([[0.], [0.], [0.]])     # sensor at origin
+    az = 0.0                                        # pointing east
+    el = np.pi / 4                                  # 45 degrees up
+    lob = model.draw_lob(x_sensor_3d, psi=az, el=el)
+    assert lob.shape == (3, 2, 1)
+    end = lob[:, 1, 0]
+    # Expected end (range=1, scale=1): [cos(0)*cos(pi/4), sin(0)*cos(pi/4), sin(pi/4)]
+    expected = np.array([np.cos(el), 0., np.sin(el)])
+    assert np.allclose(end, expected)
+
+
 # ===========================================================================
 # DirectionFinder.draw_lobs  (1D AOA)
 # ===========================================================================
@@ -605,21 +627,18 @@ _COV_2D = CovarianceMatrix(_sig_2d ** 2 * np.eye(6))  # 2*n_sensors = 6
 
 
 def test_draw_lobs_2d_output_shape():
-    """2D AOA with 3D sensors, single case -> (2, 2, n_sensors, 1)."""
+    """2D AOA with 3D sensors, single case -> (3, 2, n_sensors, 1)."""
     df = DirectionFinder(_X_SENSOR_3D, _COV_2D, do_2d_aoa=True)
     zeta = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=True)  # shape (6,)
     lobs = df.draw_lobs(zeta)
-    assert lobs.shape == (2, 2, 3, 1), f"Expected (2, 2, 3, 1), got {lobs.shape}"
+    assert lobs.shape == (3, 2, 3, 1), f"Expected (3, 2, 3, 1), got {lobs.shape}"
 
 
-def test_draw_lobs_2d_azimuth_matches_1d():
-    """LOBs from a 2D AOA system should match those from a 1D system (draw_lob
-    is azimuth-only; elevation is ignored until 3D LOB support is added)."""
-    _cov_1d_3d = CovarianceMatrix(_sig_2d ** 2 * np.eye(3))
-    df_1d = DirectionFinder(_X_SENSOR_3D, _cov_1d_3d, do_2d_aoa=False)
-    df_2d = DirectionFinder(_X_SENSOR_3D, _COV_2D,    do_2d_aoa=True)
-    zeta_1d = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=False)
-    zeta_2d = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=True)
-    lobs_1d = df_1d.draw_lobs(zeta_1d)
-    lobs_2d = df_2d.draw_lobs(zeta_2d)
-    assert equal_to_tolerance(lobs_1d, lobs_2d)
+def test_draw_lobs_2d_aoa_uses_elevation():
+    """2D AOA LOBs must have a nonzero z displacement when source is not at sensor altitude."""
+    df = DirectionFinder(_X_SENSOR_3D, _COV_2D, do_2d_aoa=True)
+    zeta = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=True)
+    lobs = df.draw_lobs(zeta)                       # shape (3, 2, 3, 1)
+    # Sensors are at z=500; source is at z=0 → LOBs must point downward
+    z_displacement = lobs[2, 1, :, 0] - lobs[2, 0, :, 0]
+    assert np.all(z_displacement < 0.), "Expected negative z displacement (sensors above source)"
