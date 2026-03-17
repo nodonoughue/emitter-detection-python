@@ -443,7 +443,7 @@ def grad_bias(x_sensor, x_source, do_2d_aoa=False):
 
     # Repeat for each source position
     if num_sources > 1:
-        grad = np.repeat(grad, num_sources, axis=2)
+        grad = np.repeat(grad[:, :, np.newaxis], num_sources, axis=2)
 
     return grad
 

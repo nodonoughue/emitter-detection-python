@@ -447,7 +447,8 @@ class PassiveSurveillanceSystem(ABC):
         :return parameter_est: dict containing the estimated bias, sensor position, and sensor velocity terms
         """
 
-        # ToDo: Add support for a bias covariance term, sensor position error covariance, and sensor velocity error covariance
+        # Future enhancement: add MAP-style prior covariances for bias, sensor position, and sensor velocity,
+        # analogous to gd_ls_uncertainty, so the grid search becomes a joint MAP estimate.
 
         # Check for missing info
         if do_sensor_pos: assert pos_search is not None, 'Missing argument ''pos_search''.'
@@ -748,8 +749,6 @@ class PassiveSurveillanceSystem(ABC):
         :return bias_est: Estimated measurement biases (None if ignored)
         """
 
-        # TODO: Test and debug
-
         # ==== Parse Inputs ====
         if not do_pos_cal and not do_vel_cal and not do_bias_cal:
             # No calibration called for
@@ -970,7 +969,6 @@ class PassiveSurveillanceSystem(ABC):
         :return bias_est: Estimated measurement biases (None if ignored)
         """
 
-        # TODO: Test
         # ================ Parse inputs =========================
         if bias is None: bias = self.bias
         if x_sensor is None: x_sensor = self.pos
@@ -1013,7 +1011,7 @@ class PassiveSurveillanceSystem(ABC):
 
             def jacobian_bias(_)-> npt.NDArray:
                 return np.reshape(self.grad_bias(x_sensor=x_sensor, v_sensor=v_sensor, x_source=x_cal, v_source=v_cal),
-                                  shape=(self.num_measurements, self.num_measurements*num_cal))
+                                  shape=(self.num_measurements, self.num_measurements*num_cal), order='F')
 
 
             bias_est, _ = solver(y=y_bias, jacobian=jacobian_bias, x_init=bias, cov=cov_cal, **gd_kwargs)

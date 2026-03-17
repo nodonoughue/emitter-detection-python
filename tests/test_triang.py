@@ -642,3 +642,87 @@ def test_draw_lobs_2d_aoa_uses_elevation():
     # Sensors are at z=500; source is at z=0 → LOBs must point downward
     z_displacement = lobs[2, 1, :, 0] - lobs[2, 0, :, 0]
     assert np.all(z_displacement < 0.), "Expected negative z displacement (sensors above source)"
+
+
+# ===========================================================================
+# sensor_calibration / sensor_calibration_gd_ls
+# ===========================================================================
+
+# Calibration emitters spread around the sensor array
+_X_CAL = np.array([[200., 800., 600., 100., 900.],
+                   [400., 100., 700., 800.,  50.]])   # shape (2, 5)
+
+
+def test_sensor_calibration_no_cal_returns_nominal():
+    """With all do_*_cal flags False, calibration returns the nominal system parameters."""
+    df = DirectionFinder(X_SENSOR, COV_1DEG, bias=np.zeros(3))
+    x_est, v_est, b_est = df.sensor_calibration(do_pos_cal=False, do_vel_cal=False, do_bias_cal=False,
+                                                 solver_type='ls',
+                                                 zeta_cal=np.zeros((3, 5)), x_cal=_X_CAL)
+    assert np.array_equal(x_est, df.pos)
+    assert np.array_equal(b_est, df.bias)
+
+
+def test_sensor_calibration_invalid_solver_raises():
+    """An unrecognised solver_type should raise ValueError."""
+    df = DirectionFinder(X_SENSOR, COV_1DEG)
+    with pytest.raises(ValueError):
+        df.sensor_calibration(solver_type='bogus', do_pos_cal=True,
+                               zeta_cal=np.zeros((3, 5)), x_cal=_X_CAL)
+
+
+def test_sensor_calibration_gd_ls_bias_recovery_ls():
+    """LS calibration should recover a small known bias from noiseless measurements."""
+    true_bias = np.array([0.05, -0.03, 0.02])   # radians
+    df = DirectionFinder(X_SENSOR, COV_1DEG, bias=np.zeros(3))
+    # Noiseless measurements at zero bias, then add true_bias column-wise
+    zeta_cal = model.measurement(X_SENSOR, _X_CAL) + true_bias[:, np.newaxis]
+    _, _, bias_est = df.sensor_calibration_gd_ls(zeta_cal, _X_CAL,
+                                                  do_bias_cal=True, do_pos_cal=False,
+                                                  do_gd=False)
+    assert equal_to_tolerance(bias_est, true_bias, tol=1e-4), \
+        f"Bias recovery failed: got {bias_est}, expected {true_bias}"
+
+
+def test_sensor_calibration_gd_ls_bias_recovery_gd():
+    """GD calibration should also converge to the known bias."""
+    true_bias = np.array([0.04, -0.02, 0.01])
+    df = DirectionFinder(X_SENSOR, COV_1DEG, bias=np.zeros(3))
+    zeta_cal = model.measurement(X_SENSOR, _X_CAL) + true_bias[:, np.newaxis]
+    _, _, bias_est = df.sensor_calibration_gd_ls(zeta_cal, _X_CAL,
+                                                  do_bias_cal=True, do_pos_cal=False,
+                                                  do_gd=True)
+    assert equal_to_tolerance(bias_est, true_bias, tol=1e-3), \
+        f"GD bias recovery failed: got {bias_est}, expected {true_bias}"
+
+
+def test_sensor_calibration_gd_ls_pos_recovery():
+    """LS calibration should reduce position error when starting from a perturbed position."""
+    # Generate noiseless calibration measurements from true sensor positions
+    zeta_cal = model.measurement(X_SENSOR, _X_CAL)
+    # Perturb sensor positions by 20 m
+    x_perturb = X_SENSOR + np.array([[20., -20., 15.], [15., 10., -20.]])
+    df = DirectionFinder(X_SENSOR, COV_1DEG, bias=np.zeros(3))
+    x_sensor_est, _, _ = df.sensor_calibration_gd_ls(zeta_cal, _X_CAL,
+                                                       x_sensor=x_perturb,
+                                                       do_pos_cal=True, do_bias_cal=False,
+                                                       do_gd=False)
+    init_err = np.linalg.norm(x_perturb - X_SENSOR)
+    final_err = np.linalg.norm(x_sensor_est - X_SENSOR)
+    assert final_err < init_err, \
+        f"Position error increased: init={init_err:.2f} m, final={final_err:.2f} m"
+
+
+def test_sensor_calibration_dispatcher_routes_to_gd_ls():
+    """sensor_calibration with solver_type='ls' should produce same result as sensor_calibration_gd_ls directly."""
+    true_bias = np.array([0.05, -0.03, 0.02])
+    df = DirectionFinder(X_SENSOR, COV_1DEG, bias=np.zeros(3))
+    zeta_cal = model.measurement(X_SENSOR, _X_CAL) + true_bias[:, np.newaxis]
+    _, _, b_via_dispatch = df.sensor_calibration(solver_type='ls',
+                                                  do_bias_cal=True, do_pos_cal=False,
+                                                  zeta_cal=zeta_cal, x_cal=_X_CAL)
+    _, _, b_direct = df.sensor_calibration_gd_ls(zeta_cal, _X_CAL,
+                                                  do_bias_cal=True, do_pos_cal=False,
+                                                  do_gd=False)
+    assert np.allclose(b_via_dispatch, b_direct), \
+        "Dispatcher result should match direct call to sensor_calibration_gd_ls"
