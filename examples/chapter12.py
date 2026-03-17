@@ -76,8 +76,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
     rho_actual = fdoa.measurement(x_source=x_source, v_source=v_source)
 
     # Initialize Solvers
-    num_monte_carlo = int(100)  # MATLAB uses 1,000. Reducing to 100 for faster runtime
-    # TODO: Is 100 accurate enough?
+    num_monte_carlo = int(200)  # MATLAB uses 1,000. Reducing to 200 for faster runtime
     if mc_params is not None:
         num_monte_carlo = max(int(num_monte_carlo/mc_params['monte_carlo_decimation']),mc_params['min_num_monte_carlo'])
 
@@ -235,7 +234,7 @@ def example1(rng=np.random.default_rng(), mc_params=None):
 
     plt.xlabel('Iteration Number')
     plt.ylabel('$CEP_{50}$ [km]')
-    plt.ylim(1, 30)
+    plt.ylim(1, 50)
     plt.legend(loc='upper right')
 
     return fig_geo_a, fig_geo_b, fig_err
