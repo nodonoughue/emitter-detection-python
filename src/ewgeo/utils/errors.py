@@ -56,8 +56,8 @@ def compute_cep50(covariance: CovarianceMatrix | list[CovarianceMatrix],
         if lam_min > .25*lam_max:
             cep = .59*(np.sqrt(lam_min)+np.sqrt(lam_max))
         else:
-            # ToDo: suppress runtime warning (invalid value encountered in scalar divide....inf? nan?) while generating Fig 13.8a
-            cep = np.sqrt(lam_max)*(.67+.8*lam_min/lam_max)
+            with np.errstate(invalid='ignore', divide='ignore'):
+                cep = np.sqrt(lam_max)*(.67+.8*lam_min/lam_max)
 
     return cep
 
