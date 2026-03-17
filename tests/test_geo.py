@@ -102,7 +102,23 @@ def test_calc_doppler():
     expected_shift = -f0 * 1000.0 / speed_of_light
     assert equal_to_tolerance(fd, expected_shift, tol=1e-12)
 
-    # TODO: multi-dimensional case to test array shapes
+
+def test_calc_doppler_multidim():
+    """calc_doppler returns shape (num_sources, num_sensors) for array inputs."""
+    f0 = 1e9
+    num_sources = 2
+    num_sensors = 4
+
+    # All positions and velocities are zero → Doppler is zero for every pair
+    x_source = np.zeros((3, num_sources))
+    v_source = np.zeros((3, num_sources))
+    x_sensor = np.zeros((3, num_sensors))
+    v_sensor = np.zeros((3, num_sensors))
+
+    fd = calc_doppler(x_source, v_source, x_sensor, v_sensor, f0)
+    assert fd.shape == (num_sources, num_sensors)
+    assert np.all(fd == 0.)
+
 
 def test_calc_doppler_diff():
     f0 = 1e9
