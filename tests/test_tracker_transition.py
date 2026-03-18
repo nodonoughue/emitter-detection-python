@@ -6,6 +6,7 @@ from ewgeo.tracker.transition import (
     ConstantAccelerationMotionModel,
     ConstantJerkMotionModel,
     ConstantTurnMotionModel,
+    BallisticMotionModel,
     MotionModel,
     kf_predict,
     ekf_predict,
@@ -452,3 +453,151 @@ def test_make_motion_model_ct():
 def test_make_motion_model_constant_turn():
     m = MotionModel.make_motion_model('constant_turn', num_dims=2, process_covar=1.0)
     assert isinstance(m, ConstantTurnMotionModel)
+
+
+# ---------------------------------------------------------------------------
+# BallisticMotionModel — construction and properties
+# ---------------------------------------------------------------------------
+
+def test_ballistic_is_linear():
+    m = BallisticMotionModel(process_covar=1.0)
+    assert m.is_linear is True
+
+
+def test_ballistic_state_space():
+    m = BallisticMotionModel(process_covar=1.0)
+    assert m.num_dims == 3
+    assert m.num_states == 6       # [px, py, pz, vx, vy, vz]
+    assert m.state_space.has_vel is True
+    assert m.state_space.has_accel is False
+
+
+def test_ballistic_default_gravity_vec():
+    m = BallisticMotionModel(process_covar=1.0)
+    assert equal_to_tolerance(m.gravity_vec, [0., 0., -9.80665])
+
+
+def test_ballistic_scalar_gravity():
+    m = BallisticMotionModel(process_covar=1.0, gravity=-5.0)
+    assert equal_to_tolerance(m.gravity_vec, [0., 0., -5.0])
+
+
+def test_ballistic_vector_gravity():
+    g = np.array([0., -9.81, 0.])
+    m = BallisticMotionModel(process_covar=1.0, gravity=g)
+    assert equal_to_tolerance(m.gravity_vec, g)
+
+
+def test_ballistic_invalid_gravity_raises():
+    with pytest.raises(ValueError):
+        BallisticMotionModel(process_covar=1.0, gravity=np.array([1., 2.]))
+
+
+# ---------------------------------------------------------------------------
+# BallisticMotionModel — transition matrix and process noise
+# ---------------------------------------------------------------------------
+
+def test_ballistic_transition_matrix_matches_cv_3d():
+    """Transition matrix must equal the 3-D CV matrix."""
+    m   = BallisticMotionModel(process_covar=1.0)
+    cv  = ConstantVelocityMotionModel(num_dims=3, process_covar=1.0)
+    dt  = 0.5
+    assert equal_to_tolerance(m.make_transition_matrix(dt),
+                               cv.make_transition_matrix(dt))
+
+
+def test_ballistic_process_noise_matches_cv_3d():
+    """Process noise matrix must equal the 3-D CV Q."""
+    m   = BallisticMotionModel(process_covar=1.0)
+    cv  = ConstantVelocityMotionModel(num_dims=3, process_covar=1.0)
+    dt  = 0.5
+    assert equal_to_tolerance(m.make_process_covariance_matrix(time_delta=dt).cov,
+                               cv.make_process_covariance_matrix(time_delta=dt).cov)
+
+
+# ---------------------------------------------------------------------------
+# BallisticMotionModel — predict()
+# ---------------------------------------------------------------------------
+
+def test_ballistic_predict_zero_gravity_matches_cv():
+    """With gravity=0 the ballistic model must give identical results to CV."""
+    dt = 1.0
+    x0 = np.array([0., 0., 100., 10., 0., 50.])
+    m_b  = BallisticMotionModel(process_covar=1.0, gravity=0.0, time_delta=dt)
+    m_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=1.0, time_delta=dt)
+    ss   = m_b.state_space
+    s0   = State(ss, time=0.0, state=x0)
+    s_b  = m_b.predict(s0, new_time=dt)
+    s_cv = m_cv.predict(s0, new_time=dt)
+    assert equal_to_tolerance(s_b.state, s_cv.state)
+
+
+def test_ballistic_predict_vz_decremented_by_gravity():
+    """vz must decrease by g*dt each step."""
+    g  = -9.80665
+    dt = 1.0
+    m  = BallisticMotionModel(process_covar=1.0, gravity=g, time_delta=dt)
+    ss = m.state_space
+    x0 = np.array([0., 0., 0., 0., 0., 0.])
+    s0 = State(ss, time=0.0, state=x0)
+    s1 = m.predict(s0, new_time=dt)
+    assert equal_to_tolerance(s1.state[5], g * dt)     # vz' = g*dt
+
+
+def test_ballistic_predict_pz_parabolic():
+    """pz must follow the parabolic free-fall equation pz' = pz + vz*dt + 0.5*g*dt²."""
+    g  = -9.80665
+    dt = 2.0
+    vz0 = 50.0
+    pz0 = 1000.0
+    m  = BallisticMotionModel(process_covar=1.0, gravity=g, time_delta=dt)
+    ss = m.state_space
+    x0 = np.array([0., 0., pz0, 0., 0., vz0])
+    s0 = State(ss, time=0.0, state=x0)
+    s1 = m.predict(s0, new_time=dt)
+    expected_pz = pz0 + vz0 * dt + 0.5 * g * dt ** 2
+    assert equal_to_tolerance(s1.state[2], expected_pz)
+
+
+def test_ballistic_predict_xy_unaffected_by_gravity():
+    """Horizontal components must be unaffected by gravity."""
+    dt = 1.0
+    m  = BallisticMotionModel(process_covar=1.0, time_delta=dt)
+    ss = m.state_space
+    x0 = np.array([10., 20., 0., 3., 4., 0.])
+    s0 = State(ss, time=0.0, state=x0)
+    s1 = m.predict(s0, new_time=dt)
+    assert equal_to_tolerance(s1.state[0], 10. + 3. * dt)   # px' = px + vx*dt
+    assert equal_to_tolerance(s1.state[1], 20. + 4. * dt)   # py' = py + vy*dt
+    assert equal_to_tolerance(s1.state[3], 3.)               # vx unchanged
+    assert equal_to_tolerance(s1.state[4], 4.)               # vy unchanged
+
+
+def test_ballistic_predict_covariance_positive_definite():
+    """Posterior covariance must be positive definite."""
+    m  = BallisticMotionModel(process_covar=1.0)
+    ss = m.state_space
+    P0 = CovarianceMatrix(np.eye(6))
+    x0 = np.array([0., 0., 1000., 10., 0., 50.])
+    s0 = State(ss, time=0.0, state=x0, covar=P0)
+    s1 = m.predict(s0, new_time=0.5)
+    assert np.all(np.linalg.eigvalsh(s1.covar.cov) > 0)
+
+
+def test_ballistic_predict_covariance_matches_cv():
+    """Covariance must propagate identically to CV (gravity does not affect covariance)."""
+    dt = 1.0
+    x0 = np.array([0., 0., 0., 1., 1., 1.])
+    P0 = CovarianceMatrix(np.eye(6))
+    m_b  = BallisticMotionModel(process_covar=1.0, time_delta=dt)
+    m_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=1.0, time_delta=dt)
+    ss   = m_b.state_space
+    s0   = State(ss, time=0.0, state=x0, covar=P0)
+    s_b  = m_b.predict(s0, new_time=dt)
+    s_cv = m_cv.predict(s0, new_time=dt)
+    assert equal_to_tolerance(s_b.covar.cov, s_cv.covar.cov)
+
+
+def test_make_motion_model_ballistic():
+    m = MotionModel.make_motion_model('ballistic', num_dims=3, process_covar=1.0)
+    assert isinstance(m, BallisticMotionModel)

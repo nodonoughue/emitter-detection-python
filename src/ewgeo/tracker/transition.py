@@ -124,7 +124,7 @@ class MotionModel(ABC):
             self.time_delta = None
             self.f = None
             self.q = None
-        elif time_delta == self.time_delta and self.q is not None and (not self.is_linear or self.f is not None):
+        elif time_delta == self.time_delta and getattr(self, 'q', None) is not None and (not self.is_linear or getattr(self, 'f', None) is not None):
             pass  # nothing to do; no change
         else:
             # Update the process noise (and transition matrix for linear models)
@@ -177,6 +177,7 @@ class MotionModel(ABC):
                         'cj': ConstantJerkMotionModel,
                         'constant_turn': ConstantTurnMotionModel,
                         'ct': ConstantTurnMotionModel,
+                        'ballistic': BallisticMotionModel,
                         }
         if model_type.lower() not in valid_models:
             raise ValueError(f'Invalid model type: {model_type}. Valid options are: {valid_models.keys()}')
@@ -487,8 +488,105 @@ class ConstantTurnMotionModel(MotionModel):
         return CovarianceMatrix(q_mat)
 
 
+class BallisticMotionModel(MotionModel):
+    """
+    Ballistic trajectory motion model (3-D, gravity-only forcing).
+
+    State vector (CartesianStateSpace, num_dims=3):
+        [px, py, pz, vx, vy, vz]
+
+    The transition is the standard 3-D constant-velocity matrix F (identical to
+    ConstantVelocityMotionModel with num_dims=3).  Gravity enters as a deterministic
+    affine bias applied to the predicted state mean after the linear step:
+
+        pz' += 0.5 * gravity * dt²
+        vz' += gravity * dt
+
+    Because the Jacobian is state-independent (F is constant), covariance propagates
+    exactly as in a linear KF: P' = F P Fᵀ + Q.  ``is_linear`` is therefore True and
+    the base-class predict() path is reused for the covariance update; only the mean
+    state requires the extra gravity offset.
+
+    :param process_covar: Kinematic process noise spectral density: scalar, 1-D array
+                          of length 3, or (3 × 3) matrix.
+    :param gravity:       Gravitational acceleration [m/s²] in the −z direction.
+                          Pass a positive value; internally stored as negative
+                          (default −9.80665 m/s²).  Alternatively supply a full
+                          3-element gravity vector to model non-standard orientations.
+    :param time_delta:    Optional fixed time step [s]; pre-computes F and Q if given.
+    """
+
+    def __init__(self, num_dims: int = 3, process_covar: npt.ArrayLike = None,
+                 gravity: npt.ArrayLike = -9.80665,
+                 time_delta: float = None):
+        super().__init__()
+
+        if num_dims != 3:
+            raise ValueError("BallisticMotionModel requires num_dims=3")
+
+        self.state_space = CartesianStateSpace(num_dims=3, has_vel=True, has_accel=False)
+
+        gravity_arr = np.asarray(gravity, dtype=float)
+        if gravity_arr.ndim == 0:
+            self.gravity_vec = np.array([0., 0., float(gravity_arr)])
+        elif gravity_arr.shape == (3,):
+            self.gravity_vec = gravity_arr.copy()
+        else:
+            raise ValueError("gravity must be a scalar or a 3-element array")
+
+        # Initialize time_delta to None so update_time_step always computes F and Q
+        # on first call, regardless of what time_delta is passed.
+        self.time_delta = None
+        self.f = None
+        self.q = None
+        self.process_covar = process_covar
+        self.update_time_step(time_delta)
+
+    def make_transition_matrix(self, time_delta: float = None):
+        """Standard CV transition matrix F for 3-D (identical to ConstantVelocityMotionModel)."""
+        if time_delta is None:
+            time_delta = self.time_delta
+        n = self.num_dims   # 3
+        return np.block([[np.eye(n), time_delta * np.eye(n)],
+                         [np.zeros((n, n)), np.eye(n)]])
+
+    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike = None,
+                                       time_delta: float = None) -> CovarianceMatrix:
+        """CV-style process noise covariance Q for 3-D."""
+        process_covar = self.validate_process_covar_input(process_covar)
+        if time_delta is None:
+            time_delta = self.time_delta
+        dt = time_delta
+        q_mat = np.block([[.25 * dt ** 4 * process_covar, .5 * dt ** 3 * process_covar],
+                          [.5  * dt ** 3 * process_covar, dt ** 2      * process_covar]])
+        return CovarianceMatrix(q_mat)
+
+    def predict(self, s: State | Track, new_time: float) -> State:
+        """
+        Predict forward to new_time.
+
+        Delegates to the base-class linear path for F, Q caching and covariance
+        propagation, then applies the gravity affine bias to the predicted state mean.
+        """
+        # Base class handles caching of F/Q and covariance propagation (linear path)
+        s_pred = super().predict(s, new_time)
+
+        # Resolve the source state and time delta (Track may have been unwrapped by super)
+        if isinstance(s, Track):
+            s = s.curr_state
+        dt = new_time - s.time
+
+        if dt == 0:
+            return s_pred
+
+        # Apply gravity bias to the predicted mean (does not affect covariance)
+        s_pred.state[self.state_space.pos_slice] += 0.5 * dt ** 2 * self.gravity_vec
+        s_pred.state[self.state_space.vel_slice] += dt * self.gravity_vec
+
+        return s_pred
+
+
 # TODO: ConstantTurnRateAccelerationMotionModel
-# TODO: BallisticMotionModel
 
 # =============== Elementary Kalman Filter and Extended Kalman Filter Prediction Functions ================
 def kf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f):
