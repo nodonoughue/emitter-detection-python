@@ -152,6 +152,6 @@ def music(x, steer, num_sig_dims=0, max_psi=np.pi / 2, num_points=101):
         q = np.conjugate(vv).T.dot(proj).dot(vv)
 
         # Invert the power
-        p[idx_pt] = 1/np.abs(q)
+        p[idx_pt] = float(np.squeeze(1/np.abs(q)))
 
     return p, psi_vec
