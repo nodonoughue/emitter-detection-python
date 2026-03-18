@@ -5,6 +5,7 @@ from ewgeo.tracker.transition import (
     ConstantVelocityMotionModel,
     ConstantAccelerationMotionModel,
     ConstantJerkMotionModel,
+    ConstantTurnMotionModel,
     MotionModel,
     kf_predict,
     ekf_predict,
@@ -245,3 +246,209 @@ def test_make_motion_model_long_names():
 def test_make_motion_model_invalid_raises():
     with pytest.raises(ValueError):
         MotionModel.make_motion_model('banana', num_dims=2, process_covar=1.0)
+
+
+# ---------------------------------------------------------------------------
+# ConstantTurnMotionModel — construction and properties
+# ---------------------------------------------------------------------------
+
+def test_ct_is_nonlinear():
+    m = ConstantTurnMotionModel(num_dims=2, process_covar=1.0, process_covar_omega=0.1)
+    assert m.is_linear is False
+
+
+def test_ct_state_space_2d():
+    m = ConstantTurnMotionModel(num_dims=2, process_covar=1.0, process_covar_omega=0.1)
+    assert m.num_dims == 2
+    assert m.num_states == 5          # [px, py, vx, vy, ω]
+    assert m.state_space.has_turn_rate is True
+
+
+def test_ct_state_space_3d():
+    m = ConstantTurnMotionModel(num_dims=3, process_covar=1.0, process_covar_omega=0.1)
+    assert m.num_dims == 3
+    assert m.num_states == 7          # [px, py, pz, vx, vy, vz, ω]
+
+
+def test_ct_invalid_num_dims_raises():
+    with pytest.raises(ValueError):
+        ConstantTurnMotionModel(num_dims=1, process_covar=1.0)
+
+
+def test_ct_make_transition_matrix_raises():
+    m = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
+    with pytest.raises(NotImplementedError):
+        m.make_transition_matrix(1.0)
+
+
+# ---------------------------------------------------------------------------
+# ConstantTurnMotionModel — transition function
+# ---------------------------------------------------------------------------
+
+def test_ct_zero_turn_rate_recovers_cv():
+    """With ω = 0, CT reduces to constant velocity (straight line)."""
+    m   = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
+    dt  = 0.5
+    x   = np.array([0., 0., 10., 5., 0.])    # [px, py, vx, vy, ω=0]
+    f   = m.make_transition_function(dt)
+    x_new = f(x)
+    expected = np.array([5., 2.5, 10., 5., 0.])
+    assert equal_to_tolerance(x_new, expected)
+
+
+def test_ct_quarter_turn():
+    """ω = π/2 rad/s, dt = 1 s → 90° turn; velocity rotates 90°."""
+    m   = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
+    dt  = 1.0
+    om  = np.pi / 2
+    x   = np.array([0., 0., 1., 0., om])   # moving in +x, turning left
+    f   = m.make_transition_function(dt)
+    x_new = f(x)
+    # After 90° turn: velocity should point in +y
+    assert equal_to_tolerance(x_new[2], 0., tol=1e-10)    # vx' ≈ 0
+    assert equal_to_tolerance(x_new[3], 1., tol=1e-10)    # vy' = 1
+    # ω unchanged
+    assert equal_to_tolerance(x_new[4], om)
+
+
+def test_ct_turn_rate_unchanged():
+    """Turn rate ω is propagated unchanged by the transition."""
+    m = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
+    om = 0.3
+    x  = np.array([1., 2., 3., 4., om])
+    x_new = m.make_transition_function(0.1)(x)
+    assert equal_to_tolerance(x_new[4], om)
+
+
+def test_ct_3d_z_propagates_as_cv():
+    """In 3D, the z-component should advance as pz' = pz + dt * vz."""
+    m  = ConstantTurnMotionModel(num_dims=3, process_covar=1.0)
+    dt = 0.5
+    x  = np.array([0., 0., 0., 1., 0., 2., 0.1])   # vz=2, ω=0.1
+    x_new = m.make_transition_function(dt)(x)
+    assert equal_to_tolerance(x_new[2], 0. + 0.5 * 2.)   # pz' = 0 + 0.5*2 = 1.0
+    assert equal_to_tolerance(x_new[5], 2.)               # vz unchanged
+
+
+# ---------------------------------------------------------------------------
+# ConstantTurnMotionModel — Jacobian
+# ---------------------------------------------------------------------------
+
+def test_ct_jacobian_shape_2d():
+    m = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
+    x = np.array([0., 0., 1., 0., 0.5])
+    J = m.make_jacobian(x, time_delta=0.1)
+    assert J.shape == (5, 5)
+
+
+def test_ct_jacobian_shape_3d():
+    m = ConstantTurnMotionModel(num_dims=3, process_covar=1.0)
+    x = np.array([0., 0., 0., 1., 0., 0., 0.5])
+    J = m.make_jacobian(x, time_delta=0.1)
+    assert J.shape == (7, 7)
+
+
+def test_ct_jacobian_zero_omega_matches_cv():
+    """At ω = 0 the Jacobian should match the CV transition matrix."""
+    m  = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
+    dt = 1.0
+    x  = np.array([0., 0., 1., 0., 0.])   # vx=1, ω=0
+    J  = m.make_jacobian(x, time_delta=dt)
+    # CV F for 2D, dt=1: [[1,0,1,0,*],[0,1,0,1,*],[0,0,1,0,*],[0,0,0,1,*],[0,0,0,0,1]]
+    assert equal_to_tolerance(J[0, 2], 1.0)   # ∂px'/∂vx = dt = 1
+    assert equal_to_tolerance(J[0, 3], 0.0)   # ∂px'/∂vy = 0  (no rotation)
+    assert equal_to_tolerance(J[2, 2], 1.0)   # ∂vx'/∂vx = cos(0) = 1
+    assert equal_to_tolerance(J[2, 3], 0.0)   # ∂vx'/∂vy = -sin(0) = 0
+
+
+def test_ct_jacobian_numerical_check():
+    """Jacobian matches finite-difference approximation."""
+    m   = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
+    dt  = 0.3
+    x   = np.array([1., 2., 3., 4., 0.5])
+    J   = m.make_jacobian(x, time_delta=dt)
+    f   = m.make_transition_function(dt)
+    eps = 1e-6
+    J_fd = np.zeros((5, 5))
+    for i in range(5):
+        xp, xm = x.copy(), x.copy()
+        xp[i] += eps
+        xm[i] -= eps
+        J_fd[:, i] = (f(xp) - f(xm)) / (2 * eps)
+    assert equal_to_tolerance(J, J_fd, tol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# ConstantTurnMotionModel — process noise
+# ---------------------------------------------------------------------------
+
+def test_ct_process_noise_shape_2d():
+    m = ConstantTurnMotionModel(num_dims=2, process_covar=1.0, process_covar_omega=0.5)
+    Q = m.make_process_covariance_matrix(time_delta=1.0)
+    assert Q.cov.shape == (5, 5)
+
+
+def test_ct_process_noise_shape_3d():
+    m = ConstantTurnMotionModel(num_dims=3, process_covar=1.0, process_covar_omega=0.5)
+    Q = m.make_process_covariance_matrix(time_delta=1.0)
+    assert Q.cov.shape == (7, 7)
+
+
+def test_ct_process_noise_omega_block():
+    """The turn-rate variance element equals process_covar_omega * dt."""
+    dt = 0.5
+    m  = ConstantTurnMotionModel(num_dims=2, process_covar=1.0, process_covar_omega=0.4)
+    Q  = m.make_process_covariance_matrix(time_delta=dt)
+    assert equal_to_tolerance(Q.cov[-1, -1], 0.4 * dt)
+
+
+# ---------------------------------------------------------------------------
+# ConstantTurnMotionModel — predict()
+# ---------------------------------------------------------------------------
+
+def test_ct_predict_propagates_state():
+    """predict() returns a State object with the nonlinear transition applied."""
+    m   = ConstantTurnMotionModel(num_dims=2, process_covar=1.0, process_covar_omega=0.1)
+    ss  = m.state_space
+    dt  = 1.0
+    om  = np.pi / 2
+    x0  = np.array([0., 0., 1., 0., om])
+    s0  = State(ss, time=0.0, state=x0)
+    s1  = m.predict(s0, new_time=dt)
+    assert isinstance(s1, State)
+    assert s1.time == dt
+    # velocity should have rotated 90°
+    assert equal_to_tolerance(s1.state[2], 0., tol=1e-10)
+    assert equal_to_tolerance(s1.state[3], 1., tol=1e-10)
+
+
+def test_ct_predict_propagates_covariance():
+    """predict() propagates covariance via the EKF Jacobian."""
+    m   = ConstantTurnMotionModel(num_dims=2, process_covar=1.0, process_covar_omega=0.1)
+    ss  = m.state_space
+    P0  = CovarianceMatrix(np.eye(5))
+    x0  = np.array([0., 0., 1., 0., 0.1])
+    s0  = State(ss, time=0.0, state=x0, covar=P0)
+    s1  = m.predict(s0, new_time=0.5)
+    assert s1.covar is not None
+    # Posterior covariance must be positive definite (all eigenvalues > 0)
+    assert np.all(np.linalg.eigvalsh(s1.covar.cov) > 0)
+
+
+def test_ct_predict_no_covar_returns_none_covar():
+    """If the input State has no covariance, predict() returns a State with no covariance."""
+    m  = ConstantTurnMotionModel(num_dims=2, process_covar=1.0, process_covar_omega=0.1)
+    ss = m.state_space
+    s0 = State(ss, time=0.0, state=np.array([0., 0., 1., 0., 0.2]))
+    s1 = m.predict(s0, new_time=0.5)
+    assert s1.covar is None
+
+
+def test_make_motion_model_ct():
+    m = MotionModel.make_motion_model('ct', num_dims=2, process_covar=1.0)
+    assert isinstance(m, ConstantTurnMotionModel)
+
+
+def test_make_motion_model_constant_turn():
+    m = MotionModel.make_motion_model('constant_turn', num_dims=2, process_covar=1.0)
+    assert isinstance(m, ConstantTurnMotionModel)
