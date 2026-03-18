@@ -167,11 +167,14 @@ class MeasurementModel:
             init_covar = 1e6*np.eye(self.state_space.num_states)
             init_covar[:crlb.size, :crlb.size] = crlb.cov
 
-            # Check for a velocity component
-            eps_vel_trace = .001 # if it's better than .001 m/s, let's assume it's actually a numerical
-                                 # error
+            # Check for a velocity component.
+            # Replace the velocity block if:
+            #   (a) it is near-zero (numerical noise, not a true estimate), or
+            #   (b) it is extremely large (CRLB sentinel value like 1e99 for unobservable
+            #       dims) — values that large cause catastrophic cancellation in F@P@F^T.
             vel_slice = self.state_space.vel_slice
-            if np.trace(init_covar[vel_slice, vel_slice]) <= eps_vel_trace:
+            vel_diag = np.diag(init_covar[vel_slice, vel_slice])
+            if np.all(vel_diag <= 1e-3) or np.any(vel_diag > 1e12):
                 init_covar[vel_slice, vel_slice] = 1e6*np.eye(self.state_space.num_dims)
 
             s.covar = CovarianceMatrix(init_covar)
