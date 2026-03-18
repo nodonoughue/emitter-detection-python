@@ -32,3 +32,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+filterwarnings = [
+    # Expected: ill-conditioned LOB geometry in angle-bisector tests
+    "ignore:Slopes are almost parallel:UserWarning",
+    # Expected: latitude conversion at the poles (test_global_unit_conversion)
+    "ignore:invalid value encountered in scalar divide:RuntimeWarning",
+]
