@@ -549,6 +549,28 @@ def test_draw_lob_scale_factor():
     assert equal_to_tolerance(diff2, 2 * diff1)
 
 
+def test_draw_lob_3d_azimuth_only():
+    """3-D sensor, no elevation: output shape is (3, 2, 1), z displacement is zero."""
+    x_sensor_3d = np.array([[0.], [0.], [500.]])   # sensor at z=500
+    lob = model.draw_lob(x_sensor_3d, psi=0.0)
+    assert lob.shape == (3, 2, 1)
+    assert lob[2, 0, 0] == pytest.approx(500.)     # z start = sensor z
+    assert lob[2, 1, 0] == pytest.approx(500.)     # z end = sensor z (no z displacement)
+
+
+def test_draw_lob_3d_with_elevation():
+    """3-D sensor + elevation: end point direction matches [cos(az)*cos(el), sin(az)*cos(el), sin(el)]."""
+    x_sensor_3d = np.array([[0.], [0.], [0.]])     # sensor at origin
+    az = 0.0                                        # pointing east
+    el = np.pi / 4                                  # 45 degrees up
+    lob = model.draw_lob(x_sensor_3d, psi=az, el=el)
+    assert lob.shape == (3, 2, 1)
+    end = lob[:, 1, 0]
+    # Expected end (range=1, scale=1): [cos(0)*cos(pi/4), sin(0)*cos(pi/4), sin(pi/4)]
+    expected = np.array([np.cos(el), 0., np.sin(el)])
+    assert np.allclose(end, expected)
+
+
 # ===========================================================================
 # DirectionFinder.draw_lobs  (1D AOA)
 # ===========================================================================
@@ -605,21 +627,102 @@ _COV_2D = CovarianceMatrix(_sig_2d ** 2 * np.eye(6))  # 2*n_sensors = 6
 
 
 def test_draw_lobs_2d_output_shape():
-    """2D AOA with 3D sensors, single case -> (2, 2, n_sensors, 1)."""
+    """2D AOA with 3D sensors, single case -> (3, 2, n_sensors, 1)."""
     df = DirectionFinder(_X_SENSOR_3D, _COV_2D, do_2d_aoa=True)
     zeta = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=True)  # shape (6,)
     lobs = df.draw_lobs(zeta)
-    assert lobs.shape == (2, 2, 3, 1), f"Expected (2, 2, 3, 1), got {lobs.shape}"
+    assert lobs.shape == (3, 2, 3, 1), f"Expected (3, 2, 3, 1), got {lobs.shape}"
 
 
-def test_draw_lobs_2d_azimuth_matches_1d():
-    """LOBs from a 2D AOA system should match those from a 1D system (draw_lob
-    is azimuth-only; elevation is ignored until 3D LOB support is added)."""
-    _cov_1d_3d = CovarianceMatrix(_sig_2d ** 2 * np.eye(3))
-    df_1d = DirectionFinder(_X_SENSOR_3D, _cov_1d_3d, do_2d_aoa=False)
-    df_2d = DirectionFinder(_X_SENSOR_3D, _COV_2D,    do_2d_aoa=True)
-    zeta_1d = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=False)
-    zeta_2d = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=True)
-    lobs_1d = df_1d.draw_lobs(zeta_1d)
-    lobs_2d = df_2d.draw_lobs(zeta_2d)
-    assert equal_to_tolerance(lobs_1d, lobs_2d)
+def test_draw_lobs_2d_aoa_uses_elevation():
+    """2D AOA LOBs must have a nonzero z displacement when source is not at sensor altitude."""
+    df = DirectionFinder(_X_SENSOR_3D, _COV_2D, do_2d_aoa=True)
+    zeta = model.measurement(_X_SENSOR_3D, _X_SOURCE_3D, do_2d_aoa=True)
+    lobs = df.draw_lobs(zeta)                       # shape (3, 2, 3, 1)
+    # Sensors are at z=500; source is at z=0 → LOBs must point downward
+    z_displacement = lobs[2, 1, :, 0] - lobs[2, 0, :, 0]
+    assert np.all(z_displacement < 0.), "Expected negative z displacement (sensors above source)"
+
+
+# ===========================================================================
+# sensor_calibration / sensor_calibration_gd_ls
+# ===========================================================================
+
+# Calibration emitters spread around the sensor array
+_X_CAL = np.array([[200., 800., 600., 100., 900.],
+                   [400., 100., 700., 800.,  50.]])   # shape (2, 5)
+
+
+def test_sensor_calibration_no_cal_returns_nominal():
+    """With all do_*_cal flags False, calibration returns the nominal system parameters."""
+    df = DirectionFinder(X_SENSOR, COV_1DEG, bias=np.zeros(3))
+    x_est, v_est, b_est = df.sensor_calibration(do_pos_cal=False, do_vel_cal=False, do_bias_cal=False,
+                                                 solver_type='ls',
+                                                 zeta_cal=np.zeros((3, 5)), x_cal=_X_CAL)
+    assert np.array_equal(x_est, df.pos)
+    assert np.array_equal(b_est, df.bias)
+
+
+def test_sensor_calibration_invalid_solver_raises():
+    """An unrecognised solver_type should raise ValueError."""
+    df = DirectionFinder(X_SENSOR, COV_1DEG)
+    with pytest.raises(ValueError):
+        df.sensor_calibration(solver_type='bogus', do_pos_cal=True,
+                               zeta_cal=np.zeros((3, 5)), x_cal=_X_CAL)
+
+
+def test_sensor_calibration_gd_ls_bias_recovery_ls():
+    """LS calibration should recover a small known bias from noiseless measurements."""
+    true_bias = np.array([0.05, -0.03, 0.02])   # radians
+    df = DirectionFinder(X_SENSOR, COV_1DEG, bias=np.zeros(3))
+    # Noiseless measurements at zero bias, then add true_bias column-wise
+    zeta_cal = model.measurement(X_SENSOR, _X_CAL) + true_bias[:, np.newaxis]
+    _, _, bias_est = df.sensor_calibration_gd_ls(zeta_cal, _X_CAL,
+                                                  do_bias_cal=True, do_pos_cal=False,
+                                                  do_gd=False)
+    assert equal_to_tolerance(bias_est, true_bias, tol=1e-4), \
+        f"Bias recovery failed: got {bias_est}, expected {true_bias}"
+
+
+def test_sensor_calibration_gd_ls_bias_recovery_gd():
+    """GD calibration should also converge to the known bias."""
+    true_bias = np.array([0.04, -0.02, 0.01])
+    df = DirectionFinder(X_SENSOR, COV_1DEG, bias=np.zeros(3))
+    zeta_cal = model.measurement(X_SENSOR, _X_CAL) + true_bias[:, np.newaxis]
+    _, _, bias_est = df.sensor_calibration_gd_ls(zeta_cal, _X_CAL,
+                                                  do_bias_cal=True, do_pos_cal=False,
+                                                  do_gd=True)
+    assert equal_to_tolerance(bias_est, true_bias, tol=1e-3), \
+        f"GD bias recovery failed: got {bias_est}, expected {true_bias}"
+
+
+def test_sensor_calibration_gd_ls_pos_recovery():
+    """LS calibration should reduce position error when starting from a perturbed position."""
+    # Generate noiseless calibration measurements from true sensor positions
+    zeta_cal = model.measurement(X_SENSOR, _X_CAL)
+    # Perturb sensor positions by 20 m
+    x_perturb = X_SENSOR + np.array([[20., -20., 15.], [15., 10., -20.]])
+    df = DirectionFinder(X_SENSOR, COV_1DEG, bias=np.zeros(3))
+    x_sensor_est, _, _ = df.sensor_calibration_gd_ls(zeta_cal, _X_CAL,
+                                                       x_sensor=x_perturb,
+                                                       do_pos_cal=True, do_bias_cal=False,
+                                                       do_gd=False)
+    init_err = np.linalg.norm(x_perturb - X_SENSOR)
+    final_err = np.linalg.norm(x_sensor_est - X_SENSOR)
+    assert final_err < init_err, \
+        f"Position error increased: init={init_err:.2f} m, final={final_err:.2f} m"
+
+
+def test_sensor_calibration_dispatcher_routes_to_gd_ls():
+    """sensor_calibration with solver_type='ls' should produce same result as sensor_calibration_gd_ls directly."""
+    true_bias = np.array([0.05, -0.03, 0.02])
+    df = DirectionFinder(X_SENSOR, COV_1DEG, bias=np.zeros(3))
+    zeta_cal = model.measurement(X_SENSOR, _X_CAL) + true_bias[:, np.newaxis]
+    _, _, b_via_dispatch = df.sensor_calibration(solver_type='ls',
+                                                  do_bias_cal=True, do_pos_cal=False,
+                                                  zeta_cal=zeta_cal, x_cal=_X_CAL)
+    _, _, b_direct = df.sensor_calibration_gd_ls(zeta_cal, _X_CAL,
+                                                  do_bias_cal=True, do_pos_cal=False,
+                                                  do_gd=False)
+    assert np.allclose(b_via_dispatch, b_direct), \
+        "Dispatcher result should match direct call to sensor_calibration_gd_ls"

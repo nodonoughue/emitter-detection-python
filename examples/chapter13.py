@@ -239,7 +239,8 @@ def example2(mc_params=None):
 
     gd_args = {'x_init': x_init,
                'max_num_iterations': num_iterations,
-               'epsilon': epsilon,
+               'epsilon': epsilon/10,  # general rule-of-thumb, use 10% of desired epsilon to guard against
+                                       # edge cases caused by poor sensor geometry
                'force_full_calc': True,
                'alpha': alpha,
                'beta': beta
@@ -309,8 +310,6 @@ def _mc_iteration(pss:HybridPassiveSurveillanceSystem, ml_search: SearchSpace, a
     Nicholas O'Donoughue
     18 March 2022
     """
-
-    # TODO: Check for divergent case and set a flag to ignore this iteration
 
     # Generate a random measurement
     zeta_act = args['rho_act']

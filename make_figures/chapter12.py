@@ -108,7 +108,7 @@ def make_figure_1(prefix=None, cmap=None, do_uncertainty=False):
     iso_doppler_label = 'Lines of Constant FDOA'
     uncertainty_label = 'Uncertainty Interval'
     for idx in np.arange(num_sensors-1):
-        this_color = cmap.colors[idx]  # TODO: reference the existing colormap index, instead of starting over
+        this_color = cmap.colors[idx+2]  # Transmitter uses the first color, Sensors uses the second.
 
         idx2 = idx+1
         vdiff = calc_doppler_diff(x_source, np.array([0, 0]), x_sensor[idx], v_sensor[idx],

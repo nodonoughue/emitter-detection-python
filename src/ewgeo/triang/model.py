@@ -329,9 +329,27 @@ def error(x_sensor, cov: CovarianceMatrix, x_source, x_max, num_pts, do_2d_aoa=F
     return epsilon
 
 
-def draw_lob(x_sensor, psi, x_source=None, scale=1):
-    # TODO: Expand for 3D LOBs
+def draw_lob(x_sensor, psi, el=None, x_source=None, scale=1):
+    """
+    Draw a line (or lines) of bearing from sensor(s) given azimuth angle(s).
+
+    Supports 2-D and 3-D geometries:
+      - 2-D sensors (n_dim=2): output shape (2, 2, n_sensors).
+      - 3-D sensors, azimuth only (el=None): horizontal LOB, zero z displacement;
+        output shape (3, 2, n_sensors).
+      - 3-D sensors with elevation (el provided): full 3-D LOB using
+        direction [cos(az)*cos(el), sin(az)*cos(el), sin(el)];
+        output shape (3, 2, n_sensors).
+
+    :param x_sensor: (n_dim,) or (n_dim, n_sensors) sensor position(s)
+    :param psi:      Azimuth angle(s) in radians
+    :param el:       Elevation angle(s) in radians; None for azimuth-only LOB
+    :param x_source: Optional source position used to set LOB length (scale applied on top)
+    :param scale:    Multiplicative scale on the LOB length [default 1]
+    :return lob:     (n_dim_out, 2, n_sensors) array; first column is start (sensor), second is end
+    """
     shp = np.shape(x_sensor)
+    n_dim = shp[0] if len(shp) > 0 else 2
     num_sensors = shp[1] if len(shp) > 1 else 1
     num_measurements = np.size(psi)
 
@@ -346,21 +364,32 @@ def draw_lob(x_sensor, psi, x_source=None, scale=1):
     if x_source is None:
         range_to_source = 1
     else:
-        # range = utils.rng(x_sensor, x_source)
         range_to_source = utils.geo.calc_range(x_sensor, x_source)
 
-    x_end = np.cos(psi) * range_to_source * scale
-    y_end = np.sin(psi) * range_to_source * scale
+    r = range_to_source * scale
 
-    xy_end = np.vstack([np.reshape(x_end, [1, 1, num_measurements]),
-                        np.reshape(y_end, [1, 1, num_measurements])])
-    xy_start = np.zeros([2, 1, num_measurements])
-    xy_lob_centered = np.hstack([xy_start,
-                                 xy_end
-                                 ])
-    xy_lob = np.reshape(np.asarray(x_sensor)[:2], [2, 1, num_measurements]) + xy_lob_centered
+    if n_dim >= 3 and el is not None:
+        # Full 3-D LOB: direction is [cos(az)*cos(el), sin(az)*cos(el), sin(el)]
+        cos_el = np.cos(el)
+        lob_end = np.vstack([np.reshape(np.cos(psi) * cos_el * r, [1, 1, num_measurements]),
+                             np.reshape(np.sin(psi) * cos_el * r, [1, 1, num_measurements]),
+                             np.reshape(np.sin(el) * r,           [1, 1, num_measurements])])
+    elif n_dim >= 3:
+        # 3-D sensor, azimuth-only: LOB is horizontal (zero z displacement)
+        lob_end = np.vstack([np.reshape(np.cos(psi) * r, [1, 1, num_measurements]),
+                             np.reshape(np.sin(psi) * r, [1, 1, num_measurements]),
+                             np.zeros([1, 1, num_measurements])])
+    else:
+        # 2-D: original behaviour
+        lob_end = np.vstack([np.reshape(np.cos(psi) * r, [1, 1, num_measurements]),
+                             np.reshape(np.sin(psi) * r, [1, 1, num_measurements])])
 
-    return xy_lob
+    n_dim_out = 3 if n_dim >= 3 else 2
+    lob_start = np.zeros([n_dim_out, 1, num_measurements])
+    lob_centered = np.hstack([lob_start, lob_end])
+    lob = np.reshape(np.asarray(x_sensor)[:n_dim_out], [n_dim_out, 1, num_measurements]) + lob_centered
+
+    return lob
 
 
 def grad_source(x_sensor, x_source, do_2d_aoa=False):
@@ -414,7 +443,7 @@ def grad_bias(x_sensor, x_source, do_2d_aoa=False):
 
     # Repeat for each source position
     if num_sources > 1:
-        grad = np.repeat(grad, num_sources, axis=2)
+        grad = np.repeat(grad[:, :, np.newaxis], num_sources, axis=2)
 
     return grad
 

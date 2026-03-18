@@ -98,7 +98,30 @@ def test_fixed_cartesian():
     eps_test, _ = a(x_vec)
     assert equal_to_tolerance(cost, eps_test)
 
-    # ToDo: Test case for 'linear' type cartesian constraints
+
+def test_fixed_cartesian_linear():
+    """Linear constraint snaps points onto the line through x0 in direction u_vec."""
+    # Line through origin along the x-axis
+    x0 = np.array([0., 0., 0.])
+    u_vec = np.array([1., 0., 0.])
+    a, a_gradient = constraints.fixed_cartesian('linear', x0=x0, u_vec=u_vec)
+
+    # Points already on the line: epsilon should be zero, x_valid unchanged
+    x_on = np.array([[1., 2., -3.], [0., 0., 0.], [0., 0., 0.]])
+    eps_on, x_valid_on = a(x_on)
+    assert equal_to_tolerance(eps_on, np.zeros(3))
+    assert np.allclose(x_valid_on, x_on)
+
+    # Point off the line: offset 3 in y, 0 in z → distance from line = 3
+    x_off = np.array([[5.], [3.], [0.]])
+    eps_off, x_valid_off = a(x_off)
+    assert equal_to_tolerance(eps_off, [3.])
+    assert np.allclose(x_valid_off, [[5.], [0.], [0.]])  # snapped onto the line
+
+    # is_upper_bound=False flips the sign of epsilon
+    a_lower, _ = constraints.fixed_cartesian('linear', x0=x0, u_vec=u_vec, is_upper_bound=False)
+    eps_lower, _ = a_lower(x_off)
+    assert equal_to_tolerance(eps_lower, [-3.])
 
 # ---------------------------------------------------------------------------
 # bounded_alt

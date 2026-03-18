@@ -202,7 +202,7 @@ def gd_solver(y,
 
     # Divergence Detection
     num_expanding_iterations = 0
-    max_num_expanding_iterations = 5
+    max_num_expanding_iterations = 20  # GD does more exploratory searching than LS, needs a higher divergence threshold
     prev_error = np.inf
 
     # Loop until either the desired tolerance is achieved or the maximum

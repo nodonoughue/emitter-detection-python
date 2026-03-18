@@ -306,6 +306,33 @@ def test_nn_all_outside_gate_uses_null_hypothesis():
     assert isinstance(hypotheses[track], MissedDetectionHypothesis)
 
 
+def test_nn_coasts_all_tracks_when_no_measurements_and_curr_time():
+    """Empty measurement list + curr_time → every track gets a MissedDetectionHypothesis."""
+    t1 = make_track(0, 0, track_id='T1')
+    t2 = make_track(10, 0, track_id='T2')
+    assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
+    hypotheses, unassoc = assoc.associate([t1, t2], [], curr_time=1.0)
+
+    assert isinstance(hypotheses[t1], MissedDetectionHypothesis)
+    assert isinstance(hypotheses[t2], MissedDetectionHypothesis)
+    assert unassoc == []
+
+
+def test_nn_two_tracks_measurement_exclusivity():
+    """Once a measurement is assigned to T1 it cannot also be assigned to T2."""
+    t1 = make_track(0,  0, track_id='T1')   # predicted x=0
+    t2 = make_track(0,  0, track_id='T2')   # same predicted position
+    m1 = make_measurement(0)                 # only one close measurement
+    m2 = make_measurement(40)                # far measurement (fails gate)
+
+    assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
+    hypotheses, unassoc = assoc.associate([t1, t2], [m1, m2])
+
+    # T1 (processed first) takes m1; T2 must receive a null hypothesis
+    assert hypotheses[t1].measurement is m1
+    assert isinstance(hypotheses[t2], MissedDetectionHypothesis)
+
+
 # ---------------------------------------------------------------------------
 # GNNAssociator
 # ---------------------------------------------------------------------------
@@ -343,6 +370,32 @@ def test_gnn_assigns_globally_optimal():
     assert hypotheses[t1].measurement is m1
     assert hypotheses[t2].measurement is m2
     assert unassoc == []
+
+
+def test_gnn_coasts_all_tracks_when_no_measurements_and_curr_time():
+    """Empty measurement list + curr_time → every track gets a MissedDetectionHypothesis."""
+    t1 = make_track(0,  0, track_id='T1')
+    t2 = make_track(10, 0, track_id='T2')
+    assoc = GNNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
+    hypotheses, unassoc = assoc.associate([t1, t2], [], curr_time=1.0)
+
+    assert isinstance(hypotheses[t1], MissedDetectionHypothesis)
+    assert isinstance(hypotheses[t2], MissedDetectionHypothesis)
+    assert unassoc == []
+
+
+def test_gnn_all_outside_gate_uses_null_hypotheses():
+    """When all measurements are far from all tracks, every track gets a null hypothesis."""
+    t1 = make_track(0,  0, track_id='T1')
+    t2 = make_track(10, 0, track_id='T2')
+    m_far = make_measurement(500)   # far from both tracks
+
+    assoc = GNNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
+    hypotheses, unassoc = assoc.associate([t1, t2], [m_far])
+
+    assert isinstance(hypotheses[t1], MissedDetectionHypothesis)
+    assert isinstance(hypotheses[t2], MissedDetectionHypothesis)
+    assert m_far in unassoc
 
 
 # ---------------------------------------------------------------------------
@@ -386,6 +439,27 @@ def test_pda_measurement_outside_gate_only_null_hypothesis():
     gmm = hypotheses[track]
     assert len(gmm._hypotheses) == 1
     assert isinstance(gmm._hypotheses[0], MissedDetectionHypothesis)
+
+
+def test_pda_multiple_measurements_within_gate_all_included():
+    """All gated measurements plus the null hypothesis appear in the GMMHypothesis."""
+    track = make_track(10, 5, track_id='T1')   # predicted x=15
+    m1 = make_measurement(14)   # near: passes gate
+    m2 = make_measurement(16)   # near: passes gate
+
+    assoc = PDAAssociator(motion_model=make_cv_model(), gate_probability=0.99,
+                          detection_probability=0.9)
+    hypotheses, unassoc = assoc.associate([track], [m1, m2])
+
+    gmm = hypotheses[track]
+    # Two real measurements + one null hypothesis
+    assert len(gmm._hypotheses) == 3
+    assert isinstance(gmm._hypotheses[-1], MissedDetectionHypothesis)
+    # Weights still sum to 1
+    assert equal_to_tolerance(np.sum(gmm._weights), 1.0)
+    # Both measurements are consumed (not left unassociated)
+    assert m1 not in unassoc
+    assert m2 not in unassoc
 
 
 # ---------------------------------------------------------------------------

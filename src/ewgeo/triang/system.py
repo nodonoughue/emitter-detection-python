@@ -175,21 +175,24 @@ class DirectionFinder(PassiveSurveillanceSystem):
         # assert num_zeta == num_measurements, "Sensor measurement dimension mismatch."
         zeta_reshape = np.reshape(zeta, shape=(num_zeta, num_cases))
 
-        # Initialize the output
-        # Dimensions are: (2 or 3) x 2 x num_sensors x num_cases
-        lobs_out = np.zeros(shape=(2, 2, num_sensors, num_cases))
+        # Determine spatial dimensionality from sensor positions
+        n_dim = np.shape(x_sensor)[0] if len(np.shape(x_sensor)) > 0 else 2
+
+        # Initialize the output: n_dim x 2 x num_sensors x num_cases
+        lobs_out = np.zeros(shape=(n_dim, 2, num_sensors, num_cases))
 
         # Loop over lobs
         for idx_sensor in range(num_sensors):
             this_x = x_sensor[:, idx_sensor]
 
             for idx_case in range(num_cases):
-                # For 2D AOA the measurement vector is [az_0..az_{N-1}, el_0..el_{N-1}].
-                # draw_lob is azimuth-only (TODO: Expand for 3D LOBs), so we always
-                # extract the azimuth component at index idx_sensor.
-                this_zeta = zeta_reshape[idx_sensor, idx_case]
+                # Measurement vector is [az_0..az_{N-1}] for 1D AOA, or
+                # [az_0..az_{N-1}, el_0..el_{N-1}] for 2D AOA.
+                this_az = zeta_reshape[idx_sensor, idx_case]
+                this_el = (zeta_reshape[num_sensors + idx_sensor, idx_case]
+                           if self.do_2d_aoa and n_dim >= 3 else None)
 
-                this_lob = model.draw_lob(x_sensor=this_x, psi=this_zeta, **kwargs)
+                this_lob = model.draw_lob(x_sensor=this_x, psi=this_az, el=this_el, **kwargs)
                 lobs_out[:, :, idx_sensor, idx_case] = np.asarray(this_lob).squeeze()
 
         return lobs_out
@@ -202,6 +205,6 @@ class DirectionFinder(PassiveSurveillanceSystem):
         # Fourth dimension is across case
         if plot_args is None: plot_args = {} # Make an empty dict so that ax.plot doesn't throw an error
 
-        lobs = np.reshape(self.draw_lobs(zeta=zeta, x_sensor=x_sensor, **kwargs), (2, 2, -1))
+        lobs = np.reshape(self.draw_lobs(zeta=zeta, x_sensor=x_sensor, **kwargs)[:2], (2, 2, -1))
         ax.plot(lobs[0], lobs[1], **plot_args)
 

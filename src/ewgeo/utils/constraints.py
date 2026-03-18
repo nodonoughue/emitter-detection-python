@@ -8,8 +8,6 @@ from .unit_conversions import convert
 
 _deg2rad = convert(1, 'deg', 'rad')
 
-# TODO: Test and Debug!!
-
 # **********************************************************************************************************************
 # Altitude Constraints
 # **********************************************************************************************************************
@@ -386,10 +384,12 @@ def fixed_cartesian_linear(x: npt.NDArray[np.float64], x0: npt.NDArray[np.float6
 
     # Make sure the pointing vector is unit-norm and compute projection matrix
     u_vec = u_vec / np.linalg.norm(u_vec)
-    proj_matrix = np.eye(n_dim) - np.asarray(u_vec) @ np.asarray(u_vec).T
+    proj_matrix = np.eye(n_dim) - np.outer(u_vec, u_vec)
 
-    # Find the component of x-x0 that is perpendicular to u_vec
-    x_ortho = proj_matrix @ (x - x0)
+    # Find the component of x-x0 that is perpendicular to u_vec.
+    # Reshape x0 to a column vector so that (x - x0) broadcasts correctly
+    # when x has multiple columns (shape n_dim x n_pts).
+    x_ortho = proj_matrix @ (x - np.asarray(x0).reshape(n_dim, 1))
 
     # The distance is the norm of x_ortho along the first axis
     epsilon = np.linalg.norm(x_ortho, axis=0)
@@ -409,7 +409,7 @@ def fixed_cartesian_gradient_linear(x: npt.NDArray[np.float64], x0: npt.NDArray[
 
     # Make sure the pointing vector is unit-norm and compute projection matrix
     u_vec = u_vec / np.linalg.norm(u_vec)
-    proj_matrix = np.eye(n_dim) - np.asarray(u_vec) @ np.asarray(u_vec).T
+    proj_matrix = np.eye(n_dim) - np.outer(u_vec, u_vec)
 
     epsilon_gradient = 2 * proj_matrix @ (x - x0)
     return epsilon_gradient
@@ -434,7 +434,7 @@ def verify_common_dim(*args: npt.ArrayLike):
     Ensure that all inputs args have a common first dimension
     """
     dims = [np.shape(np.atleast_1d(this_arg))[0] for this_arg in args]
-    assert np.all(dims == dims[0]), 'Not all inputs have the same number of spatial dimensions'
+    assert np.all(np.array(dims) == dims[0]), 'Not all inputs have the same number of spatial dimensions'
 
 
 def snap_to_constraints(x: npt.NDArray[np.float64],

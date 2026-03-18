@@ -56,7 +56,45 @@ def test_rmse_confidence_interval():
                1.0]
     assert all(errors.compute_rmse_confidence_interval(x) == y for x, y in zip(inputs, outputs))
 
-# ToDo: unit test for draw_cep50 and draw_error_ellipse
+def test_draw_cep50():
+    """draw_cep50 returns a circle: (a) constant radius, (b) centered on x, (c) radius = compute_cep50."""
+    x_target = np.array([3., -5.])
+    cov = CovarianceMatrix(np.eye(2))
+    num_pts = 100
+    xx, yy = errors.draw_cep50(x_target, cov, num_pts=num_pts)
+
+    expected_radius = errors.compute_cep50(cov)  # 1.18
+
+    # (a) all points are equidistant from the center → it is a circle
+    radii = np.sqrt((xx - x_target[0])**2 + (yy - x_target[1])**2)
+    assert np.all(np.fabs(radii - expected_radius) < 1e-10)
+
+    # (b) centered on the target: midpoint of bounding box equals x_target
+    assert equal_to_tolerance((xx.max() + xx.min()) / 2, x_target[0], tol=1e-3)
+    assert equal_to_tolerance((yy.max() + yy.min()) / 2, x_target[1], tol=1e-3)
+
+    # (c) radius matches compute_cep50
+    assert equal_to_tolerance(radii[0], expected_radius)
+
+
+def test_draw_error_ellipse():
+    """draw_error_ellipse returns correct shape and is centered on x; isotropic cov gives a circle."""
+    x_target = np.array([3., -5.])
+    cov = CovarianceMatrix(np.eye(2))
+    num_pts = 100
+    result = errors.draw_error_ellipse(x_target, cov, num_pts=num_pts)
+
+    # Output shape is (2, num_pts)
+    assert result.shape == (2, num_pts)
+
+    # For isotropic covariance all radii are equal → ellipse degenerates to a circle
+    radii = np.linalg.norm(result - x_target[:, np.newaxis], axis=0)
+    expected_r = np.sqrt(1.386)  # sqrt(gamma * lam) with gamma=1.386, lam=1 for 50% CI
+    assert np.all(np.fabs(radii - expected_r) < 1e-10)
+
+    # Centered on the target
+    assert equal_to_tolerance((result[0].max() + result[0].min()) / 2, x_target[0], tol=1e-3)
+    assert equal_to_tolerance((result[1].max() + result[1].min()) / 2, x_target[1], tol=1e-3)
 
 
 # ---------------------------------------------------------------------------
