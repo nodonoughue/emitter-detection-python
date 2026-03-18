@@ -1,9 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from pathlib import Path
 from scipy.io import loadmat, savemat
 from scipy.signal import find_peaks
 import time
+
+_DATA_DIR = Path(__file__).parent.parent / 'data'
 
 from ewgeo import array_df
 from ewgeo import prop
@@ -93,7 +96,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    savemat('data/ex8_1.mat',
+    savemat(_DATA_DIR / 'ex8_1.mat',
             {'x': noisy_signal,
              'num_sources': num_sources,
              'num_elements': num_elements,
@@ -147,7 +150,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    savemat('data/problem8_5.mat',
+    savemat(_DATA_DIR / 'problem8_5.mat',
             {'x': noisy_signal,
              'num_sources': num_sources,
              'num_elements': num_elements,
@@ -201,7 +204,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
                                    + 1j * rng.standard_normal(size=(num_elements, num_samples)))
     noisy_signal = (rx_signal+noise)  # num_elements x num_samples
 
-    savemat('data/problem8_6.mat',
+    savemat(_DATA_DIR / 'problem8_6.mat',
             {'x': noisy_signal,
              'num_sources': num_sources,
              'num_elements': num_elements,
@@ -211,7 +214,7 @@ def generate_ex1_data(rng=np.random.default_rng()):
 
 def example1(rng=np.random.default_rng()):
     """
-    Executes Example 8.1, relying on the sample data in examples/ex8_1.mat, and generates one figure.
+    Executes Example 8.1, relying on the sample data in data/ex8_1.mat, and generates one figure.
 
     Ported from MATLAB Code
     
@@ -223,8 +226,8 @@ def example1(rng=np.random.default_rng()):
     """
 
     # If the data is missing, make it
-    data_fnm = 'data/ex8_1.mat'
-    if not os.path.exists(data_fnm):
+    data_fnm = _DATA_DIR / 'ex8_1.mat'
+    if not data_fnm.exists():
         generate_ex1_data(rng)
 
     # Load sample data
