@@ -3,7 +3,7 @@ import numpy as np
 import numpy.typing as npt
 
 from ewgeo.utils.covariance import CovarianceMatrix
-from . import State, StateSpace, CartesianStateSpace, Track
+from . import State, StateSpace, CartesianStateSpace, Track, PolarKinematicStateSpace
 
 
 class MotionModel(ABC):
@@ -32,6 +32,12 @@ class MotionModel(ABC):
         result.state_space = self.state_space
         return result
 
+    @property
+    def is_linear(self) -> bool:
+        """True for linear models (KF); False for nonlinear models (EKF).
+        Linear subclasses inherit this default; nonlinear subclasses must override to return False."""
+        return True
+
     @abstractmethod
     def make_transition_matrix(self, time_delta: float):
         pass
@@ -39,6 +45,17 @@ class MotionModel(ABC):
     @abstractmethod
     def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: float)-> CovarianceMatrix:
         pass
+
+    def make_transition_function(self, time_delta: float):
+        """Return a callable f(x) that propagates a state vector forward by time_delta.
+        Only called when is_linear is False.  Nonlinear subclasses must override this method."""
+        raise NotImplementedError(f"{self.__class__.__name__} must implement make_transition_function")
+
+    def make_jacobian(self, x: npt.ArrayLike, time_delta: float) -> npt.NDArray:
+        """Return the Jacobian of the transition function evaluated at state x for time_delta.
+        Used by predict() for EKF-style covariance propagation when is_linear is False.
+        Nonlinear subclasses must override this method."""
+        raise NotImplementedError(f"{self.__class__.__name__} must implement make_jacobian")
 
     @property
     def num_dims(self):
@@ -70,18 +87,27 @@ class MotionModel(ABC):
             # We already have a state at this time; nothing to predict forward
             return s
 
-        if time_delta is not None and time_delta != self.time_delta:
-            # Generate new ones
-            self.time_delta = time_delta
-            self.f = self.make_transition_matrix(time_delta)
-            self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
+        if self.is_linear:
+            # Linear prediction: cache F and Q when dt changes
+            if time_delta != self.time_delta:
+                self.time_delta = time_delta
+                self.f = self.make_transition_matrix(time_delta)
+                self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
+            new_state = self.f @ s.state
+            f_for_cov = self.f
+        else:
+            # Nonlinear (EKF-style) prediction: F is state-dependent, computed fresh each call
+            if time_delta != self.time_delta:
+                self.time_delta = time_delta
+                self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
+            f_fun = self.make_transition_function(time_delta)
+            new_state = f_fun(s.state)
+            f_for_cov = self.make_jacobian(s.state, time_delta)
 
-        # To predict forward, just pre-multiply the previous state with the transition matrix
-        new_state = self.f @ s.state
         if s.covar is None:
             new_covar = None
         else:
-            new_covar = CovarianceMatrix(self.f @ s.covar.cov @ np.transpose(self.f) + self.q.cov)
+            new_covar = CovarianceMatrix(f_for_cov @ s.covar.cov @ np.transpose(f_for_cov) + self.q.cov)
 
         # Make a new State object
         return State(s.state_space, new_time, new_state, new_covar)
@@ -98,12 +124,15 @@ class MotionModel(ABC):
             self.time_delta = None
             self.f = None
             self.q = None
-        elif time_delta == self.time_delta and self.f is not None and self.q is not None:
+        elif time_delta == self.time_delta and self.q is not None and (not self.is_linear or self.f is not None):
             pass  # nothing to do; no change
         else:
-            # Update the transition and process noise mapping matrices
+            # Update the process noise (and transition matrix for linear models)
             self.time_delta = time_delta
-            self.f = self.make_transition_matrix(self.time_delta)
+            if self.is_linear:
+                self.f = self.make_transition_matrix(self.time_delta)
+            else:
+                self.f = None  # Jacobian is state-dependent; computed fresh in predict()
             if self.process_covar is None:
                 self.q = None
             else:
