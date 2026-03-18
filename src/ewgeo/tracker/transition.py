@@ -3,7 +3,7 @@ import numpy as np
 import numpy.typing as npt
 
 from ewgeo.utils.covariance import CovarianceMatrix
-from . import State, StateSpace, Track
+from . import State, StateSpace, CartesianStateSpace, Track
 
 
 class MotionModel(ABC):
@@ -28,9 +28,8 @@ class MotionModel(ABC):
         cls = self.__class__
         result = cls.__new__(cls)
 
-        # The only thing worth copying is the state_space
-        # Other parameters are generated as needed
-        result.state_space = self.state_space.copy()
+        # StateSpace is immutable; share the reference directly
+        result.state_space = self.state_space
         return result
 
     @abstractmethod
@@ -161,17 +160,7 @@ class ConstantVelocityMotionModel(MotionModel):
     def __init__(self, num_dims: int, process_covar: npt.ArrayLike=None, time_delta: float=None):
         super().__init__()
 
-        state_space = StateSpace()
-        state_space.num_states = 2*num_dims
-        state_space.num_dims = num_dims
-        state_space.pos_slice = np.s_[:num_dims]
-        state_space.vel_slice = np.s_[num_dims:2*num_dims]
-        state_space.pos_vel_slice = np.s_[:2*num_dims]
-        state_space.accel_slice = None
-        state_space.has_pos = True
-        state_space.has_vel = True
-        state_space.has_accel = False
-        self.state_space = state_space
+        self.state_space = CartesianStateSpace(num_dims=num_dims, has_vel=True, has_accel=False)
 
         self.time_delta = time_delta
         self.process_covar = process_covar
@@ -209,19 +198,8 @@ class ConstantAccelerationMotionModel(MotionModel):
     def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: float = None):
         super().__init__()
 
-        # State model is:
-        # [px, py, pz, vx, vy, vz, ax, ay, az]'
-        state_space = StateSpace()
-        state_space.num_states = 3 * num_dims
-        state_space.num_dims = num_dims
-        state_space.pos_slice = np.s_[:num_dims]
-        state_space.vel_slice = np.s_[num_dims:2 * num_dims]
-        state_space.pos_vel_slice = np.s_[:2 * num_dims]
-        state_space.accel_slice = np.s_[2 * num_dims:3 * num_dims]
-        state_space.has_pos = True
-        state_space.has_vel = True
-        state_space.has_accel = True
-        self.state_space = state_space
+        # State model is: [px, py, pz, vx, vy, vz, ax, ay, az]
+        self.state_space = CartesianStateSpace(num_dims=num_dims, has_vel=True, has_accel=True)
 
         self.time_delta = time_delta
         self.process_covar = process_covar
@@ -266,19 +244,9 @@ class ConstantJerkMotionModel(MotionModel):
     def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: float = None):
         super().__init__()
 
-        # State model is:
-        # [px, py, pz, vx, vy, vz, ax, ay, az, jx, jy, jz]'
-        state_space = StateSpace()
-        state_space.num_states = 4 * num_dims
-        state_space.num_dims = num_dims
-        state_space.pos_slice = np.s_[:num_dims]
-        state_space.vel_slice = np.s_[num_dims:2 * num_dims]
-        state_space.pos_vel_slice = np.s_[:2 * num_dims]
-        state_space.accel_slice = np.s_[2 * num_dims:3 * num_dims]
-        state_space.has_pos = True
-        state_space.has_vel = True
-        state_space.has_accel = True
-        self.state_space = state_space
+        # State model is: [px, py, pz, vx, vy, vz, ax, ay, az, jx, jy, jz]
+        self.state_space = CartesianStateSpace(num_dims=num_dims, has_vel=True,
+                                               has_accel=True, has_jerk=True)
 
         self.time_delta = time_delta
         self.process_covar = process_covar

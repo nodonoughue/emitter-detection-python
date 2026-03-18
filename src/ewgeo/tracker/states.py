@@ -1,55 +1,167 @@
+from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 from matplotlib.lines import Line2D
 from matplotlib.quiver import Quiver
-from typing import Self
 
 from ..utils.covariance import CovarianceMatrix
 from ..utils.errors import draw_error_ellipse
 
-class StateSpace:
-    """
-    Class to represent various state types and parameters to assist in easily accessing them.
-    """
-    num_dims: int
-    num_states: int
-    has_pos: bool
-    has_vel: bool
-    has_accel: bool
-    pos_slice: slice | None
-    vel_slice: slice | None
-    pos_vel_slice: slice | None
-    accel_slice: slice | None
 
-    def __init__(self, **kwargs):
-        """Initialize a StateSpace from keyword arguments mapping attribute names to values."""
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+class StateSpace(ABC):
+    """
+    Abstract base class describing the layout of a tracker state vector.
+
+    Subclasses define which physical quantities are tracked and how to extract
+    them from a flat state vector.  All properties are read-only after construction
+    so that a single StateSpace instance can safely be shared across many State
+    objects without risk of mutation.
+    """
+
+    # ------------------------------------------------------------------ #
+    # Abstract scalar properties                                           #
+    # ------------------------------------------------------------------ #
+
+    @property
+    @abstractmethod
+    def num_dims(self) -> int:
+        """Number of spatial dimensions (e.g. 2 for 2-D, 3 for 3-D)."""
+
+    @property
+    @abstractmethod
+    def num_states(self) -> int:
+        """Total length of the state vector."""
+
+    @property
+    @abstractmethod
+    def has_pos(self) -> bool:
+        """True if the state vector contains position components."""
+
+    @property
+    @abstractmethod
+    def has_vel(self) -> bool:
+        """True if the state vector contains velocity components."""
+
+    @property
+    @abstractmethod
+    def has_accel(self) -> bool:
+        """True if the state vector contains acceleration components."""
+
+    # ------------------------------------------------------------------ #
+    # Abstract slice properties                                            #
+    # ------------------------------------------------------------------ #
+
+    @property
+    @abstractmethod
+    def pos_slice(self) -> slice:
+        """Index slice selecting the position components of the state vector."""
+
+    @property
+    @abstractmethod
+    def vel_slice(self) -> slice | None:
+        """Index slice selecting the velocity components, or None when absent."""
+
+    @property
+    @abstractmethod
+    def pos_vel_slice(self) -> slice | None:
+        """Index slice selecting the combined position+velocity block, or None when absent."""
+
+    @property
+    @abstractmethod
+    def accel_slice(self) -> slice | None:
+        """Index slice selecting the acceleration components, or None when absent."""
+
+    # ------------------------------------------------------------------ #
+    # Concrete accessor methods (use the abstract slice properties above)  #
+    # Subclasses may override these for non-Cartesian state representations #
+    # ------------------------------------------------------------------ #
 
     def pos_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """Return the position sub-vector of state vector x."""
         return x[self.pos_slice]
 
-    def vel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        """Return the velocity sub-vector of state vector x, or None if this state space has no velocity."""
+    def vel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64] | None:
+        """Return the velocity sub-vector of state vector x, or None if absent."""
         return x[self.vel_slice] if self.has_vel else None
 
     def pos_vel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        """Return the combined position+velocity sub-vector of state vector x. Falls back to position-only
-        if this state space has no velocity."""
+        """Return the combined position+velocity sub-vector, falling back to position-only."""
         return x[self.pos_vel_slice] if self.has_vel else self.pos_component(x)
 
-    def accel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        """Return the acceleration sub-vector of state vector x, or None if this state space has no acceleration."""
+    def accel_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64] | None:
+        """Return the acceleration sub-vector of state vector x, or None if absent."""
         return x[self.accel_slice] if self.has_accel else None
 
-    def copy(self, **kwargs)-> Self:
-        """Return a copy of this StateSpace, optionally overriding specific attributes via kwargs."""
-        new_state_space = StateSpace(**self.__dict__)
-        for key, value in kwargs.items():
-            new_state_space.__setattr__(key, value)
-        return new_state_space
+
+class CartesianStateSpace(StateSpace):
+    """
+    Concrete StateSpace for models whose state vector has the block layout:
+
+        [pos (n_dims) | vel (n_dims) | accel (n_dims) | jerk (n_dims)]
+
+    where trailing blocks are optional.  All properties are computed once at
+    construction and exposed as read-only via @property.
+
+    :param num_dims:  Number of spatial dimensions.
+    :param has_vel:   Include a velocity block (default True).
+    :param has_accel: Include an acceleration block (default False).
+    :param has_jerk:  Include a jerk block (default False); requires has_accel=True.
+    """
+
+    def __init__(self, num_dims: int, has_vel: bool = True,
+                 has_accel: bool = False, has_jerk: bool = False):
+        if has_jerk and not has_accel:
+            raise ValueError("has_jerk=True requires has_accel=True")
+
+        n = num_dims
+        num_blocks = 1 + int(has_vel) + int(has_accel) + int(has_jerk)
+
+        self._num_dims   = n
+        self._num_states = num_blocks * n
+        self._has_vel    = has_vel
+        self._has_accel  = has_accel
+
+        self._pos_slice     = np.s_[:n]
+        self._vel_slice     = np.s_[n:2*n]       if has_vel   else None
+        self._pos_vel_slice = np.s_[:2*n]         if has_vel   else np.s_[:n]
+        self._accel_slice   = np.s_[2*n:3*n]     if has_accel else None
+
+    @property
+    def num_dims(self) -> int:
+        return self._num_dims
+
+    @property
+    def num_states(self) -> int:
+        return self._num_states
+
+    @property
+    def has_pos(self) -> bool:
+        return True
+
+    @property
+    def has_vel(self) -> bool:
+        return self._has_vel
+
+    @property
+    def has_accel(self) -> bool:
+        return self._has_accel
+
+    @property
+    def pos_slice(self) -> slice:
+        return self._pos_slice
+
+    @property
+    def vel_slice(self) -> slice | None:
+        return self._vel_slice
+
+    @property
+    def pos_vel_slice(self) -> slice | None:
+        return self._pos_vel_slice
+
+    @property
+    def accel_slice(self) -> slice | None:
+        return self._accel_slice
 
 class State:
     """

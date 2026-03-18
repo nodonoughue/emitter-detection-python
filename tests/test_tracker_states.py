@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from ewgeo.tracker.states import State, StateSpace
+from ewgeo.tracker.states import State, CartesianStateSpace
 
 
 # ---------------------------------------------------------------------------
@@ -10,47 +10,17 @@ from ewgeo.tracker.states import State, StateSpace
 
 def make_cv_state_space():
     """2D constant-velocity state space: [px, py, vx, vy]"""
-    ss = StateSpace()
-    ss.num_dims = 2
-    ss.num_states = 4
-    ss.has_pos = True
-    ss.has_vel = True
-    ss.has_accel = False
-    ss.pos_slice = np.s_[:2]
-    ss.vel_slice = np.s_[2:4]
-    ss.pos_vel_slice = np.s_[:4]
-    ss.accel_slice = None
-    return ss
+    return CartesianStateSpace(num_dims=2, has_vel=True, has_accel=False)
 
 
 def make_ca_state_space():
     """2D constant-acceleration state space: [px, py, vx, vy, ax, ay]"""
-    ss = StateSpace()
-    ss.num_dims = 2
-    ss.num_states = 6
-    ss.has_pos = True
-    ss.has_vel = True
-    ss.has_accel = True
-    ss.pos_slice = np.s_[:2]
-    ss.vel_slice = np.s_[2:4]
-    ss.pos_vel_slice = np.s_[:4]
-    ss.accel_slice = np.s_[4:6]
-    return ss
+    return CartesianStateSpace(num_dims=2, has_vel=True, has_accel=True)
 
 
 def make_pos_only_state_space():
     """1D position-only state space: [px]"""
-    ss = StateSpace()
-    ss.num_dims = 1
-    ss.num_states = 1
-    ss.has_pos = True
-    ss.has_vel = False
-    ss.has_accel = False
-    ss.pos_slice = np.s_[:1]
-    ss.vel_slice = None
-    ss.pos_vel_slice = np.s_[:1]
-    ss.accel_slice = None
-    return ss
+    return CartesianStateSpace(num_dims=1, has_vel=False, has_accel=False)
 
 
 CV_VEC = np.array([1.0, 2.0, 3.0, 4.0])   # [px, py, vx, vy]
@@ -112,21 +82,54 @@ def test_statespace_pos_vel_component_falls_back_to_pos():
     assert equal_to_tolerance(ss.pos_vel_component(np.array([7.0])), np.array([7.0]))
 
 
-def test_statespace_copy_preserves_attributes():
-    ss = make_cv_state_space()
-    ss2 = ss.copy()
-    assert ss2.num_dims == ss.num_dims
-    assert ss2.num_states == ss.num_states
-    assert ss2.has_vel == ss.has_vel
-    assert ss2.has_accel == ss.has_accel
+def test_cartesian_state_space_cv_properties():
+    """CartesianStateSpace CV: correct num_states, slices, and flags."""
+    ss = CartesianStateSpace(num_dims=2, has_vel=True, has_accel=False)
+    assert ss.num_dims == 2
+    assert ss.num_states == 4
+    assert ss.has_pos is True
+    assert ss.has_vel is True
+    assert ss.has_accel is False
+    assert ss.pos_slice == np.s_[:2]
+    assert ss.vel_slice == np.s_[2:4]
+    assert ss.pos_vel_slice == np.s_[:4]
+    assert ss.accel_slice is None
 
 
-def test_statespace_copy_override():
-    """copy() should accept keyword overrides."""
-    ss = make_cv_state_space()
-    ss2 = ss.copy(num_dims=3)
-    assert ss2.num_dims == 3
-    assert ss.num_dims == 2  # original unchanged
+def test_cartesian_state_space_ca_properties():
+    """CartesianStateSpace CA: 3-block layout, accel_slice present."""
+    ss = CartesianStateSpace(num_dims=2, has_vel=True, has_accel=True)
+    assert ss.num_states == 6
+    assert ss.has_accel is True
+    assert ss.accel_slice == np.s_[4:6]
+
+
+def test_cartesian_state_space_cj_properties():
+    """CartesianStateSpace CJ: 4-block layout (jerk block)."""
+    ss = CartesianStateSpace(num_dims=2, has_vel=True, has_accel=True, has_jerk=True)
+    assert ss.num_states == 8
+
+
+def test_cartesian_state_space_pos_only_properties():
+    """CartesianStateSpace position-only: vel and accel slices are None."""
+    ss = CartesianStateSpace(num_dims=1, has_vel=False, has_accel=False)
+    assert ss.num_states == 1
+    assert ss.has_vel is False
+    assert ss.vel_slice is None
+    assert ss.accel_slice is None
+
+
+def test_cartesian_state_space_jerk_without_accel_raises():
+    """has_jerk=True without has_accel=True must raise ValueError."""
+    with pytest.raises(ValueError):
+        CartesianStateSpace(num_dims=2, has_vel=True, has_accel=False, has_jerk=True)
+
+
+def test_cartesian_state_space_is_immutable():
+    """Properties have no setters; assigning to one must raise AttributeError."""
+    ss = CartesianStateSpace(num_dims=2, has_vel=True, has_accel=False)
+    with pytest.raises(AttributeError):
+        ss.num_dims = 3
 
 
 # ---------------------------------------------------------------------------
