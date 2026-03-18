@@ -173,11 +173,11 @@ class TwoPointInitiator(Initiator):
             crlb_vel = crlb_pos / (dt**2)
             init_covar[vel_slice, vel_slice] = crlb_vel
 
-        # There isn't enough information to initialize acceleration; so just give it a large value and let
-        # the tracker bring it down
+        # There isn't enough information to initialize acceleration; scale by another 1/dt²
+        # (consistent with the velocity scaling above) to get a physically reasonable estimate.
         if state.state_space.has_accel:
             accel_slice = state.state_space.accel_slice
-            crlb_accel = crlb_pos * 1e6
+            crlb_accel = crlb_vel / (dt**2)
             init_covar[accel_slice, accel_slice] = crlb_accel
 
         return CovarianceMatrix(init_covar)
