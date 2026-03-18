@@ -104,9 +104,9 @@ def test_copy():
     cov2 = cov.copy()
     cov2.cov = c2
 
-    assert ~equal_to_tolerance(cov.cov, cov2.cov)
-    assert ~equal_to_tolerance(cov.inv, cov2.inv)
-    assert ~equal_to_tolerance(cov.lower, cov2.lower)
+    assert not equal_to_tolerance(cov.cov, cov2.cov)
+    assert not equal_to_tolerance(cov.inv, cov2.inv)
+    assert not equal_to_tolerance(cov.lower, cov2.lower)
 
 def test_solve_aca():
     """
@@ -442,7 +442,7 @@ def test_sample():
 
     # Multiple samples at once
     # Should have size (num_measurements, num_samples)
-    for num_samples in np.random.random_integers(low=5, high=100, size=(10, )):
+    for num_samples in np.random.randint(low=5, high=101, size=(10, )):
         res = cov.sample(num_samples)
         assert res.shape == (3, num_samples)
 
