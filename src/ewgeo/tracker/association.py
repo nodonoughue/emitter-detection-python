@@ -505,7 +505,6 @@ class NNAssociator(Associator):
         :param print_table: If True, print a distance table to stdout (currently stubbed out)
         :return: Tuple of (track→hypothesis dict, list of unassociated measurements)
         """
-        # TODO: Test
         hypotheses = {}
         unassociated_measurements = measurements[:]
         if len(measurements) == 0:
@@ -614,7 +613,6 @@ class GNNAssociator(Associator):
         :param print_table: If True, print a distance table to stdout (currently stubbed out)
         :return: Tuple of (track→hypothesis dict, list of unassociated measurements)
         """
-        # TODO: Test
         num_tracks = len(tracks)
         num_measurements = len(measurements)
         if num_tracks == 0:

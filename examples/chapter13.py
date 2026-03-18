@@ -310,8 +310,6 @@ def _mc_iteration(pss:HybridPassiveSurveillanceSystem, ml_search: SearchSpace, a
     18 March 2022
     """
 
-    # TODO: Check for divergent case and set a flag to ignore this iteration
-
     # Generate a random measurement
     zeta_act = args['rho_act']
     zeta = zeta_act + pss.cov.sample()
