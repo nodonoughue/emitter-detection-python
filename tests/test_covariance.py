@@ -282,7 +282,7 @@ def test_resample():
     c_out = c[:-1, :-1] + c[-1, -1]
     cov_out = cov.resample(ref_idx=None)
     assert equal_to_tolerance(cov_out.cov, c_out)
-    assert ~equal_to_tolerance(cov_out.cov, cov.cov)  # make sure the original wasn't resampled
+    assert not equal_to_tolerance(cov_out.cov, cov.cov)  # make sure the original wasn't resampled
 
     # 2. ref_idx=integer
     ref_idx = 5
