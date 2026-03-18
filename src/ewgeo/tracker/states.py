@@ -431,3 +431,68 @@ class State:
             trk_err_hdl.set_data(*xy_ellipse)
 
         return
+
+
+def adapt_cartesian_state(source: State, target_ss: StateSpace,
+                           sigma_turn_rate: float = 0.5) -> State:
+    """
+    Create a new State with ``target_ss`` as its state space, copying all
+    kinematic blocks (position, velocity, acceleration) that exist in both
+    ``source`` and ``target_ss``.  Extra blocks present only in ``target_ss``
+    (e.g. turn-rate) are zeroed in the mean and given a diagonal variance of
+    ``sigma_turn_rate**2``.
+
+    This is the bridge between Cartesian initiators (which always produce
+    CartesianStateSpace states) and motion models that use a richer state
+    space such as PolarKinematicStateSpace.
+
+    :param source:           Input State (typically from an initiator).
+    :param target_ss:        Desired output StateSpace.
+    :param sigma_turn_rate:  1-σ turn-rate uncertainty [rad/s] used to
+                             initialise the turn-rate block of the covariance.
+    :return: New State with ``target_ss``, same timestamp, adapted mean and
+             covariance.
+    """
+    n = target_ss.num_states
+    x_new = np.zeros(n)
+    x_new[target_ss.pos_slice] = source.position
+    if target_ss.has_vel and source.has_vel:
+        x_new[target_ss.vel_slice] = source.velocity
+    if target_ss.has_accel and source.has_accel:
+        x_new[target_ss.accel_slice] = source.acceleration
+    # turn_rate and any other extra components remain zero
+
+    if source.covar is None:
+        p_new = None
+    else:
+        p_new = np.zeros((n, n))
+        src_cov = source.covar.cov
+        src_ss  = source.state_space
+
+        p_new[target_ss.pos_slice, target_ss.pos_slice] = \
+            src_cov[src_ss.pos_slice, src_ss.pos_slice]
+
+        if target_ss.has_vel:
+            if src_ss.has_vel:
+                p_new[target_ss.vel_slice, target_ss.vel_slice] = \
+                    src_cov[src_ss.vel_slice, src_ss.vel_slice]
+            else:
+                p_new[target_ss.vel_slice, target_ss.vel_slice] = \
+                    1e6 * np.eye(target_ss.num_dims)
+
+        if target_ss.has_accel:
+            if src_ss.has_accel:
+                p_new[target_ss.accel_slice, target_ss.accel_slice] = \
+                    src_cov[src_ss.accel_slice, src_ss.accel_slice]
+            else:
+                p_new[target_ss.accel_slice, target_ss.accel_slice] = \
+                    1e6 * np.eye(target_ss.num_dims)
+
+        if target_ss.has_turn_rate:
+            tr_sl = target_ss.turn_rate_slice
+            n_tr  = tr_sl.stop - tr_sl.start
+            p_new[tr_sl, tr_sl] = sigma_turn_rate ** 2 * np.eye(n_tr)
+
+        p_new = CovarianceMatrix(p_new)
+
+    return State(target_ss, source.time, x_new, p_new)

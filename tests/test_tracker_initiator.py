@@ -14,11 +14,13 @@ from ewgeo.tracker.initiator import (
 )
 from ewgeo.tracker.association import NNAssociator
 from ewgeo.tracker.measurement import Measurement, MeasurementModel
-from ewgeo.tracker.states import State, StateSpace
+from ewgeo.tracker.states import (State, StateSpace, adapt_cartesian_state,
+                                  PolarKinematicStateSpace)
 from ewgeo.tracker.track import Track
 from ewgeo.tracker.transition import (
     ConstantVelocityMotionModel,
     ConstantAccelerationMotionModel,
+    ConstantTurnMotionModel,
 )
 from ewgeo.utils.covariance import CovarianceMatrix
 
@@ -273,3 +275,182 @@ def test_build_track_covariance_structure():
     assert track is not None
     cov_diag = np.diag(track.curr_state.covar.cov)
     assert equal_to_tolerance(cov_diag, [1.0, 0.5, 6.0])
+
+
+# ---------------------------------------------------------------------------
+# adapt_cartesian_state
+# ---------------------------------------------------------------------------
+
+def make_cv_state_1d(x=5.0, v=2.0, t=1.0, pos_var=4.0, vel_var=1000.0):
+    """1D CV state [x, vx] with diagonal covariance."""
+    model = ConstantVelocityMotionModel(num_dims=1, process_covar=1.0)
+    ss = model.state_space
+    state_vec = np.array([x, v])
+    covar = CovarianceMatrix(np.diag([pos_var, vel_var]))
+    return State(ss, time=t, state=state_vec, covar=covar)
+
+
+def make_ct_ss_1d():
+    """1D CT-like state space [x, vx, ω] built directly (CT model requires ≥2D)."""
+    return PolarKinematicStateSpace(num_dims=1, has_accel=False, num_turn_dims=1)
+
+
+def make_ct_ss_2d():
+    """2D CT state space [px, py, vx, vy, ω]."""
+    return ConstantTurnMotionModel(num_dims=2, process_covar=1.0).state_space
+
+
+def test_adapt_cartesian_copies_position():
+    """Adapted position equals source position."""
+    src = make_cv_state_1d(x=7.5)
+    adapted = adapt_cartesian_state(src, make_ct_ss_1d())
+    assert equal_to_tolerance(adapted.position, [7.5])
+
+
+def test_adapt_cartesian_copies_velocity():
+    """Adapted velocity equals source velocity."""
+    src = make_cv_state_1d(x=5.0, v=3.0)
+    adapted = adapt_cartesian_state(src, make_ct_ss_1d())
+    assert equal_to_tolerance(adapted.velocity, [3.0])
+
+
+def test_adapt_cartesian_turn_rate_is_zero():
+    """Turn-rate mean initialises to zero."""
+    src = make_cv_state_1d()
+    ct_ss = make_ct_ss_1d()
+    adapted = adapt_cartesian_state(src, ct_ss)
+    assert equal_to_tolerance(ct_ss.turn_rate_component(adapted.state), [0.0])
+
+
+def test_adapt_cartesian_state_size():
+    """Output state vector has target_ss.num_states entries."""
+    ct_ss = make_ct_ss_1d()
+    adapted = adapt_cartesian_state(make_cv_state_1d(), ct_ss)
+    assert adapted.size == ct_ss.num_states
+
+
+def test_adapt_cartesian_turn_rate_variance():
+    """Turn-rate variance block equals sigma_turn_rate**2."""
+    ct_ss = make_ct_ss_1d()
+    adapted = adapt_cartesian_state(make_cv_state_1d(pos_var=4.0, vel_var=1000.0),
+                                    ct_ss, sigma_turn_rate=0.3)
+    tr_sl = ct_ss.turn_rate_slice
+    assert equal_to_tolerance(adapted.covar.cov[tr_sl, tr_sl], [[0.09]])  # 0.3**2
+
+
+def test_adapt_cartesian_copies_pos_covariance():
+    """Position covariance block is copied from source."""
+    ct_ss = make_ct_ss_1d()
+    adapted = adapt_cartesian_state(make_cv_state_1d(pos_var=4.0, vel_var=1000.0), ct_ss)
+    assert equal_to_tolerance(adapted.covar.cov[ct_ss.pos_slice, ct_ss.pos_slice], [[4.0]])
+
+
+def test_adapt_cartesian_no_covar_gives_none():
+    """When source has no covariance, the adapted state also has None."""
+    model = ConstantVelocityMotionModel(num_dims=1, process_covar=1.0)
+    src = State(model.state_space, time=0.0, state=np.array([5.0, 2.0]), covar=None)
+    adapted = adapt_cartesian_state(src, make_ct_ss_1d())
+    assert adapted.covar is None
+
+
+def test_adapt_cartesian_preserves_timestamp():
+    """Adapted state keeps the source timestamp."""
+    adapted = adapt_cartesian_state(make_cv_state_1d(t=42.5), make_ct_ss_1d())
+    assert adapted.time == 42.5
+
+
+# ---------------------------------------------------------------------------
+# SinglePointMeasurementInitiator with target_state_space
+# ---------------------------------------------------------------------------
+
+def test_single_point_with_target_ss_produces_ct_state():
+    """Tracks produced with target_state_space have the CT state size."""
+    # Use 1D PolarKinematicStateSpace so it matches the 1D mock sensor
+    ct_ss = make_ct_ss_1d()
+    initiator = SinglePointMeasurementInitiator(
+        msmt_model=make_cv_measurement_model(),
+        target_state_space=ct_ss,
+    )
+    tracks, _ = initiator.initiate([make_measurement(5.0)], next_track_id=0)
+    assert len(tracks) == 1
+    assert tracks[0].curr_state.size == ct_ss.num_states
+
+
+def test_single_point_with_target_ss_has_zero_turn_rate():
+    """Turn-rate component of the adapted state is zero."""
+    ct_ss = make_ct_ss_1d()
+    initiator = SinglePointMeasurementInitiator(
+        msmt_model=make_cv_measurement_model(),
+        target_state_space=ct_ss,
+    )
+    tracks, _ = initiator.initiate([make_measurement(5.0)], next_track_id=0)
+    tr = ct_ss.turn_rate_component(tracks[0].curr_state.state)
+    assert equal_to_tolerance(tr, [0.0])
+
+
+# ---------------------------------------------------------------------------
+# TwoPointInitiator with target_state_space
+# ---------------------------------------------------------------------------
+
+def test_two_point_with_target_ss_produces_ct_state():
+    """Confirmed tracks have CT state size when target_state_space is set."""
+    ct_ss = make_ct_ss_1d()
+    mm = make_cv_measurement_model()
+    assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
+    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                  target_state_space=ct_ss)
+
+    initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
+    tracks, _ = initiator.initiate([make_measurement(12, t=1)], next_track_id=1)
+
+    assert len(tracks) == 1
+    assert tracks[0].curr_state.size == ct_ss.num_states
+
+
+def test_two_point_with_target_ss_velocity_preserved():
+    """Velocity estimate is preserved after adaptation to CT state space."""
+    ct_ss = make_ct_ss_1d()
+    mm = make_cv_measurement_model()
+    assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
+    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                  target_state_space=ct_ss)
+
+    initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
+    tracks, _ = initiator.initiate([make_measurement(12, t=1)], next_track_id=1)
+
+    assert equal_to_tolerance(tracks[0].curr_state.velocity, [2.0])
+
+
+# ---------------------------------------------------------------------------
+# ThreePointInitiator with target_state_space
+# ---------------------------------------------------------------------------
+
+def test_three_point_with_target_ss_produces_ct_state():
+    """Confirmed tracks from ThreePointInitiator have CT state size."""
+    ct_ss = make_ct_ss_1d()
+    initiator = ThreePointInitiator(msmt_model=None, associator=None,
+                                    target_state_space=ct_ss)
+    s1 = make_ca_state(0.0, t=0)
+    s2 = make_ca_state(1.5, t=1)
+    s3 = make_ca_state(4.0, t=2)
+    # _build_track uses s3.state_space (CA), then adaptation replaces it with ct_ss
+    full_track = initiator._build_track(s1, s2, s3)
+    # Direct adaptation path (bypasses the initiate() association loop)
+    adapted = adapt_cartesian_state(full_track.curr_state, ct_ss)
+    assert adapted.size == ct_ss.num_states
+    assert equal_to_tolerance(adapted.velocity, [2.0])
+
+
+# ---------------------------------------------------------------------------
+# _propagate_covariance bug fix: no crash for CV (no accel) state space
+# ---------------------------------------------------------------------------
+
+def test_propagate_covariance_no_accel_does_not_crash():
+    """_propagate_covariance must not crash when state_space.has_accel is False."""
+    cv_ss = ConstantVelocityMotionModel(num_dims=1, process_covar=1.0).state_space
+    initiator = ThreePointInitiator(msmt_model=None, associator=None)
+    pos_var = np.array([[1.0]])
+    # This should not raise even though cv_ss.accel_slice is None
+    covar = initiator._propagate_covariance(pos_var, dt=1.0, state_space=cv_ss)
+    # pos block was scaled; size matches CV num_states (2)
+    assert covar.shape == (cv_ss.num_states, cv_ss.num_states)

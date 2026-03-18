@@ -1,5 +1,5 @@
 # Directly import several classes for easier reference
-from .states import StateSpace, CartesianStateSpace, PolarKinematicStateSpace, State
+from .states import StateSpace, CartesianStateSpace, PolarKinematicStateSpace, State, adapt_cartesian_state
 from .track import Track
 from .transition import (MotionModel, ConstantTurnMotionModel, BallisticMotionModel,
                          ConstantTurnRateAccelerationMotionModel,
