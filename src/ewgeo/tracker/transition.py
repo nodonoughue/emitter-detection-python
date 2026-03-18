@@ -810,3 +810,74 @@ def ekf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f_fun, g_fu
     p_pred = CovarianceMatrix(f @ p_est.cov @ np.transpose(f) + q.cov)
 
     return x_pred, p_pred
+
+
+def ukf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f_fun,
+                alpha: float = 1e-3, beta: float = 2., kappa: float = 0.):
+    """
+    Conduct an Unscented Kalman Filter (UKF) prediction using the scaled unscented transform.
+
+    Unlike ekf_predict, no Jacobian is required.  The transition function is applied
+    directly to 2n+1 sigma points chosen to capture the mean and covariance of the
+    prior.  This makes ukf_predict drop-in compatible with any nonlinear transition
+    function, including those where the Jacobian is unavailable or inaccurate.
+
+    For the current motion models, pass::
+
+        f_fun = motion_model.make_transition_function(time_delta)
+
+    The same f_fun used by ekf_predict works unchanged here.
+
+    Scaled unscented transform parameters (Julier & Uhlmann / Van der Merwe):
+      λ = α²(n + κ) − n
+      W_m[0] = λ/(n+λ),  W_m[i] = 1/(2(n+λ))  for i = 1 … 2n
+      W_c[0] = W_m[0] + (1 − α² + β),  W_c[i] = W_m[i]  for i = 1 … 2n
+
+    :param x_est:  Current state estimate, shape (n_states,).
+    :param p_est:  Current state error covariance, CovarianceMatrix of size n_states.
+    :param q:      Process noise covariance, CovarianceMatrix of size n_states.
+    :param f_fun:  Transition function f(x) → x_new, maps (n_states,) → (n_states,).
+    :param alpha:  Sigma-point spread (1e-4 … 1). Smaller values cluster points near
+                   the mean; larger values explore more of the distribution. Default 1e-3.
+    :param beta:   Prior distribution parameter. beta=2 is optimal for Gaussian priors.
+                   Default 2.
+    :param kappa:  Secondary scaling (0 or 3−n are common choices). Default 0.
+    :return x_pred: Predicted state estimate, shape (n_states,).
+    :return p_pred: Predicted state error covariance, CovarianceMatrix of size n_states.
+    """
+    n   = len(x_est)
+    lam = alpha ** 2 * (n + kappa) - n
+
+    # ── Weights ───────────────────────────────────────────────────────────────
+    w_common = 0.5 / (n + lam)
+    W_m      = np.full(2 * n + 1, w_common)
+    W_c      = np.full(2 * n + 1, w_common)
+    W_m[0]   = lam / (n + lam)
+    W_c[0]   = lam / (n + lam) + (1. - alpha ** 2 + beta)
+
+    # ── Matrix square root of (n+λ)·P ────────────────────────────────────────
+    try:
+        L = np.linalg.cholesky((n + lam) * p_est.cov)
+    except np.linalg.LinAlgError:
+        # Near-singular P: fall back to symmetric square root via eigendecomposition
+        eigvals, eigvecs = np.linalg.eigh((n + lam) * p_est.cov)
+        L = eigvecs @ np.diag(np.sqrt(np.maximum(eigvals, 0.)))
+
+    # ── Sigma points ──────────────────────────────────────────────────────────
+    sigma = np.empty((n, 2 * n + 1))
+    sigma[:, 0] = x_est
+    for i in range(n):
+        sigma[:, i + 1]     = x_est + L[:, i]
+        sigma[:, i + 1 + n] = x_est - L[:, i]
+
+    # ── Propagate sigma points through transition function ────────────────────
+    sigma_pred = np.column_stack([f_fun(sigma[:, i]) for i in range(2 * n + 1)])
+
+    # ── Predicted mean ────────────────────────────────────────────────────────
+    x_pred = sigma_pred @ W_m
+
+    # ── Predicted covariance ──────────────────────────────────────────────────
+    diff   = sigma_pred - x_pred[:, np.newaxis]
+    p_pred = CovarianceMatrix((W_c * diff) @ diff.T + q.cov)
+
+    return x_pred, p_pred

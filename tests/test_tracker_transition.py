@@ -11,6 +11,7 @@ from ewgeo.tracker.transition import (
     MotionModel,
     kf_predict,
     ekf_predict,
+    ukf_predict,
 )
 from ewgeo.tracker.states import State
 from ewgeo.utils.covariance import CovarianceMatrix
@@ -818,3 +819,106 @@ def test_make_motion_model_ctra_long_key():
     m = MotionModel.make_motion_model('constant_turn_rate_acceleration',
                                       num_dims=3, process_covar=1.0)
     assert isinstance(m, ConstantTurnRateAccelerationMotionModel)
+
+
+# ---------------------------------------------------------------------------
+# ukf_predict
+# ---------------------------------------------------------------------------
+
+def _cv_f_fun(F):
+    """Return a closure that applies the linear CV transition matrix."""
+    return lambda x: F @ x
+
+
+def test_ukf_predict_output_shapes():
+    """ukf_predict returns x of shape (n,) and CovarianceMatrix of size (n,n)."""
+    m  = ConstantVelocityMotionModel(num_dims=2, process_covar=1.0)
+    dt = 1.0
+    m.update_time_step(dt)
+    x  = np.array([0., 0., 1., 0.])
+    P  = CovarianceMatrix(np.eye(4))
+    f  = _cv_f_fun(m.f)
+    x_pred, p_pred = ukf_predict(x, P, m.q, f)
+    assert x_pred.shape == (4,)
+    assert p_pred.cov.shape == (4, 4)
+
+
+def test_ukf_predict_linear_matches_kf():
+    """For a linear transition function UKF and KF should agree to machine precision."""
+    m  = ConstantVelocityMotionModel(num_dims=3, process_covar=1.0)
+    dt = 0.5
+    m.update_time_step(dt)
+    x  = np.array([100., -50., 200., 10., -5., 0.])
+    P  = CovarianceMatrix(np.diag([1e4, 1e4, 1e4, 1e2, 1e2, 1e2]))
+    f_fun = _cv_f_fun(m.f)
+
+    x_kf, p_kf   = kf_predict(x, P, m.q, m.f)
+    x_ukf, p_ukf = ukf_predict(x, P, m.q, f_fun, alpha=1.0, beta=2., kappa=0.)
+
+    assert np.allclose(x_ukf, x_kf, atol=1e-8)
+    assert np.allclose(p_ukf.cov, p_kf.cov, atol=1e-8)
+
+
+def test_ukf_predict_nonlinear_ct_close_to_ekf():
+    """For a mildly nonlinear CT step UKF and EKF should give close (not identical) results."""
+    dt    = 1.0
+    omega = 0.1   # rad/s — mild nonlinearity
+    m     = ConstantTurnMotionModel(num_dims=2, process_covar=1.0,
+                                    process_covar_omega=0.01)
+    m.update_time_step(dt)
+
+    x = np.array([0., 0., 10., 0., omega])
+    P = CovarianceMatrix(np.diag([1e4, 1e4, 1e2, 1e2, 0.01]))
+
+    f_fun = m.make_transition_function(dt)
+    g_fun = lambda state: m.make_jacobian(state, dt)
+
+    x_ekf, p_ekf = ekf_predict(x, P, m.q, f_fun, g_fun)
+    x_ukf, p_ukf = ukf_predict(x, P, m.q, f_fun)
+
+    # Means should agree closely for mild nonlinearity
+    assert np.allclose(x_ukf, x_ekf, atol=0.5)
+    # Covariances should have the same order of magnitude
+    assert np.allclose(np.diag(p_ukf.cov), np.diag(p_ekf.cov), rtol=0.1)
+
+
+def test_ukf_predict_covariance_positive_semidefinite():
+    """Predicted covariance from UKF should be positive semidefinite."""
+    m  = ConstantTurnMotionModel(num_dims=2, process_covar=2.0,
+                                 process_covar_omega=0.01)
+    dt = 2.0
+    m.update_time_step(dt)
+    x  = np.array([0., 0., 15., 5., 0.05])
+    P  = CovarianceMatrix(np.diag([1e4, 1e4, 1e2, 1e2, 0.01]))
+    f  = m.make_transition_function(dt)
+    _, p_pred = ukf_predict(x, P, m.q, f)
+    eigvals = np.linalg.eigvalsh(p_pred.cov)
+    assert np.all(eigvals > -1e-10)
+
+
+def test_ukf_predict_alpha_affects_result():
+    """Changing alpha should change the predicted covariance for a nonlinear model."""
+    m  = ConstantTurnMotionModel(num_dims=2, process_covar=1.0,
+                                 process_covar_omega=0.01)
+    dt = 1.0
+    m.update_time_step(dt)
+    x  = np.array([0., 0., 10., 0., 0.3])   # larger ω → stronger nonlinearity
+    P  = CovarianceMatrix(np.diag([1e4, 1e4, 1e2, 1e2, 0.1]))
+    f  = m.make_transition_function(dt)
+    _, p1 = ukf_predict(x, P, m.q, f, alpha=1e-3)
+    _, p2 = ukf_predict(x, P, m.q, f, alpha=1.0)
+    assert not np.allclose(p1.cov, p2.cov, atol=1e-6)
+
+
+def test_ukf_predict_near_singular_covariance():
+    """UKF should not crash when P is near-singular (Cholesky fallback path)."""
+    m  = ConstantVelocityMotionModel(num_dims=2, process_covar=1.0)
+    dt = 1.0
+    m.update_time_step(dt)
+    x  = np.array([0., 0., 1., 0.])
+    # Near-singular P: one eigenvalue essentially zero
+    P  = CovarianceMatrix(np.diag([1e4, 1e4, 1., 1e-12]))
+    f  = _cv_f_fun(m.f)
+    x_pred, p_pred = ukf_predict(x, P, m.q, f)
+    assert x_pred.shape == (4,)
+    assert np.all(np.isfinite(p_pred.cov))
