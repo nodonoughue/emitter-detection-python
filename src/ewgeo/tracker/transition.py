@@ -177,6 +177,8 @@ class MotionModel(ABC):
                         'cj': ConstantJerkMotionModel,
                         'constant_turn': ConstantTurnMotionModel,
                         'ct': ConstantTurnMotionModel,
+                        'constant_turn_rate_acceleration': ConstantTurnRateAccelerationMotionModel,
+                        'ctra': ConstantTurnRateAccelerationMotionModel,
                         'ballistic': BallisticMotionModel,
                         }
         if model_type.lower() not in valid_models:
@@ -586,7 +588,182 @@ class BallisticMotionModel(MotionModel):
         return s_pred
 
 
-# TODO: ConstantTurnRateAccelerationMotionModel
+class ConstantTurnRateAccelerationMotionModel(MotionModel):
+    """
+    Constant Turn Rate and Acceleration (CTRA) motion model.
+
+    State vector (via PolarKinematicStateSpace, has_accel=True, num_turn_dims=1):
+        2D: [px, py, vx, vy, ax, ay, ω]          — 7 states
+        3D: [px, py, pz, vx, vy, vz, ax, ay, az, ω]  — 10 states
+
+    The turn rate ω (rad/s) and acceleration vector are tracked states.  The velocity
+    vector rotates in the horizontal (x-y) plane at rate ω, while a world-frame
+    acceleration acts as an additive forcing term on both position and velocity.
+    For 3D, the z-component propagates as constant acceleration (no vertical rotation);
+    only yaw-only turn (num_turn_dims=1) is supported.
+
+    Prediction uses the exact nonlinear discrete-time transition; covariance is propagated
+    EKF-style via the linearised Jacobian evaluated at the current state estimate.
+
+    :param num_dims:            Number of spatial dimensions (2 or 3).
+    :param process_covar:       Kinematic process noise spectral density: scalar, 1-D array
+                                of length num_dims, or (num_dims × num_dims) matrix.
+    :param process_covar_omega: Turn-rate process noise spectral density [rad²/s³].
+                                Discrete-time variance for ω is process_covar_omega * dt.
+    :param time_delta:          Optional fixed time step [s]; pre-computes Q if provided.
+    """
+
+    def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None,
+                 process_covar_omega: float = None, time_delta: float = None):
+        super().__init__()
+
+        if num_dims not in (2, 3):
+            raise ValueError("ConstantTurnRateAccelerationMotionModel requires num_dims in {2, 3}")
+
+        self.state_space = PolarKinematicStateSpace(num_dims=num_dims, has_vel=True,
+                                                    has_accel=True, num_turn_dims=1)
+        self.time_delta = time_delta
+        self.process_covar = process_covar
+        self.process_covar_omega = process_covar_omega if process_covar_omega is not None else 1.0
+        self.update_time_step(time_delta)
+
+    @property
+    def is_linear(self) -> bool:
+        return False
+
+    def make_transition_matrix(self, time_delta: float = None):
+        """Not applicable to this nonlinear model. Use make_jacobian instead."""
+        raise NotImplementedError(
+            "ConstantTurnRateAccelerationMotionModel is nonlinear; the transition matrix is "
+            "state-dependent. Use make_jacobian(x, time_delta) for EKF covariance propagation."
+        )
+
+    def make_transition_function(self, time_delta: float):
+        """
+        Return a callable f(x) that propagates the CTRA state vector forward by time_delta.
+
+        CT rotation kinematics are applied to the position and velocity states; world-frame
+        acceleration enters as an additive bias.  For |ω·dt| < 1e-6 the function falls back
+        to the straight-line (CA) limit to avoid numerical blow-up.
+        """
+        dt = time_delta
+        n  = self.num_dims
+
+        def f(x):
+            x     = np.asarray(x, dtype=float)
+            omega = float(x[-1])
+            vx, vy = x[n], x[n + 1]
+            ax, ay = x[2 * n], x[2 * n + 1]
+            odt    = omega * dt
+
+            if abs(odt) < 1e-6:           # straight-line (CA) limit
+                sow = dt
+                com = 0.0
+            else:
+                sow = np.sin(odt) / omega
+                com = (1.0 - np.cos(odt)) / omega
+
+            new_x        = x.copy()
+            new_x[0]     = x[0] + sow * vx - com * vy + 0.5 * dt ** 2 * ax   # px'
+            new_x[1]     = x[1] + com * vx + sow * vy + 0.5 * dt ** 2 * ay   # py'
+            new_x[n]     =  np.cos(odt) * vx - np.sin(odt) * vy + dt * ax    # vx'
+            new_x[n + 1] =  np.sin(odt) * vx + np.cos(odt) * vy + dt * ay    # vy'
+            # ax, ay, ω unchanged
+
+            if n == 3:
+                vz = x[n + 2]
+                az = x[2 * n + 2]
+                new_x[2]     = x[2] + dt * vz + 0.5 * dt ** 2 * az  # pz'
+                new_x[n + 2] = vz + dt * az                          # vz'
+                # az unchanged
+
+            return new_x
+
+        return f
+
+    def make_jacobian(self, x: npt.ArrayLike, time_delta: float) -> npt.NDArray:
+        """
+        Return the Jacobian of the CTRA transition function at state x.
+
+        Computed analytically; small-angle fallback applied when |ω·dt| < 1e-6.
+        """
+        x     = np.asarray(x, dtype=float)
+        dt    = time_delta
+        n     = self.num_dims
+        ns    = self.num_states
+        vx    = float(x[n])
+        vy    = float(x[n + 1])
+        omega = float(x[-1])
+        odt   = omega * dt
+        s     = np.sin(odt)
+        c     = np.cos(odt)
+
+        if abs(odt) < 1e-6:              # Taylor limits as ω → 0
+            sow          =  dt
+            com          =  0.0
+            d_sow_domega = -dt ** 3 / 3
+            d_com_domega =  dt ** 2 / 2
+        else:
+            sow          =  s / omega
+            com          = (1.0 - c) / omega
+            d_sow_domega =  dt * c / omega - s / omega ** 2
+            d_com_domega =  dt * s / omega - (1.0 - c) / omega ** 2
+
+        F = np.eye(ns)
+
+        # ── Position rows (px', py') ────────────────────────────────────────────
+        F[0, n]         =  sow                                      # ∂px'/∂vx
+        F[0, n + 1]     = -com                                      # ∂px'/∂vy
+        F[0, 2 * n]     =  0.5 * dt ** 2                           # ∂px'/∂ax
+        F[0, -1]        =  d_sow_domega * vx - d_com_domega * vy   # ∂px'/∂ω
+
+        F[1, n]         =  com                                      # ∂py'/∂vx
+        F[1, n + 1]     =  sow                                      # ∂py'/∂vy
+        F[1, 2 * n + 1] =  0.5 * dt ** 2                           # ∂py'/∂ay
+        F[1, -1]        =  d_com_domega * vx + d_sow_domega * vy   # ∂py'/∂ω
+
+        # ── Velocity rows (vx', vy') ────────────────────────────────────────────
+        F[n,     n]         =  c                                    # ∂vx'/∂vx
+        F[n,     n + 1]     = -s                                    # ∂vx'/∂vy
+        F[n,     2 * n]     =  dt                                   # ∂vx'/∂ax
+        F[n,     -1]        = -dt * s * vx - dt * c * vy           # ∂vx'/∂ω
+
+        F[n + 1, n]         =  s                                    # ∂vy'/∂vx
+        F[n + 1, n + 1]     =  c                                    # ∂vy'/∂vy
+        F[n + 1, 2 * n + 1] =  dt                                   # ∂vy'/∂ay
+        F[n + 1, -1]        =  dt * c * vx - dt * s * vy           # ∂vy'/∂ω
+
+        # ── 3D: z sub-system (pz', vz') ────────────────────────────────────────
+        if n == 3:
+            F[2,     n + 2]     = dt            # ∂pz'/∂vz
+            F[2,     2 * n + 2] = 0.5 * dt ** 2 # ∂pz'/∂az
+            F[n + 2, 2 * n + 2] = dt            # ∂vz'/∂az
+
+        return F
+
+    def make_process_covariance_matrix(self, process_covar: npt.ArrayLike = None,
+                                       time_delta: float = None) -> CovarianceMatrix:
+        """
+        Build Q = block_diag(Q_kin, Q_ω) where:
+          Q_kin  is the (3·num_dims × 3·num_dims) CA-style kinematic noise block, and
+          Q_ω    = process_covar_omega · dt  (random-walk model for ω).
+        """
+        process_covar = self.validate_process_covar_input(process_covar)
+        if time_delta is None:
+            time_delta = self.time_delta
+        dt  = time_delta
+        pc  = process_covar
+
+        q_kin = np.block([[.25 * dt ** 4 * pc, .5 * dt ** 3 * pc, .5 * dt ** 2 * pc],
+                          [.5  * dt ** 3 * pc, dt ** 2      * pc, dt             * pc],
+                          [.5  * dt ** 2 * pc, dt           * pc, pc                 ]])
+
+        q_omega = np.array([[self.process_covar_omega * dt]])
+        n3      = 3 * self.num_dims
+        q_mat   = np.block([[q_kin,              np.zeros((n3, 1))],
+                            [np.zeros((1, n3)),  q_omega          ]])
+        return CovarianceMatrix(q_mat)
+
 
 # =============== Elementary Kalman Filter and Extended Kalman Filter Prediction Functions ================
 def kf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f):

@@ -7,6 +7,7 @@ from ewgeo.tracker.transition import (
     ConstantJerkMotionModel,
     ConstantTurnMotionModel,
     BallisticMotionModel,
+    ConstantTurnRateAccelerationMotionModel,
     MotionModel,
     kf_predict,
     ekf_predict,
@@ -601,3 +602,219 @@ def test_ballistic_predict_covariance_matches_cv():
 def test_make_motion_model_ballistic():
     m = MotionModel.make_motion_model('ballistic', num_dims=3, process_covar=1.0)
     assert isinstance(m, BallisticMotionModel)
+
+
+# ---------------------------------------------------------------------------
+# ConstantTurnRateAccelerationMotionModel — construction and properties
+# ---------------------------------------------------------------------------
+
+def test_ctra_is_not_linear():
+    m = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    assert m.is_linear is False
+
+
+def test_ctra_state_space_2d():
+    from ewgeo.tracker.states import PolarKinematicStateSpace
+    m = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    assert isinstance(m.state_space, PolarKinematicStateSpace)
+    assert m.state_space.num_states == 7    # [px,py,vx,vy,ax,ay,ω]
+    assert m.state_space.has_accel is True
+    assert m.state_space.has_turn_rate is True
+
+
+def test_ctra_state_space_3d():
+    m = ConstantTurnRateAccelerationMotionModel(num_dims=3, process_covar=1.0)
+    assert m.state_space.num_states == 10   # [px,py,pz,vx,vy,vz,ax,ay,az,ω]
+
+
+def test_ctra_invalid_num_dims_raises():
+    with pytest.raises(ValueError):
+        ConstantTurnRateAccelerationMotionModel(num_dims=1, process_covar=1.0)
+
+
+def test_ctra_make_transition_matrix_raises():
+    m = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    with pytest.raises(NotImplementedError):
+        m.make_transition_matrix()
+
+
+# ---------------------------------------------------------------------------
+# ConstantTurnRateAccelerationMotionModel — transition function
+# ---------------------------------------------------------------------------
+
+def test_ctra_transition_zero_omega_equals_ca_2d():
+    """At ω=0 CTRA transition collapses to CA kinematics."""
+    dt = 1.0
+    m  = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    # state: [px, py, vx, vy, ax, ay, ω]
+    x  = np.array([0., 0., 10., 5., 2., 1., 0.])
+    f  = m.make_transition_function(dt)
+    x_new = f(x)
+    # CA expected (ω=0, fallback sow=dt, com=0):
+    # px' = 0 + dt*10 + 0.5*dt²*2 = 11
+    # py' = 0 + dt*5  + 0.5*dt²*1 = 5.5
+    # vx' = 10 + dt*2 = 12
+    # vy' =  5 + dt*1 = 6
+    assert equal_to_tolerance(x_new[:2], np.array([11., 5.5]))
+    assert equal_to_tolerance(x_new[2:4], np.array([12., 6.]))
+    assert equal_to_tolerance(x_new[4:6], np.array([2., 1.]))   # accel unchanged
+    assert equal_to_tolerance(x_new[-1], 0.0)                   # ω unchanged
+
+
+def test_ctra_transition_zero_accel_equals_ct_2d():
+    """At ax=ay=0 CTRA transition collapses to CT kinematics."""
+    dt    = 0.5
+    omega = np.pi / 4   # 45 deg/s
+    vx, vy = 10., 0.
+    m  = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    x  = np.array([0., 0., vx, vy, 0., 0., omega])
+    f  = m.make_transition_function(dt)
+    x_new = f(x)
+    odt   = omega * dt
+    sow   = np.sin(odt) / omega
+    com   = (1.0 - np.cos(odt)) / omega
+    # Pure CT prediction
+    assert equal_to_tolerance(x_new[0], sow * vx - com * vy, tol=1e-9)
+    assert equal_to_tolerance(x_new[1], com * vx + sow * vy, tol=1e-9)
+    assert equal_to_tolerance(x_new[2], np.cos(odt) * vx - np.sin(odt) * vy, tol=1e-9)
+    assert equal_to_tolerance(x_new[3], np.sin(odt) * vx + np.cos(odt) * vy, tol=1e-9)
+
+
+def test_ctra_transition_3d_z_propagates_as_ca():
+    """3D z sub-system uses CA (pz' = pz + dt*vz + 0.5*dt²*az, vz' = vz + dt*az)."""
+    dt = 1.0
+    m  = ConstantTurnRateAccelerationMotionModel(num_dims=3, process_covar=1.0)
+    # state: [px,py,pz, vx,vy,vz, ax,ay,az, ω]
+    x  = np.zeros(10)
+    x[5] = 5.     # vz
+    x[8] = -2.    # az
+    f  = m.make_transition_function(dt)
+    x_new = f(x)
+    assert equal_to_tolerance(x_new[2], 0 + 1.0 * 5. + 0.5 * 1. ** 2 * (-2.), tol=1e-9)  # pz'
+    assert equal_to_tolerance(x_new[5], 5. + 1.0 * (-2.), tol=1e-9)                       # vz'
+
+
+# ---------------------------------------------------------------------------
+# ConstantTurnRateAccelerationMotionModel — Jacobian
+# ---------------------------------------------------------------------------
+
+def test_ctra_jacobian_shape_2d():
+    m = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    x = np.array([0., 0., 5., 0., 1., 0., 0.1])
+    J = m.make_jacobian(x, time_delta=1.0)
+    assert J.shape == (7, 7)
+
+
+def test_ctra_jacobian_shape_3d():
+    m = ConstantTurnRateAccelerationMotionModel(num_dims=3, process_covar=1.0)
+    x = np.zeros(10)
+    J = m.make_jacobian(x, time_delta=1.0)
+    assert J.shape == (10, 10)
+
+
+def test_ctra_jacobian_omega_zero_limit():
+    """Jacobian at ω=0 should not contain NaN or Inf (Taylor fallback)."""
+    m = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    x = np.array([0., 0., 5., 3., 1., 0.5, 0.])
+    J = m.make_jacobian(x, time_delta=1.0)
+    assert not np.any(np.isnan(J))
+    assert not np.any(np.isinf(J))
+
+
+def test_ctra_jacobian_finite_difference_2d():
+    """Jacobian should match finite-difference approximation."""
+    dt    = 0.5
+    omega = 0.3
+    m     = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    x0    = np.array([1., 2., 4., -3., 0.5, -0.5, omega])
+    f     = m.make_transition_function(dt)
+    J_an  = m.make_jacobian(x0, dt)
+
+    eps  = 1e-5
+    ns   = len(x0)
+    J_fd = np.zeros((ns, ns))
+    for j in range(ns):
+        xp = x0.copy(); xp[j] += eps
+        xm = x0.copy(); xm[j] -= eps
+        J_fd[:, j] = (f(xp) - f(xm)) / (2 * eps)
+
+    assert np.allclose(J_an, J_fd, atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# ConstantTurnRateAccelerationMotionModel — process noise
+# ---------------------------------------------------------------------------
+
+def test_ctra_process_noise_shape_2d():
+    m = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0,
+                                                process_covar_omega=0.1)
+    Q = m.make_process_covariance_matrix(time_delta=1.0)
+    assert Q.cov.shape == (7, 7)
+
+
+def test_ctra_process_noise_shape_3d():
+    m = ConstantTurnRateAccelerationMotionModel(num_dims=3, process_covar=1.0)
+    Q = m.make_process_covariance_matrix(time_delta=1.0)
+    assert Q.cov.shape == (10, 10)
+
+
+def test_ctra_process_noise_omega_block():
+    """Bottom-right element of Q should equal process_covar_omega * dt."""
+    dt = 2.0
+    pw = 0.25
+    m  = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0,
+                                                 process_covar_omega=pw)
+    Q  = m.make_process_covariance_matrix(time_delta=dt)
+    assert equal_to_tolerance(Q.cov[-1, -1], pw * dt)
+
+
+def test_ctra_kinematic_block_matches_ca_2d():
+    """Top-left 6×6 of CTRA Q should equal the CA Q for the same parameters."""
+    dt = 1.0
+    m_ctra = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    m_ca   = ConstantAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    Q_ctra = m_ctra.make_process_covariance_matrix(time_delta=dt).cov
+    Q_ca   = m_ca.make_process_covariance_matrix(time_delta=dt).cov
+    assert equal_to_tolerance(Q_ctra[:6, :6], Q_ca)
+
+
+# ---------------------------------------------------------------------------
+# ConstantTurnRateAccelerationMotionModel — predict()
+# ---------------------------------------------------------------------------
+
+def test_ctra_predict_state_shape_2d():
+    dt = 1.0
+    m  = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    x0 = np.array([0., 0., 5., 0., 0., 0., 0.2])
+    cov = CovarianceMatrix(np.eye(7))
+    s  = State(m.state_space, time=0.0, state=x0, covar=cov)
+    s_new = m.predict(s, dt)
+    assert s_new.state.shape == (7,)
+    assert s_new.covar.cov.shape == (7, 7)
+
+
+def test_ctra_predict_covariance_positive_definite():
+    dt = 1.0
+    m  = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0,
+                                                 process_covar_omega=0.1)
+    x0 = np.array([0., 0., 5., 3., 1., 0., 0.2])
+    cov = CovarianceMatrix(np.eye(7))
+    s  = State(m.state_space, time=0.0, state=x0, covar=cov)
+    s_new = m.predict(s, dt)
+    eigvals = np.linalg.eigvalsh(s_new.covar.cov)
+    assert np.all(eigvals > -1e-10)
+
+
+# ---------------------------------------------------------------------------
+# Factory
+# ---------------------------------------------------------------------------
+
+def test_make_motion_model_ctra():
+    m = MotionModel.make_motion_model('ctra', num_dims=2, process_covar=1.0)
+    assert isinstance(m, ConstantTurnRateAccelerationMotionModel)
+
+
+def test_make_motion_model_ctra_long_key():
+    m = MotionModel.make_motion_model('constant_turn_rate_acceleration',
+                                      num_dims=3, process_covar=1.0)
+    assert isinstance(m, ConstantTurnRateAccelerationMotionModel)
