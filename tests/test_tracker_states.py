@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from ewgeo.tracker.states import State, CartesianStateSpace
+from ewgeo.tracker.states import State, CartesianStateSpace, PolarKinematicStateSpace
 
 
 # ---------------------------------------------------------------------------
@@ -306,3 +306,83 @@ def test_state_acceleration_covar_none_when_no_accel():
     ss = make_cv_state_space()
     s = State(ss, time=0.0, state=CV_VEC, covar=CV_COV)
     assert s.acceleration_covar is None
+
+
+# ---------------------------------------------------------------------------
+# PolarKinematicStateSpace tests
+# ---------------------------------------------------------------------------
+
+def test_polar_kinematic_ct_2d_properties():
+    """CT 2D yaw-only: [px, py, vx, vy, ω] — 5 states."""
+    ss = PolarKinematicStateSpace(num_dims=2, has_vel=True, has_accel=False, num_turn_dims=1)
+    assert ss.num_dims == 2
+    assert ss.num_states == 5
+    assert ss.has_vel is True
+    assert ss.has_accel is False
+    assert ss.has_turn_rate is True
+    assert ss.num_turn_dims == 1
+    assert ss.pos_slice == np.s_[:2]
+    assert ss.vel_slice == np.s_[2:4]
+    assert ss.accel_slice is None
+    assert ss.turn_rate_slice == np.s_[4:5]
+
+
+def test_polar_kinematic_ctra_2d_properties():
+    """CTRA 2D yaw-only: [px, py, vx, vy, ax, ay, ω] — 7 states."""
+    ss = PolarKinematicStateSpace(num_dims=2, has_vel=True, has_accel=True, num_turn_dims=1)
+    assert ss.num_states == 7
+    assert ss.has_accel is True
+    assert ss.accel_slice == np.s_[4:6]
+    assert ss.turn_rate_slice == np.s_[6:7]
+
+
+def test_polar_kinematic_ct_3d_yaw_pitch_properties():
+    """CT 3D yaw+pitch: [px, py, pz, vx, vy, vz, ωyaw, ωpitch] — 8 states."""
+    ss = PolarKinematicStateSpace(num_dims=3, has_vel=True, has_accel=False, num_turn_dims=2)
+    assert ss.num_states == 8
+    assert ss.num_turn_dims == 2
+    assert ss.turn_rate_slice == np.s_[6:8]
+
+
+def test_polar_kinematic_ctra_3d_yaw_pitch_properties():
+    """CTRA 3D yaw+pitch: [px,py,pz, vx,vy,vz, ax,ay,az, ωyaw,ωpitch] — 11 states."""
+    ss = PolarKinematicStateSpace(num_dims=3, has_vel=True, has_accel=True, num_turn_dims=2)
+    assert ss.num_states == 11
+    assert ss.turn_rate_slice == np.s_[9:11]
+
+
+def test_polar_kinematic_turn_rate_component():
+    """turn_rate_component extracts the correct scalar from the state vector."""
+    ss = PolarKinematicStateSpace(num_dims=2, has_accel=False, num_turn_dims=1)
+    x = np.array([1., 2., 3., 4., 0.1])   # ω = 0.1
+    assert equal_to_tolerance(ss.turn_rate_component(x), np.array([0.1]))
+
+
+def test_polar_kinematic_turn_rate_component_yaw_pitch():
+    """Two-element turn_rate_component for yaw+pitch case."""
+    ss = PolarKinematicStateSpace(num_dims=3, has_accel=False, num_turn_dims=2)
+    x = np.array([1., 2., 3., 4., 5., 6., 0.1, 0.05])
+    assert equal_to_tolerance(ss.turn_rate_component(x), np.array([0.1, 0.05]))
+
+
+def test_cartesian_state_space_has_no_turn_rate():
+    """CartesianStateSpace.has_turn_rate is False; turn_rate_component returns None."""
+    ss = CartesianStateSpace(num_dims=2, has_vel=True)
+    assert ss.has_turn_rate is False
+    assert ss.turn_rate_slice is None
+    assert ss.turn_rate_component(np.array([1., 2., 3., 4.])) is None
+
+
+def test_polar_kinematic_no_vel_raises():
+    with pytest.raises(ValueError):
+        PolarKinematicStateSpace(num_dims=2, has_vel=False)
+
+
+def test_polar_kinematic_invalid_num_turn_dims_raises():
+    with pytest.raises(ValueError):
+        PolarKinematicStateSpace(num_dims=2, num_turn_dims=3)
+
+
+def test_polar_kinematic_yaw_pitch_requires_3d():
+    with pytest.raises(ValueError):
+        PolarKinematicStateSpace(num_dims=2, num_turn_dims=2)

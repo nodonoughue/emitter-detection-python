@@ -93,6 +93,15 @@ class StateSpace(ABC):
         """Return the acceleration sub-vector of state vector x, or None if absent."""
         return x[self.accel_slice] if self.has_accel else None
 
+    @property
+    def has_turn_rate(self) -> bool:
+        """True if the state vector contains turn-rate components. False by default."""
+        return False
+
+    def turn_rate_component(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64] | None:
+        """Return the turn-rate sub-vector of state vector x, or None if absent."""
+        return x[self.turn_rate_slice] if self.has_turn_rate else None
+
 
 class CartesianStateSpace(StateSpace):
     """
@@ -162,6 +171,65 @@ class CartesianStateSpace(StateSpace):
     @property
     def accel_slice(self) -> slice | None:
         return self._accel_slice
+
+    @property
+    def turn_rate_slice(self) -> slice | None:
+        """Always None for purely Cartesian state spaces."""
+        return None
+
+
+class PolarKinematicStateSpace(CartesianStateSpace):
+    """
+    StateSpace for motion models that combine Cartesian position/velocity/acceleration
+    blocks with a turn-rate block:
+
+        [pos (n_dims) | vel (n_dims) | accel (n_dims, opt) | turn_rate (n_turn_dims)]
+
+    The turn-rate block represents angular rate(s) in rad/s:
+
+        num_turn_dims=1  — yaw only: a single scalar ω.  Suitable for 2-D motion or
+                           3-D motion where only heading rotation is tracked.
+        num_turn_dims=2  — yaw + pitch: [ωyaw, ωpitch].  Requires num_dims >= 3.
+
+    Designed for use with Constant Turn (CT) and Constant Turn Rate and Acceleration
+    (CTRA) motion models.  ``has_jerk`` is intentionally excluded.
+
+    :param num_dims:      Number of spatial dimensions (2 or 3).
+    :param has_vel:       Must be True (turn rate is meaningless without velocity).
+    :param has_accel:     Include an acceleration block (default False → CT; True → CTRA).
+    :param num_turn_dims: Number of turn-rate components: 1 (yaw only) or 2 (yaw+pitch).
+    """
+
+    def __init__(self, num_dims: int, has_vel: bool = True,
+                 has_accel: bool = False, num_turn_dims: int = 1):
+        if not has_vel:
+            raise ValueError("PolarKinematicStateSpace requires has_vel=True")
+        if num_turn_dims not in (1, 2):
+            raise ValueError("num_turn_dims must be 1 or 2")
+        if num_turn_dims == 2 and num_dims < 3:
+            raise ValueError("num_turn_dims=2 (yaw + pitch) requires num_dims >= 3")
+
+        super().__init__(num_dims=num_dims, has_vel=has_vel,
+                         has_accel=has_accel, has_jerk=False)
+
+        self._num_turn_dims = num_turn_dims
+        turn_start = self._num_states          # end of the Cartesian blocks
+        self._num_states = turn_start + num_turn_dims
+        self._turn_rate_slice = np.s_[turn_start:turn_start + num_turn_dims]
+
+    @property
+    def num_turn_dims(self) -> int:
+        """Number of turn-rate components (1 = yaw only, 2 = yaw + pitch)."""
+        return self._num_turn_dims
+
+    @property
+    def has_turn_rate(self) -> bool:
+        return True
+
+    @property
+    def turn_rate_slice(self) -> slice:
+        return self._turn_rate_slice
+
 
 class State:
     """
