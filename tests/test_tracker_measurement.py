@@ -3,7 +3,7 @@ import pytest
 from scipy.stats import multivariate_normal
 
 from ewgeo.tracker.measurement import Measurement, MeasurementModel, kf_update, ekf_update
-from ewgeo.tracker.states import State, StateSpace
+from ewgeo.tracker.states import State, StateSpace, CartesianStateSpace
 from ewgeo.utils.covariance import CovarianceMatrix
 
 
@@ -66,32 +66,12 @@ class _MockPSSWithVel:
 
 def make_cv_state_space():
     """2D CV state space: [px, py, vx, vy]"""
-    ss = StateSpace()
-    ss.num_dims = 2
-    ss.num_states = 4
-    ss.has_pos = True
-    ss.has_vel = True
-    ss.has_accel = False
-    ss.pos_slice = np.s_[:2]
-    ss.vel_slice = np.s_[2:4]
-    ss.pos_vel_slice = np.s_[:4]
-    ss.accel_slice = None
-    return ss
+    return CartesianStateSpace(num_dims=2, has_vel=True, has_accel=False)
 
 
 def make_pos_only_state_space():
     """2D position-only state space: [px, py]"""
-    ss = StateSpace()
-    ss.num_dims = 2
-    ss.num_states = 2
-    ss.has_pos = True
-    ss.has_vel = False
-    ss.has_accel = False
-    ss.pos_slice = np.s_[:2]
-    ss.vel_slice = None
-    ss.pos_vel_slice = np.s_[:2]
-    ss.accel_slice = None
-    return ss
+    return CartesianStateSpace(num_dims=2, has_vel=False, has_accel=False)
 
 
 # ---------------------------------------------------------------------------

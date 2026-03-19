@@ -4,6 +4,7 @@ import numpy as np
 from .association import Associator, MissedDetectionHypothesis
 from .measurement import Measurement, MeasurementModel
 from .track import Track, State, StateSpace
+from .states import adapt_cartesian_state
 from ..utils.covariance import CovarianceMatrix
 
 class Initiator(ABC):
@@ -27,11 +28,14 @@ class SinglePointMeasurementInitiator(Initiator):
     """
     msmt_model: MeasurementModel
 
-    def __init__(self, msmt_model: MeasurementModel):
+    def __init__(self, msmt_model: MeasurementModel, target_state_space: StateSpace = None):
         """
-        :param msmt_model: MeasurementModel used to convert each measurement into an initial State
+        :param msmt_model:         MeasurementModel used to convert each measurement into an initial State
+        :param target_state_space: If provided, each newly created State is adapted to this StateSpace
+                                   via adapt_cartesian_state before the Track is created.
         """
         self.msmt_model = msmt_model
+        self.target_state_space = target_state_space
 
     def initiate(self, measurements: list[Measurement], next_track_id: int=None) -> tuple[list[Track], int]:
         """
@@ -48,6 +52,8 @@ class SinglePointMeasurementInitiator(Initiator):
         for m in measurements:
             # Determine a position and/or velocity for this measurement
             s = self.msmt_model.state_from_measurement(m)
+            if self.target_state_space is not None:
+                s = adapt_cartesian_state(s, self.target_state_space)
 
             # Initialize a track object
             t = Track(initial_state=s, track_id=next_track_id)
@@ -68,13 +74,17 @@ class TwoPointInitiator(Initiator):
     _buffered_measurements: dict  # keyed by some tentative track id
     _buffer_tracks: list          # single-point tentative tracks for association
 
-    def __init__(self, msmt_model: MeasurementModel, associator: Associator):
+    def __init__(self, msmt_model: MeasurementModel, associator: Associator,
+                 target_state_space: StateSpace = None):
         """
-        :param msmt_model: MeasurementModel used to convert each measurement into a State
-        :param associator: Associator used to pair new measurements with buffered single-point tracks
+        :param msmt_model:         MeasurementModel used to convert each measurement into a State
+        :param associator:         Associator used to pair new measurements with buffered single-point tracks
+        :param target_state_space: If provided, each confirmed Track's initial State is adapted to this
+                                   StateSpace via adapt_cartesian_state before the Track is created.
         """
         self.msmt_model = msmt_model
         self.associator = associator
+        self.target_state_space = target_state_space
         self._buffered_measurements = {}
         self._buffer_tracks = []
 
@@ -111,6 +121,8 @@ class TwoPointInitiator(Initiator):
                         init_state = State(s2.state_space, s2.time,
                                            self._build_state_with_velocity(s2, vel_est),
                                            self._build_initial_covariance(s2, dt))
+                        if self.target_state_space is not None:
+                            init_state = adapt_cartesian_state(init_state, self.target_state_space)
                         confirmed_tracks.append(
                             Track(initial_state=init_state, track_id=track.track_id)
                         )
@@ -161,11 +173,11 @@ class TwoPointInitiator(Initiator):
             crlb_vel = crlb_pos / (dt**2)
             init_covar[vel_slice, vel_slice] = crlb_vel
 
-        # There isn't enough information to initialize acceleration; so just give it a large value and let
-        # the tracker bring it down
+        # There isn't enough information to initialize acceleration; scale by another 1/dt²
+        # (consistent with the velocity scaling above) to get a physically reasonable estimate.
         if state.state_space.has_accel:
             accel_slice = state.state_space.accel_slice
-            crlb_accel = crlb_pos * 1e6
+            crlb_accel = crlb_vel / (dt**2)
             init_covar[accel_slice, accel_slice] = crlb_accel
 
         return CovarianceMatrix(init_covar)
@@ -183,13 +195,17 @@ class ThreePointInitiator(Initiator):
     _stage1_tracks: list[Track]   # single-point buffer (t1)
     _stage2_tracks: list[Track]   # two-point buffer (t1, t2)
 
-    def __init__(self, msmt_model: MeasurementModel, associator: Associator):
+    def __init__(self, msmt_model: MeasurementModel, associator: Associator,
+                 target_state_space: StateSpace = None):
         """
-        :param msmt_model: MeasurementModel used to convert measurements into States
-        :param associator: Associator used to link measurements across the three buffered stages
+        :param msmt_model:         MeasurementModel used to convert measurements into States
+        :param associator:         Associator used to link measurements across the three buffered stages
+        :param target_state_space: If provided, each confirmed Track's initial State is adapted to this
+                                   StateSpace via adapt_cartesian_state before the Track is created.
         """
         self.msmt_model = msmt_model
         self.associator = associator
+        self.target_state_space = target_state_space
         self._stage1_tracks = []
         self._stage2_tracks = []
 
@@ -223,6 +239,11 @@ class ThreePointInitiator(Initiator):
 
                     full_track = self._build_track(s1, s2, s3)
                     if full_track is not None:
+                        if self.target_state_space is not None:
+                            adapted = adapt_cartesian_state(
+                                full_track.curr_state, self.target_state_space)
+                            full_track = Track(initial_state=adapted,
+                                               track_id=full_track.track_id)
                         confirmed_tracks.append(full_track)
                     matched_stage2.append(track)
                 # Unconditionally retire stage-2 tracks (matched or not)
@@ -329,7 +350,9 @@ class ThreePointInitiator(Initiator):
         acc_var = 6.0 * pos_var / (dt ** 4)
 
         covar[state_space.pos_slice, state_space.pos_slice] *= pos_var
-        covar[state_space.vel_slice, state_space.vel_slice] *= vel_var
-        covar[state_space.accel_slice, state_space.accel_slice] *= acc_var
+        if state_space.has_vel:
+            covar[state_space.vel_slice, state_space.vel_slice] *= vel_var
+        if state_space.has_accel:
+            covar[state_space.accel_slice, state_space.accel_slice] *= acc_var
 
         return covar

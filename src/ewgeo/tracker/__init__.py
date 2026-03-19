@@ -1,7 +1,9 @@
 # Directly import several classes for easier reference
-from .states import StateSpace, State
+from .states import StateSpace, CartesianStateSpace, PolarKinematicStateSpace, State, adapt_cartesian_state
 from .track import Track
-from .transition import MotionModel, kf_predict, ekf_predict
+from .transition import (MotionModel, ConstantTurnMotionModel, BallisticMotionModel,
+                         ConstantTurnRateAccelerationMotionModel,
+                         kf_predict, ekf_predict, ukf_predict)
 from .measurement import MeasurementModel, kf_update, ekf_update
 from .tracker import Tracker
 

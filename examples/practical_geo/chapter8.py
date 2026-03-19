@@ -5,6 +5,9 @@ import time
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo import tracker
+from ewgeo.tracker.transition import (ConstantVelocityMotionModel,
+                                      BallisticMotionModel,
+                                      ConstantTurnMotionModel)
 from ewgeo.utils import print_progress, print_elapsed
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.constraints import fixed_alt
@@ -23,7 +26,7 @@ def run_all_examples():
     :return figs: list of figure handles
     """
 
-    return list(example1()) + list(example2())
+    return list(example1()) + list(example2()) + list(example3()) + list(example4())
 
 
 def example1(mc_params=None):
@@ -554,6 +557,307 @@ def example2(rng=np.random.default_rng()):
     # ===  Return Figure Handles
     figs = [fig1, fig2, fig3]
     return figs
+
+
+def example3(rng=np.random.default_rng(0)):
+    """
+    Example 8.3: Ballistic Trajectory Tracking.
+
+    A projectile is launched and tracked using four ground-based TDOA sensors.
+    Two EKF variants are compared:
+
+    - Constant-Velocity (CV) model: gravity is unmodelled; must rely on large
+      process noise to follow the curved descent.  This inflates estimation noise
+      throughout the trajectory.
+    - Ballistic motion model: gravity is an explicit deterministic forcing term on
+      the state mean.  A small kinematic process noise is sufficient, yielding
+      accurate tracking through ascent and descent.
+
+    :param rng: numpy random-number generator (seeded for reproducibility)
+    :return: list of figure handles [trajectory profile, RMSE vs time]
+    """
+
+    # --- Target trajectory: ballistic, 3-D --------------------------------
+    g_scalar = -9.80665         # m/s²  (downward, applied to z-axis)
+    t_inc    = 1.0              # seconds between updates
+    v_init   = np.array([100., 80., 200.])   # initial velocity [m/s]: east, north, up
+    x_init   = np.array([0., 0., 0.])        # launch point (ground level)
+
+    t_flight = -2. * v_init[2] / g_scalar    # total flight time ≈ 40.8 s
+    t_vec    = np.arange(0., t_flight, t_inc)
+    num_time = len(t_vec)
+
+    gravity_vec  = np.array([0., 0., g_scalar])
+    x_tgt_full = (x_init[:, np.newaxis]
+                  + v_init[:, np.newaxis] * t_vec[np.newaxis, :]
+                  + 0.5 * gravity_vec[:, np.newaxis] * t_vec[np.newaxis, :] ** 2)
+
+    # --- TDOA sensors: cross pattern at 3 km (ground level) ---------------
+    x_tdoa = np.array([[ 3e3,  0.,  -3e3,  0. ],
+                       [ 0.,   3e3,  0.,  -3e3],
+                       [ 10.,  10.,  10.,  10.]])
+    n_tdoa = x_tdoa.shape[1]
+
+    ref_idx   = 0
+    sigma_toa = 300e-9    # 300 ns → ~90 m RDOA noise
+    cov_toa   = CovarianceMatrix(speed_of_light ** 2 * sigma_toa ** 2 * np.eye(n_tdoa))
+    tdoa      = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_toa, ref_idx=ref_idx,
+                                              variance_is_toa=False)
+
+    z    = tdoa.measurement(x_tgt_full)
+    noise = rng.standard_normal((n_tdoa - 1, num_time)) * sigma_toa * speed_of_light
+    zeta  = z + noise
+
+    # --- EKF helpers -------------------------------------------------------
+    def make_mfns(ss):
+        """Build (z_fun, h_fun) callables for a given state space."""
+        mm = tracker.MeasurementModel(pss=tdoa, state_space=ss)
+        def z_fun(x):
+            return mm.measurement(tracker.State(state_space=ss, state=x, time=0.)).zeta
+        def h_fun(x):
+            return mm.jacobian(tracker.State(state_space=ss, state=x, time=0.))
+        return z_fun, h_fun
+
+    def run_ekf(motion_model, x0, P0):
+        """Run the EKF loop; return (3, num_time) position estimate array."""
+        ss    = motion_model.state_space
+        pos_s = ss.pos_slice
+        z_fn, h_fn = make_mfns(ss)
+
+        x_p = x0.copy()
+        p_p = CovarianceMatrix(P0.copy())
+
+        x_out = np.zeros((3, num_time))
+        for idx in range(num_time):
+            t_now = t_vec[idx]
+            x_e, p_e = tracker.ekf_update(x_p, p_p, zeta[:, idx], tdoa.cov, z_fn, h_fn)
+            s_e    = tracker.State(state_space=ss, time=t_now, state=x_e, covar=p_e)
+            s_pred = motion_model.predict(s_e, t_now + t_inc)
+            x_p    = s_pred.state
+            p_p    = s_pred.covar
+            x_out[:, idx] = x_e[pos_s]
+        return x_out
+
+    # --- Shared initial conditions ----------------------------------------
+    pos_perturb = np.array([300., -200., 200.])   # intentional offset [m]
+
+    # CV tracker: large process noise to compensate for unmodelled gravity
+    mm_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=50. ** 2)
+    ss_cv = mm_cv.state_space
+    x0_cv = np.zeros(ss_cv.num_states)
+    x0_cv[ss_cv.pos_slice] = x_init + pos_perturb
+    x0_cv[ss_cv.vel_slice] = v_init
+    P0_cv = np.zeros((ss_cv.num_states, ss_cv.num_states))
+    P0_cv[ss_cv.pos_slice, ss_cv.pos_slice] = (500. ** 2) * np.eye(3)
+    P0_cv[ss_cv.vel_slice, ss_cv.vel_slice] = (300. ** 2) * np.eye(3)
+
+    # Ballistic tracker: gravity is modelled → small kinematic process noise suffices
+    mm_bal = BallisticMotionModel(process_covar=3. ** 2)
+    ss_bal = mm_bal.state_space
+    x0_bal = x0_cv.copy()   # same starting point
+    P0_bal = P0_cv.copy()
+
+    x_cv  = run_ekf(mm_cv,  x0_cv,  P0_cv)
+    x_bal = run_ekf(mm_bal, x0_bal, P0_bal)
+
+    # --- Figure 1: range–altitude profile ---------------------------------
+    rng_tgt = np.hypot(x_tgt_full[0], x_tgt_full[1])
+    rng_cv  = np.hypot(x_cv[0],  x_cv[1])
+    rng_bal = np.hypot(x_bal[0], x_bal[1])
+
+    fig1, ax1 = plt.subplots()
+    ax1.plot(rng_tgt / 1e3, x_tgt_full[2] / 1e3, 'k-',  linewidth=2, label='True trajectory')
+    ax1.plot(rng_cv  / 1e3, x_cv[2]  / 1e3,       '--',  label='CV model')
+    ax1.plot(rng_bal / 1e3, x_bal[2] / 1e3,       '-.',  label='Ballistic model')
+    ax1.set_xlabel('Horizontal range [km]')
+    ax1.set_ylabel('Altitude [km]')
+    ax1.legend()
+    ax1.grid(True)
+    ax1.set_title('Example 8.3: Ballistic Trajectory – Range/Altitude Profile')
+
+    # --- Figure 2: 3-D position RMSE vs time ------------------------------
+    rmse_cv  = np.sqrt(np.sum((x_cv  - x_tgt_full) ** 2, axis=0))
+    rmse_bal = np.sqrt(np.sum((x_bal - x_tgt_full) ** 2, axis=0))
+
+    fig2, ax2 = plt.subplots()
+    ax2.semilogy(t_vec, rmse_cv  / 1e3, label='CV model')
+    ax2.semilogy(t_vec, rmse_bal / 1e3, label='Ballistic model')
+    ax2.set_xlabel('Time [s]')
+    ax2.set_ylabel('3-D RMSE [km]')
+    ax2.legend()
+    ax2.grid(True)
+    ax2.set_title('Example 8.3: Position RMSE vs Time')
+
+    return [fig1, fig2]
+
+
+def example4(rng=np.random.default_rng(0)):
+    """
+    Example 8.4: Constant-Turn Aircraft Tracking.
+
+    An aircraft executes a sustained coordinated level turn (one full circle)
+    tracked by four ground-based TDOA sensors.  Two EKF variants are compared:
+
+    - Constant-Velocity (CV) model: the centripetal acceleration is unmodelled;
+      a large process noise is required to follow the turn, producing noisy estimates.
+    - Constant-Turn (CT) model: the turn rate ω is a tracked state.  A small
+      kinematic process noise suffices, yielding smooth, accurate estimates
+      throughout the manoeuvre.
+
+    The CT model tracks ω from an initial value of zero, converging to the true
+    turn rate after a few observations.
+
+    :param rng: numpy random-number generator (seeded for reproducibility)
+    :return: list of figure handles [x-y trajectory, RMSE vs time, ω estimate]
+    """
+
+    # --- Target trajectory: constant-rate level turn ----------------------
+    omega_true = np.pi / 60.       # rad/s  → one full circle in 120 s (standard-rate turn)
+    v0         = 200.              # m/s
+    alt        = 3e3               # m  (constant altitude)
+    R          = v0 / omega_true   # turn radius ≈ 3820 m
+
+    t_inc    = 5.0                         # seconds between updates
+    t_max    = 2. * np.pi / omega_true     # 120 s  (full circle)
+    t_vec    = np.arange(0., t_max, t_inc)
+    num_time = len(t_vec)
+
+    # Exact CT trajectory starting at [0, 0, alt] heading north (+y)
+    x_tgt_full = np.array([
+        -R * (1. - np.cos(omega_true * t_vec)),   # px: circles left (west)
+         R *       np.sin(omega_true * t_vec),    # py
+        np.full(num_time, alt)                    # pz: level
+    ])
+    vx_true = -v0 * np.sin(omega_true * t_vec)
+    vy_true =  v0 * np.cos(omega_true * t_vec)
+
+    # --- TDOA sensors: rectangle surrounding the turn circle --------------
+    # Circle centre ≈ (−R, 0, alt); bounding box x ∈ [−2R, 0], y ∈ [−R, R]
+    x_tdoa = np.array([[ 2e3, -9e3, -9e3,  2e3],
+                       [ 5e3,  5e3, -5e3, -5e3],
+                       [  0.,   0.,   0.,   0.]])
+    n_tdoa = x_tdoa.shape[1]
+
+    ref_idx   = 0
+    sigma_toa = 100e-9    # 100 ns → ~30 m RDOA noise
+    cov_toa   = CovarianceMatrix(speed_of_light ** 2 * sigma_toa ** 2 * np.eye(n_tdoa))
+    tdoa      = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_toa, ref_idx=ref_idx,
+                                              variance_is_toa=False)
+
+    z     = tdoa.measurement(x_tgt_full)
+    noise = rng.standard_normal((n_tdoa - 1, num_time)) * sigma_toa * speed_of_light
+    zeta  = z + noise
+
+    # --- EKF helpers -------------------------------------------------------
+    def make_mfns(ss):
+        mm = tracker.MeasurementModel(pss=tdoa, state_space=ss)
+        def z_fun(x):
+            return mm.measurement(tracker.State(state_space=ss, state=x, time=0.)).zeta
+        def h_fun(x):
+            return mm.jacobian(tracker.State(state_space=ss, state=x, time=0.))
+        return z_fun, h_fun
+
+    def run_ekf(motion_model, x0, P0, track_omega=False):
+        """Run the EKF loop. Returns (3, T) position array and, if track_omega,
+        also a (T,) array of estimated turn-rate values."""
+        ss    = motion_model.state_space
+        pos_s = ss.pos_slice
+        z_fn, h_fn = make_mfns(ss)
+
+        x_p = x0.copy()
+        p_p = CovarianceMatrix(P0.copy())
+
+        x_out     = np.zeros((3, num_time))
+        omega_out = np.zeros(num_time) if track_omega else None
+
+        for idx in range(num_time):
+            t_now = t_vec[idx]
+            x_e, p_e = tracker.ekf_update(x_p, p_p, zeta[:, idx], tdoa.cov, z_fn, h_fn)
+            s_e    = tracker.State(state_space=ss, time=t_now, state=x_e, covar=p_e)
+            s_pred = motion_model.predict(s_e, t_now + t_inc)
+            x_p    = s_pred.state
+            p_p    = s_pred.covar
+            x_out[:, idx] = x_e[pos_s]
+            if track_omega:
+                omega_out[idx] = x_e[ss.turn_rate_slice][0]
+
+        return (x_out, omega_out) if track_omega else x_out
+
+    # --- Shared initial conditions ----------------------------------------
+    pos_perturb = np.array([400., -400., 100.])
+
+    # CV tracker
+    # CV: tuned for a non-maneuvering target (σ_a = 2 m/s²). The centripetal
+    # acceleration is ~10.5 m/s², so each 5-second prediction step introduces a
+    # ~130 m position error — roughly 5× the CV process-noise σ_pos of ~25 m.
+    # This systematic mismatch causes visible filter lag during the turn.
+    mm_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=2. ** 2)
+    ss_cv = mm_cv.state_space
+    x0_cv = np.zeros(ss_cv.num_states)
+    x0_cv[ss_cv.pos_slice] = x_tgt_full[:, 0] + pos_perturb
+    x0_cv[ss_cv.vel_slice] = [0., v0, 0.]
+    P0_cv = np.zeros((ss_cv.num_states, ss_cv.num_states))
+    P0_cv[ss_cv.pos_slice, ss_cv.pos_slice] = (500. ** 2) * np.eye(3)
+    P0_cv[ss_cv.vel_slice, ss_cv.vel_slice] = (100. ** 2) * np.eye(3)
+
+    # CT tracker: ω initially unknown → start at 0 with generous uncertainty
+    sigma_omega_init = 0.1   # rad/s  (covers ±2σ of the true ω ≈ 0.052 rad/s)
+    # CT: same kinematic σ_a as CV for a fair comparison; ω treated as nearly
+    # constant (process_covar_omega = 1e-6 → σ_ω ≈ 0.002 rad/s per step),
+    # which forces the filter to maintain its ω estimate between updates.
+    mm_ct = ConstantTurnMotionModel(num_dims=3, process_covar=2. ** 2,
+                                    process_covar_omega=1e-6)
+    ss_ct = mm_ct.state_space
+    x0_ct = np.zeros(ss_ct.num_states)   # [px,py,pz, vx,vy,vz, ω]
+    x0_ct[ss_ct.pos_slice] = x_tgt_full[:, 0] + pos_perturb
+    x0_ct[ss_ct.vel_slice] = [0., v0, 0.]
+    x0_ct[-1]               = 0.          # ω unknown at start
+    P0_ct = np.zeros((ss_ct.num_states, ss_ct.num_states))
+    P0_ct[ss_ct.pos_slice, ss_ct.pos_slice] = (500. ** 2) * np.eye(3)
+    P0_ct[ss_ct.vel_slice, ss_ct.vel_slice] = (100. ** 2) * np.eye(3)
+    P0_ct[-1, -1]                            = sigma_omega_init ** 2
+
+    x_cv                 = run_ekf(mm_cv, x0_cv, P0_cv, track_omega=False)
+    x_ct, omega_est      = run_ekf(mm_ct, x0_ct, P0_ct, track_omega=True)
+
+    # --- Figure 1: x-y trajectory -----------------------------------------
+    fig1, ax1 = plt.subplots()
+    ax1.plot(x_tgt_full[0] / 1e3, x_tgt_full[1] / 1e3, 'k-', linewidth=2,
+             label='True trajectory')
+    ax1.plot(x_cv[0] / 1e3, x_cv[1] / 1e3,  '--', label='CV model')
+    ax1.plot(x_ct[0] / 1e3, x_ct[1] / 1e3,  '-.', label='CT model')
+    ax1.scatter(*x_tdoa[:2] / 1e3, marker='^', zorder=5, label='Sensors')
+    ax1.set_xlabel('x [km]')
+    ax1.set_ylabel('y [km]')
+    ax1.set_aspect('equal')
+    ax1.legend()
+    ax1.grid(True)
+    ax1.set_title('Example 8.4: Constant-Turn Aircraft – x-y Trajectory')
+
+    # --- Figure 2: 3-D position RMSE vs time ------------------------------
+    rmse_cv = np.sqrt(np.sum((x_cv - x_tgt_full) ** 2, axis=0))
+    rmse_ct = np.sqrt(np.sum((x_ct - x_tgt_full) ** 2, axis=0))
+
+    fig2, ax2 = plt.subplots()
+    ax2.semilogy(t_vec, rmse_cv / 1e3, label='CV model')
+    ax2.semilogy(t_vec, rmse_ct / 1e3, label='CT model')
+    ax2.set_xlabel('Time [s]')
+    ax2.set_ylabel('3-D RMSE [km]')
+    ax2.legend()
+    ax2.grid(True)
+    ax2.set_title('Example 8.4: Position RMSE vs Time')
+
+    # --- Figure 3: estimated turn rate vs time ----------------------------
+    fig3, ax3 = plt.subplots()
+    ax3.axhline(np.degrees(omega_true), color='k', linewidth=2, label='True ω')
+    ax3.plot(t_vec, np.degrees(omega_est), label='CT estimate')
+    ax3.set_xlabel('Time [s]')
+    ax3.set_ylabel('Turn rate [deg/s]')
+    ax3.legend()
+    ax3.grid(True)
+    ax3.set_title('Example 8.4: CT Model – Estimated Turn Rate')
+
+    return [fig1, fig2, fig3]
 
 
 if __name__ == '__main__':
