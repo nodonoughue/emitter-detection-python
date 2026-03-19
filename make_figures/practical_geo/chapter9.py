@@ -449,7 +449,7 @@ def make_figure_9(prefix=None):
 
     # Output to file
     if prefix is not None:
-        labels = ['fig9a', 'fig9b']
+        labels = ['fig9a', 'fig9b', 'fig9c']
         if len(labels) != len(figs):
             print('**Error saving figure 9.9; unexpected number of figures generated.')
         else:

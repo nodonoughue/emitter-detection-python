@@ -423,7 +423,7 @@ def example4():
     time_vec = tgts[0][0]
     truth_label = 'Noisy Truth Measurements'
     fa_label = 'False Alarm Measurements'
-    num_fa_per_step = 5
+    num_fa_per_step = 20
 
     iterations_per_marker = 1
     iterations_per_row = 40 * iterations_per_marker
@@ -481,16 +481,16 @@ def example4():
         ax2.plot(x_tgt[0]/scale, x_tgt[1]/scale, color=color, label=label)
 
     # CV confirmed tracks
-    cv_label = 'CV Confirmed'
+    cv_label = 'CV Tracks'
     for t in tracker_cv.all_tracks:
-        t.plot(ax2, do_cov=False, do_vel=False, linestyle='--', color='tab:blue',
+        t.plot(ax2, do_cov=False, do_vel=False, linestyle='--', color='tab:red',
                label=cv_label, scale=scale, plot_dims=np.s_[:2])
         cv_label = None
 
     # CA confirmed tracks
-    ca_label = 'CA Confirmed'
+    ca_label = 'CA Tracks'
     for t in tracker_ca.all_tracks:
-        t.plot(ax2, do_cov=False, do_vel=False, linestyle='--', color='tab:orange',
+        t.plot(ax2, do_cov=False, do_vel=False, linestyle='-.', color='tab:purple',
                label=ca_label, scale=scale, plot_dims=np.s_[:2])
         ca_label = None
 
@@ -530,13 +530,12 @@ def example4():
                               default=np.nan) / scale)
 
         label = f'Target {tgt_idx + 1}'
-        ax3.plot(time_vec, cv_err, color=color, linestyle='-',  label=f'{label} CV')
-        ax3.plot(time_vec, ca_err, color=color, linestyle='--', label=f'{label} CA')
+        ax3.plot(time_vec, cv_err, color=color, linestyle='--',  label=f'{label} CV')
+        ax3.plot(time_vec, ca_err, color=color, linestyle='-.', label=f'{label} CA')
 
     ax3.set_title('Position Error vs Time (CV solid, CA dashed)', fontsize=10)
     ax3.set_xlabel('Time [s]', fontsize=8)
     ax3.set_ylabel('Error [km]', fontsize=8)
-    ax3.set_yscale('log')
     ax3.legend(fontsize=8)
     ax3.grid(True)
     ax3.tick_params(labelsize=8)
