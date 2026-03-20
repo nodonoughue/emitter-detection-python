@@ -171,21 +171,18 @@ def compute_rmse(covariance: CovarianceMatrix | list[CovarianceMatrix] | npt.Arr
     """
     # Scalar result; straightforward
     if isinstance(covariance, CovarianceMatrix):
-        return np.sqrt(np.trace(covariance.cov))
+        return covariance.rmse
 
     # Batch processing
     if isinstance(covariance, (list, tuple)):
-        # Grab raw covariance matrices
-        covs = np.stack([c.cov for c in covariance], axis=0)
+        # Call the native .rmse property for each one and return as an array
+        return np.array([c.rmse for c in covariance])
     elif isinstance(covariance, np.ndarray):
-        # Already stacked
-        covs = covariance
+        # Already stacked; vectorized computation
+        trace = np.trace(covariance, axis1=-1, axis2=-2)  # trace over the last two dimensions
+        return np.sqrt(trace)
     else:
         raise TypeError("Input must be a CovarianceMatrix, list of CovarianceMatrices, or numpy array.")
-
-    # Vectorized computation
-    trace = np.trace(covs, axis1=-1, axis2=-2) # trace over the last two dimensions
-    return np.sqrt(trace)
 
 
 def draw_cep50(x: npt.ArrayLike,

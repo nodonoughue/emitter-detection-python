@@ -155,9 +155,8 @@ def example1(mc_params=None):
         x_ekf_est[:,idx] = x_est.position
         x_ekf_pred[:,idx] = x_pred.position
 
-        # TODO: make an RMSE function for CovarianceMatrix that natively computes sqrt of trace
-        rmse_cov_est[idx] = np.sqrt(np.linalg.trace(x_est.position_covar.cov))
-        rmse_cov_pred[idx] = np.sqrt(np.linalg.trace(x_pred.position_covar.cov))
+        rmse_cov_est[idx] = x_est.position_covar.rmse
+        rmse_cov_pred[idx] = x_pred.position_covar.rmse
 
         # Draw an error ellipse
         x_est_xyz = x_est.position
@@ -250,8 +249,8 @@ def example1(mc_params=None):
             x_ekf_est[:, idx] = x_est.state[pos_slice]
             x_ekf_pred[:, idx] = x_pred.state[pos_slice]
 
-            sse_cov_est[idx_mc, idx] = np.linalg.trace(x_est.covar.cov[pos_slice, pos_slice])
-            sse_cov_pred[idx_mc, idx] = np.linalg.trace(x_pred.covar.cov[pos_slice, pos_slice])
+            sse_cov_est[idx_mc, idx] = x_est.position_covar.trace
+            sse_cov_pred[idx_mc, idx] = x_pred.position_covar.trace
 
         err_pred = x_ekf_pred[:, :-1] - x_tgt_full[:, 1:]
         err_est = x_ekf_est - x_tgt_full
@@ -471,17 +470,15 @@ def example2(rng=np.random.default_rng()):
         x_pred.covar.cov[vel_slice, vel_slice] = p_vel
 
         # Output the current prediction/estimation state
-        pos_est = x_est.state[pos_slice]
-        p_pos_est = x_est.covar.cov[pos_slice, pos_slice]
-        x_ekf_est[:, idx] = pos_est
-        x_ekf_pred[:,idx] = x_pred.state[pos_slice]
+        x_ekf_est[:, idx] = x_est.position
+        x_ekf_pred[:,idx] = x_pred.position
 
-        rmse_cov_est[idx] = np.sqrt(np.linalg.trace(x_est.covar.cov[pos_slice, pos_slice]))
-        rmse_cov_pred[idx]= np.sqrt(np.linalg.trace(x_pred.covar.cov[pos_slice, pos_slice]))
+        rmse_cov_est[idx] = x_est.position_covar.rmse
+        rmse_cov_pred[idx]= x_pred.position_covar.rmse
 
         # Draw an error ellipse
-        p_pos_xy = CovarianceMatrix(p_pos_est[:2, :2])
-        x_ell_est[:, :, idx] = draw_error_ellipse(x=pos_est[:2],
+        p_pos_xy = CovarianceMatrix(x_est.position_covar.cov[:2, :2])
+        x_ell_est[:, :, idx] = draw_error_ellipse(x=x_est.position[:2],
                                                   covariance=p_pos_xy,
                                                   num_pts=num_ell_pts)
 
