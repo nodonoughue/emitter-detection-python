@@ -158,6 +158,20 @@ class CovarianceMatrix:
             self._parse()
         return self._eigenvectors
 
+    @property
+    def rmse(self)-> np.float64 | None:
+        """
+        Compute the RMSE for this CovarianceMatrix, defined as the square root of the trace.
+        """
+        return np.sqrt(self.trace)
+
+    @property
+    def trace(self)-> np.float64 | None:
+        """
+        Compute the trace for this CovarianceMatrix
+        """
+        return np.trace(self.cov) if self.cov is not None else None
+
     """
     =========================================================
     Administrative Functions
