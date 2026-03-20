@@ -239,7 +239,8 @@ def example2():
     
     for idx in np.arange(num_pulses):
         this_x_ls, _ = tdoa.least_square(zeta=zeta[:, idx], x_init=x_init)
-        this_x_ls_mn, _ = tdoa.least_square(zeta= zeta_mn[:, idx], x_init=x_init)
+        this_x_ls_mn, _ = tdoa.least_square(zeta=zeta_mn[:, idx], x_init=x_init,
+                                             cov=tdoa.cov.multiply(1/(idx+1), overwrite=False))
         x_ls[:, idx] = this_x_ls
         x_ls_mn[:, idx] = this_x_ls_mn
     
@@ -319,16 +320,13 @@ def example3():
     cep = np.zeros(shape=(num_pulses,))
 
     x_init = np.array([1, 1]) * 1e3
-    prev_x=None
-    prev_p=None
     for idx in np.arange(num_pulses):
         # Grab the current measurement
         this_zeta = zeta[:, idx]
 
         if idx==0:
             # Initialization
-            res = aoa.least_square(zeta=this_zeta, x_init=x_init)
-            this_x = res[0]
+            this_x, _ = aoa.least_square(zeta=this_zeta, x_init=x_init)
             this_p = aoa.compute_crlb(x_source=this_x)
             this_state = tracker.State(state_space=_ss_pos, time=0, state=this_x, covar=this_p)
         else:
@@ -425,8 +423,6 @@ def example4():
     
     # Step through pulses
     this_p=None
-    prev_p=None
-    prev_x=None
     _ss_pos = tracker.CartesianStateSpace(num_dims=aoa.num_dim, has_vel=False)
     _mm = tracker.MeasurementModel(state_space=_ss_pos, pss=aoa)
 
@@ -449,7 +445,7 @@ def example4():
 
         # Store the results and update the variables
         x_est[:, idx] = this_state.position
-        cep[idx] = compute_cep50(this_state.covar)
+        cep[idx] = compute_cep50(this_state.position_covar)
 
         prev_state = this_state
 
@@ -463,7 +459,7 @@ def example4():
     ell = draw_error_ellipse(x=x_tgt, covariance=crlb, num_pts=101)
     plt.plot(ell[0]/1e3, ell[1]/1e3,'-.',label='Error Ellipse (single msmt.)')
     
-    ell_end = draw_error_ellipse(x=x_tgt, covariance=this_p, num_pts=101)
+    ell_end = draw_error_ellipse(x=x_tgt, covariance=prev_state.covar, num_pts=101)
     plt.plot(ell_end[0]/1e3, ell_end[1]/1e3,'-.',label='Error Ellipse (Final EKF Update)')
     
     offset = np.amax(np.amax(ell, axis=1)-np.amin(ell,axis=1), axis=None)
