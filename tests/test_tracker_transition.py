@@ -13,8 +13,11 @@ from ewgeo.tracker.transition import (
     ekf_predict,
     ukf_predict,
 )
-from ewgeo.tracker.states import State
+from ewgeo.tracker.states import State, CartesianStateSpace
 from ewgeo.utils.covariance import CovarianceMatrix
+
+# 1-D constant-velocity state space: [pos, vel] (2 states)
+_SS_1D_CV = CartesianStateSpace(num_dims=1, has_vel=True)
 
 
 def equal_to_tolerance(x, y, tol=1e-10):
@@ -183,11 +186,11 @@ def test_kf_predict_state_and_covariance():
     Q = CovarianceMatrix(np.array([[0.25, 0.5], [0.5, 1.0]]))
     x = np.array([10., 5.])
 
-    x_pred, P_pred = kf_predict(x, P, Q, F)
+    result = kf_predict(State(_SS_1D_CV, 0., x, P), Q, F)
 
-    assert equal_to_tolerance(x_pred, [15., 5.])
+    assert equal_to_tolerance(result.state, [15., 5.])
     P_expected = F @ np.eye(2) @ F.T + Q.cov
-    assert equal_to_tolerance(P_pred.cov, P_expected)
+    assert equal_to_tolerance(result.covar.cov, P_expected)
 
 
 def test_kf_predict_returns_covariance_matrix_instance():
@@ -195,8 +198,8 @@ def test_kf_predict_returns_covariance_matrix_instance():
     F = np.eye(2)
     P = CovarianceMatrix(np.eye(2))
     Q = CovarianceMatrix(np.eye(2))
-    _, P_pred = kf_predict(np.zeros(2), P, Q, F)
-    assert isinstance(P_pred, CovarianceMatrix)
+    result = kf_predict(State(_SS_1D_CV, 0., np.zeros(2), P), Q, F)
+    assert isinstance(result.covar, CovarianceMatrix)
 
 
 # ---------------------------------------------------------------------------
@@ -210,11 +213,15 @@ def test_ekf_predict_linear_case_matches_kf_predict():
     Q = CovarianceMatrix(np.array([[0.25, 0.5], [0.5, 1.0]]))
     x = np.array([10., 5.])
 
-    x_kf, P_kf = kf_predict(x, P, Q, F)
-    x_ekf, P_ekf = ekf_predict(x, P, Q, f_fun=lambda s: F @ s, g_fun=lambda s: F)
+    s_est = State(_SS_1D_CV, 0., x, P)
+    result_kf  = kf_predict(s_est, Q, F)
+    result_ekf = ekf_predict(s_est, Q,
+                             transition_fun=lambda s, dt: State(s.state_space, s.time + dt, F @ s.state, s.covar),
+                             jacobian_fun=lambda s, dt: F,
+                             time_step=0.0)
 
-    assert equal_to_tolerance(x_ekf, x_kf)
-    assert equal_to_tolerance(P_ekf.cov, P_kf.cov)
+    assert equal_to_tolerance(result_ekf.state, result_kf.state)
+    assert equal_to_tolerance(result_ekf.covar.cov, result_kf.covar.cov)
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +300,7 @@ def test_ct_zero_turn_rate_recovers_cv():
     m   = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
     dt  = 0.5
     x   = np.array([0., 0., 10., 5., 0.])    # [px, py, vx, vy, ω=0]
-    f   = m.make_transition_function(dt)
+    f   = _ct_f_fun(m, dt)
     x_new = f(x)
     expected = np.array([5., 2.5, 10., 5., 0.])
     assert equal_to_tolerance(x_new, expected)
@@ -305,7 +312,7 @@ def test_ct_quarter_turn():
     dt  = 1.0
     om  = np.pi / 2
     x   = np.array([0., 0., 1., 0., om])   # moving in +x, turning left
-    f   = m.make_transition_function(dt)
+    f   = _ct_f_fun(m, dt)
     x_new = f(x)
     # After 90° turn: velocity should point in +y
     assert equal_to_tolerance(x_new[2], 0., tol=1e-10)    # vx' ≈ 0
@@ -319,7 +326,7 @@ def test_ct_turn_rate_unchanged():
     m = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
     om = 0.3
     x  = np.array([1., 2., 3., 4., om])
-    x_new = m.make_transition_function(0.1)(x)
+    x_new = _ct_f_fun(m, 0.1)(x)
     assert equal_to_tolerance(x_new[4], om)
 
 
@@ -328,7 +335,7 @@ def test_ct_3d_z_propagates_as_cv():
     m  = ConstantTurnMotionModel(num_dims=3, process_covar=1.0)
     dt = 0.5
     x  = np.array([0., 0., 0., 1., 0., 2., 0.1])   # vz=2, ω=0.1
-    x_new = m.make_transition_function(dt)(x)
+    x_new = _ct_f_fun(m, dt)(x)
     assert equal_to_tolerance(x_new[2], 0. + 0.5 * 2.)   # pz' = 0 + 0.5*2 = 1.0
     assert equal_to_tolerance(x_new[5], 2.)               # vz unchanged
 
@@ -340,14 +347,14 @@ def test_ct_3d_z_propagates_as_cv():
 def test_ct_jacobian_shape_2d():
     m = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
     x = np.array([0., 0., 1., 0., 0.5])
-    J = m.make_jacobian(x, time_delta=0.1)
+    J = m.transition_matrix(State(m.state_space, 0., x, None), time_delta=0.1)
     assert J.shape == (5, 5)
 
 
 def test_ct_jacobian_shape_3d():
     m = ConstantTurnMotionModel(num_dims=3, process_covar=1.0)
     x = np.array([0., 0., 0., 1., 0., 0., 0.5])
-    J = m.make_jacobian(x, time_delta=0.1)
+    J = m.transition_matrix(State(m.state_space, 0., x, None), time_delta=0.1)
     assert J.shape == (7, 7)
 
 
@@ -356,7 +363,7 @@ def test_ct_jacobian_zero_omega_matches_cv():
     m  = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
     dt = 1.0
     x  = np.array([0., 0., 1., 0., 0.])   # vx=1, ω=0
-    J  = m.make_jacobian(x, time_delta=dt)
+    J  = m.transition_matrix(State(m.state_space, 0., x, None), time_delta=dt)
     # CV F for 2D, dt=1: [[1,0,1,0,*],[0,1,0,1,*],[0,0,1,0,*],[0,0,0,1,*],[0,0,0,0,1]]
     assert equal_to_tolerance(J[0, 2], 1.0)   # ∂px'/∂vx = dt = 1
     assert equal_to_tolerance(J[0, 3], 0.0)   # ∂px'/∂vy = 0  (no rotation)
@@ -369,8 +376,8 @@ def test_ct_jacobian_numerical_check():
     m   = ConstantTurnMotionModel(num_dims=2, process_covar=1.0)
     dt  = 0.3
     x   = np.array([1., 2., 3., 4., 0.5])
-    J   = m.make_jacobian(x, time_delta=dt)
-    f   = m.make_transition_function(dt)
+    J   = m.transition_matrix(State(m.state_space, 0., x, None), time_delta=dt)
+    f   = _ct_f_fun(m, dt)
     eps = 1e-6
     J_fd = np.zeros((5, 5))
     for i in range(5):
@@ -695,6 +702,49 @@ def test_ctra_transition_3d_z_propagates_as_ca():
     assert equal_to_tolerance(x_new[5], 5. + 1.0 * (-2.), tol=1e-9)                       # vz'
 
 
+def test_ctra_transition_function_returns_state():
+    """transition_function() returns a State with advanced time and correct state values."""
+    dt = 1.0
+    m  = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
+    x0 = np.array([1., 2., 5., 3., 0.5, -0.5, 0.0])
+    s0 = State(m.state_space, time=3.0, state=x0, covar=None)
+    s1 = m.transition_function(s0, dt)
+    assert isinstance(s1, State)
+    assert s1.time == 3.0 + dt
+    # Values must match the raw make_transition_function output
+    f  = m.make_transition_function(dt)
+    assert equal_to_tolerance(s1.state, f(x0))
+
+
+def test_ctra_transition_function_caches_q():
+    """transition_function() caches self.q when time_delta changes."""
+    m  = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0,
+                                                 process_covar_omega=0.2)
+    x0 = np.array([0., 0., 1., 0., 0., 0., 0.1])
+    s0 = State(m.state_space, time=0.0, state=x0, covar=None)
+    assert m.q is None    # nothing cached yet
+    m.transition_function(s0, 1.0)
+    assert m.q is not None
+    assert m.q.cov.shape == (7, 7)
+    # Bottom-right element should equal process_covar_omega * dt = 0.2 * 1.0
+    assert equal_to_tolerance(m.q.cov[-1, -1], 0.2 * 1.0)
+
+
+def test_ctra_transition_function_updates_q_on_new_dt():
+    """transition_function() refreshes self.q when called with a different time_delta."""
+    m  = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0,
+                                                 process_covar_omega=1.0)
+    x0 = np.array([0., 0., 1., 0., 0., 0., 0.0])
+    s0 = State(m.state_space, time=0.0, state=x0, covar=None)
+    m.transition_function(s0, 1.0)
+    q_before = m.q.cov[-1, -1]   # should be 1.0 * 1.0 = 1.0
+    s1 = State(m.state_space, time=1.0, state=m.transition_function(s0, 1.0).state, covar=None)
+    m.transition_function(s1, 2.0)
+    q_after = m.q.cov[-1, -1]    # should be 1.0 * 2.0 = 2.0
+    assert equal_to_tolerance(q_before, 1.0)
+    assert equal_to_tolerance(q_after,  2.0)
+
+
 # ---------------------------------------------------------------------------
 # ConstantTurnRateAccelerationMotionModel — Jacobian
 # ---------------------------------------------------------------------------
@@ -702,14 +752,14 @@ def test_ctra_transition_3d_z_propagates_as_ca():
 def test_ctra_jacobian_shape_2d():
     m = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
     x = np.array([0., 0., 5., 0., 1., 0., 0.1])
-    J = m.make_jacobian(x, time_delta=1.0)
+    J = m.transition_matrix(x, time_delta=1.0)
     assert J.shape == (7, 7)
 
 
 def test_ctra_jacobian_shape_3d():
     m = ConstantTurnRateAccelerationMotionModel(num_dims=3, process_covar=1.0)
     x = np.zeros(10)
-    J = m.make_jacobian(x, time_delta=1.0)
+    J = m.transition_matrix(x, time_delta=1.0)
     assert J.shape == (10, 10)
 
 
@@ -717,7 +767,7 @@ def test_ctra_jacobian_omega_zero_limit():
     """Jacobian at ω=0 should not contain NaN or Inf (Taylor fallback)."""
     m = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
     x = np.array([0., 0., 5., 3., 1., 0.5, 0.])
-    J = m.make_jacobian(x, time_delta=1.0)
+    J = m.transition_matrix(x, time_delta=1.0)
     assert not np.any(np.isnan(J))
     assert not np.any(np.isinf(J))
 
@@ -729,7 +779,7 @@ def test_ctra_jacobian_finite_difference_2d():
     m     = ConstantTurnRateAccelerationMotionModel(num_dims=2, process_covar=1.0)
     x0    = np.array([1., 2., 4., -3., 0.5, -0.5, omega])
     f     = m.make_transition_function(dt)
-    J_an  = m.make_jacobian(x0, dt)
+    J_an  = m.transition_matrix(x0, dt)
 
     eps  = 1e-5
     ns   = len(x0)
@@ -830,17 +880,25 @@ def _cv_f_fun(F):
     return lambda x: F @ x
 
 
+def _ct_f_fun(m, dt):
+    """Return a closure that applies the CT nonlinear transition to a state vector (ndarray → ndarray)."""
+    def f(x_arr):
+        s_tmp = State(m.state_space, 0., x_arr, None)
+        return m.transition_function(s_tmp, dt).state
+    return f
+
+
 def test_ukf_predict_output_shapes():
-    """ukf_predict returns x of shape (n,) and CovarianceMatrix of size (n,n)."""
+    """ukf_predict returns a State with x of shape (n,) and CovarianceMatrix of size (n,n)."""
     m  = ConstantVelocityMotionModel(num_dims=2, process_covar=1.0)
     dt = 1.0
     m.update_time_step(dt)
     x  = np.array([0., 0., 1., 0.])
     P  = CovarianceMatrix(np.eye(4))
     f  = _cv_f_fun(m.f)
-    x_pred, p_pred = ukf_predict(x, P, m.q, f)
-    assert x_pred.shape == (4,)
-    assert p_pred.cov.shape == (4, 4)
+    result = ukf_predict(State(m.state_space, 0., x, P), m.q, f)
+    assert result.state.shape == (4,)
+    assert result.covar.cov.shape == (4, 4)
 
 
 def test_ukf_predict_linear_matches_kf():
@@ -852,11 +910,12 @@ def test_ukf_predict_linear_matches_kf():
     P  = CovarianceMatrix(np.diag([1e4, 1e4, 1e4, 1e2, 1e2, 1e2]))
     f_fun = _cv_f_fun(m.f)
 
-    x_kf, p_kf   = kf_predict(x, P, m.q, m.f)
-    x_ukf, p_ukf = ukf_predict(x, P, m.q, f_fun, alpha=1.0, beta=2., kappa=0.)
+    s_est = State(m.state_space, 0., x, P)
+    result_kf  = kf_predict(s_est, m.q, m.f)
+    result_ukf = ukf_predict(s_est, m.q, f_fun, alpha=1.0, beta=2., kappa=0.)
 
-    assert np.allclose(x_ukf, x_kf, atol=1e-8)
-    assert np.allclose(p_ukf.cov, p_kf.cov, atol=1e-8)
+    assert np.allclose(result_ukf.state, result_kf.state, atol=1e-8)
+    assert np.allclose(result_ukf.covar.cov, result_kf.covar.cov, atol=1e-8)
 
 
 def test_ukf_predict_nonlinear_ct_close_to_ekf():
@@ -870,16 +929,16 @@ def test_ukf_predict_nonlinear_ct_close_to_ekf():
     x = np.array([0., 0., 10., 0., omega])
     P = CovarianceMatrix(np.diag([1e4, 1e4, 1e2, 1e2, 0.01]))
 
-    f_fun = m.make_transition_function(dt)
-    g_fun = lambda state: m.make_jacobian(state, dt)
+    f_fun_ukf = _ct_f_fun(m, dt)
 
-    x_ekf, p_ekf = ekf_predict(x, P, m.q, f_fun, g_fun)
-    x_ukf, p_ukf = ukf_predict(x, P, m.q, f_fun)
+    s_est = State(m.state_space, 0., x, P)
+    result_ekf = ekf_predict(s_est, m.q, m.transition_function, m.transition_matrix, time_step=dt)
+    result_ukf = ukf_predict(s_est, m.q, f_fun_ukf, time_step=dt)
 
     # Means should agree closely for mild nonlinearity
-    assert np.allclose(x_ukf, x_ekf, atol=0.5)
+    assert np.allclose(result_ukf.state, result_ekf.state, atol=0.5)
     # Covariances should have the same order of magnitude
-    assert np.allclose(np.diag(p_ukf.cov), np.diag(p_ekf.cov), rtol=0.1)
+    assert np.allclose(np.diag(result_ukf.covar.cov), np.diag(result_ekf.covar.cov), rtol=0.1)
 
 
 def test_ukf_predict_covariance_positive_semidefinite():
@@ -890,9 +949,9 @@ def test_ukf_predict_covariance_positive_semidefinite():
     m.update_time_step(dt)
     x  = np.array([0., 0., 15., 5., 0.05])
     P  = CovarianceMatrix(np.diag([1e4, 1e4, 1e2, 1e2, 0.01]))
-    f  = m.make_transition_function(dt)
-    _, p_pred = ukf_predict(x, P, m.q, f)
-    eigvals = np.linalg.eigvalsh(p_pred.cov)
+    f  = _ct_f_fun(m, dt)
+    result = ukf_predict(State(m.state_space, 0., x, P), m.q, f, time_step=dt)
+    eigvals = np.linalg.eigvalsh(result.covar.cov)
     assert np.all(eigvals > -1e-10)
 
 
@@ -904,10 +963,11 @@ def test_ukf_predict_alpha_affects_result():
     m.update_time_step(dt)
     x  = np.array([0., 0., 10., 0., 0.3])   # larger ω → stronger nonlinearity
     P  = CovarianceMatrix(np.diag([1e4, 1e4, 1e2, 1e2, 0.1]))
-    f  = m.make_transition_function(dt)
-    _, p1 = ukf_predict(x, P, m.q, f, alpha=1e-3)
-    _, p2 = ukf_predict(x, P, m.q, f, alpha=1.0)
-    assert not np.allclose(p1.cov, p2.cov, atol=1e-6)
+    f  = _ct_f_fun(m, dt)
+    s_est = State(m.state_space, 0., x, P)
+    result1 = ukf_predict(s_est, m.q, f, alpha=1e-3)
+    result2 = ukf_predict(s_est, m.q, f, alpha=1.0)
+    assert not np.allclose(result1.covar.cov, result2.covar.cov, atol=1e-6)
 
 
 def test_ukf_predict_near_singular_covariance():
@@ -919,6 +979,6 @@ def test_ukf_predict_near_singular_covariance():
     # Near-singular P: one eigenvalue essentially zero
     P  = CovarianceMatrix(np.diag([1e4, 1e4, 1., 1e-12]))
     f  = _cv_f_fun(m.f)
-    x_pred, p_pred = ukf_predict(x, P, m.q, f)
-    assert x_pred.shape == (4,)
-    assert np.all(np.isfinite(p_pred.cov))
+    result = ukf_predict(State(m.state_space, 0., x, P), m.q, f)
+    assert result.state.shape == (4,)
+    assert np.all(np.isfinite(result.covar.cov))

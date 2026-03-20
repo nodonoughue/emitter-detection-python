@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 import numpy as np
 import numpy.typing as npt
 
@@ -46,16 +47,26 @@ class MotionModel(ABC):
     def make_process_covariance_matrix(self, process_covar: npt.ArrayLike, time_delta: float)-> CovarianceMatrix:
         pass
 
-    def make_transition_function(self, time_delta: float):
-        """Return a callable f(x) that propagates a state vector forward by time_delta.
-        Only called when is_linear is False.  Nonlinear subclasses must override this method."""
-        raise NotImplementedError(f"{self.__class__.__name__} must implement make_transition_function")
+    def transition_function(self, curr_state: State, time_delta: float) -> State:
+        if time_delta != self.time_delta:
+            # We need to update the transition matrix
+            self.time_delta = time_delta
+            self.f = self.make_transition_matrix(time_delta)
+            self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
 
-    def make_jacobian(self, x: npt.ArrayLike, time_delta: float) -> npt.NDArray:
-        """Return the Jacobian of the transition function evaluated at state x for time_delta.
-        Used by predict() for EKF-style covariance propagation when is_linear is False.
-        Nonlinear subclasses must override this method."""
-        raise NotImplementedError(f"{self.__class__.__name__} must implement make_jacobian")
+        # Default is a linear transition
+        return State(state_space=curr_state.state_space, time=curr_state.time + time_delta,
+                     state=self.f @ curr_state.state, covar=curr_state.covar)
+
+    def transition_matrix(self, x: npt.ArrayLike, time_delta: float) -> npt.NDArray:
+        """Default behavior, for linear models, is that the jacobian is just self.f, which
+        is populated by make_transition_matrix"""
+        if self.f is None or self.time_delta != time_delta:
+            self.time_delta = time_delta
+            self.f = self.make_transition_matrix(time_delta)
+            self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
+
+        return self.f
 
     @property
     def num_dims(self):
@@ -87,30 +98,18 @@ class MotionModel(ABC):
             # We already have a state at this time; nothing to predict forward
             return s
 
-        if self.is_linear:
-            # Linear prediction: cache F and Q when dt changes
-            if time_delta != self.time_delta:
-                self.time_delta = time_delta
-                self.f = self.make_transition_matrix(time_delta)
-                self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
-            new_state = self.f @ s.state
-            f_for_cov = self.f
-        else:
-            # Nonlinear (EKF-style) prediction: F is state-dependent, computed fresh each call
-            if time_delta != self.time_delta:
-                self.time_delta = time_delta
-                self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
-            f_fun = self.make_transition_function(time_delta)
-            new_state = f_fun(s.state)
-            f_for_cov = self.make_jacobian(s.state, time_delta)
+        # Predict the state forward, and grab the jacobian for use in updating the
+        # state error covariance
+        new_state = self.transition_function(s, time_delta)
+        f_for_cov = self.transition_matrix(s, time_delta)
 
         if s.covar is None:
-            new_covar = None
+            new_state.covar = None
         else:
-            new_covar = CovarianceMatrix(f_for_cov @ s.covar.cov @ np.transpose(f_for_cov) + self.q.cov)
+            new_state.covar = CovarianceMatrix(f_for_cov @ s.covar.cov @ np.transpose(f_for_cov) + self.q.cov)
 
         # Make a new State object
-        return State(s.state_space, new_time, new_state, new_covar)
+        return new_state
 
     def update_time_step(self, time_delta):
         """
@@ -353,6 +352,7 @@ class ConstantTurnMotionModel(MotionModel):
                                 Discrete-time variance for ω is process_covar_omega * dt.
     :param time_delta:          Optional fixed time step [s]; pre-computes Q if provided.
     """
+    state_space: PolarKinematicStateSpace
 
     def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None,
                  process_covar_omega: float = None, time_delta: float = None):
@@ -379,49 +379,56 @@ class ConstantTurnMotionModel(MotionModel):
             "Use make_jacobian(x, time_delta) for EKF covariance propagation."
         )
 
-    def make_transition_function(self, time_delta: float):
+    def transition_function(self, curr_state: State, time_delta: float) -> State:
         """
         Return a callable f(x) that propagates the CT state vector forward by time_delta.
 
         For |ω·dt| < 1e-6 the function falls back to the straight-line (CV) limit to avoid
         numerical blow-up in the sin(ω·dt)/ω and (1-cos(ω·dt))/ω terms.
         """
+        if self.q is None or self.time_delta is not time_delta:
+            self.time_delta = time_delta
+            self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
+
         dt = time_delta
         n  = self.num_dims
 
-        def f(x):
-            x     = np.asarray(x, dtype=float)
-            omega = float(x[-1])          # turn rate (scalar, always the last element)
-            vx    = x[n]
-            vy    = x[n + 1]
-            odt   = omega * dt
+        x = curr_state.position
+        v = curr_state.velocity
+        vx = v[0]
+        vy = v[1]
 
-            if abs(odt) < 1e-6:           # straight-line limit (Taylor expansion)
-                sow = dt
-                com = 0.0
-            else:
-                sow = np.sin(odt) / omega
-                com = (1.0 - np.cos(odt)) / omega
+        assert self.state_space.num_turn_dims == 1, "ConstantTurnMotionModel assumes only one turn dimension, state space defines two."
 
-            new_x        = x.copy()
-            new_x[0]     = x[0] + sow * vx - com * vy            # px'
-            new_x[1]     = x[1] + com * vx + sow * vy            # py'
-            new_x[n]     =  np.cos(odt) * vx - np.sin(odt) * vy  # vx'
-            new_x[n + 1] =  np.sin(odt) * vx + np.cos(odt) * vy  # vy'
-            if n == 3:
-                new_x[2] = x[2] + dt * x[n + 2]                  # pz' = pz + dt·vz
-                # vz' = vz (unchanged), ω' = ω (unchanged)
-            return new_x
+        omega = curr_state.state[self.state_space.turn_rate_slice].item()
+        odt   = omega * dt  # amount of heading change
 
-        return f
+        if abs(odt) < 1e-6:           # straight-line limit (Taylor expansion)
+            sow = dt
+            com = 0.0
+        else:
+            sow = np.sin(odt) / omega
+            com = (1.0 - np.cos(odt)) / omega
 
-    def make_jacobian(self, x: npt.ArrayLike, time_delta: float) -> npt.NDArray:
+        new_x        = curr_state.state.copy()  # start from current state; only updated entries change
+        new_x[0]     = x[0] + sow * vx - com * vy            # px'
+        new_x[1]     = x[1] + com * vx + sow * vy            # py'
+        new_x[n]     =  np.cos(odt) * vx - np.sin(odt) * vy  # vx'
+        new_x[n + 1] =  np.sin(odt) * vx + np.cos(odt) * vy  # vy'
+        if n == 3:
+            new_x[2] = x[2] + dt * v[2]                  # pz' = pz + dt·vz
+            # vz' = vz (unchanged), ω' = ω (unchanged)
+
+        return State(state_space=curr_state.state_space, time=curr_state.time+time_delta,
+                     state=new_x, covar=curr_state.covar)
+
+    def transition_matrix(self, s: State, time_delta: float) -> npt.NDArray:
         """
         Return the Jacobian of the CT transition function at state x.
 
         Computed analytically; small-angle fallback applied when |ω·dt| < 1e-6.
         """
-        x     = np.asarray(x, dtype=float)
+        x     = s.state
         dt    = time_delta
         n     = self.num_dims
         ns    = self.num_states
@@ -631,6 +638,17 @@ class ConstantTurnRateAccelerationMotionModel(MotionModel):
     def is_linear(self) -> bool:
         return False
 
+    def transition_function(self, curr_state: State, time_delta: float) -> State:
+        """Propagate the CTRA state vector forward by time_delta."""
+        if time_delta != self.time_delta:
+            self.time_delta = time_delta
+            self.q = self.make_process_covariance_matrix(self.process_covar, time_delta)
+
+        f = self.make_transition_function(time_delta)
+        new_x = f(curr_state.state)
+        return State(state_space=curr_state.state_space, time=curr_state.time + time_delta,
+                     state=new_x, covar=curr_state.covar)
+
     def make_transition_matrix(self, time_delta: float = None):
         """Not applicable to this nonlinear model. Use make_jacobian instead."""
         raise NotImplementedError(
@@ -681,12 +699,16 @@ class ConstantTurnRateAccelerationMotionModel(MotionModel):
 
         return f
 
-    def make_jacobian(self, x: npt.ArrayLike, time_delta: float) -> npt.NDArray:
+    def transition_matrix(self, x, time_delta: float) -> npt.NDArray:
         """
         Return the Jacobian of the CTRA transition function at state x.
 
         Computed analytically; small-angle fallback applied when |ω·dt| < 1e-6.
+
+        :param x: State object or ndarray of shape (num_states,)
         """
+        if isinstance(x, State):
+            x = x.state
         x     = np.asarray(x, dtype=float)
         dt    = time_delta
         n     = self.num_dims
@@ -766,54 +788,53 @@ class ConstantTurnRateAccelerationMotionModel(MotionModel):
 
 
 # =============== Elementary Kalman Filter and Extended Kalman Filter Prediction Functions ================
-def kf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f):
+def kf_predict(x_est: State, q: CovarianceMatrix, f: npt.ArrayLike, time_step: float=0.0) -> State:
     """
     Conduct a Kalman Filter prediction, given the current estimated state and covariance, a transition matrix, and
     the process noise covariance.
 
-    :param x_est: Current state estimate, shape: (n_states, )
-    :param p_est: Current state error covariance, CovarianceMatrix object with size n_states
+    :param x_est: Current state estimate; includes an estimated state error covariance
     :param q: Process noise covariance, CovarianceMatrix object with size n_states
     :param f: Transition matrix, shape: (n_states, n_states)
-    :return x_pred: Predicted state estimate, shape: (n_states, )
-    :return p_pred: Predicted state error covariance, shape: (n_states, n_states)
+    :param time_step: float (optional, default is zero). For advancing the time index of the new state.
+    :return x_pred: Predicted state (State)
     """
 
     # Predict the next state
-    x_pred = f @ x_est
+    xx_pred = f @ x_est.state
 
     # Predict the next state error covariance
-    p_pred = CovarianceMatrix(f @ p_est.cov @ f.T + q.cov)
+    pp_pred = CovarianceMatrix(f @ x_est.covar.cov @ f.T + q.cov)
 
-    return x_pred, p_pred
+    return State(state_space=x_est.state_space, state=xx_pred, covar=pp_pred, time=x_est.time + time_step)
 
 
-def ekf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f_fun, g_fun):
+def ekf_predict(x_est: State, q: CovarianceMatrix, transition_fun: Callable[[State, float], State],
+                jacobian_fun: Callable[[State, float], npt.NDArray], time_step: float) -> State:
     """
     Conduct an Extended Kalman Filter prediction, given the current estimated state and covariance, a function handle
     to generate the predicted state, and a function handle to generate the transition matrix.
 
-    :param x_est: Current state estimate, shape: (n_states, )
-    :param p_est: Current state error covariance, CovarianceMatrix object with size n_states
+    :param x_est: Current state estimate, State object
     :param q: Process noise covariance, CovarianceMatrix object with size n_states
-    :param f_fun: Transition function handle, returns an array of shape: (n_states, )
-    :param g_fun: Transition matrix function handle, returns a matrix of shape: (n_states, n_states)
-    :return x_pred: Predicted state estimate, shape: (n_states, )
-    :return p_pred: Predicted state error covariance, shape: (n_states, n_states)
+    :param transition_fun: Transition function handle, accepts a State and a time step; returns a State
+    :param jacobian_fun: Transition Jacobian function handle, returns a matrix of shape: (n_states, n_states)
+    :param time_step: float (optional, default is zero). For advancing the time index of the new state.
+    :return x_pred: Predicted state estimate, State object
     """
 
     # Forward prediction of state
-    x_pred = f_fun(x_est)
+    xx_pred = transition_fun(x_est, time_step)  # State object
 
     # Forward prediction of state error covariance
-    f = g_fun(x_est)
-    p_pred = CovarianceMatrix(f @ p_est.cov @ np.transpose(f) + q.cov)
+    f = jacobian_fun(x_est, time_step)
+    pp_pred = CovarianceMatrix(f @ x_est.covar.cov @ np.transpose(f) + q.cov)
 
-    return x_pred, p_pred
+    return State(state_space=x_est.state_space, state=xx_pred.state, covar=pp_pred, time=x_est.time + time_step)
 
 
-def ukf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f_fun,
-                alpha: float = 1e-3, beta: float = 2., kappa: float = 0.):
+def ukf_predict(x_est: State, q: CovarianceMatrix, f_fun, time_step: float=0.0,
+                alpha: float = 1e-3, beta: float = 2., kappa: float = 0.) -> State:
     """
     Conduct an Unscented Kalman Filter (UKF) prediction using the scaled unscented transform.
 
@@ -833,19 +854,18 @@ def ukf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f_fun,
       W_m[0] = λ/(n+λ),  W_m[i] = 1/(2(n+λ))  for i = 1 … 2n
       W_c[0] = W_m[0] + (1 − α² + β),  W_c[i] = W_m[i]  for i = 1 … 2n
 
-    :param x_est:  Current state estimate, shape (n_states,).
-    :param p_est:  Current state error covariance, CovarianceMatrix of size n_states.
+    :param x_est:  Current state estimate, State object
     :param q:      Process noise covariance, CovarianceMatrix of size n_states.
     :param f_fun:  Transition function f(x) → x_new, maps (n_states,) → (n_states,).
+    :param time_step: float (optional, default is zero). For advancing the time index of the new state.
     :param alpha:  Sigma-point spread (1e-4 … 1). Smaller values cluster points near
                    the mean; larger values explore more of the distribution. Default 1e-3.
     :param beta:   Prior distribution parameter. beta=2 is optimal for Gaussian priors.
                    Default 2.
     :param kappa:  Secondary scaling (0 or 3−n are common choices). Default 0.
-    :return x_pred: Predicted state estimate, shape (n_states,).
-    :return p_pred: Predicted state error covariance, CovarianceMatrix of size n_states.
+    :return x_pred: Predicted state estimate, State object.
     """
-    n   = len(x_est)
+    n   = x_est.size
     lam = alpha ** 2 * (n + kappa) - n
 
     # ── Weights ───────────────────────────────────────────────────────────────
@@ -857,27 +877,27 @@ def ukf_predict(x_est, p_est: CovarianceMatrix, q: CovarianceMatrix, f_fun,
 
     # ── Matrix square root of (n+λ)·P ────────────────────────────────────────
     try:
-        L = np.linalg.cholesky((n + lam) * p_est.cov)
+        L = np.linalg.cholesky((n + lam) * x_est.covar.cov)
     except np.linalg.LinAlgError:
         # Near-singular P: fall back to symmetric square root via eigendecomposition
-        eigvals, eigvecs = np.linalg.eigh((n + lam) * p_est.cov)
+        eigvals, eigvecs = np.linalg.eigh((n + lam) * x_est.covar.cov)
         L = eigvecs @ np.diag(np.sqrt(np.maximum(eigvals, 0.)))
 
     # ── Sigma points ──────────────────────────────────────────────────────────
     sigma = np.empty((n, 2 * n + 1))
-    sigma[:, 0] = x_est
+    sigma[:, 0] = x_est.state
     for i in range(n):
-        sigma[:, i + 1]     = x_est + L[:, i]
-        sigma[:, i + 1 + n] = x_est - L[:, i]
+        sigma[:, i + 1]     = x_est.state + L[:, i]
+        sigma[:, i + 1 + n] = x_est.state - L[:, i]
 
     # ── Propagate sigma points through transition function ────────────────────
     sigma_pred = np.column_stack([f_fun(sigma[:, i]) for i in range(2 * n + 1)])
 
     # ── Predicted mean ────────────────────────────────────────────────────────
-    x_pred = sigma_pred @ W_m
+    xx_pred = sigma_pred @ W_m
 
     # ── Predicted covariance ──────────────────────────────────────────────────
-    diff   = sigma_pred - x_pred[:, np.newaxis]
-    p_pred = CovarianceMatrix((W_c * diff) @ diff.T + q.cov)
+    diff   = sigma_pred - xx_pred[:, np.newaxis]
+    pp_pred = CovarianceMatrix((W_c * diff) @ diff.T + q.cov)
 
-    return x_pred, p_pred
+    return State(state_space=x_est.state_space, state=xx_pred, covar=pp_pred, time=x_est.time + time_step)

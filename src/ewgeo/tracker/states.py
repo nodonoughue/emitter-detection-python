@@ -318,13 +318,32 @@ class State:
     def has_accel(self) -> bool:
         return self.state_space.has_accel
 
-    @ property
+    @property
     def position_covar(self) -> CovarianceMatrix | None:
         if self.covar is None:
             return None
         else:
             pos_slice = self.state_space.pos_slice
             return CovarianceMatrix(self.covar.cov[pos_slice, pos_slice])
+
+    @position_covar.setter
+    def position_covar(self, value: CovarianceMatrix | npt.ArrayLike):
+        # Check that the input is valid
+        if value is None: raise ValueError("Unable to set position covariance component of state with a None.")
+        _size = len(self.position)
+        if isinstance(value, CovarianceMatrix):
+            value = value.cov
+        if len(np.shape(value)) != 2 or np.any(np.shape(value) != (_size, _size)):
+            raise ValueError(f"Unable to set position covariance; dimension mismatch.")
+
+        # Initialize the covar if it isn't already
+        if self.covar is None:
+            self.covar = CovarianceMatrix(np.eye(self.size))
+
+        _cov = self.covar.cov
+        _slice = self.state_space.pos_slice
+        _cov[_slice, _slice] = value
+        self.covar = CovarianceMatrix(_cov)
 
     @property
     def velocity_covar(self) -> CovarianceMatrix | None:
@@ -334,6 +353,26 @@ class State:
             vel_slice = self.state_space.vel_slice
             return CovarianceMatrix(self.covar.cov[vel_slice, vel_slice])
 
+    @velocity_covar.setter
+    def velocity_covar(self, value: CovarianceMatrix | npt.ArrayLike):
+        # Check that the input is valid
+        if not self.has_vel:
+            raise AttributeError("Unable to set velocity covariance component; state has no velocity terms.")
+        if value is None:
+            raise ValueError("Unable to set velocity covariance component of state with a None.")
+        _size = len(self.velocity)
+        if (isinstance(value, CovarianceMatrix) and (value.size != _size)) or np.any(np.shape(value) != (_size, _size)):
+            raise ValueError(f"Unable to set velocity covariance; dimension mismatch.")
+
+        # Initialize the covar if it isn't already
+        if self.covar is None:
+            self.covar = CovarianceMatrix(np.eye(self.size))
+
+        _cov = self.covar.cov
+        _slice = self.state_space.vel_slice
+        _cov[_slice, _slice] = value
+        self.covar = CovarianceMatrix(_cov)
+
     @property
     def acceleration_covar(self) -> CovarianceMatrix | None:
         if self.covar is None or not self.has_accel:
@@ -342,6 +381,26 @@ class State:
             accel_slice = self.state_space.accel_slice
             return CovarianceMatrix(self.covar.cov[accel_slice, accel_slice])
 
+    @acceleration_covar.setter
+    def acceleration_covar(self, value: CovarianceMatrix | npt.ArrayLike):
+        # Check that the input is valid
+        if not self.has_accel:
+            raise AttributeError("Unable to set acceleration covariance component; state has no acceleration terms.")
+        if value is None:
+            raise ValueError("Unable to set acceleration covariance component of state with a None.")
+        _size = len(self.acceleration)
+        if (isinstance(value, CovarianceMatrix) and (value.size != _size)) or np.any(np.shape(value) != (_size, _size)):
+            raise ValueError(f"Unable to set acceleration covariance; dimension mismatch.")
+
+        # Initialize the covar if it isn't already
+        if self.covar is None:
+            self.covar = CovarianceMatrix(np.eye(self.size))
+
+        _cov = self.covar.cov
+        _slice = self.state_space.accel_slice
+        _cov[_slice, _slice] = value
+        self.covar = CovarianceMatrix(_cov)
+
     @property
     def pos_vel_covar(self) -> CovarianceMatrix | None:
         if self.covar is None:
@@ -349,6 +408,24 @@ class State:
         else:
             pos_vel_slice = self.state_space.pos_vel_slice
             return CovarianceMatrix(self.covar.cov[pos_vel_slice, pos_vel_slice])
+
+    @pos_vel_covar.setter
+    def pos_vel_covar(self, value: CovarianceMatrix | npt.ArrayLike):
+        # Check that the input is valid
+        if value is None:
+            raise ValueError("Unable to set position/velocity covariance component of state with a None.")
+        _size = len(self.pos_vel)
+        if (isinstance(value, CovarianceMatrix) and (value.size != _size)) or np.any(np.shape(value) != (_size, _size)):
+            raise ValueError(f"Unable to set position/velocity covariance; dimension mismatch.")
+
+        # Initialize the covar if it isn't already
+        if self.covar is None:
+            self.covar = CovarianceMatrix(np.eye(self.size))
+
+        _cov = self.covar.cov
+        _slice = self.state_space.pos_vel_slice
+        _cov[_slice, _slice] = value
+        self.covar = CovarianceMatrix(_cov)
 
     def plot(self, ax: plt.Axes, plot_dims: slice=np.s_[:],
              do_pos: bool=True, do_vel: bool=False, do_cov: bool=False,
@@ -431,6 +508,37 @@ class State:
             trk_err_hdl.set_data(*xy_ellipse)
 
         return
+
+
+class IMMState(State):
+    """
+    Fused state produced by an Interacting Multiple Model (IMM) filter.
+
+    Extends :class:`State` with per-model states and model mixture probabilities.
+    The parent ``state`` / ``covar`` attributes hold the fused (Gaussian-mixture-
+    collapsed) estimate in the common state space.
+
+    After a **predict** step the ``model_probs`` field stores the predicted mode
+    probabilities ``c̄_j = Σ_i p_ij μ_i``.  After an **update** step they store
+    the posterior mode probabilities ``μ_j(t|t)`` computed from measurement
+    likelihoods.
+
+    :param state_space:   Common state space shared by all sub-models.
+    :param time:          Timestamp [seconds].
+    :param state:         Fused state vector in the common state space.
+    :param covar:         Fused state covariance.
+    :param model_states:  List of per-model States (one per sub-model), each in
+                          the model's native state space.
+    :param model_probs:   Model mixture probabilities, shape ``(M,)``.  Must sum
+                          to 1.
+    """
+
+    def __init__(self, state_space: StateSpace, time: float,
+                 state: npt.ArrayLike, covar: CovarianceMatrix,
+                 model_states: list, model_probs: npt.ArrayLike):
+        super().__init__(state_space, time, state, covar)
+        self.model_states = list(model_states)
+        self.model_probs = np.asarray(model_probs, dtype=float)
 
 
 def adapt_cartesian_state(source: State, target_ss: StateSpace,

@@ -310,9 +310,9 @@ def example3():
     # Generate noisy measurements
     zeta = aoa.noisy_measurement(x_source=x_tgt, num_samples=num_pulses)
 
-    # Define measurement and Jacobian functions
-    z_fun = aoa.measurement
-    h_fun = aoa.measurement_gradient
+    # Define measurement and Jacobian functions via MeasurementModel
+    _ss_pos = tracker.CartesianStateSpace(num_dims=aoa.num_dim, has_vel=False)
+    _mm = tracker.MeasurementModel(state_space=_ss_pos, pss=aoa)
 
     # Estimate position recursively, using EKF Update algorithm
     x_est = np.zeros(shape=(aoa.num_dim, num_pulses))
@@ -330,17 +330,16 @@ def example3():
             res = aoa.least_square(zeta=this_zeta, x_init=x_init)
             this_x = res[0]
             this_p = aoa.compute_crlb(x_source=this_x)
+            this_state = tracker.State(state_space=_ss_pos, time=0, state=this_x, covar=this_p)
         else:
             # EKF Update
-            this_x, this_p = tracker.ekf_update(x_prev=prev_x, p_prev=prev_p, zeta=this_zeta, cov=aoa.cov,
-                                            z_fun=z_fun, h_fun=h_fun)
+            this_state = tracker.ekf_update(prev_state, this_zeta, aoa.cov, _mm.measurement, _mm.jacobian)
 
         # Store the results and update the variables
-        x_est[:, idx] = this_x
-        cep[idx] = compute_cep50(this_p)
+        x_est[:, idx] = this_state.position
+        cep[idx] = compute_cep50(this_state.covar)
 
-        prev_x = this_x
-        prev_p = this_p
+        prev_state = this_state
 
     fig1=plt.figure()
     plt.scatter(x_tgt[0]/1e3, x_tgt[1]/1e3, marker='^', label='Target')
@@ -428,8 +427,8 @@ def example4():
     this_p=None
     prev_p=None
     prev_x=None
-    z_fun = aoa.measurement
-    h_fun = aoa.measurement_gradient
+    _ss_pos = tracker.CartesianStateSpace(num_dims=aoa.num_dim, has_vel=False)
+    _mm = tracker.MeasurementModel(state_space=_ss_pos, pss=aoa)
 
     for idx in np.arange(num_pulses):
         # Update positions
@@ -438,22 +437,21 @@ def example4():
 
         # Generate noisy measurements
         zeta = aoa.noisy_measurement(x_source=x_tgt)
-    
+
         if idx==0:
             # Initialization
             this_x, _ = aoa.least_square(zeta=zeta, x_init=x_init)
             this_p = aoa.compute_crlb(x_source=this_x)
+            this_state = tracker.State(state_space=_ss_pos, time=0., state=this_x, covar=this_p)
         else:
             # EKF Update
-            this_x, this_p = tracker.ekf_update(x_prev=prev_x, p_prev=prev_p, zeta=zeta,
-                                            cov=aoa.cov, z_fun=z_fun, h_fun=h_fun)
+            this_state = tracker.ekf_update(prev_state, zeta, aoa.cov, _mm.measurement, _mm.jacobian)
 
         # Store the results and update the variables
-        x_est[:, idx] = this_x
-        cep[idx] = compute_cep50(this_p)
-    
-        prev_x = this_x
-        prev_p = this_p
+        x_est[:, idx] = this_state.position
+        cep[idx] = compute_cep50(this_state.covar)
+
+        prev_state = this_state
 
     fig1=plt.figure()
     plt.plot(x_tgt[0]/1e3,x_tgt[1]/1e3,'^', label='Target')

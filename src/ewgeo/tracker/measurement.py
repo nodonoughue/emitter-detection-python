@@ -1,3 +1,4 @@
+from collections.abc import Callable
 import numpy as np
 import numpy.typing as npt
 
@@ -182,70 +183,67 @@ class MeasurementModel:
         return s
 
 # =============== Elementary Kalman Filter and Extended Kalman Filter Update Functions ================
-def kf_update(x_prev: npt.ArrayLike, p_prev: CovarianceMatrix,
-              zeta: npt.ArrayLike, cov: CovarianceMatrix, h: npt.ArrayLike) -> tuple[npt.NDArray, CovarianceMatrix]:
+def kf_update(x_prev: State, zeta: npt.ArrayLike, cov: CovarianceMatrix, h: npt.ArrayLike) -> State:
     """
     Conduct a Kalman Filter update, given the previous state estimate and covariance, a measurement, and
     the measurement matrix.
 
-    :param x_prev: Previous state estimate, shape: (n_states, )
-    :param p_prev: Previous state error covariance, CovarianceMatrix object with size n_states
+    :param x_prev: Previous state estimate, State
     :param zeta: Measurement vector, shape: (n_meas, )
     :param cov: Measurement error covariance (Covariance Matrix object with size n_meas)
     :param h: Measurement matrix, shape: (n_meas, n_states)
-    :return x: Updated state estimate, shape: (n_states, )
-    :return p: Updated state error covariance, shape: (n_states, n_states)
+    :return x_est: Updated state estimate, State
     """
     # Evaluate the Measurement and Jacobian at x_prev
-    z = h @ x_prev
+    z = h @ x_prev.state
 
     # Compute the Innovation (or Residual)
     y = zeta - z
 
     # Compute the Innovation Covariance
-    s = h @ p_prev.cov @ h.T + cov.cov
+    s = h @ x_prev.covar.cov @ h.T + cov.cov
 
     # Compute the Kalman Gain
-    k = p_prev.cov @ h.T/s
+    k = x_prev.covar.cov @ h.T/s
 
     # Update the Estimate
-    x = x_prev + k @ y
-    p = CovarianceMatrix((np.eye(p_prev.size) - (k @ h)) @ p_prev.cov)
+    x = x_prev.state + k @ y
+    p = CovarianceMatrix((np.eye(x_prev.size) - (k @ h)) @ x_prev.covar.cov)
 
-    return x, p
+    return State(state_space=x_prev.state_space, time=x_prev.time, state=x, covar=p)
 
 
-def ekf_update(x_prev: npt.ArrayLike, p_prev: CovarianceMatrix, zeta: npt.ArrayLike, cov: CovarianceMatrix,
-               z_fun, h_fun)-> tuple[npt.NDArray, CovarianceMatrix]:
+def ekf_update(x_prev: State, zeta: npt.ArrayLike, cov: CovarianceMatrix,
+               msmt_fun: Callable[[State], Measurement],
+               jacobian_fun: Callable[[State], npt.NDArray])-> State:
     """
     Conduct an Extended Kalman Filter update, given the previous state estimate and covariance, a measurement function,
     and the measurement matrix function.
 
-    :param x_prev: Previous state estimate, shape: (n_states, )
-    :param p_prev: Previous state error covariance, Covariance Matrix with size n_states
+    :param x_prev: Previous state estimate, State
     :param zeta: Measurement vector, shape: (n_meas, )
     :param cov: Measurement error covariance, Covariance Matrix with size n_meas
-    :param z_fun: Function handle for measurement evaluation, returns a vector of shape (n_meas, )
-    :param h_fun: Function handle for measurement matrix evaluation, returns a matrix of shape (n_meas, n_states)
-    :return x: Updated state estimate, shape: (n_states, )
-    :return p: Updated state error covariance, shape: (n_states, n_states)
+    :param msmt_fun: Function handle for measurement evaluation, accepts a State object and returns a Measurement object
+    :param jacobian_fun: Function handle for measurement matrix evaluation, accepts a State object and returns a numpy array
+    :return x: Updated state estimate, State
     """
 
     # Evaluate the Measurement and Jacobian at x_prev
-    z = z_fun(x_prev)
-    h = h_fun(x_prev)
+    msmt = msmt_fun(x_prev)
+    jacobian = jacobian_fun(x_prev)
 
     # Compute the Innovation (or Residual)
-    y = zeta - z
+    y = zeta - msmt.zeta
 
     # Compute the Innovation Covariance
-    s = h @ p_prev.cov @ h.T + cov.cov
+    p_prev = x_prev.covar.cov  # extract the covariance matrix
+    s = jacobian @ p_prev @ jacobian.T + cov.cov
 
     # Compute the Kalman Gain
-    k = p_prev.cov @ h.T @ np.linalg.inv(s)
+    k = p_prev @ jacobian.T @ np.linalg.inv(s)
 
     # Update the Estimate
-    x = x_prev + k @ y
-    p = CovarianceMatrix((np.eye(p_prev.size)- (k @ h)) @ p_prev.cov)
+    x = x_prev.state + k @ y
+    p = CovarianceMatrix((np.eye(x_prev.size)- (k @ jacobian)) @ p_prev)
 
-    return x, p
+    return State(state_space=x_prev.state_space, time=x_prev.time, state=x, covar=p)
