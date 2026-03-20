@@ -37,6 +37,8 @@ def make_all_figures(close_figs=False, mc_params=None):
     figs = []
     figs.extend(make_figures_3_4_5(prefix, mc_params))
     figs.extend(make_figures_7_8(prefix, mc_params))
+    figs.extend(make_figures_10(prefix))
+    figs.extend(make_figures_11_12(prefix))
 
     if close_figs:
         [plt.close(fig) for fig in figs]
@@ -100,6 +102,54 @@ def make_figures_7_8(prefix=None, mc_params=None):
         labels = ['fig7a', 'fig7b', 'fig8']
         if len(labels) != len(figs):
             print('**Error saving figure 8.7 and 8.8; unexpected number of figures returned from Example 8.2.')
+        else:
+            for fig, label in zip(figs, labels):
+                fig.savefig(prefix + label + '.svg')
+                fig.savefig(prefix + label + '.png')
+
+    return figs
+
+
+def make_figures_10(prefix=None):
+    """
+    Figures 8.10a and 8.10b from Example 8.3 (Ballistic Trajectory Tracking)
+
+    :param prefix: output directory to place generated figures
+    :return: list of figure handles
+    """
+
+    print('Generating Figures 8.10a and 8.10b (Example 8.3)...')
+
+    figs = chapter8.example3()
+
+    if prefix is not None:
+        labels = ['fig10a', 'fig10b']
+        if len(labels) != len(figs):
+            print('**Error saving figures 8.10a and 8.10b; unexpected number of figures returned from Example 8.3.')
+        else:
+            for fig, label in zip(figs, labels):
+                fig.savefig(prefix + label + '.svg')
+                fig.savefig(prefix + label + '.png')
+
+    return figs
+
+
+def make_figures_11_12(prefix=None):
+    """
+    Figures 8.11a, 8.11b, 8.12a, and 8.12b from Example 8.4 (Constant-Turn Tracking)
+
+    :param prefix: output directory to place generated figures
+    :return: list of figure handles
+    """
+
+    print('Generating Figures 8.11a, 8.11b, 8.12a, and 8.12b (Example 8.4)...')
+
+    figs = chapter8.example4()
+
+    if prefix is not None:
+        labels = ['fig11a', 'fig11b', 'fig12a', 'fig12b']
+        if len(labels) != len(figs):
+            print('**Error saving figures 8.11a–8.12b; unexpected number of figures returned from Example 8.4.')
         else:
             for fig, label in zip(figs, labels):
                 fig.savefig(prefix + label + '.svg')

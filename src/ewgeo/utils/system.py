@@ -526,10 +526,11 @@ class PassiveSurveillanceSystem(ABC):
         def jacobian(pos_vel: npt.ArrayLike):
             return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_sensor=v_sensor)
 
+        cov = kwargs.pop('cov', self.cov)
         if do_gd:
-            x, x_full = gd_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+            x, x_full = gd_solver(x_init=x_init, y=y, jacobian=jacobian, cov=cov, **kwargs)
         else:
-            x, x_full = ls_solver(x_init=x_init, y=y, jacobian=jacobian, cov=self.cov, **kwargs)
+            x, x_full = ls_solver(x_init=x_init, y=y, jacobian=jacobian, cov=cov, **kwargs)
 
         if cal_data is not None:
             return x, x_full, x_sensor, v_sensor, bias

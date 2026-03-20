@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 – registers '3d' projection
 import time
 
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
@@ -715,7 +716,7 @@ def example4(rng=np.random.default_rng(0)):
                        [  0.,   0.,   0.,   0.]])
     n_tdoa = x_tdoa.shape[1]
 
-    sigma_toa = 100e-9    # 100 ns → ~30 m RDOA noise
+    sigma_toa = 10e-9    # 10 ns → ~3 m RDOA noise
     cov_toa   = CovarianceMatrix(sigma_toa ** 2 * np.eye(n_tdoa))
     tdoa      = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_toa,
                                               variance_is_toa=True)
@@ -726,11 +727,11 @@ def example4(rng=np.random.default_rng(0)):
     x_init = np.array([400., -400., 100.])
 
     # CV tracker
-    # CV: tuned for a non-maneuvering target (σ_a = 2 m/s²). The centripetal
+    # CV: tuned for a non-maneuvering target (σ_a = 1 m/s²). The centripetal
     # acceleration is ~10.5 m/s², so each 5-second prediction step introduces a
     # ~130 m position error — roughly 5× the CV process-noise σ_pos of ~25 m.
     # This systematic mismatch causes visible filter lag during the turn.
-    mm_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=2. ** 2)
+    mm_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=1. ** 2)
     x0_cv = State(state_space=mm_cv.state_space, time=0, state=None, covar=None)
     x0_cv.position = x_tgt_full[:, 0] + x_init
     x0_cv.velocity = [0., v0, 0.]
@@ -796,6 +797,25 @@ def example4(rng=np.random.default_rng(0)):
     ax1.grid(True)
     ax1.set_title('Example 8.4: Constant-Turn Aircraft – x-y Trajectory')
 
+    # --- Figure 1b: 3-D isometric trajectory ------------------------------
+    fig1b = plt.figure()
+    ax1b = fig1b.add_subplot(111, projection='3d')
+    ax1b.plot(x_tgt_full[0] / 1e3, x_tgt_full[1] / 1e3, x_tgt_full[2] / 1e3,
+              'k-', linewidth=2, label='True trajectory')
+    ax1b.plot(x_cv[0] / 1e3, x_cv[1] / 1e3, x_cv[2] / 1e3,
+              '--', label='CV model')
+    ax1b.plot(x_ct[0] / 1e3, x_ct[1] / 1e3, x_ct[2] / 1e3,
+              '-.', label='CT model')
+    ax1b.scatter(x_tdoa[0] / 1e3, x_tdoa[1] / 1e3, x_tdoa[2] / 1e3,
+                 marker='^', zorder=5, label='Sensors')
+    ax1b.set_xlabel('x [km]')
+    ax1b.set_ylabel('y [km]')
+    ax1b.set_zlabel('z [km]')
+    ax1b.view_init(elev=30, azim=45)
+    ax1b.legend()
+    ax1b.grid(True)
+    ax1b.set_title('Example 8.4: Constant-Turn Aircraft – 3-D Trajectory')
+
     # --- Figure 2: 3-D position RMSE vs time ------------------------------
     rmse_cv = np.sqrt(np.sum((x_cv - x_tgt_full) ** 2, axis=0))
     rmse_ct = np.sqrt(np.sum((x_ct - x_tgt_full) ** 2, axis=0))
@@ -819,7 +839,7 @@ def example4(rng=np.random.default_rng(0)):
     ax3.grid(True)
     ax3.set_title('Example 8.4: CT Model – Estimated Turn Rate')
 
-    return [fig1, fig2, fig3]
+    return [fig1, fig1b, fig2, fig3]
 
 
 if __name__ == '__main__':
