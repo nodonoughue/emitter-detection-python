@@ -443,6 +443,7 @@ def example4():
         [ax.scatter(time_vec[idx]*np.ones(len(truth_msmts)), [m.zeta[ii]/scale for m in truth_msmts], 3,
                     marker='v', color='b', alpha=0.5, label=truth_label)
          for ii, ax in enumerate(axs.flatten()[1:])]
+        noisy_msmts = [msmt_model_cv.measurement(s, noise=True) for s in truth_states]
 
         # Generate false alarm measurements and add to the TDOA panels
         fa_msmt = msmt_model_cv.false_alarm(max_val=8e3, num=num_fa_per_step, time=time_vec[idx].item())
@@ -451,7 +452,7 @@ def example4():
          for ii, ax in enumerate(axs.flatten()[1:])]
 
         # Feed the same shuffled measurements to both trackers
-        measurements = truth_msmts[:] + fa_msmt[:]
+        measurements = noisy_msmts[:] + fa_msmt[:]
         shuffle(measurements)
         tracker_cv.update(measurements=measurements)
         tracker_ca.update(measurements=measurements)
