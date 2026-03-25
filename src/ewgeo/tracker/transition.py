@@ -101,6 +101,9 @@ class MotionModel(ABC):
         # Predict the state forward, and grab the jacobian for use in updating the
         # state error covariance
         new_state = self.transition_function(s, time_delta)
+        u = self.make_control_input(time_delta)
+        if u is not None:
+            new_state.state = new_state.state + u
         f_for_cov = self.transition_matrix(s, time_delta)
 
         if s.covar is None:
@@ -110,6 +113,19 @@ class MotionModel(ABC):
 
         # Make a new State object
         return new_state
+
+    def make_control_input(self, time_delta: float) -> npt.NDArray | None:
+        """
+        Control input vector u for the affine state update x_{k+1} = F·x_k + u(dt).
+
+        Returns None for models with no deterministic forcing (default). Override in
+        subclasses that have a known, state-independent input (e.g. gravity in the
+        ballistic model).
+
+        :param time_delta: Prediction interval [s]
+        :return: Control vector of shape (num_states,), or None
+        """
+        return None
 
     def update_time_step(self, time_delta):
         """
@@ -570,29 +586,20 @@ class BallisticMotionModel(MotionModel):
                           [.5  * dt ** 3 * process_covar, dt ** 2      * process_covar]])
         return CovarianceMatrix(q_mat)
 
-    def predict(self, s: State | Track, new_time: float) -> State:
+    def make_control_input(self, time_delta: float) -> npt.NDArray:
         """
-        Predict forward to new_time.
+        Gravity control vector u = [0,0,½g·dt², 0,0,g·dt]ᵀ.
 
-        Delegates to the base-class linear path for F, Q caching and covariance
-        propagation, then applies the gravity affine bias to the predicted state mean.
+        Applied by the base-class predict() as the affine term x_{k+1} = F·x_k + u(dt).
+        Covariance propagation is unaffected (gravity is deterministic, not stochastic).
+
+        :param time_delta: Prediction interval [s]
+        :return: Control vector of shape (num_states,)
         """
-        # Base class handles caching of F/Q and covariance propagation (linear path)
-        s_pred = super().predict(s, new_time)
-
-        # Resolve the source state and time delta (Track may have been unwrapped by super)
-        if isinstance(s, Track):
-            s = s.curr_state
-        dt = new_time - s.time
-
-        if dt == 0:
-            return s_pred
-
-        # Apply gravity bias to the predicted mean (does not affect covariance)
-        s_pred.state[self.state_space.pos_slice] += 0.5 * dt ** 2 * self.gravity_vec
-        s_pred.state[self.state_space.vel_slice] += dt * self.gravity_vec
-
-        return s_pred
+        u = np.zeros(self.state_space.num_states)
+        u[self.state_space.pos_slice] = 0.5 * time_delta ** 2 * self.gravity_vec
+        u[self.state_space.vel_slice] = time_delta * self.gravity_vec
+        return u
 
 
 class ConstantTurnRateAccelerationMotionModel(MotionModel):
@@ -788,7 +795,8 @@ class ConstantTurnRateAccelerationMotionModel(MotionModel):
 
 
 # =============== Elementary Kalman Filter and Extended Kalman Filter Prediction Functions ================
-def kf_predict(x_est: State, q: CovarianceMatrix, f: npt.ArrayLike, time_step: float=0.0) -> State:
+def kf_predict(x_est: State, q: CovarianceMatrix, f: npt.ArrayLike, time_step: float=0.0,
+               u: npt.ArrayLike = None) -> State:
     """
     Conduct a Kalman Filter prediction, given the current estimated state and covariance, a transition matrix, and
     the process noise covariance.
@@ -797,11 +805,15 @@ def kf_predict(x_est: State, q: CovarianceMatrix, f: npt.ArrayLike, time_step: f
     :param q: Process noise covariance, CovarianceMatrix object with size n_states
     :param f: Transition matrix, shape: (n_states, n_states)
     :param time_step: float (optional, default is zero). For advancing the time index of the new state.
+    :param u: Control input vector of shape (n_states,), or None (default). When provided, added
+              to the predicted mean: x_pred = F·x + u. Does not affect covariance propagation.
     :return x_pred: Predicted state (State)
     """
 
-    # Predict the next state
+    # Predict the next state, applying optional deterministic control input
     xx_pred = f @ x_est.state
+    if u is not None:
+        xx_pred = xx_pred + u
 
     # Predict the next state error covariance
     pp_pred = CovarianceMatrix(f @ x_est.covar.cov @ f.T + q.cov)
