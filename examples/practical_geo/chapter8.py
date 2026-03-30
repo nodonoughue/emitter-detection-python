@@ -100,17 +100,11 @@ def example1(mc_params=None):
     noise = tdoa.cov.sample(num_samples=num_time)
     zeta = z + noise
 
-    # crlb = tdoa.computeCRLB(x_tdoa, x_tgt_full, C_roa, ref_idx, false, true)
-    # rmse_crlb = sqrt(arrayfun(@(i) trace(crlb(:,:,i)), 1:size(crlb,3)))
-
     # ===  Set Up Tracker
     sigma_a = 1
 
     motion_model = tracker.MotionModel.make_motion_model('cv',num_dims,sigma_a**2)
     state_space = motion_model.state_space
-    num_states = state_space.num_states
-    pos_slice = state_space.pos_slice
-    vel_slice = state_space.vel_slice
     motion_model.update_time_step(t_inc)
     f = motion_model.f # generate state transition matrix
     q = motion_model.q # generate process noise covariance matrix
@@ -151,7 +145,7 @@ def example1(mc_params=None):
         this_zeta = zeta[:, idx]
 
         # Update Position Estimate
-        x_est = tracker.ekf_update(x_pred, this_zeta, tdoa.cov, msmt_model.measurement, msmt_model.jacobian)
+        x_est = msmt_model.ekf_update(x_pred, this_zeta)
 
         # Predict state to the next time step
         x_pred = tracker.kf_predict(x_est, q, f)
@@ -222,20 +216,16 @@ def example1(mc_params=None):
         zeta = z + noise
 
         # Initialize Track State
-        _x_vec_mc = np.zeros((num_states,))
-        _p_mat_mc = np.zeros((num_states, num_states))
+        x_pred = State(state_space=state_space, time=t_vec[0], state=None, covar=None)
 
-        # Initialize position with TDOA estimate from first measurement
         x_init = np.array([0, 50e3, 5e3])
         epsilon = 100
-        _x_vec_mc[pos_slice], _ = tdoa.gradient_descent(zeta[:, 0], x_init=x_init,epsilon=epsilon)
-        _p_mat_mc[pos_slice, pos_slice] = tdoa.compute_crlb(x_source=_x_vec_mc[pos_slice]).cov
+        x_pred.position, _ = tdoa.gradient_descent(zeta[:, 0], x_init=x_init,epsilon=epsilon)
+        x_pred.position_covar = tdoa.compute_crlb(x_source=x_pred.position)
 
         # Bound initial velocity uncertainty by assumed max velocity of 340 m/s
         # (Mach 1 at sea level)
-        _p_mat_mc[vel_slice, vel_slice] = max_vel**2*np.eye(num_dims)
-        x_pred = State(state_space=state_space, time=t_vec[0], state=_x_vec_mc,
-                       covar=CovarianceMatrix(_p_mat_mc))
+        x_pred.velocity_covar = 10 * max_vel**2*np.eye(num_dims)
 
         # Step Through Time
         x_ekf_est = np.zeros((num_dims,num_time))
@@ -245,14 +235,14 @@ def example1(mc_params=None):
             this_zeta = zeta[:, idx]
 
             # Update Position Estimate
-            x_est = tracker.ekf_update(x_pred, this_zeta, tdoa.cov, msmt_model.measurement, msmt_model.jacobian)
+            x_est = msmt_model.ekf_update(x_pred, this_zeta, tdoa.cov)
 
             # Predict state to the next time step
             x_pred = tracker.kf_predict(x_est, q, f)
 
             # Output the current prediction/estimation state
-            x_ekf_est[:, idx] = x_est.state[pos_slice]
-            x_ekf_pred[:, idx] = x_pred.state[pos_slice]
+            x_ekf_est[:, idx] = x_est.position
+            x_ekf_pred[:, idx] = x_pred.position
 
             sse_cov_est[idx_mc, idx] = x_est.position_covar.trace
             sse_cov_pred[idx_mc, idx] = x_pred.position_covar.trace
@@ -367,12 +357,10 @@ def example2(rng=np.random.default_rng()):
     plt.ylim([-5,105])
 
     # ===  Generate Measurements
-    do2daoa = aoa.do_2d_aoa
-    num_msmt = aoa.num_measurements
-    z = np.array([aoa.measurement(x_source=this_x_source.T, x_sensor=this_x_sensor.T) 
-                  for this_x_source, this_x_sensor in zip(x_tgt_full.T, x_aoa_full.T)]).T
-    noise = sigma_psi * rng.standard_normal((num_msmt, num_time))
-    zeta = z + noise
+    zeta = np.zeros((aoa.num_measurements, num_time))
+    for idx in range(num_time):
+        zeta[:, idx] = aoa.noisy_measurement(x_source=x_tgt_full[:, idx],
+                                             x_sensor=x_aoa_full[:, idx])
 
     # ===  Set Up Tracker
     # Track in x/y, even though a/c and tgt in x/y/z
@@ -381,40 +369,40 @@ def example2(rng=np.random.default_rng()):
 
     motion_model = tracker.MotionModel.make_motion_model('cv',num_dims,sigma_a**2)
     state_space = motion_model.state_space
-    num_states = state_space.num_states
-    pos_slice = state_space.pos_slice
-    vel_slice = state_space.vel_slice
     motion_model.update_time_step(t_inc)
     f = motion_model.f # generate state transition matrix
     q = motion_model.q # generate process noise covariance matrix
 
     # ===  Initialize Track State
-    _x_vec2 = np.zeros((num_states,))
-    _p_mat2 = np.zeros((num_states, num_states))
-
     # Initialize position with AOA estimate from first three measurement
-    x_aoa_init = x_aoa_full[:, :3]
-    zeta_init = np.ravel(zeta[:,:3])
-    cov_init = CovarianceMatrix.block_diagonal(*[cov_psi]*3)
-
-    aoa_init = DirectionFinder(x=x_aoa_init, cov=cov_init, do_2d_aoa=do2daoa)
-
     x_init_guess = np.array([10e3, 10e3, 0])
     bnd, bnd_grad = fixed_alt(0, 'flat')
-    x_init, _ = aoa_init.gradient_descent(zeta=zeta_init, x_init=x_init_guess, eq_constraints=[bnd], epsilon=100)
-    p_init = aoa_init.compute_crlb(x_source=x_init, eq_constraints_grad=[bnd_grad]).cov
-
-    _x_vec2[pos_slice] = x_init[:num_dims]
-    _p_mat2[pos_slice, pos_slice] = p_init[:num_dims, :num_dims]
+    x_init, _ = aoa.gradient_descent(zeta=zeta[:, 0], x_init=x_init_guess,
+                                     eq_constraints=[bnd], epsilon=1e-3)
+    p_init = aoa.compute_crlb(x_source=x_init, eq_constraints_grad=[bnd_grad]).cov
+    init_state = State(state_space=state_space, time=t_vec[0], state=None, covar=None)
+    init_state.position = x_init
+    init_state.position_covar = p_init
 
     # Bound initial velocity uncertainty by assumed max velocity of 10 m/s
     # (~20 knots)
-    max_vel = 30
+    max_vel = 10
     p_vel = max_vel**2*np.eye(num_dims)
-    p_vel[-1, :] = 0
-    p_vel[:, -1] = 0
-    _p_mat2[vel_slice, vel_slice] = p_vel
-    x_pred = State(state_space=state_space, time=t_vec[0], state=_x_vec2, covar=CovarianceMatrix(_p_mat2))
+    init_state.velocity = 0.
+    init_state.velocity_covar = p_vel
+
+    def constrain_state(s: State):
+        # Constrain a state, in-place, to have no vertical component or vertical velocity
+        s.position[-1] = 0.  # no altitude
+        s.velocity[-1] = 0.  # no vertical motion
+        s.position_covar.cov[-1, :] = 0.  # no altitude error
+        s.position_covar.cov[:, -1] = 0.
+        s.velocity_covar.cov[-1, :] = 0.  # no vertical velocity error
+        s.velocity_covar.cov[:, -1] = 0.
+        return
+    constrain_state(init_state)
+
+    msmt_model = tracker.MeasurementModel(pss=aoa, state_space=state_space)
 
     # ===  Step Through Time
     print('Iterating through EKF tracker time steps...')
@@ -422,9 +410,6 @@ def example2(rng=np.random.default_rng()):
     iter_per_marker = 1
     iter_per_row = markers_per_row * iter_per_marker
 
-    msmt_model = tracker.MeasurementModel(pss=aoa, state_space=state_space)
-
-    # at least 1 iteration per marker, no more than 100 iterations per marker
     t_start = time.perf_counter()
 
     x_ekf_est = np.zeros((num_dims,num_time))
@@ -441,38 +426,24 @@ def example2(rng=np.random.default_rng()):
         this_zeta = zeta[:, idx]
 
         # Update sensor positions
-        this_x_aoa = x_aoa_full[:num_dims, idx]
-        aoa.pos = this_x_aoa
+        aoa.pos = x_aoa_full[:num_dims, idx]
 
         # Update Position Estimate
-        x_est = tracker.ekf_update(x_pred, this_zeta, aoa.cov, msmt_model.measurement, msmt_model.jacobian)
+        if idx==0:
+            # Start with the initial state we computed before the loop began
+            x_est = init_state
+        else:
+            # Update the prior prediction with the current measurement
+            x_est = tracker.ekf_update(x_pred, this_zeta, aoa.cov, msmt_model.measurement, msmt_model.jacobian)
 
-        # Enforce known altitude
-        x_est.state[pos_slice][-1] = 0
-        x_est.state[vel_slice][-1] = 0
-        p_pos = x_est.covar.cov[pos_slice, pos_slice]
-        p_pos[-1, :] = 0
-        p_pos[:, -1] = 0
-        x_est.covar.cov[pos_slice, pos_slice] = p_pos
-        p_vel = x_est.covar.cov[vel_slice, vel_slice]
-        p_vel[-1, :] = 0
-        p_vel[:, -1] = 0
-        x_est.covar.cov[vel_slice, vel_slice] = p_vel
+            # Enforce known altitude
+            constrain_state(x_est)
 
         # Predict state to the next time step
         x_pred = tracker.kf_predict(x_est, q, f)
 
         # Enforce known altitude
-        x_pred.state[pos_slice][-1] = 0
-        x_pred.state[vel_slice][-1] = 0
-        p_pos = x_pred.covar.cov[pos_slice, pos_slice]
-        p_pos[-1, :] = 0
-        p_pos[:, -1] = 0
-        x_pred.covar.cov[pos_slice, pos_slice] = p_pos
-        p_vel = x_pred.covar.cov[vel_slice, vel_slice]
-        p_vel[-1, :] = 0
-        p_vel[:, -1] = 0
-        x_pred.covar.cov[vel_slice, vel_slice] = p_vel
+        constrain_state(x_pred)
 
         # Output the current prediction/estimation state
         x_ekf_est[:, idx] = x_est.position
@@ -601,17 +572,7 @@ def example3(rng=np.random.default_rng(0)):
     # Measurement Model for Trackers
     # Both Ballistic and CV motion models use the same state space, so we can use a common
     # measurement model for both.
-    mm = tracker.MeasurementModel(pss=tdoa, state_space=mm_bal.state_space)
-
-    # --- EKF helpers -------------------------------------------------------
-    def make_mfns(ss):
-        """Build (z_fun, h_fun) callables for a given state space."""
-        mm = tracker.MeasurementModel(pss=tdoa, state_space=ss)
-        def z_fun(x):
-            return mm.measurement(tracker.State(state_space=ss, state=x, time=0.)).zeta
-        def h_fun(x):
-            return mm.jacobian(tracker.State(state_space=ss, state=x, time=0.))
-        return z_fun, h_fun
+    msmt = tracker.MeasurementModel(pss=tdoa, state_space=mm_bal.state_space)
 
     # Run the tracker loop on both trackers
     x_cv = []
@@ -631,8 +592,8 @@ def example3(rng=np.random.default_rng(0)):
             x_bal_pred = mm_bal.predict(x_bal[-1], t_now)
 
         # Update the estimates with new data
-        x_cv_est = tracker.ekf_update(x_cv_pred, this_zeta, tdoa.cov, mm.measurement, mm.jacobian)
-        x_bal_est = tracker.ekf_update(x_bal_pred, this_zeta, tdoa.cov, mm.measurement, mm.jacobian)
+        x_cv_est = msmt.ekf_update(x_cv_pred, this_zeta)
+        x_bal_est = msmt.ekf_update(x_bal_pred, this_zeta)
 
         # Append the states
         x_cv.append(x_cv_est)
@@ -766,7 +727,7 @@ def example4(rng=np.random.default_rng(0)):
         # Grab the current time and measurement
         t_now = t_vec[idx]
         this_zeta = zeta[:, idx]
-        # Predict the tracks forward
+        # Predict the tracks forward to current time
         if idx==0:
             x_cv_pred = x0_cv
             x_ct_pred = x0_ct
@@ -775,8 +736,8 @@ def example4(rng=np.random.default_rng(0)):
             x_ct_pred = mm_ct.predict(x_ct[-1], t_now)
 
         # EKF Update with new measurement
-        x_cv_est = tracker.ekf_update(x_cv_pred, this_zeta, tdoa.cov, msmt_cv.measurement, msmt_cv.jacobian)
-        x_ct_est = tracker.ekf_update(x_ct_pred, this_zeta, tdoa.cov, msmt_ct.measurement, msmt_ct.jacobian)
+        x_cv_est = msmt_cv.ekf_update(x_cv_pred, this_zeta)
+        x_ct_est = msmt_ct.ekf_update(x_ct_pred, this_zeta)
 
         # Append track estimates to the list
         x_cv.append(x_cv_est)
@@ -908,8 +869,6 @@ def example1_vid(save_path=_FIGS_DIR / 'example1_vid.gif'):
     sigma_a      = 10   # match MATLAB vid8_1 (larger than example1's sigma_a=1)
     motion_model = tracker.MotionModel.make_motion_model('cv', num_dims, sigma_a ** 2)
     state_space  = motion_model.state_space
-    pos_slice    = state_space.pos_slice
-    vel_slice    = state_space.vel_slice
     motion_model.update_time_step(t_inc)
     f = motion_model.f
     q = motion_model.q
@@ -932,9 +891,8 @@ def example1_vid(save_path=_FIGS_DIR / 'example1_vid.gif'):
 
     for idx in range(num_time):
         this_zeta = zeta[:, idx]
-        x_est  = tracker.ekf_update(x_pred, this_zeta, tdoa.cov,
-                                     msmt_model.measurement, msmt_model.jacobian)
-        x_pred = tracker.kf_predict(x_est, q, f)
+        x_est  = msmt_model.ekf_update(x_pred, this_zeta)
+        x_pred = motion_model.predict(x_est, new_time=t_vec[idx]+t_inc)
 
         x_ekf_est[:, idx] = x_est.position
         err = np.linalg.norm(x_est.position - x_tgt_full[:, idx])

@@ -182,6 +182,41 @@ class MeasurementModel:
 
         return s
 
+    def ekf_update(self, x_prev: State, zeta: npt.ArrayLike, cov: CovarianceMatrix | None = None) -> State:
+        """
+        Conduct an Extended Kalman Filter update, given the previous state estimate and covariance, a measurement function,
+        and the measurement matrix function.
+
+        :param x_prev: Previous state estimate, State
+        :param zeta: Measurement vector, shape: (n_meas, )
+        :param cov: Measurement error covariance, Covariance Matrix with size n_meas
+        :return x: Updated state estimate, State
+        """
+
+        # Grab covariance matrix from PSS, if not provided
+        if cov is None:
+            cov = self.pss.cov
+
+        # Evaluate the Measurement and Jacobian at x_prev
+        msmt = self.measurement(x_prev)
+        jacobian = self.jacobian(x_prev)
+
+        # Compute the Innovation (or Residual)
+        y = zeta - msmt.zeta
+
+        # Compute the Innovation Covariance
+        p_prev = x_prev.covar.cov  # extract the covariance matrix
+        s = jacobian @ p_prev @ jacobian.T + cov.cov
+
+        # Compute the Kalman Gain
+        k = p_prev @ jacobian.T @ np.linalg.inv(s)
+
+        # Update the Estimate
+        x = x_prev.state + k @ y
+        p = CovarianceMatrix((np.eye(x_prev.size) - (k @ jacobian)) @ p_prev)
+
+        return State(state_space=x_prev.state_space, time=x_prev.time, state=x, covar=p)
+
 # =============== Elementary Kalman Filter and Extended Kalman Filter Update Functions ================
 def kf_update(x_prev: State, zeta: npt.ArrayLike, cov: CovarianceMatrix, h: npt.ArrayLike) -> State:
     """
