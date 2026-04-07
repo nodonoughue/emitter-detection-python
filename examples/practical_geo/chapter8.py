@@ -96,9 +96,7 @@ def example1(mc_params=None):
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx, variance_is_toa=False)
 
     # ===  Generate Measurements
-    z = tdoa.measurement(x_tgt_full)
-    noise = tdoa.cov.sample(num_samples=num_time)
-    zeta = z + noise
+    zeta = tdoa.noisy_measurement(x_tgt_full)
 
     # ===  Set Up Tracker
     sigma_a = 1
