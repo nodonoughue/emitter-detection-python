@@ -223,7 +223,7 @@ def draw_cep50(x: npt.ArrayLike,
 
 
 def draw_error_ellipse(x: npt.ArrayLike,
-                       covariance: CovarianceMatrix,
+                       covariance: CovarianceMatrix | npt.ArrayLike,
                        num_pts: int=100,
                        conf_interval: float=50)-> tuple[npt.NDArray, npt.NDArray]:
     """
@@ -250,6 +250,9 @@ def draw_error_ellipse(x: npt.ArrayLike,
     :return x: x-coordinate defining error ellipse
     :return y: y-coordinate defining error ellipse
     """
+
+    if not isinstance(covariance, CovarianceMatrix):
+        covariance = CovarianceMatrix(covariance)
 
     # Eigenvector analysis to identify major/minor axes rotation and length
     lam = covariance.eigenvalues
