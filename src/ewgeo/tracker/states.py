@@ -310,6 +310,28 @@ class State:
         else:
             raise ValueError("Unable to set acceleration component of state that has not acceleration component.")
 
+    def constrain_motion(self,
+                         max_velocity: float | None = None,
+                         max_acceleration: float | None = None) -> None:
+        """
+        Clip velocity and/or acceleration in-place so that neither exceeds the given
+        magnitude bound.  Direction is preserved; only the magnitude is scaled down.
+
+        :param max_velocity: Maximum speed [m/s], or None to skip the velocity check.
+        :param max_acceleration: Maximum acceleration magnitude [m/s²], or None to skip.
+        """
+        if max_velocity is not None and self.has_vel:
+            v = self.state[self.state_space.vel_slice]
+            speed = np.linalg.norm(v)
+            if speed > max_velocity:
+                self.state[self.state_space.vel_slice] = v * (max_velocity / speed)
+
+        if max_acceleration is not None and self.has_accel:
+            a = self.state[self.state_space.accel_slice]
+            mag = np.linalg.norm(a)
+            if mag > max_acceleration:
+                self.state[self.state_space.accel_slice] = a * (max_acceleration / mag)
+
     @property
     def has_vel(self) -> bool:
         return self.state_space.has_vel

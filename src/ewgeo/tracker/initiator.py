@@ -28,14 +28,23 @@ class SinglePointMeasurementInitiator(Initiator):
     """
     msmt_model: MeasurementModel
 
-    def __init__(self, msmt_model: MeasurementModel, target_state_space: StateSpace = None):
+    def __init__(self, msmt_model: MeasurementModel, target_state_space: StateSpace = None,
+                 target_max_velocity: float | None = None,
+                 target_max_acceleration: float | None = None):
         """
-        :param msmt_model:         MeasurementModel used to convert each measurement into an initial State
-        :param target_state_space: If provided, each newly created State is adapted to this StateSpace
-                                   via adapt_cartesian_state before the Track is created.
+        :param msmt_model:              MeasurementModel used to convert each measurement into an initial State
+        :param target_state_space:      If provided, each newly created State is adapted to this StateSpace
+                                        via adapt_cartesian_state before the Track is created.
+        :param target_max_velocity:     Optional upper bound on target speed [m/s].  Stored on each created
+                                        Track so the Tracker can clip the estimated velocity after each update.
+        :param target_max_acceleration: Optional upper bound on target acceleration [m/s²].  Stored on each
+                                        created Track so the Tracker can clip the estimated acceleration after
+                                        each update.
         """
         self.msmt_model = msmt_model
         self.target_state_space = target_state_space
+        self.target_max_velocity = target_max_velocity
+        self.target_max_acceleration = target_max_acceleration
 
     def initiate(self, measurements: list[Measurement], next_track_id: int=None) -> tuple[list[Track], int]:
         """
@@ -51,12 +60,19 @@ class SinglePointMeasurementInitiator(Initiator):
 
         for m in measurements:
             # Determine a position and/or velocity for this measurement
-            s = self.msmt_model.state_from_measurement(m)
+            s = self.msmt_model.state_from_measurement(
+                m,
+                target_max_velocity=self.target_max_velocity,
+                target_max_acceleration=self.target_max_acceleration)
             if self.target_state_space is not None:
+                # Convert from whatever the measurement's state space was to
+                # the desired state space
                 s = adapt_cartesian_state(s, self.target_state_space)
 
             # Initialize a track object
-            t = Track(initial_state=s, track_id=next_track_id)
+            t = Track(initial_state=s, track_id=next_track_id,
+                      max_velocity=self.target_max_velocity,
+                      max_acceleration=self.target_max_acceleration)
             next_track_id += 1
             tracks.append(t)
 
@@ -152,9 +168,12 @@ class TwoPointInitiator(Initiator):
                                            self._build_initial_covariance(s2, dt,
                                                self.target_max_velocity))
                         if self.target_state_space is not None:
+                            # Make sure the state is in the proper state space
                             init_state = adapt_cartesian_state(init_state, self.target_state_space)
                         confirmed_tracks.append(
-                            Track(initial_state=init_state, track_id=track.track_id)
+                            Track(initial_state=init_state, track_id=track.track_id,
+                                  max_velocity=self.target_max_velocity,
+                                  max_acceleration=self.target_max_acceleration)
                         )
                 # Either way, remove from buffer
                 self._buffer_tracks.remove(track)
@@ -301,10 +320,13 @@ class ThreePointInitiator(Initiator):
                     full_track = self._build_track(s1, s2, s3)
                     if full_track is not None:
                         if self.target_state_space is not None:
+                            # Ensure that the generated state is in the desired state space
                             adapted = adapt_cartesian_state(
                                 full_track.curr_state, self.target_state_space)
                             full_track = Track(initial_state=adapted,
                                                track_id=full_track.track_id)
+                        full_track.max_velocity = self.target_max_velocity
+                        full_track.max_acceleration = self.target_max_acceleration
                         confirmed_tracks.append(full_track)
                     matched_stage2.append(track)
                 # Unconditionally retire stage-2 tracks (matched or not)
