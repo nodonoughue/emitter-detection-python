@@ -140,18 +140,59 @@ class MeasurementModel:
                                        v_source=self.state_space.vel_component(state.state),
                                        zeta=measurement.zeta)
 
-    def state_from_measurement(self, m: Measurement, truth_state: bool=False)-> State:
+    def state_from_measurement(self, m: Measurement, truth_state: bool=False,
+                               x_init: npt.ArrayLike | None = None,
+                               target_max_velocity: float | None = None,
+                               target_max_acceleration: float | None = None)-> State:
         """
         Attempt to populate a state from a measurement.
 
         We will first generate an empty state, based on the state space, then attempt to populate the
         position and velocity using the least square solver from the underlying PassiveSurveillanceSystem object stored
         in self.pss.
+
+        :param m: Input measurement from which the state will be estimated
+        :param truth_state: Boolean flag (default=False) declaring whether this should be considered a
+                            truth state (no error) or an estimated state (with error)
+        :param x_init: Optional initial position (or pos+vel) estimate for the LS solver. If position-only
+                       (num_dims elements), velocity is padded with zeros. Providing a good starting point
+                       (e.g. the previous scan's position) dramatically improves convergence for distant
+                       targets and eliminates mirror-image z-ambiguity when z_init > 0.
+        :param target_max_velocity: Optional upper bound on target speed [m/s]. When provided, the velocity
+                                    block of the initial covariance is scaled so that its largest diagonal
+                                    element does not exceed target_max_velocity². Applied after the sentinel
+                                    check. If None, the covariance is left as-is.
+        :param target_max_acceleration: Optional upper bound on target acceleration [m/s²]. When provided,
+                                        the acceleration block of the initial covariance is scaled so that
+                                        its largest diagonal element does not exceed target_max_acceleration².
+                                        Only applies when the state space has an acceleration component.
+                                        If None, the covariance is left as-is.
         """
 
-        # Use the PSS object's least square estimator to come up with an estimated position
-        init_pos_vel = np.zeros((2*self.state_space.num_dims, ))
+        # Use the PSS object's least square estimator to come up with an estimated position.
+        n = self.state_space.num_dims
+        if x_init is not None:
+            x_init = np.asarray(x_init, dtype=float).ravel()
+            init_pos_vel = np.zeros((2*n, ))
+            init_pos_vel[:min(x_init.size, 2*n)] = x_init[:min(x_init.size, 2*n)]
+        else:
+            init_pos_vel = np.zeros((2*n, ))
         pos_vel_est, _ = self.pss.least_square(zeta=m.zeta, x_init=init_pos_vel, max_num_iterations=100)
+
+        # If the 3D result has z < 0, retry with the z sign flipped to escape the
+        # mirror-image local minimum that arises with near-coplanar sensor arrays.
+        if n >= 3 and pos_vel_est[2] < 0:
+            retry_init = np.zeros((2*n, ))
+            retry_init[2] = -pos_vel_est[2]
+            pos_vel_est_retry, _ = self.pss.least_square(zeta=m.zeta, x_init=retry_init, max_num_iterations=100)
+            if pos_vel_est_retry[2] >= 0:
+                pos_vel_est = pos_vel_est_retry
+
+        # Sanity check: if the LS result is unreasonably far from the sensor origin
+        # (> 5000 km), the solver likely diverged.  Reset to zeros so that the caller
+        # can detect the failure via `norm(position) < 1` and skip the result.
+        if np.linalg.norm(pos_vel_est[:n]) > 5e6:
+            pos_vel_est = np.zeros((2*n, ))
 
         # Convert to a state vector
         init_state_vec = np.zeros((self.state_space.num_states, ))
@@ -177,6 +218,19 @@ class MeasurementModel:
             vel_diag = np.diag(init_covar[vel_slice, vel_slice])
             if np.all(vel_diag <= 1e-3) or np.any(vel_diag > 1e12):
                 init_covar[vel_slice, vel_slice] = 1e6*np.eye(self.state_space.num_dims)
+
+            if target_max_velocity is not None:
+                vel_cov = init_covar[vel_slice, vel_slice]
+                max_diag = np.max(np.diag(vel_cov))
+                if max_diag > target_max_velocity**2:
+                    init_covar[vel_slice, vel_slice] = vel_cov * (target_max_velocity**2 / max_diag)
+
+            if target_max_acceleration is not None and self.state_space.has_accel:
+                accel_slice = self.state_space.accel_slice
+                accel_cov = init_covar[accel_slice, accel_slice]
+                max_diag = np.max(np.diag(accel_cov))
+                if max_diag > target_max_acceleration**2:
+                    init_covar[accel_slice, accel_slice] = accel_cov * (target_max_acceleration**2 / max_diag)
 
             s.covar = CovarianceMatrix(init_covar)
 
