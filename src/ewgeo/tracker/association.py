@@ -128,8 +128,8 @@ class Hypothesis:
             if self.measurement is None:
                 return np.inf
             else:
-                # Mahalanobis Distance
-                self._distance = self.innovation_covar.solve_aca(self.innovation.T)/self.measurement.size
+                # Mahalanobis distance squared: y' S^{-1} y ~ chi2(n)
+                self._distance = self.innovation_covar.solve_aca(self.innovation.T)
         return self._distance
 
     @property
@@ -528,11 +528,14 @@ class NNAssociator(Associator):
             # table.float_format = ".2"
 
         for track in tracks:
-            # Generate a hypothesis for each track; we'll start with the null hypothesis
+            # Generate a hypothesis for each track; we'll start with the null hypothesis.
+            # The null cost must equal the gate threshold so it loses to any measurement that
+            # passes the gate (d² < gate_threshold) and wins when all measurements fail.
             null_hypothesis = MissedDetectionHypothesis(track=track,
                                                         motion_model=self.motion_model,
                                                         sensor=measurements[0].sensor,
-                                                        distance=1.0 - self.gate_probability,
+                                                        distance=chi2.ppf(self.gate_probability,
+                                                                          measurements[0].size),
                                                         time=curr_time)
 
             # There are no more measurements to associate; we need to use the missed detection hypothesis
@@ -654,9 +657,12 @@ class GNNAssociator(Associator):
             for j, h in enumerate(this_hypotheses):
                 distance[index, j] = h.distance if np.isfinite(h.distance) else large_value
 
-            # Null hypothesis
+            # Null hypothesis: cost equals the gate threshold so it loses to any measurement
+            # that passes the gate (d² < gate_threshold) and wins when all measurements fail.
             null_hyp = MissedDetectionHypothesis(track=track, motion_model=self.motion_model,
-                                                 sensor=measurements[0].sensor, distance=1.0 - self.gate_probability,
+                                                 sensor=measurements[0].sensor,
+                                                 distance=chi2.ppf(self.gate_probability,
+                                                                   measurements[0].size),
                                                  time=curr_time)
             null_hypotheses.append(null_hyp)
             distance[index, num_measurements + index] = null_hyp.distance
