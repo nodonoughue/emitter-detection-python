@@ -91,6 +91,12 @@ class MotionModel(ABC):
         if isinstance(s, Track):
             s = s.curr_state
 
+        if not self.state_space.is_equal(s.state_space):
+            raise ValueError(
+                f"State space mismatch: motion model expects {self.state_space!r} "
+                f"but received state with {s.state_space!r}."
+            )
+
         # Look up or compute the process noise and transition matrices
         time_delta = new_time - s.time
 

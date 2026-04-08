@@ -247,6 +247,12 @@ class MeasurementModel:
         :return x: Updated state estimate, State
         """
 
+        if not self.state_space.is_equal(x_prev.state_space):
+            raise ValueError(
+                f"State space mismatch: measurement model expects {self.state_space!r} "
+                f"but received state with {x_prev.state_space!r}."
+            )
+
         # Grab covariance matrix from PSS, if not provided
         if cov is None:
             cov = self.pss.cov

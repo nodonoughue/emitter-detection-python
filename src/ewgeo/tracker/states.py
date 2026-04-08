@@ -102,6 +102,39 @@ class StateSpace(ABC):
         """Return the turn-rate sub-vector of state vector x, or None if absent."""
         return x[self.turn_rate_slice] if self.has_turn_rate else None
 
+    def is_equal(self, other: 'StateSpace') -> bool:
+        """
+        Test whether two StateSpace instances are structurally equivalent.
+
+        All properties defined on either concrete class are compared.
+        Returns False on the first mismatch; num_dims and num_states are
+        checked first, then all remaining properties in alphabetical order.
+        Equality is structural, not nominal: two different subclasses with
+        identical layouts are considered equal.
+
+        :param other: StateSpace instance to compare against.
+        :return: True if all properties match, False otherwise.
+        """
+        if not isinstance(other, StateSpace):
+            return False
+
+        # Collect all property names defined across both concrete classes
+        all_props = {
+            name
+            for cls in (*type(self).__mro__, *type(other).__mro__)
+            for name, val in vars(cls).items()
+            if isinstance(val, property)
+        }
+
+        # Check num_dims and num_states first, then the rest alphabetically
+        priority = ['num_dims', 'num_states']
+        ordered = priority + sorted(all_props - set(priority))
+
+        for name in ordered:
+            if getattr(self, name, None) != getattr(other, name, None):
+                return False
+        return True
+
 
 class CartesianStateSpace(StateSpace):
     """
@@ -583,6 +616,9 @@ def adapt_cartesian_state(source: State, target_ss: StateSpace,
     :return: New State with ``target_ss``, same timestamp, adapted mean and
              covariance.
     """
+    if source.state_space.is_equal(target_ss):
+        return source
+
     n = target_ss.num_states
     x_new = np.zeros(n)
     x_new[target_ss.pos_slice] = source.position
