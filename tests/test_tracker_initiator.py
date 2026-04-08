@@ -454,3 +454,89 @@ def test_propagate_covariance_no_accel_does_not_crash():
     covar = initiator._propagate_covariance(pos_var, dt=1.0, state_space=cv_ss)
     # pos block was scaled; size matches CV num_states (2)
     assert covar.shape == (cv_ss.num_states, cv_ss.num_states)
+
+
+# ---------------------------------------------------------------------------
+# target_max_velocity / target_max_acceleration caps
+# ---------------------------------------------------------------------------
+
+def test_two_point_build_covariance_vel_uncapped_when_no_max():
+    """Without target_max_velocity the velocity variance equals pos_var / dt^2."""
+    model = make_cv_model()
+    s = State(model.state_space, time=1.0,
+              state=np.array([5.0, 0.0]),
+              covar=CovarianceMatrix(np.diag([4.0, 1000.0])))
+    covar = TwoPointInitiator._build_initial_covariance(s, dt=1.0,
+                                                        target_max_velocity=None)
+    # pos_var = 10 * 4 = 40; vel_var = 40 / 1^2 = 40
+    assert equal_to_tolerance(covar.cov[1, 1], 40.0)
+
+
+def test_two_point_build_covariance_vel_capped_when_below_crlb():
+    """target_max_velocity=3 caps vel_var at 3^2=9 (CRLB-derived would be 40)."""
+    model = make_cv_model()
+    s = State(model.state_space, time=1.0,
+              state=np.array([5.0, 0.0]),
+              covar=CovarianceMatrix(np.diag([4.0, 1000.0])))
+    covar = TwoPointInitiator._build_initial_covariance(s, dt=1.0,
+                                                        target_max_velocity=3.0)
+    assert covar.cov[1, 1] <= 3.0 ** 2 + 1e-9
+
+
+def test_two_point_build_covariance_vel_unchanged_when_max_is_large():
+    """target_max_velocity larger than the CRLB estimate leaves vel_var unchanged."""
+    model = make_cv_model()
+    s = State(model.state_space, time=1.0,
+              state=np.array([5.0, 0.0]),
+              covar=CovarianceMatrix(np.diag([4.0, 1000.0])))
+    # CRLB-derived vel_var = 40; max_velocity=10 -> cap = 100 > 40, no change
+    covar_uncapped = TwoPointInitiator._build_initial_covariance(s, dt=1.0)
+    covar_capped   = TwoPointInitiator._build_initial_covariance(s, dt=1.0,
+                                                                 target_max_velocity=10.0)
+    assert equal_to_tolerance(covar_capped.cov[1, 1], covar_uncapped.cov[1, 1])
+
+
+def test_two_point_constructor_stores_max_velocity():
+    mm = make_cv_measurement_model()
+    assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
+    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                  target_max_velocity=250.0)
+    assert initiator.target_max_velocity == 250.0
+
+
+def test_three_point_propagate_vel_capped():
+    """target_max_velocity=2 caps vel_var (normally pos_var/(2*dt^2) = 0.5) ... but
+    pos_var=1 gives vel_var=0.5 < 2^2=4, so no cap should trigger.
+    Use a large pos_var so the cap is needed."""
+    ca_ss = ConstantAccelerationMotionModel(num_dims=1, process_covar=1.0).state_space
+    initiator = ThreePointInitiator(msmt_model=None, associator=None,
+                                    target_max_velocity=2.0)
+    # pos_var = 100 -> vel_var = 100/(2*1) = 50 >> 4 -> should be capped to 4
+    pos_var = np.array([[100.0]])
+    covar = initiator._propagate_covariance(pos_var, dt=1.0, state_space=ca_ss)
+    vel_idx = ca_ss.vel_slice
+    assert covar[vel_idx, vel_idx][0, 0] <= 2.0 ** 2 + 1e-9
+
+
+def test_three_point_propagate_accel_capped():
+    """target_max_acceleration=1 caps acc_var (normally 6*pos_var/dt^4 = 600) to 1."""
+    ca_ss = ConstantAccelerationMotionModel(num_dims=1, process_covar=1.0).state_space
+    initiator = ThreePointInitiator(msmt_model=None, associator=None,
+                                    target_max_acceleration=1.0)
+    pos_var = np.array([[100.0]])
+    covar = initiator._propagate_covariance(pos_var, dt=1.0, state_space=ca_ss)
+    accel_idx = ca_ss.accel_slice
+    assert covar[accel_idx, accel_idx][0, 0] <= 1.0 ** 2 + 1e-9
+
+
+def test_three_point_propagate_no_cap_when_below_bound():
+    """No cap when both bounds are larger than the CRLB-derived variances."""
+    ca_ss = ConstantAccelerationMotionModel(num_dims=1, process_covar=1.0).state_space
+    initiator_no_cap = ThreePointInitiator(msmt_model=None, associator=None)
+    initiator_large  = ThreePointInitiator(msmt_model=None, associator=None,
+                                           target_max_velocity=1000.0,
+                                           target_max_acceleration=1000.0)
+    pos_var = np.array([[1.0]])
+    c1 = initiator_no_cap._propagate_covariance(pos_var, dt=1.0, state_space=ca_ss)
+    c2 = initiator_large._propagate_covariance(pos_var, dt=1.0, state_space=ca_ss)
+    assert equal_to_tolerance(c1, c2)
