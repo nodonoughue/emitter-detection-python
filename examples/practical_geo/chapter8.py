@@ -99,9 +99,9 @@ def example1(mc_params=None):
     zeta = tdoa.noisy_measurement(x_tgt_full)
 
     # ===  Set Up Tracker
-    sigma_a = 1
+    q_a = 1
 
-    motion_model = tracker.MotionModel.make_motion_model('cv',num_dims,sigma_a**2)
+    motion_model = tracker.MotionModel.make_motion_model('cv',num_dims,q_a**2)
     state_space = motion_model.state_space
     motion_model.update_time_step(t_inc)
     f = motion_model.f # generate state transition matrix
@@ -223,7 +223,7 @@ def example1(mc_params=None):
 
         # Bound initial velocity uncertainty by assumed max velocity of 340 m/s
         # (Mach 1 at sea level)
-        x_pred.velocity_covar = 10 * max_vel**2*np.eye(num_dims)
+        x_pred.velocity_covar = max_vel**2*np.eye(num_dims)
 
         # Step Through Time
         x_ekf_est = np.zeros((num_dims,num_time))
@@ -362,10 +362,10 @@ def example2(rng=np.random.default_rng()):
 
     # ===  Set Up Tracker
     # Track in x/y, even though a/c and tgt in x/y/z
-    sigma_a = .05
+    q_a = .05
     num_dims = 3 # number of dimensions to use in state
 
-    motion_model = tracker.MotionModel.make_motion_model('cv',num_dims,sigma_a**2)
+    motion_model = tracker.MotionModel.make_motion_model('cv',num_dims,q_a**2)
     state_space = motion_model.state_space
     motion_model.update_time_step(t_inc)
     f = motion_model.f # generate state transition matrix
@@ -679,7 +679,7 @@ def example4(rng=np.random.default_rng(0)):
                        [  0.,   0.,   0.,   0.]])
     n_tdoa = x_tdoa.shape[1]
 
-    sigma_toa = 10e-9    # 10 ns → ~3 m RDOA noise
+    sigma_toa = 100e-9   # 100 ns → ~30 m RDOA noise
     cov_toa   = CovarianceMatrix(sigma_toa ** 2 * np.eye(n_tdoa))
     tdoa      = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_toa,
                                               variance_is_toa=True)
@@ -708,7 +708,7 @@ def example4(rng=np.random.default_rng(0)):
     # constant (process_covar_omega = 1e-6 → σ_ω ≈ 0.002 rad/s per step),
     # which forces the filter to maintain its ω estimate between updates.
     mm_ct = ConstantTurnMotionModel(num_dims=3, process_covar=2. ** 2,
-                                    process_covar_omega=1e-3)
+                                    process_covar_omega=.01**2)
     x0_ct = State(state_space=mm_ct.state_space, time=0, state=None, covar=None)
     x0_ct.position = x_tgt_full[:, 0] + x_init
     x0_ct.velocity = [0., v0, 0.]
@@ -864,8 +864,8 @@ def example1_vid(save_path=_FIGS_DIR / 'example1_vid.gif'):
     z    = tdoa.measurement(x_tgt_full)
     zeta = z + tdoa.cov.sample(num_samples=num_time)
 
-    sigma_a      = 10   # match MATLAB vid8_1 (larger than example1's sigma_a=1)
-    motion_model = tracker.MotionModel.make_motion_model('cv', num_dims, sigma_a ** 2)
+    q_a      = 10   # match MATLAB vid8_1 (larger than example1's q_a=1)
+    motion_model = tracker.MotionModel.make_motion_model('cv', num_dims, q_a ** 2)
     state_space  = motion_model.state_space
     motion_model.update_time_step(t_inc)
     f = motion_model.f
