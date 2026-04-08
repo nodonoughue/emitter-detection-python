@@ -246,17 +246,15 @@ def example3():
 
     return figs
 
-def _make_tgt_1(max_time: float = 600):
+def _make_tgt_1(max_time: float = 600, t_inc: float = 10):
     # ===  Define target trajectory
-    x_tgt_init = np.array([-50e3, 50e3, 20e3 * _ft2m])
+    x_tgt_init = np.array([-50e3, 80e3, 20e3 * _ft2m])
     vel = 200
 
     t_e_leg = 3 * 60  # turn at 3 min
     turn_rad = 50e3
     t_turn = np.pi / 2 * turn_rad / vel
     t_s_leg = max_time
-
-    t_inc = 10  # 10 seconds between track updates
 
     # Due East
     t_e_vec = np.arange(start=0, stop=t_e_leg + t_inc, step=t_inc)
@@ -283,7 +281,7 @@ def _make_tgt_1(max_time: float = 600):
 
     return t_vec, x_tgt_full
 
-def _make_tgt_2(max_time: float = 600):
+def _make_tgt_2(max_time: float = 600, t_inc: float = 10):
     # ===  Define target trajectory
     x_tgt_init = np.array([-50e3, 75e3, 20e3 * _ft2m])
     vel = 210
@@ -292,8 +290,6 @@ def _make_tgt_2(max_time: float = 600):
     turn_rad = 50e3
     t_turn = np.pi * turn_rad / vel
     t_sw_leg = max_time
-
-    t_inc = 10  # 10 seconds between track updates
 
     # Due North-East
     t_ne_vec = np.arange(start=0, stop=t_ne_leg + t_inc, step=t_inc)
@@ -322,13 +318,12 @@ def _make_tgt_2(max_time: float = 600):
 
     return t_vec, x_tgt_full
 
-def _make_tgt_3(max_time: float = 600):
+def _make_tgt_3(max_time: float = 600, t_inc: float = 10):
     # ===  Define target trajectory
     x_tgt_init = np.array([-50e3, 125e3, 20e3 * _ft2m])
     vel = 170
 
     t_se_leg = max_time  # turn at 3 min
-    t_inc = 10  # 10 seconds between track updates
 
     # Due South-East
     t_se_vec = np.arange(start=0, stop=t_se_leg + t_inc, step=t_inc)
@@ -340,9 +335,10 @@ def _make_tgt_3(max_time: float = 600):
 def example4():
     # Make the targets
     max_time = 900 # seconds
-    tgt_1 = _make_tgt_1(max_time)
-    tgt_2 = _make_tgt_2(max_time)
-    tgt_3 = _make_tgt_3(max_time)
+    t_inc = 10
+    tgt_1 = _make_tgt_1(max_time, t_inc)
+    tgt_2 = _make_tgt_2(max_time, t_inc)
+    tgt_3 = _make_tgt_3(max_time, t_inc)
     tgts = [tgt_1, tgt_2, tgt_3] # each one has a tuple of time, pos
 
     # Make figure handles
@@ -355,15 +351,14 @@ def example4():
     tgt_colors = [h.get_color() for h in tgt_hdls]
 
     # Initialize the PSS
-    x_tdoa = np.array([[5e3, 0, 0, -5e3],
-                       [0, 5e3, 0, 0],
-                       [30, 60, 30, 60]])
+    x_tdoa = np.array([[15e3,    0,  0, -15e3],
+                       [0,    15e3,  0,     0],
+                       [30,     60,  30,   60]])
     num_dims, n_tdoa = np.shape(x_tdoa)
     ref_idx = 0
     sigma_toa = 1e-7
     cov_toa = (sigma_toa ** 2) * np.eye(n_tdoa)
-    cov_roa = CovarianceMatrix(speed_of_light ** 2 * cov_toa)
-    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx, variance_is_toa=False)
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_toa, ref_idx=ref_idx, variance_is_toa=True)
 
     # Truth measurements
     for tgt, color in zip(tgts, tgt_colors):
@@ -396,20 +391,34 @@ def example4():
     plt.tight_layout()
 
     # Initialize CV tracker
-    transition_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=1**2)
+    # target_max_velocity=300 m/s caps the initial velocity covariance so that the
+    # predicted-position gate stays well below the ~25 km inter-target separation,
+    # preventing spurious cross-target pairings during the tentative-track stage.
+    target_max_vel = 300  # m/s — conservative upper bound for subsonic aircraft
+    transition_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=3**2)
     msmt_model_cv = MeasurementModel(state_space=transition_cv.state_space, pss=tdoa)
-    associator_cv = GNNAssociator(motion_model=transition_cv, gate_probability=.7)
-    initiator_cv  = TwoPointInitiator(msmt_model=msmt_model_cv, associator=associator_cv)
+    associator_cv = GNNAssociator(motion_model=transition_cv, gate_probability=.9)
+    initiator_cv  = TwoPointInitiator(msmt_model=msmt_model_cv, associator=associator_cv,
+                                      target_max_velocity=target_max_vel)
     tracker_cv = Tracker(initiator=initiator_cv, associator=associator_cv,
                          deleter=MissedDetectionDeleter(num_missed_detections=3),
                          promoter=MofNPromoter(num_hits=3, num_chances=5),
                          do_plotting=False, keep_all_tracks=True, print_status=False)
 
     # Initialize CA tracker (independent — separate motion model, associator, initiator)
+    # Same velocity cap; target_max_acceleration keeps the dt^4/4 * P_accel term from
+    # inflating the gate beyond the inter-target separation.
+    # gate_probability=0.9999 (chi²≈21.1) rather than 0.9 (chi²=6.25): T3 is ~134 km from
+    # the sensor array (15 km baseline), so the TDOA Jacobian entries are ~0.07. A 2 km
+    # EKF position error maps to a ~140 m TDOA prediction mismatch, giving d²≈33 >> 6.25.
+    # The wider gate lets CA maintain track through this linearization transient.
+    target_max_accel = 10  # m/s^2 — generous bound for a maneuvering aircraft
     transition_ca = ConstantAccelerationMotionModel(num_dims=3, process_covar=1**2)
     msmt_model_ca = MeasurementModel(state_space=transition_ca.state_space, pss=tdoa)
-    associator_ca = GNNAssociator(motion_model=transition_ca, gate_probability=.7)
-    initiator_ca  = TwoPointInitiator(msmt_model=msmt_model_ca, associator=associator_ca)
+    associator_ca = GNNAssociator(motion_model=transition_ca, gate_probability=0.9999)
+    initiator_ca  = TwoPointInitiator(msmt_model=msmt_model_ca, associator=associator_ca,
+                                      target_max_velocity=target_max_vel,
+                                      target_max_acceleration=target_max_accel)
     tracker_ca = Tracker(initiator=initiator_ca, associator=associator_ca,
                          deleter=MissedDetectionDeleter(num_missed_detections=3),
                          promoter=MofNPromoter(num_hits=3, num_chances=5),
@@ -423,7 +432,8 @@ def example4():
     time_vec = tgts[0][0]
     truth_label = 'Noisy Truth Measurements'
     fa_label = 'False Alarm Measurements'
-    num_fa_per_step = 20
+    num_fa_per_step = 10
+    fa_max_rdoa = 20e3
 
     iterations_per_marker = 1
     iterations_per_row = 40 * iterations_per_marker
@@ -446,7 +456,7 @@ def example4():
         noisy_msmts = [msmt_model_cv.measurement(s, noise=True) for s in truth_states]
 
         # Generate false alarm measurements and add to the TDOA panels
-        fa_msmt = msmt_model_cv.false_alarm(max_val=8e3, num=num_fa_per_step, time=time_vec[idx].item())
+        fa_msmt = msmt_model_cv.false_alarm(max_val=fa_max_rdoa, num=num_fa_per_step, time=time_vec[idx].item())
         [ax.scatter(time_vec[idx]*np.ones(num_fa_per_step), [m.zeta[ii]/scale for m in fa_msmt], 3,
                     marker='^', color='gray', alpha=0.1, label=fa_label)
          for ii, ax in enumerate(axs.flatten()[1:])]
@@ -495,7 +505,7 @@ def example4():
                label=ca_label, scale=scale, plot_dims=np.s_[:2])
         ca_label = None
 
-    tdoa.plot_sensors(scale=scale, ax=ax2, marker='s', color='k', label='TDOA Sensors')
+    tdoa.plot_sensors(scale=scale, ax=ax2, marker='o', color='k', label='TDOA Sensors')
     ax2.set_xlim([-75, 125])
     ax2.set_ylim([-50, 200])
     ax2.set_xlabel('East [km]')
@@ -523,20 +533,21 @@ def example4():
             truth_pos = x_tgt[:, time_idx]
 
             cv_pos = cv_lookup.get(t, [])
-            cv_err.append(min((np.linalg.norm(truth_pos - p) for p in cv_pos),
+            cv_err.append(min((np.linalg.norm(truth_pos[:2] - p[:2]) for p in cv_pos),
                               default=np.nan) / scale)
 
             ca_pos = ca_lookup.get(t, [])
-            ca_err.append(min((np.linalg.norm(truth_pos - p) for p in ca_pos),
+            ca_err.append(min((np.linalg.norm(truth_pos[:2] - p[:2]) for p in ca_pos),
                               default=np.nan) / scale)
 
         label = f'Target {tgt_idx + 1}'
-        ax3.plot(time_vec, cv_err, color=color, linestyle='--',  label=f'{label} CV')
-        ax3.plot(time_vec, ca_err, color=color, linestyle='-.', label=f'{label} CA')
+        ax3.plot(time_vec, cv_err, color=color, linestyle='-',  label=f'{label} CV')
+        ax3.plot(time_vec, ca_err, color=color, linestyle='--', label=f'{label} CA')
 
-    ax3.set_title('Position Error vs Time (CV solid, CA dashed)', fontsize=10)
+    ax3.set_title('Horizontal Position Error vs Time (CV dashed, CA dash-dot)', fontsize=10)
     ax3.set_xlabel('Time [s]', fontsize=8)
-    ax3.set_ylabel('Error [km]', fontsize=8)
+    ax3.set_ylabel('Horizontal Error [km]', fontsize=8)
+    ax3.set_yscale('log')
     ax3.legend(fontsize=8)
     ax3.grid(True)
     ax3.tick_params(labelsize=8)
