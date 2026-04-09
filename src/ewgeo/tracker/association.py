@@ -251,21 +251,36 @@ class MissedDetectionHypothesis(Hypothesis):
     no measurement update. The distance and likelihood are supplied at construction and held fixed.
     """
     def __init__(self, track: Track, motion_model: MotionModel, sensor: PassiveSurveillanceSystem | None,
-                 distance: float, time: float):
+                 time: float, gate_probability: float = None, num_msmt_dims: int = None,
+                 distance: float = None):
         """
         :param track: Existing track to coast
         :param motion_model: MotionModel used to predict the track forward to ``time``
         :param sensor: Sensor associated with this scan (may be None when no measurements exist)
-        :param distance: Fixed distance value assigned to this hypothesis (typically 1 − gate_probability)
         :param time: Timestamp to coast the track to [seconds]
+        :param gate_probability: Chi-square gate probability (e.g., 0.99); used with num_msmt_dims
+                                 to compute the gate threshold chi2.ppf(gate_probability, num_msmt_dims).
+                                 Ignored when distance is provided explicitly.
+        :param num_msmt_dims: Measurement vector dimension; combined with gate_probability to
+                              compute the chi-square gate threshold. When None (e.g., no measurements
+                              are available in the current scan), distance defaults to 0.0, meaning
+                              this hypothesis always wins any cost comparison.
+        :param distance: Override the inferred distance directly (e.g., PDA uses 1 − Pd·Pg as a
+                         probability weight rather than a Mahalanobis threshold). When None the value
+                         is computed from gate_probability and num_msmt_dims.
         """
         dummy_measurement = Measurement(sensor=sensor, time=time, zeta=np.array([0.0]))
         super().__init__(track, dummy_measurement, motion_model)
 
-        # The innovation of a missed detection is zero, set some dummy values for likelihood, as well
+        if distance is None:
+            if gate_probability is not None and num_msmt_dims is not None:
+                distance = chi2.ppf(gate_probability, num_msmt_dims)
+            else:
+                distance = 0.0  # no competing measurements; this hypothesis always wins
+
         self._distance = distance
         self._likelihood = distance  # also use it as the likelihood
-        self._log_likelihood = np.log(distance)
+        self._log_likelihood = np.log(distance) if distance > 0 else -np.inf
         self._innov = None
         self._innov_covar = None
 
@@ -485,7 +500,7 @@ class Associator(ABC):
 class NNAssociator(Associator):
     """
     Nearest-Neighbor (NN) associator. Assigns each track independently to its closest measurement
-    (by normalized Mahalanobis distance) that passes the acceptance gate. Earlier tracks take
+    (by Mahalanobis distance squared y'S⁻¹y) that passes the acceptance gate. Earlier tracks take
     priority: a measurement already assigned to a track is unavailable to later tracks.
     If no measurements are provided and ``curr_time`` is given, every track receives a
     MissedDetectionHypothesis coasting it to ``curr_time``.
@@ -515,8 +530,8 @@ class NNAssociator(Associator):
                 hypotheses[track] = MissedDetectionHypothesis(track=track,
                                                               motion_model=self.motion_model,
                                                               sensor=None,
-                                                              distance=1.0 - self.gate_probability,
-                                                              time=curr_time)
+                                                              time=curr_time,
+                                                              gate_probability=self.gate_probability)
             return hypotheses, unassociated_measurements
 
         curr_time = measurements[0].time
@@ -534,9 +549,9 @@ class NNAssociator(Associator):
             null_hypothesis = MissedDetectionHypothesis(track=track,
                                                         motion_model=self.motion_model,
                                                         sensor=measurements[0].sensor,
-                                                        distance=chi2.ppf(self.gate_probability,
-                                                                          measurements[0].size),
-                                                        time=curr_time)
+                                                        time=curr_time,
+                                                        gate_probability=self.gate_probability,
+                                                        num_msmt_dims=measurements[0].size)
 
             # There are no more measurements to associate; we need to use the missed detection hypothesis
             if not measurements:
@@ -629,8 +644,8 @@ class GNNAssociator(Associator):
                 hypotheses[track] = MissedDetectionHypothesis(track=track,
                                                               motion_model=self.motion_model,
                                                               sensor=None,
-                                                              distance=1.0 - self.gate_probability,
-                                                              time=curr_time)
+                                                              time=curr_time,
+                                                              gate_probability=self.gate_probability)
             return hypotheses, []
 
         curr_time = measurements[0].time
@@ -661,9 +676,9 @@ class GNNAssociator(Associator):
             # that passes the gate (d² < gate_threshold) and wins when all measurements fail.
             null_hyp = MissedDetectionHypothesis(track=track, motion_model=self.motion_model,
                                                  sensor=measurements[0].sensor,
-                                                 distance=chi2.ppf(self.gate_probability,
-                                                                   measurements[0].size),
-                                                 time=curr_time)
+                                                 time=curr_time,
+                                                 gate_probability=self.gate_probability,
+                                                 num_msmt_dims=measurements[0].size)
             null_hypotheses.append(null_hyp)
             distance[index, num_measurements + index] = null_hyp.distance
 
@@ -738,10 +753,12 @@ class PDAAssociator(Associator):
             # Initialize a Null Hypothesis
             p_miss = 1 - self.detection_probability*self.gate_probability
             null_hypothesis = MissedDetectionHypothesis(track=track,
-                                                        distance=p_miss,
-                                                        sensor=measurements[0].sensor,
                                                         motion_model=self.motion_model,
-                                                        time=measurements[0].time)
+                                                        sensor=measurements[0].sensor,
+                                                        time=measurements[0].time,
+                                                        gate_probability=self.gate_probability,
+                                                        num_msmt_dims=measurements[0].size,
+                                                        distance=p_miss)
             # Generate the full set of hypotheses and apply the acceptance gate
             this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=self.motion_model) for m in measurements]
             [h.apply_distance_gate(self.gate_probability) for h in this_hypotheses]
