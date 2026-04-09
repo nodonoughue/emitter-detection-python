@@ -413,9 +413,9 @@ def example4():
     # EKF position error maps to a ~140 m TDOA prediction mismatch, giving d²≈33 >> 6.25.
     # The wider gate lets CA maintain track through this linearization transient.
     target_max_accel = 10  # m/s^2 — generous bound for a maneuvering aircraft
-    transition_ca = ConstantAccelerationMotionModel(num_dims=3, process_covar=1**2)
+    transition_ca = ConstantAccelerationMotionModel(num_dims=3, process_covar=.1**2)
     msmt_model_ca = MeasurementModel(state_space=transition_ca.state_space, pss=tdoa)
-    associator_ca = GNNAssociator(motion_model=transition_ca, gate_probability=0.9999)
+    associator_ca = GNNAssociator(motion_model=transition_ca, gate_probability=1)
     initiator_ca  = TwoPointInitiator(msmt_model=msmt_model_ca, associator=associator_ca,
                                       target_max_velocity=target_max_vel,
                                       target_max_acceleration=target_max_accel)
@@ -506,8 +506,8 @@ def example4():
         ca_label = None
 
     tdoa.plot_sensors(scale=scale, ax=ax2, marker='o', color='k', label='TDOA Sensors')
-    ax2.set_xlim([-75, 125])
-    ax2.set_ylim([-50, 200])
+    ax2.set_xlim([-75, 75])
+    ax2.set_ylim([-50, 150])
     ax2.set_xlabel('East [km]')
     ax2.set_ylabel('North [km]')
     ax2.set_title('Truth Trajectories and Tracker Output (CV vs CA)')
