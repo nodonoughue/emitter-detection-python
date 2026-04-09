@@ -237,7 +237,7 @@ def make_figure_3(prefix=None):
 
     # x/y plot
     figs = []
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6.4, 3.6))
     figs.append(fig)
     [t.plot(ax=ax, predicted_state=p) for (t, p) in zip(tracks, predicted_states)]
     pss.plot_sensors(ax=ax, label='DF System')
@@ -248,7 +248,7 @@ def make_figure_3(prefix=None):
     plt.ylabel('y [m]')
 
     # Measurement Plot
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6.4, 3.6))
     figs.append(fig)
     plt.scatter([m.zeta[0] for m in measurements],
                 [m.zeta[1] for m in measurements],
