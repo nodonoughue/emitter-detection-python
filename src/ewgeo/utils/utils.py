@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import typing as npt
 import os
+from pathlib import Path
 from scipy import stats
 from scipy.special import erfcinv
 from scipy.linalg import pinvh
@@ -27,24 +28,27 @@ def init_plot_style(dpi: int=400):
     sns.set_theme(context='paper', palette='colorblind')
 
 
+_PROJECT_ROOT = Path(__file__).parents[3]
+
+
 def init_output_dir(subdir: str='')-> str:
     """
-    Create the output directory for figures, if needed, and return address as a prefix string
+    Create the output directory for figures, if needed, and return address as a prefix string.
 
-    :return: path to output directory
+    The output directory is always ``<project_root>/figures/<subdir>/``, regardless of the
+    current working directory.  This means figure-generation scripts can be run from any
+    directory (e.g. directly from ``make_figures/practical_geo/``) and still write their
+    outputs to the correct location.
+
+    :return: path to output directory (string ending with the OS path separator)
     """
 
-    # Set up directory and filename for figures
-    dir_nm = 'figures'
-    if not os.path.exists(dir_nm):
-        os.makedirs(dir_nm)
+    dir_nm = _PROJECT_ROOT / 'figures'
+    if subdir:
+        dir_nm = dir_nm / subdir
+    dir_nm.mkdir(parents=True, exist_ok=True)
 
-    # Make the requested subfolder
-    dir_nm = os.path.join(dir_nm, subdir)
-    if not os.path.exists(dir_nm):
-        os.makedirs(dir_nm)
-
-    return dir_nm + os.sep
+    return str(dir_nm) + os.sep
 
 
 def sinc_derivative(x: npt.ArrayLike)-> npt.NDArray:
