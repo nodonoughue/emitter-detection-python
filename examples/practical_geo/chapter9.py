@@ -433,7 +433,7 @@ def example4():
     truth_label = 'Noisy Truth Measurements'
     fa_label = 'False Alarm Measurements'
     num_fa_per_step = 10
-    fa_max_rdoa = 20e3
+    fa_max_rdoa = 30e3
 
     iterations_per_marker = 1
     iterations_per_row = 40 * iterations_per_marker
