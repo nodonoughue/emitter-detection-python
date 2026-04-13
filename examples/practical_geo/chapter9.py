@@ -13,7 +13,7 @@ from ewgeo.tracker.promoter import MofNPromoter
 from ewgeo.tracker.transition import MotionModel, ConstantVelocityMotionModel, ConstantAccelerationMotionModel
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils import print_progress, print_elapsed
-from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.constraints import bounded_alt
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import PassiveSurveillanceSystem
 from ewgeo.utils.unit_conversions import convert
@@ -390,14 +390,23 @@ def example4():
     [ax.tick_params(labelsize=8) for ax in axs.flatten()]
     plt.tight_layout()
 
+    # Target Assumptions
+    target_max_vel = 300  # m/s — conservative upper bound for subsonic aircraft
+    target_max_accel = 10  # m/s^2 — generous bound for a maneuvering aircraft
+    min_alt = 300 # meters; 1 kft
+    max_alt = 40000 # meters; 100 kft
+    bnds = bounded_alt(geo_type='flat', alt_min=min_alt, alt_max=max_alt)
+
     # Initialize CV tracker
     # target_max_velocity=300 m/s caps the initial velocity covariance so that the
     # predicted-position gate stays well below the ~25 km inter-target separation,
     # preventing spurious cross-target pairings during the tentative-track stage.
-    target_max_vel = 300  # m/s — conservative upper bound for subsonic aircraft
+
     transition_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=3**2)
-    msmt_model_cv = MeasurementModel(state_space=transition_cv.state_space, pss=tdoa)
-    associator_cv = GNNAssociator(motion_model=transition_cv, gate_probability=.9)
+    transition_cv.ineq_constraints = bnds
+    msmt_model_cv = MeasurementModel(state_space=transition_cv.state_space, pss=tdoa,
+                                     ineq_constraints=bnds)
+    associator_cv = GNNAssociator(motion_model=transition_cv, gate_probability=0.95)
     initiator_cv  = TwoPointInitiator(msmt_model=msmt_model_cv, associator=associator_cv,
                                       target_max_velocity=target_max_vel)
     tracker_cv = Tracker(initiator=initiator_cv, associator=associator_cv,
@@ -412,10 +421,12 @@ def example4():
     # the sensor array (15 km baseline), so the TDOA Jacobian entries are ~0.07. A 2 km
     # EKF position error maps to a ~140 m TDOA prediction mismatch, giving d²≈33 >> 6.25.
     # The wider gate lets CA maintain track through this linearization transient.
-    target_max_accel = 10  # m/s^2 — generous bound for a maneuvering aircraft
-    transition_ca = ConstantAccelerationMotionModel(num_dims=3, process_covar=.1**2)
-    msmt_model_ca = MeasurementModel(state_space=transition_ca.state_space, pss=tdoa)
-    associator_ca = GNNAssociator(motion_model=transition_ca, gate_probability=1)
+
+    transition_ca = ConstantAccelerationMotionModel(num_dims=3, process_covar=.2**2)
+    transition_ca.ineq_constraints = bnds
+    msmt_model_ca = MeasurementModel(state_space=transition_ca.state_space, pss=tdoa,
+                                     ineq_constraints=bnds)
+    associator_ca = GNNAssociator(motion_model=transition_ca, gate_probability=0.999)
     initiator_ca  = TwoPointInitiator(msmt_model=msmt_model_ca, associator=associator_ca,
                                       target_max_velocity=target_max_vel,
                                       target_max_acceleration=target_max_accel)
@@ -547,7 +558,7 @@ def example4():
     ax3.set_title('Horizontal Position Error vs Time (CV dashed, CA dash-dot)', fontsize=10)
     ax3.set_xlabel('Time [s]', fontsize=8)
     ax3.set_ylabel('Horizontal Error [km]', fontsize=8)
-    ax3.set_yscale('log')
+    # ax3.set_yscale('log')
     ax3.legend(fontsize=8)
     ax3.grid(True)
     ax3.tick_params(labelsize=8)
