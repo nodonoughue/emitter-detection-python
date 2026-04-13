@@ -3,6 +3,7 @@ from collections.abc import Callable
 import numpy as np
 import numpy.typing as npt
 
+from ewgeo.utils.constraints import snap_to_constraints
 from ewgeo.utils.covariance import CovarianceMatrix
 from . import State, StateSpace, CartesianStateSpace, Track, PolarKinematicStateSpace
 
@@ -18,6 +19,10 @@ class MotionModel(ABC):
     f: npt.ArrayLike                # Transition Matrix
     process_covar: npt.ArrayLike
     q: CovarianceMatrix | None            # Process Noise
+
+    # Optional inequality constraints applied to the position block after each predict step.
+    # Each callable has the signature: (x: ndarray (num_dims, n)) -> (eps: ndarray (n,), x_valid: ndarray (num_dims, n))
+    ineq_constraints: list | None = None
 
     def __init__(self):
         pass
@@ -110,6 +115,15 @@ class MotionModel(ABC):
         u = self.make_control_input(time_delta)
         if u is not None:
             new_state.state = new_state.state + u
+
+        # Snap position to any inequality constraints (e.g. altitude bounds)
+        if self.ineq_constraints is not None:
+            n = self.state_space.num_dims
+            pos_sl = self.state_space.pos_slice
+            pos = new_state.state[pos_sl].reshape(n, 1)
+            new_state.state[pos_sl] = snap_to_constraints(
+                pos, ineq_constraints=self.ineq_constraints).ravel()
+
         f_for_cov = self.transition_matrix(s, time_delta)
 
         if s.covar is None:
@@ -234,7 +248,10 @@ class ConstantVelocityMotionModel(MotionModel):
     def make_process_covariance_matrix(self, process_covar: npt.ArrayLike=None,
                                        time_delta: float=None)-> CovarianceMatrix:
         """
-        Implement the process noise covariance Q for a constant velocity motion model
+        Implement the process noise covariance Q for a constant velocity motion model.
+
+        Process noise is an acceleration disturbance.
+        :param process_covar: Variance term, in units of m^2/s^3
         """
         process_covar = self.validate_process_covar_input(process_covar)
         if time_delta is None:
@@ -736,7 +753,7 @@ class ConstantTurnRateAccelerationMotionModel(MotionModel):
         if abs(odt) < 1e-6:              # Taylor limits as ω → 0
             sow          =  dt
             com          =  0.0
-            d_sow_domega = -dt ** 3 / 3
+            d_sow_domega =  0.0          # lim_{ω→0} d(sin(ωdt)/ω)/dω = 0
             d_com_domega =  dt ** 2 / 2
         else:
             sow          =  s / omega

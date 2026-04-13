@@ -2,6 +2,7 @@ from collections.abc import Callable
 import numpy as np
 import numpy.typing as npt
 
+from ..utils.constraints import snap_to_constraints
 from ..utils.covariance import CovarianceMatrix
 from ..utils.system import PassiveSurveillanceSystem
 from .states import StateSpace, State
@@ -39,13 +40,21 @@ class MeasurementModel:
     state_space: StateSpace
     pss: PassiveSurveillanceSystem
 
-    def __init__(self, state_space: StateSpace, pss: PassiveSurveillanceSystem):
+    def __init__(self, state_space: StateSpace, pss: PassiveSurveillanceSystem,
+                 ineq_constraints: list | None = None):
         """
         :param state_space: StateSpace describing the tracker state vector layout
         :param pss: PassiveSurveillanceSystem used to generate and evaluate measurements
+        :param ineq_constraints: Optional list of inequality constraint callables applied to the
+                                 position estimate produced by state_from_measurement. Each callable
+                                 has signature (x: ndarray (num_dims, n)) -> (eps: ndarray (n,),
+                                 x_valid: ndarray (num_dims, n)). Applied as a post-solve position
+                                 snap (the LS solver operates on pos+vel and cannot apply
+                                 position-only constraints mid-iteration).
         """
         self.state_space = state_space
         self.pss = pss
+        self.ineq_constraints = ineq_constraints
 
     @property
     def num_measurement_dimensions(self)->int:
@@ -193,6 +202,13 @@ class MeasurementModel:
         # can detect the failure via `norm(position) < 1` and skip the result.
         if np.linalg.norm(pos_vel_est[:n]) > 5e6:
             pos_vel_est = np.zeros((2*n, ))
+
+        # Snap position to inequality constraints (e.g. altitude bounds), in case the LS
+        # solver converged to a point that still marginally violates one.
+        if self.ineq_constraints is not None:
+            pos = pos_vel_est[:n].reshape(n, 1)
+            pos_vel_est[:n] = snap_to_constraints(pos, ineq_constraints=self.ineq_constraints).ravel()
+        # TODO: Also add support for equality constraints, once this is verified.
 
         # Convert to a state vector
         init_state_vec = np.zeros((self.state_space.num_states, ))

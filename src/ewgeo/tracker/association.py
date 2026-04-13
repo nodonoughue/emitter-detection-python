@@ -11,6 +11,7 @@ from . import State
 from .measurement import Measurement, MeasurementModel
 from .track import Track
 from .transition import MotionModel
+from ..utils.constraints import snap_to_constraints
 from ..utils.covariance import CovarianceMatrix
 from ..utils.system import PassiveSurveillanceSystem
 
@@ -230,6 +231,16 @@ class Hypothesis:
         # Update the Estimate
         new_state_vec = self.predicted_state.state + kalman_gain @ self.innovation
         new_state_covar = (np.eye(t.curr_state.size) - kalman_gain @ measurement_jacobian) @ prediction_state_covar
+
+        # Snap position to inequality constraints (e.g. altitude bounds) if the motion
+        # model carries them. The covariance is left as-is (project-then-filter approximation).
+        ineq = getattr(self._motion_model, 'ineq_constraints', None) or \
+               getattr(self.measurement_model, 'ineq_constraints', None)
+        if ineq is not None:
+            n = t.curr_state.state_space.num_dims
+            pos_sl = t.curr_state.state_space.pos_slice
+            pos = new_state_vec[pos_sl].reshape(n, 1)
+            new_state_vec[pos_sl] = snap_to_constraints(pos, ineq_constraints=ineq).ravel()
 
         # Make a new State object and add it to the track
         new_state = State(t.curr_state.state_space, self.measurement.time, new_state_vec, CovarianceMatrix(new_state_covar))
