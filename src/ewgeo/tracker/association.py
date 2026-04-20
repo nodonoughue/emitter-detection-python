@@ -3,7 +3,6 @@ from collections.abc import Mapping
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy import typing as npt
-# from prettytable import PrettyTable
 from scipy.stats import chi2, multivariate_normal
 from scipy.optimize import linear_sum_assignment
 
@@ -14,11 +13,6 @@ from .transition import MotionModel
 from ..utils.constraints import snap_to_constraints
 from ..utils.covariance import CovarianceMatrix
 from ..utils.system import PassiveSurveillanceSystem
-
-# Cell colors for use with prettytable
-pt_red = "\033[0;31;40m"
-pt_blue = "\033[0;34;40m"
-pt_reset = "\033[0m"
 
 class Hypothesis:
     """
@@ -161,7 +155,7 @@ class Hypothesis:
     def measurement(self, value: Measurement):
         self._measurement = value
         if value is not None:
-            self.measurement_model = MeasurementModel(state_space=self.track.state_space, pss=value.sensor)
+            self.measurement_model = MeasurementModel(pss=value.sensor)
 
         # Clear the dependent parameters
         self.clear_dependent_parameters()
@@ -178,7 +172,7 @@ class Hypothesis:
     @property
     def state_from_measurement(self):
         if self._state_from_msmt is None:
-            self._state_from_msmt = self.measurement_model.state_from_measurement(self.measurement)
+            self._state_from_msmt = self.measurement_model.state_from_measurement(self.measurement, self.track.state_space)
 
         return self._state_from_msmt
 
@@ -247,7 +241,7 @@ class Hypothesis:
         if ax is not None:
             # Plot a dashed line from the current state to the new one
             plt.plot(*zip(t.curr_state.position[plot_dims], new_state.position[plot_dims]),
-                     color=hdl[0].get_color(), linestyle=':', label=f'Track {self.track.track_id}, Updated State')
+                     color=hdl[0].get_color(), linestyle=':', label=f'Updated State')
             new_state.plot(ax=ax, do_vel=False, do_cov=True, color=hdl[0].get_color(), linestyle=':')
 
         t.append(new_state)
@@ -490,9 +484,10 @@ class Associator(ABC):
     gate_probability: float = None
     motion_model: MotionModel = None
 
-    def __init__(self, motion_model: MotionModel, gate_probability: float=None):
+    def __init__(self, motion_model: MotionModel = None, gate_probability: float=None):
         """
-        :param motion_model: MotionModel used to predict each track to the current measurement time
+        :param motion_model: MotionModel used to predict each track to the current measurement time;
+                             if None, each track must carry its own motion_model attribute
         :param gate_probability: Chi-square gate probability for the acceptance gate (e.g., 0.99);
                                  if None the class-level default is used
         """
@@ -500,10 +495,24 @@ class Associator(ABC):
         if gate_probability is not None:
             self.gate_probability = gate_probability
 
+    def _resolve_motion_model(self, track: Track) -> MotionModel:
+        """
+        Resolve the motion model for a given track.
+
+        Prefers ``track.motion_model``; falls back to ``self.motion_model``.
+        Raises ``ValueError`` if both are None.
+        """
+        mm = getattr(track, 'motion_model', None) or self.motion_model
+        if mm is None:
+            raise ValueError(
+                f'No motion model available for track {track.track_id}. '
+                'Set track.motion_model or pass motion_model to the Associator constructor.')
+        return mm
+
     @abstractmethod
     def associate(self, tracks: list[Track],
                   measurements: list[Measurement],
-                  curr_time: float = None)-> tuple[dict[Track, Hypothesis], list[Measurement]]:
+                  curr_time: float = None) -> tuple[dict[Track, Hypothesis], list[Measurement], list | np.ndarray | None]:
         pass
 
 
@@ -519,8 +528,7 @@ class NNAssociator(Associator):
 
     def associate(self, tracks: list[Track],
                   measurements: list[Measurement],
-                  curr_time: float = None,
-                  print_table: bool=False)-> tuple[dict[Track, Hypothesis], list[Measurement]]:
+                  curr_time: float = None) -> tuple[dict[Track, Hypothesis], list[Measurement], list | None]:
         """
         Run NN association for one scan.
 
@@ -528,37 +536,35 @@ class NNAssociator(Associator):
         :param measurements: New measurements from the current scan
         :param curr_time: Current scan timestamp [seconds]; required when ``measurements`` is empty
                           so that missed-detection hypotheses can be coasted to the right time
-        :param print_table: If True, print a distance table to stdout (currently stubbed out)
-        :return: Tuple of (track→hypothesis dict, list of unassociated measurements)
+        :return: Tuple of (track→hypothesis dict, list of unassociated measurements,
+                 distance table as list[list[float]] with one row per track and one column per
+                 measurement, or None when there are no measurements)
         """
         hypotheses = {}
         unassociated_measurements = measurements[:]
         if len(measurements) == 0:
             if curr_time is None or not tracks:
-                return hypotheses, unassociated_measurements
+                return hypotheses, unassociated_measurements, None
             # No measurements: coast every track via a missed-detection hypothesis
             for track in tracks:
+                mm = self._resolve_motion_model(track)
                 hypotheses[track] = MissedDetectionHypothesis(track=track,
-                                                              motion_model=self.motion_model,
+                                                              motion_model=mm,
                                                               sensor=None,
                                                               time=curr_time,
                                                               gate_probability=self.gate_probability)
-            return hypotheses, unassociated_measurements
+            return hypotheses, unassociated_measurements, None
 
         curr_time = measurements[0].time
-
-        if print_table:
-            pass
-            # table = PrettyTable()
-            # table.field_names = ['Track'] + [f"Msmt {i}" for i in range(len(measurements))]
-            # table.float_format = ".2"
+        dist_table = []
 
         for track in tracks:
+            mm = self._resolve_motion_model(track)
             # Generate a hypothesis for each track; we'll start with the null hypothesis.
             # The null cost must equal the gate threshold so it loses to any measurement that
             # passes the gate (d² < gate_threshold) and wins when all measurements fail.
             null_hypothesis = MissedDetectionHypothesis(track=track,
-                                                        motion_model=self.motion_model,
+                                                        motion_model=mm,
                                                         sensor=measurements[0].sensor,
                                                         time=curr_time,
                                                         gate_probability=self.gate_probability,
@@ -567,23 +573,12 @@ class NNAssociator(Associator):
             # There are no more measurements to associate; we need to use the missed detection hypothesis
             if not measurements:
                 hypotheses[track] = null_hypothesis
+                dist_table.append([])
                 continue
 
-            # Generate a set of candidate hypotheses
-            this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=self.motion_model) for m in measurements]
-            for h in this_hypotheses:
-                gate_size = h.compute_gate_size(self.gate_probability)
-                # print(f"    Track {track.track_id}: distance={h.distance:.4f}, "
-                #       f"gate={gate_size:.4f}")
-
-            if all([h.distance > h.compute_gate_size(self.gate_probability) for h in this_hypotheses]):
-                pass
-
-            # print('Generating hypotheses for track ', track.track_id, '...')
-            # [print(h) for h in this_hypotheses]
-            if print_table:
-                pass
-                # table.add_row([track.__str__()] + [h.distance for h in this_hypotheses])
+            # Generate a set of candidate hypotheses and record raw distances
+            this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=mm) for m in measurements]
+            dist_table.append([h.distance for h in this_hypotheses])
 
             [h.apply_distance_gate(self.gate_probability) for h in this_hypotheses]
             already_associated = [h.measurement for h in hypotheses.values()]
@@ -592,7 +587,6 @@ class NNAssociator(Associator):
             # Compute the Mahalanobis distances and find the best one
             d = np.asarray([h.distance for h in this_hypotheses])
 
-
             # Make sure the acceptance gate is valid
             if np.isfinite(np.amin(d)):
                 idx = np.argmin(d, axis=None)
@@ -600,21 +594,11 @@ class NNAssociator(Associator):
                 best_hypothesis = this_hypotheses[idx]
                 hypotheses[track] = best_hypothesis
                 unassociated_measurements.remove(best_hypothesis.measurement)
-                # print(f'...NN={best_hypothesis}')
             else:
-                # All measurements failed the acceptance gate test;
-                # Use the null hypothesis
+                # All measurements failed the acceptance gate test; use the null hypothesis
                 hypotheses[track] = null_hypothesis
-                # print('...NN=null')
 
-        total_cost = np.sum([h.distance for h in hypotheses.values()])
-        if print_table:
-            pass
-            # print(f"Nearest Neighbor Association Distances (total distance={total_cost:.2f})")
-            # print(table)
-
-        # Convert to an Association object and return
-        return hypotheses, unassociated_measurements
+        return hypotheses, unassociated_measurements, dist_table
 
 
 class GNNAssociator(Associator):
@@ -630,8 +614,7 @@ class GNNAssociator(Associator):
 
     def associate(self, tracks: list[Track],
                   measurements: list[Measurement],
-                  curr_time: float = None,
-                  print_table: bool=False) -> tuple[dict[Track, Hypothesis], list[Measurement]]:
+                  curr_time: float = None) -> tuple[dict[Track, Hypothesis], list[Measurement], np.ndarray | None]:
         """
         Run GNN association for one scan.
 
@@ -639,53 +622,46 @@ class GNNAssociator(Associator):
         :param measurements: New measurements from the current scan
         :param curr_time: Current scan timestamp [seconds]; required when ``measurements`` is empty
                           so that missed-detection hypotheses can be coasted to the right time
-        :param print_table: If True, print a distance table to stdout (currently stubbed out)
-        :return: Tuple of (track→hypothesis dict, list of unassociated measurements)
+        :return: Tuple of (track→hypothesis dict, list of unassociated measurements,
+                 distance matrix as ndarray of shape (num_tracks, num_measurements) with np.inf for
+                 outside-gate entries, or None when there are no measurements)
         """
         num_tracks = len(tracks)
         num_measurements = len(measurements)
         if num_tracks == 0:
-            return {}, measurements
+            return {}, measurements, None
         if num_measurements == 0:
             if curr_time is None:
-                return {}, measurements
+                return {}, measurements, None
             # No measurements: coast every track via a missed-detection hypothesis
             hypotheses = {}
             for track in tracks:
+                mm = self._resolve_motion_model(track)
                 hypotheses[track] = MissedDetectionHypothesis(track=track,
-                                                              motion_model=self.motion_model,
+                                                              motion_model=mm,
                                                               sensor=None,
                                                               time=curr_time,
                                                               gate_probability=self.gate_probability)
-            return hypotheses, []
+            return hypotheses, [], None
 
         curr_time = measurements[0].time
-
-        if print_table:
-            pass
-            # table = PrettyTable()
-            # table.field_names = ['Track'] + [f"Msmt {i}" for i in range(len(measurements))]
-            # table.float_format = ".2"
 
         # Generate the full set of hypotheses and record their distances
         hypotheses = []
         null_hypotheses = []
-        large_value = 1e10 # mahalanobis distance for detections that are outside the gate
+        large_value = 1e10  # sentinel for outside-gate entries in the cost matrix
         distance = np.full((num_tracks, num_measurements + num_tracks), large_value)
 
         for index, track in enumerate(tracks):
-            this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=self.motion_model) for m in measurements]
-
-            if print_table:
-                pass
-                # table.add_row([track.__str__()] + [h.distance for h in this_hypotheses])
+            mm = self._resolve_motion_model(track)
+            this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=mm) for m in measurements]
             [h.apply_distance_gate(self.gate_probability) for h in this_hypotheses]
             for j, h in enumerate(this_hypotheses):
                 distance[index, j] = h.distance if np.isfinite(h.distance) else large_value
 
             # Null hypothesis: cost equals the gate threshold so it loses to any measurement
             # that passes the gate (d² < gate_threshold) and wins when all measurements fail.
-            null_hyp = MissedDetectionHypothesis(track=track, motion_model=self.motion_model,
+            null_hyp = MissedDetectionHypothesis(track=track, motion_model=mm,
                                                  sensor=measurements[0].sensor,
                                                  time=curr_time,
                                                  gate_probability=self.gate_probability,
@@ -693,31 +669,26 @@ class GNNAssociator(Associator):
             null_hypotheses.append(null_hyp)
             distance[index, num_measurements + index] = null_hyp.distance
 
-            # Add to the nested list and distance array
             hypotheses.append(this_hypotheses)
 
-        # Convert to a 2D matrix and apply the Munkres Algorithm via scipy.optimize
+        # Apply the Munkres algorithm via scipy.optimize
         row_ind, col_ind = linear_sum_assignment(distance)
-        total_cost = distance[row_ind, col_ind].sum()
 
         # Collect the valid hypotheses
         good_hypotheses = {}
         unassociated_measurements = measurements[:]
         for r, c in zip(row_ind, col_ind):
             if c < num_measurements:
-                # Assigned to a real measurement
-                good_hypotheses[tracks[r]] = hypotheses[r][c]
+                good_hypotheses[tracks[int(r)]] = hypotheses[r][c]
                 unassociated_measurements.remove(hypotheses[r][c].measurement)
             else:
-                # Assigned to a null hypothesis
-                good_hypotheses[tracks[r]] = null_hypotheses[r]
+                good_hypotheses[tracks[int(r)]] = null_hypotheses[r]
 
-        if print_table:
-            pass
-            # print(f"Global Nearest Neighbor Association Distances (total distance={total_cost:.2f})")
-            # print(table)
+        # Build the distance table: replace the large sentinel with np.inf for readability
+        dist_matrix = np.where(distance[:, :num_measurements] >= large_value,
+                               np.inf, distance[:, :num_measurements])
 
-        return good_hypotheses, unassociated_measurements
+        return good_hypotheses, unassociated_measurements, dist_matrix
 
 
 class PDAAssociator(Associator):
@@ -729,7 +700,7 @@ class PDAAssociator(Associator):
     """
     detection_probability: float = 1.0
 
-    def __init__(self, motion_model: MotionModel, gate_probability: float=None, detection_probability: float=1.0):
+    def __init__(self, motion_model: MotionModel = None, gate_probability: float=None, detection_probability: float=1.0):
         """
         :param motion_model: MotionModel used to predict each track to the measurement time
         :param gate_probability: Chi-square gate probability for the acceptance gate (e.g., 0.99)
@@ -740,44 +711,41 @@ class PDAAssociator(Associator):
 
     def associate(self, tracks: list[Track],
                   measurements: list[Measurement],
-                  curr_time: float = None,
-                  print_table: bool=False)-> tuple[dict[Track, GMMHypothesis], list[Measurement]]:
+                  curr_time: float = None) -> tuple[dict[Track, GMMHypothesis], list[Measurement], list]:
         """
         Run PDA association for one scan.
 
         :param tracks: Active tracks to associate
         :param measurements: New measurements from the current scan
         :param curr_time: Unused (measurement time is read from measurements[0].time); kept for API consistency
-        :param print_table: If True, print a likelihood table to stdout (currently stubbed out)
-        :return: Tuple of (track→GMMHypothesis dict, list of unassociated measurements)
+        :return: Tuple of (track→GMMHypothesis dict, list of unassociated measurements,
+                 likelihood table as list[list[float]] with one row per track; each row is
+                 [p_miss, L_msmt_0, L_msmt_1, ...] using pre-gate likelihoods)
         """
-
-        if print_table:
-            pass
-            # table = PrettyTable()
-            # table.field_names = ['Track', 'Miss'] + [f"Msmt {i}" for i in range(len(measurements))]
-            # table.float_format = ".2"
-
         hypotheses = {}
         unassociated_measurements = measurements[:]
+        likelihood_table = []
+
         for track in tracks:
+            mm = self._resolve_motion_model(track)
             # Initialize a Null Hypothesis
             p_miss = 1 - self.detection_probability*self.gate_probability
             null_hypothesis = MissedDetectionHypothesis(track=track,
-                                                        motion_model=self.motion_model,
+                                                        motion_model=mm,
                                                         sensor=measurements[0].sensor,
                                                         time=measurements[0].time,
                                                         gate_probability=self.gate_probability,
                                                         num_msmt_dims=measurements[0].size,
                                                         distance=p_miss)
-            # Generate the full set of hypotheses and apply the acceptance gate
-            this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=self.motion_model) for m in measurements]
-            [h.apply_distance_gate(self.gate_probability) for h in this_hypotheses]
+            # Generate the full set of hypotheses and record pre-gate likelihoods for the table
+            this_hypotheses = [Hypothesis(track=track, measurement=m, motion_model=mm) for m in measurements]
             init_likelihoods = [h.likelihood for h in this_hypotheses]
+            likelihood_table.append([null_hypothesis.likelihood] + init_likelihoods)
 
-            # Keep only those hypotheses that passed the acceptance gate
+            # Apply gate and keep only passing hypotheses
+            [h.apply_distance_gate(self.gate_probability) for h in this_hypotheses]
             good_hypotheses = [h for h in this_hypotheses if h.is_valid]
-            good_hypotheses.append(null_hypothesis) # Add a missed detection hypothesis
+            good_hypotheses.append(null_hypothesis)
 
             # Remove any measurements that are used in this PDA filter from the set of unassociated ones
             for h in good_hypotheses:
@@ -793,13 +761,4 @@ class PDAAssociator(Associator):
             this_hypothesis = GMMHypothesis(good_hypotheses, likelihoods, motion_model=self.motion_model)
             hypotheses[track] = this_hypothesis
 
-            if print_table:
-                pass
-                # table.add_row([track.__str__(), null_hypothesis.likelihood] + init_likelihoods)
-
-        if print_table:
-            pass
-            # print('PDA Associator Table of Likelihoods')
-            # print(table)
-
-        return hypotheses, unassociated_measurements
+        return hypotheses, unassociated_measurements, likelihood_table

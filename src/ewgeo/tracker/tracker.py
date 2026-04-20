@@ -149,7 +149,7 @@ class Tracker:
             return measurements
 
         # Generate hypotheses
-        hypothesis_dict, unassoc_msmts = self.associator.associate(tracks=self.tracks, measurements=measurements, curr_time=curr_time)
+        hypothesis_dict, unassoc_msmts, _ = self.associator.associate(tracks=self.tracks, measurements=measurements, curr_time=curr_time)
 
         num_coasted_tracks = np.sum([1 for h in hypothesis_dict.values() if isinstance(h,MissedDetectionHypothesis)])
         if num_coasted_tracks > 0:
@@ -190,9 +190,9 @@ class Tracker:
         #     print(f"  Track {t.track_id}: P_trace={np.trace(t.curr_state.covar.cov):.4e}")
 
         # Generate hypotheses to match measurements to the tentative tracks
-        hypothesis_dict, unassoc_msmt = self.associator.associate(tracks=self._tentative_tracks,
-                                                                  measurements=measurements,
-                                                                  curr_time=curr_time)
+        hypothesis_dict, unassoc_msmt, _ = self.associator.associate(tracks=self._tentative_tracks,
+                                                                    measurements=measurements,
+                                                                    curr_time=curr_time)
 
         # Update the tracks associated with these hypotheses
         tentative_hypotheses = hypothesis_dict.values()

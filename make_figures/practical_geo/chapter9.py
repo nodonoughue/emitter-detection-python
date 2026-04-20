@@ -93,7 +93,7 @@ def make_figure_2(prefix=None):
                                         cov=CovarianceMatrix(np.diag([1.0, 1.0, 1.0])*1e2),
                                         variance_is_toa=False,
                                         ref_idx=0)
-    msmt_model = MeasurementModel(pss=pss, state_space=transition.state_space)
+    msmt_model = MeasurementModel(pss=pss)
 
     # Find the predicted measurement and measurement error covariance (for drawing an ellipse)
     prediction_msmt = msmt_model.measurement(state=prediction, noise=False)
@@ -220,7 +220,7 @@ def make_figure_3(prefix=None):
                       [200, 800]])
     c_zeta = CovarianceMatrix(np.power(np.diag([3, 3])*_deg2rad,2))
     pss = DirectionFinder(x=x_aoa, cov=c_zeta, do_2d_aoa=False)
-    msmt_model = MeasurementModel(pss=pss, state_space=state_space)
+    msmt_model = MeasurementModel(pss=pss)
 
     # Let's make some new random states based on the predicted states for each track, and a few clutter-type states
     new_states = []
@@ -257,7 +257,7 @@ def make_figure_3(prefix=None):
     # Set up the Nearest Neighbor Association Scheme
     gate_probability=.75
     associator = NNAssociator(motion_model=transition, gate_probability=gate_probability)
-    hypotheses, _ = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
+    hypotheses, _, _ = associator.associate(tracks=tracks, measurements=measurements)
 
     trk_label = 'Predicted Track Measurement'
     gate_label = 'Association Gate'

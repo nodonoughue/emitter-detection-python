@@ -280,7 +280,7 @@ def test_nn_assigns_nearest_measurement():
     m_far  = make_measurement(40)  # farther
 
     assoc = NNAssociator(motion_model=model, gate_probability=0.99)
-    hypotheses, unassoc = assoc.associate([track], [m_near, m_far])
+    hypotheses, unassoc, _ = assoc.associate([track], [m_near, m_far])
 
     assert track in hypotheses
     assert hypotheses[track].measurement is m_near
@@ -290,7 +290,7 @@ def test_nn_assigns_nearest_measurement():
 def test_nn_empty_measurements_returns_empty_hypotheses():
     track = make_track(10, 5, track_id='T1')
     assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    hypotheses, unassoc = assoc.associate([track], [])
+    hypotheses, unassoc, _ = assoc.associate([track], [])
     assert hypotheses == {}
     assert unassoc == []
 
@@ -301,7 +301,7 @@ def test_nn_all_outside_gate_uses_null_hypothesis():
     m_far = make_measurement(40)   # distance ≈ 192 >> gate ≈ 6.6
 
     assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    hypotheses, unassoc = assoc.associate([track], [m_far])
+    hypotheses, unassoc, _ = assoc.associate([track], [m_far])
 
     assert isinstance(hypotheses[track], MissedDetectionHypothesis)
 
@@ -311,7 +311,7 @@ def test_nn_coasts_all_tracks_when_no_measurements_and_curr_time():
     t1 = make_track(0, 0, track_id='T1')
     t2 = make_track(10, 0, track_id='T2')
     assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    hypotheses, unassoc = assoc.associate([t1, t2], [], curr_time=1.0)
+    hypotheses, unassoc, _ = assoc.associate([t1, t2], [], curr_time=1.0)
 
     assert isinstance(hypotheses[t1], MissedDetectionHypothesis)
     assert isinstance(hypotheses[t2], MissedDetectionHypothesis)
@@ -326,7 +326,7 @@ def test_nn_two_tracks_measurement_exclusivity():
     m2 = make_measurement(40)                # far measurement (fails gate)
 
     assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    hypotheses, unassoc = assoc.associate([t1, t2], [m1, m2])
+    hypotheses, unassoc, _ = assoc.associate([t1, t2], [m1, m2])
 
     # T1 (processed first) takes m1; T2 must receive a null hypothesis
     assert hypotheses[t1].measurement is m1
@@ -339,14 +339,14 @@ def test_nn_two_tracks_measurement_exclusivity():
 
 def test_gnn_empty_inputs_returns_empty():
     assoc = GNNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    hypotheses, unassoc = assoc.associate([], [])
+    hypotheses, unassoc, _ = assoc.associate([], [])
     assert hypotheses == {}
     assert unassoc == []
 
 
 def test_gnn_empty_tracks_returns_empty():
     assoc = GNNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    hypotheses, unassoc = assoc.associate([], [make_measurement(5)])
+    hypotheses, unassoc, _ = assoc.associate([], [make_measurement(5)])
     assert hypotheses == {}
 
 
@@ -365,7 +365,7 @@ def test_gnn_assigns_globally_optimal():
     m2 = make_measurement(21)
 
     assoc = GNNAssociator(motion_model=make_cv_model(), gate_probability=0.5)
-    hypotheses, unassoc = assoc.associate([t1, t2], [m1, m2])
+    hypotheses, unassoc, _ = assoc.associate([t1, t2], [m1, m2])
 
     assert hypotheses[t1].measurement is m1
     assert hypotheses[t2].measurement is m2
@@ -377,7 +377,7 @@ def test_gnn_coasts_all_tracks_when_no_measurements_and_curr_time():
     t1 = make_track(0,  0, track_id='T1')
     t2 = make_track(10, 0, track_id='T2')
     assoc = GNNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    hypotheses, unassoc = assoc.associate([t1, t2], [], curr_time=1.0)
+    hypotheses, unassoc, _ = assoc.associate([t1, t2], [], curr_time=1.0)
 
     assert isinstance(hypotheses[t1], MissedDetectionHypothesis)
     assert isinstance(hypotheses[t2], MissedDetectionHypothesis)
@@ -391,7 +391,7 @@ def test_gnn_all_outside_gate_uses_null_hypotheses():
     m_far = make_measurement(500)   # far from both tracks
 
     assoc = GNNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    hypotheses, unassoc = assoc.associate([t1, t2], [m_far])
+    hypotheses, unassoc, _ = assoc.associate([t1, t2], [m_far])
 
     assert isinstance(hypotheses[t1], MissedDetectionHypothesis)
     assert isinstance(hypotheses[t2], MissedDetectionHypothesis)
@@ -409,7 +409,7 @@ def test_pda_returns_gmm_hypothesis():
 
     assoc = PDAAssociator(motion_model=make_cv_model(), gate_probability=0.99,
                           detection_probability=0.9)
-    hypotheses, _ = assoc.associate([track], [m_near])
+    hypotheses, _, _ = assoc.associate([track], [m_near])
 
     assert isinstance(hypotheses[track], GMMHypothesis)
 
@@ -421,7 +421,7 @@ def test_pda_likelihoods_sum_to_one():
 
     assoc = PDAAssociator(motion_model=make_cv_model(), gate_probability=0.99,
                           detection_probability=0.9)
-    hypotheses, _ = assoc.associate([track], [m_near])
+    hypotheses, _, _ = assoc.associate([track], [m_near])
 
     gmm = hypotheses[track]
     assert equal_to_tolerance(np.sum(gmm._weights), 1.0)
@@ -434,7 +434,7 @@ def test_pda_measurement_outside_gate_only_null_hypothesis():
 
     assoc = PDAAssociator(motion_model=make_cv_model(), gate_probability=0.99,
                           detection_probability=0.9)
-    hypotheses, _ = assoc.associate([track], [m_far])
+    hypotheses, _, _ = assoc.associate([track], [m_far])
 
     gmm = hypotheses[track]
     assert len(gmm._hypotheses) == 1
@@ -449,7 +449,7 @@ def test_pda_multiple_measurements_within_gate_all_included():
 
     assoc = PDAAssociator(motion_model=make_cv_model(), gate_probability=0.99,
                           detection_probability=0.9)
-    hypotheses, unassoc = assoc.associate([track], [m1, m2])
+    hypotheses, unassoc, _ = assoc.associate([track], [m1, m2])
 
     gmm = hypotheses[track]
     # Two real measurements + one null hypothesis

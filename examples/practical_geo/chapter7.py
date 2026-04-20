@@ -313,7 +313,7 @@ def example3():
 
     # Define measurement and Jacobian functions via MeasurementModel
     _ss_pos = tracker.CartesianStateSpace(num_dims=aoa.num_dim, has_vel=False)
-    _mm = tracker.MeasurementModel(state_space=_ss_pos, pss=aoa)
+    _mm = tracker.MeasurementModel(pss=aoa)
 
     # Estimate position recursively, using EKF Update algorithm
     x_est = np.zeros(shape=(aoa.num_dim, num_pulses))
@@ -424,7 +424,7 @@ def example4():
     # Step through pulses
     this_p=None
     _ss_pos = tracker.CartesianStateSpace(num_dims=aoa.num_dim, has_vel=False)
-    _mm = tracker.MeasurementModel(state_space=_ss_pos, pss=aoa)
+    _mm = tracker.MeasurementModel(pss=aoa)
 
     for idx in np.arange(num_pulses):
         # Update positions

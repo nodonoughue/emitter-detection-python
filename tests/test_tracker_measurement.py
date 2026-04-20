@@ -220,7 +220,7 @@ def test_measurement_model_jacobian_position_only():
     Expected H = [[1,0,0,0],[0,1,0,0]]: measurements map to positions, zeros for velocity.
     """
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSS())
+    mm = MeasurementModel(pss=_MockPSS())
     s = State(ss, time=0.0, state=np.array([1., 2., 0., 0.]))
 
     H = mm.jacobian(s)
@@ -241,7 +241,7 @@ def test_measurement_model_jacobian_with_vel_rows():
       h[:, 2:] = [[0.5,0],[0,0.5]] (vel)
     """
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSWithVel())
+    mm = MeasurementModel(pss=_MockPSSWithVel())
     s = State(ss, time=0.0, state=np.array([1., 2., 0.5, 0.5]))
 
     H = mm.jacobian(s)
@@ -257,7 +257,7 @@ def test_measurement_model_jacobian_pos_only_state_space():
     Position-only state space: H should be just the pos block (2x2 identity).
     """
     ss = make_pos_only_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSS())
+    mm = MeasurementModel(pss=_MockPSS())
     s = State(ss, time=0.0, state=np.array([3., 4.]))
 
     H = mm.jacobian(s)
@@ -267,21 +267,13 @@ def test_measurement_model_jacobian_pos_only_state_space():
 
 
 # ---------------------------------------------------------------------------
-# MeasurementModel.num_measurement_dimensions / num_state_dimensions
+# MeasurementModel.num_measurement_dimensions
 # ---------------------------------------------------------------------------
 
 def test_measurement_model_num_measurement_dimensions():
     """num_measurement_dimensions matches pss.num_measurements."""
-    ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     assert mm.num_measurement_dimensions == 2
-
-
-def test_measurement_model_num_state_dimensions():
-    """num_state_dimensions matches state_space.num_states."""
-    ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
-    assert mm.num_state_dimensions == 4
 
 
 # ---------------------------------------------------------------------------
@@ -290,7 +282,7 @@ def test_measurement_model_num_state_dimensions():
 
 def test_measurement_model_measurement_returns_measurement_instance():
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     s = State(ss, time=2.0, state=np.array([3., 4., 0.5, 0.5]))
     m = mm.measurement(s, noise=False)
     assert isinstance(m, Measurement)
@@ -299,7 +291,7 @@ def test_measurement_model_measurement_returns_measurement_instance():
 def test_measurement_model_measurement_noiseless_zeta():
     """Noiseless measurement returns zeta equal to the state's position."""
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     s = State(ss, time=2.0, state=np.array([3., 4., 0.5, 0.5]))
     m = mm.measurement(s, noise=False)
     assert equal_to_tolerance(m.zeta, [3., 4.])
@@ -308,7 +300,7 @@ def test_measurement_model_measurement_noiseless_zeta():
 def test_measurement_model_measurement_time_matches_state():
     """Returned Measurement carries the state's timestamp."""
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     s = State(ss, time=7.5, state=np.array([1., 2., 0., 0.]))
     m = mm.measurement(s, noise=False)
     assert m.time == 7.5
@@ -321,7 +313,7 @@ def test_measurement_model_measurement_time_matches_state():
 def test_measurement_model_log_likelihood_higher_at_truth():
     """LL must be higher when candidate state matches the observation state."""
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     s_true   = State(ss, time=0., state=np.array([3., 4., 0., 0.]))
     s_offset = State(ss, time=0., state=np.array([6., 8., 0., 0.]))
     ll_true   = mm.log_likelihood(s_true, s_true)
@@ -332,7 +324,7 @@ def test_measurement_model_log_likelihood_higher_at_truth():
 def test_measurement_model_log_likelihood_from_measurement_higher_at_match():
     """log_likelihood_from_measurement scores higher for a matching state."""
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     s_true   = State(ss, time=0., state=np.array([3., 4., 0., 0.]))
     s_offset = State(ss, time=0., state=np.array([6., 8., 0., 0.]))
     m = mm.measurement(s_true, noise=False)

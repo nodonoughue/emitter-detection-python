@@ -96,7 +96,8 @@ def example1(mc_params=None):
     tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx, variance_is_toa=False)
 
     # ===  Generate Measurements
-    zeta = tdoa.noisy_measurement(x_tgt_full)
+    z = tdoa.measurement(x_tgt_full)
+    zeta = z + tdoa.cov.sample(num_samples=num_time)
 
     # ===  Set Up Tracker
     q_a = 1
@@ -107,7 +108,7 @@ def example1(mc_params=None):
     f = motion_model.f # generate state transition matrix
     q = motion_model.q # generate process noise covariance matrix
 
-    msmt_model = tracker.MeasurementModel(pss=tdoa, state_space=motion_model.state_space)
+    msmt_model = tracker.MeasurementModel(pss=tdoa)
 
     # ===  Initialize Track State
     x_pred = State(state_space=state_space, time=t_vec[0], state=None, covar=None)
@@ -400,7 +401,7 @@ def example2(rng=np.random.default_rng()):
         return
     constrain_state(init_state)
 
-    msmt_model = tracker.MeasurementModel(pss=aoa, state_space=state_space)
+    msmt_model = tracker.MeasurementModel(pss=aoa)
 
     # ===  Step Through Time
     print('Iterating through EKF tracker time steps...')
@@ -570,7 +571,7 @@ def example3(rng=np.random.default_rng(0)):
     # Measurement Model for Trackers
     # Both Ballistic and CV motion models use the same state space, so we can use a common
     # measurement model for both.
-    msmt = tracker.MeasurementModel(pss=tdoa, state_space=mm_bal.state_space)
+    msmt = tracker.MeasurementModel(pss=tdoa)
 
     # Run the tracker loop on both trackers
     x_cv = []
@@ -700,7 +701,7 @@ def example4(rng=np.random.default_rng(0)):
     x0_cv.velocity = [0., v0, 0.]
     x0_cv.position_covar = (500. ** 2) * np.eye(3)
     x0_cv.velocity_covar = (100. ** 2) * np.eye(3)
-    msmt_cv = tracker.MeasurementModel(pss=tdoa, state_space=mm_cv.state_space)
+    msmt_cv = tracker.MeasurementModel(pss=tdoa)
 
     # CT tracker: ω initially unknown → start at 0 with generous uncertainty
     sigma_omega_init = 0.1  # rad/s  (covers ±2σ of the true ω ≈ 0.052 rad/s)
@@ -716,7 +717,7 @@ def example4(rng=np.random.default_rng(0)):
     x0_ct.position_covar = (500. ** 2) * np.eye(3)
     x0_ct.velocity_covar = (100. ** 2) * np.eye(3)
     x0_ct.covar.cov[-1, -1] = sigma_omega_init ** 2
-    msmt_ct = tracker.MeasurementModel(pss=tdoa, state_space=mm_ct.state_space)
+    msmt_ct = tracker.MeasurementModel(pss=tdoa)
 
     # --- EKF Loop -------------------------------------------------------
     x_cv = []
@@ -871,7 +872,7 @@ def example1_vid(save_path=_FIGS_DIR / 'example1_vid.gif'):
     f = motion_model.f
     q = motion_model.q
 
-    msmt_model = tracker.MeasurementModel(pss=tdoa, state_space=state_space)
+    msmt_model = tracker.MeasurementModel(pss=tdoa)
 
     x_pred = tracker.State(state_space=state_space, time=t_vec[0], state=None, covar=None)
     x_init = np.array([0., 50e3, 5e3])
@@ -1088,7 +1089,7 @@ def example2_vid(save_path=_FIGS_DIR / 'example2_vid.gif', rng=np.random.default
     x_pred = tracker.State(state_space=state_space, time=t_vec[0],
                            state=_x0, covar=CovarianceMatrix(_p0))
 
-    msmt_model = tracker.MeasurementModel(pss=aoa, state_space=state_space)
+    msmt_model = tracker.MeasurementModel(pss=aoa)
 
     # ===  EKF loop — store estimates, errors, ellipses, and LOB fill polygons ===
     num_ell_pts  = 101

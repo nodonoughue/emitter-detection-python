@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from ewgeo.tracker.initiator import (
-    SinglePointMeasurementInitiator,
+    SinglePointInitiator,
     TwoPointInitiator,
     ThreePointInitiator,
 )
@@ -69,8 +69,7 @@ def make_cv_model():
 
 
 def make_cv_measurement_model():
-    model = make_cv_model()
-    return MeasurementModel(state_space=model.state_space, pss=_MockSensor1D())
+    return MeasurementModel(pss=_MockSensor1D())
 
 
 def make_measurement(x, t=0.0):
@@ -88,18 +87,20 @@ def make_ca_state(x, t, covar_diag=0.1):
 
 
 # ---------------------------------------------------------------------------
-# SinglePointMeasurementInitiator
+# SinglePointInitiator
 # ---------------------------------------------------------------------------
 
 def test_single_point_creates_one_track_per_measurement():
-    initiator = SinglePointMeasurementInitiator(msmt_model=make_cv_measurement_model())
+    initiator = SinglePointInitiator(msmt_model=make_cv_measurement_model(),
+                                                motion_model=make_cv_model())
     measurements = [make_measurement(5), make_measurement(10)]
     tracks, _ = initiator.initiate(measurements, next_track_id=0)
     assert len(tracks) == 2
 
 
 def test_single_point_track_ids_are_sequential():
-    initiator = SinglePointMeasurementInitiator(msmt_model=make_cv_measurement_model())
+    initiator = SinglePointInitiator(msmt_model=make_cv_measurement_model(),
+                                                motion_model=make_cv_model())
     measurements = [make_measurement(5), make_measurement(10)]
     tracks, next_id = initiator.initiate(measurements, next_track_id=7)
     assert tracks[0].track_id == 7
@@ -108,13 +109,15 @@ def test_single_point_track_ids_are_sequential():
 
 
 def test_single_point_track_position_matches_measurement():
-    initiator = SinglePointMeasurementInitiator(msmt_model=make_cv_measurement_model())
+    initiator = SinglePointInitiator(msmt_model=make_cv_measurement_model(),
+                                                motion_model=make_cv_model())
     tracks, _ = initiator.initiate([make_measurement(5.0)], next_track_id=0)
     assert equal_to_tolerance(tracks[0].curr_state.position, [5.0])
 
 
 def test_single_point_empty_measurements_returns_empty():
-    initiator = SinglePointMeasurementInitiator(msmt_model=make_cv_measurement_model())
+    initiator = SinglePointInitiator(msmt_model=make_cv_measurement_model(),
+                                                motion_model=make_cv_model())
     tracks, next_id = initiator.initiate([], next_track_id=3)
     assert tracks == []
     assert next_id == 3
@@ -172,7 +175,8 @@ def test_two_point_first_call_returns_no_tracks():
     """First call buffers measurements; no confirmed tracks yet."""
     mm = make_cv_measurement_model()
     assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc)
+    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                   motion_model=make_cv_model())
 
     tracks, _ = initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
     assert tracks == []
@@ -187,7 +191,8 @@ def test_two_point_second_call_returns_track_with_velocity():
     """
     mm = make_cv_measurement_model()
     assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc)
+    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                   motion_model=make_cv_model())
 
     initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
     tracks, _ = initiator.initiate([make_measurement(12, t=1)], next_track_id=1)
@@ -204,7 +209,8 @@ def test_two_point_unmatched_second_call_goes_to_new_buffer():
     """
     mm = make_cv_measurement_model()
     assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
-    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc)
+    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                   motion_model=make_cv_model())
 
     initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
     # x=9000 is very far — will fail the gate against the buffered track at x=10
@@ -360,15 +366,16 @@ def test_adapt_cartesian_preserves_timestamp():
 
 
 # ---------------------------------------------------------------------------
-# SinglePointMeasurementInitiator with target_state_space
+# SinglePointInitiator with target_state_space
 # ---------------------------------------------------------------------------
 
 def test_single_point_with_target_ss_produces_ct_state():
     """Tracks produced with target_state_space have the CT state size."""
     # Use 1D PolarKinematicStateSpace so it matches the 1D mock sensor
     ct_ss = make_ct_ss_1d()
-    initiator = SinglePointMeasurementInitiator(
+    initiator = SinglePointInitiator(
         msmt_model=make_cv_measurement_model(),
+        motion_model=make_cv_model(),
         target_state_space=ct_ss,
     )
     tracks, _ = initiator.initiate([make_measurement(5.0)], next_track_id=0)
@@ -379,8 +386,9 @@ def test_single_point_with_target_ss_produces_ct_state():
 def test_single_point_with_target_ss_has_zero_turn_rate():
     """Turn-rate component of the adapted state is zero."""
     ct_ss = make_ct_ss_1d()
-    initiator = SinglePointMeasurementInitiator(
+    initiator = SinglePointInitiator(
         msmt_model=make_cv_measurement_model(),
+        motion_model=make_cv_model(),
         target_state_space=ct_ss,
     )
     tracks, _ = initiator.initiate([make_measurement(5.0)], next_track_id=0)
@@ -398,6 +406,7 @@ def test_two_point_with_target_ss_produces_ct_state():
     mm = make_cv_measurement_model()
     assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
     initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                  motion_model=make_cv_model(),
                                   target_state_space=ct_ss)
 
     initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
@@ -413,6 +422,7 @@ def test_two_point_with_target_ss_velocity_preserved():
     mm = make_cv_measurement_model()
     assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
     initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                  motion_model=make_cv_model(),
                                   target_state_space=ct_ss)
 
     initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
@@ -500,6 +510,7 @@ def test_two_point_constructor_stores_max_velocity():
     mm = make_cv_measurement_model()
     assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
     initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                  motion_model=make_cv_model(),
                                   target_max_velocity=250.0)
     assert initiator.target_max_velocity == 250.0
 

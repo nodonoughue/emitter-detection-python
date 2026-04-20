@@ -332,7 +332,7 @@ def make_figure_10(prefix=None):
     x_prev = np.array([0, 1e3])
     p_prev = CovarianceMatrix(np.diag([1e3, 10e3])**2)
     prev_state = tracker.State(state_space=_ss_pos, time=0., state=x_prev, covar=p_prev)
-    _mm = tracker.MeasurementModel(state_space=_ss_pos, pss=aoa)
+    _mm = tracker.MeasurementModel(pss=aoa)
 
     cep_vec = np.zeros_like(t_vec)
     for idx in np.arange(t_vec.size):

@@ -40,31 +40,54 @@ class MeasurementModel:
     state_space: StateSpace
     pss: PassiveSurveillanceSystem
 
-    def __init__(self, state_space: StateSpace, pss: PassiveSurveillanceSystem,
-                 ineq_constraints: list | None = None):
+    def __init__(self, pss: PassiveSurveillanceSystem,
+                 ineq_constraints: list | None = None,
+                 solver_fun: Callable | None = None,
+                 crlb_fun: Callable | None = None):
         """
-        :param state_space: StateSpace describing the tracker state vector layout
-        :param pss: PassiveSurveillanceSystem used to generate and evaluate measurements
+        :param pss:              PassiveSurveillanceSystem used for EKF measurement prediction,
+                                 Jacobian evaluation, and log-likelihood scoring.  Also used as the
+                                 default solver/CRLB when solver_fun/crlb_fun are not provided.
         :param ineq_constraints: Optional list of inequality constraint callables applied to the
                                  position estimate produced by state_from_measurement. Each callable
                                  has signature (x: ndarray (num_dims, n)) -> (eps: ndarray (n,),
                                  x_valid: ndarray (num_dims, n)). Applied as a post-solve position
                                  snap (the LS solver operates on pos+vel and cannot apply
                                  position-only constraints mid-iteration).
+        :param solver_fun:       Optional callable for track initiation.  Signature::
+
+                                     pos_est = solver_fun(zeta, x_init)
+
+                                 where ``zeta`` is the measurement vector (shape ``(n_meas,)``),
+                                 ``x_init`` is a starting-point array of length ``num_dims`` or
+                                 ``2*num_dims`` (pos or pos+vel), and the return value is a
+                                 position array of length ``num_dims`` (or pos+vel of length
+                                 ``2*num_dims``).  When ``None``, ``pss.least_square`` is used.
+                                 Supply a custom callable to use a GD solver, a bounded LS, a
+                                 centroid estimator (e.g. for DirectionFinder), or any other
+                                 inversion method.
+        :param crlb_fun:         Optional callable for the position CRLB used as the buffer-track
+                                 and initial-track covariance.  Signature::
+
+                                     crlb = crlb_fun(x_source)
+
+                                 where ``x_source`` is a position array of length ``num_dims`` and
+                                 the return value is either a ``CovarianceMatrix`` or an ndarray of
+                                 shape ``(num_dims, num_dims)``.  When ``None``,
+                                 ``pss.compute_crlb`` is used.  Supply a custom callable when the
+                                 PSS CRLB is unavailable, too expensive, or the solver has a
+                                 different uncertainty model (e.g. empirical bootstrap covariance
+                                 from a centroid estimator).
         """
-        self.state_space = state_space
         self.pss = pss
         self.ineq_constraints = ineq_constraints
+        self._solver_fun = solver_fun
+        self._crlb_fun = crlb_fun
 
     @property
     def num_measurement_dimensions(self)->int:
         """Number of scalar elements produced by one call to the underlying PSS measurement function."""
         return self.pss.num_measurements
-
-    @property
-    def num_state_dimensions(self)->int:
-        """Total number of scalar elements in the tracker state vector."""
-        return self.state_space.num_states
 
     def false_alarm(self, max_val: float, num: int, time: float = None)-> list[Measurement]:
         """
@@ -89,8 +112,8 @@ class MeasurementModel:
         :param noise: if it is a bool, then random noise will be generated if it is True and nothing if it is False;
                       if it is a numpy array, then it will be added directly to the result.
         """
-        args = {'x_source': self.state_space.pos_component(state.state),
-                'v_source': self.state_space.vel_component(state.state)}
+        args = {'x_source': state.state_space.pos_component(state.state),
+                'v_source': state.state_space.vel_component(state.state)}
         if noise == True:
             z = self.pss.noisy_measurement(**args)
         else:
@@ -110,19 +133,19 @@ class MeasurementModel:
         :param state: State at which to evaluate the Jacobian
         :return: H matrix of shape (num_measurements, num_states)
         """
-        j = self.pss.jacobian(x_source=self.state_space.pos_component(state.state),
-                              v_source=self.state_space.vel_component(state.state))
+        j = self.pss.jacobian(x_source=state.state_space.pos_component(state.state),
+                              v_source=state.state_space.vel_component(state.state))
 
         # Jacobian may be either w.r.t. position-only (pss.num_dim rows) or pos/vel,
         # depending on which type of pss we're calling.
 
         # Build the H matrix
-        h = np.zeros((self.num_measurement_dimensions, self.num_state_dimensions))
-        h[:, self.state_space.pos_slice] = np.transpose(j[:self.pss.num_dim, :])
-        if self.state_space.has_vel and j.shape[0] > self.pss.num_dim:
+        h = np.zeros((self.num_measurement_dimensions, state.state_space.num_states))
+        h[:, state.state_space.pos_slice] = np.transpose(j[:self.pss.num_dim, :])
+        if state.state_space.has_vel and j.shape[0] > self.pss.num_dim:
             # The state space has velocity components, and the pss returned rows for
             # the jacobian w.r.t. velocity.
-            h[:, self.state_space.vel_slice] = np.transpose(j[self.pss.num_dim:, :])
+            h[:, state.state_space.vel_slice] = np.transpose(j[self.pss.num_dim:, :])
 
         return h
 
@@ -145,11 +168,12 @@ class MeasurementModel:
         :param measurement: Measurement to score
         :return: Log-likelihood scalar
         """
-        return self.pss.log_likelihood(x_source=self.state_space.pos_component(state.state),
-                                       v_source=self.state_space.vel_component(state.state),
+        return self.pss.log_likelihood(x_source=state.state_space.pos_component(state.state),
+                                       v_source=state.state_space.vel_component(state.state),
                                        zeta=measurement.zeta)
 
-    def state_from_measurement(self, m: Measurement, truth_state: bool=False,
+    def state_from_measurement(self, m: Measurement, state_space: StateSpace,
+                               truth_state: bool=False,
                                x_init: npt.ArrayLike | None = None,
                                target_max_velocity: float | None = None,
                                target_max_acceleration: float | None = None)-> State:
@@ -178,22 +202,37 @@ class MeasurementModel:
                                         If None, the covariance is left as-is.
         """
 
-        # Use the PSS object's least square estimator to come up with an estimated position.
-        n = self.state_space.num_dims
+        # Resolve solver and CRLB callables — use explicit overrides when supplied,
+        # otherwise fall back to the PSS methods.  This lets callers substitute a GD
+        # solver, a bounded LS, a centroid estimator, or any other inversion method
+        # without subclassing MeasurementModel.
+        n = state_space.num_dims
+        if self._solver_fun is not None:
+            def _solve(zeta, x0):
+                result = np.asarray(self._solver_fun(zeta, x0), dtype=float).ravel()
+                # Pad to at least 2*n in case the custom solver returns position-only
+                out = np.zeros((2*n,))
+                out[:min(result.size, 2*n)] = result[:min(result.size, 2*n)]
+                return out
+        else:
+            def _solve(zeta, x0):
+                result, _ = self.pss.least_square(zeta=zeta, x_init=x0, max_num_iterations=100)
+                return result
+
         if x_init is not None:
             x_init = np.asarray(x_init, dtype=float).ravel()
             init_pos_vel = np.zeros((2*n, ))
             init_pos_vel[:min(x_init.size, 2*n)] = x_init[:min(x_init.size, 2*n)]
         else:
             init_pos_vel = np.zeros((2*n, ))
-        pos_vel_est, _ = self.pss.least_square(zeta=m.zeta, x_init=init_pos_vel, max_num_iterations=100)
+        pos_vel_est = _solve(m.zeta, init_pos_vel)
 
         # If the 3D result has z < 0, retry with the z sign flipped to escape the
         # mirror-image local minimum that arises with near-coplanar sensor arrays.
         if n >= 3 and pos_vel_est[2] < 0:
             retry_init = np.zeros((2*n, ))
             retry_init[2] = -pos_vel_est[2]
-            pos_vel_est_retry, _ = self.pss.least_square(zeta=m.zeta, x_init=retry_init, max_num_iterations=100)
+            pos_vel_est_retry = _solve(m.zeta, retry_init)
             if pos_vel_est_retry[2] >= 0:
                 pos_vel_est = pos_vel_est_retry
 
@@ -211,18 +250,22 @@ class MeasurementModel:
         # TODO: Also add support for equality constraints, once this is verified.
 
         # Convert to a state vector
-        init_state_vec = np.zeros((self.state_space.num_states, ))
-        init_state_vec[self.state_space.pos_vel_slice] = pos_vel_est
+        init_state_vec = np.zeros((state_space.num_states, ))
+        init_state_vec[state_space.pos_vel_slice] = pos_vel_est
 
         # Initialize the state without a covariance matrix
-        s = State(state_space=self.state_space, time=m.time, state=init_state_vec)
+        s = State(state_space=state_space, time=m.time, state=init_state_vec)
 
         if not truth_state:
-            # Compute the CRLB and put it on top of the covariance matrix object
-            crlb = self.pss.compute_crlb(x_source=s.pos_vel)
+            # Compute the position CRLB — use the explicit override when supplied.
+            if self._crlb_fun is not None:
+                crlb_raw = self._crlb_fun(s.pos_vel)
+                crlb = crlb_raw if isinstance(crlb_raw, CovarianceMatrix) else CovarianceMatrix(np.atleast_2d(crlb_raw))
+            else:
+                crlb = self.pss.compute_crlb(x_source=s.pos_vel)
             # Note: if the PSS system has no velocity information, the CRLB calculation
             # will return a matrix of zeros for those elements.
-            init_covar = 1e6*np.eye(self.state_space.num_states)
+            init_covar = 1e6*np.eye(state_space.num_states)
             init_covar[:crlb.size, :crlb.size] = crlb.cov
 
             # Check for a velocity component.
@@ -230,10 +273,10 @@ class MeasurementModel:
             #   (a) it is near-zero (numerical noise, not a true estimate), or
             #   (b) it is extremely large (CRLB sentinel value like 1e99 for unobservable
             #       dims) — values that large cause catastrophic cancellation in F@P@F^T.
-            vel_slice = self.state_space.vel_slice
+            vel_slice = state_space.vel_slice
             vel_diag = np.diag(init_covar[vel_slice, vel_slice])
             if np.all(vel_diag <= 1e-3) or np.any(vel_diag > 1e12):
-                init_covar[vel_slice, vel_slice] = 1e6*np.eye(self.state_space.num_dims)
+                init_covar[vel_slice, vel_slice] = 1e6*np.eye(state_space.num_dims)
 
             if target_max_velocity is not None:
                 vel_cov = init_covar[vel_slice, vel_slice]
@@ -241,8 +284,8 @@ class MeasurementModel:
                 if max_diag > target_max_velocity**2:
                     init_covar[vel_slice, vel_slice] = vel_cov * (target_max_velocity**2 / max_diag)
 
-            if target_max_acceleration is not None and self.state_space.has_accel:
-                accel_slice = self.state_space.accel_slice
+            if target_max_acceleration is not None and state_space.has_accel:
+                accel_slice = state_space.accel_slice
                 accel_cov = init_covar[accel_slice, accel_slice]
                 max_diag = np.max(np.diag(accel_cov))
                 if max_diag > target_max_acceleration**2:
@@ -262,12 +305,6 @@ class MeasurementModel:
         :param cov: Measurement error covariance, Covariance Matrix with size n_meas
         :return x: Updated state estimate, State
         """
-
-        if not self.state_space.is_equal(x_prev.state_space):
-            raise ValueError(
-                f"State space mismatch: measurement model expects {self.state_space!r} "
-                f"but received state with {x_prev.state_space!r}."
-            )
 
         # Grab covariance matrix from PSS, if not provided
         if cov is None:

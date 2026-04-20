@@ -24,8 +24,8 @@ class MotionModel(ABC):
     # Each callable has the signature: (x: ndarray (num_dims, n)) -> (eps: ndarray (n,), x_valid: ndarray (num_dims, n))
     ineq_constraints: list | None = None
 
-    def __init__(self):
-        pass
+    def __init__(self, ineq_constraints: list | None = None):
+        self.ineq_constraints = ineq_constraints
 
     def copy(self):
         """
@@ -200,7 +200,8 @@ class MotionModel(ABC):
         return process_covar
 
     @classmethod
-    def make_motion_model(cls, model_type: str, num_dims: int, process_covar: npt.ArrayLike):
+    def make_motion_model(cls, model_type: str, num_dims: int, process_covar: npt.ArrayLike,
+                          ineq_constraints: list | None = None):
         """
         Constructor method for MotionModel subclasses
         """
@@ -219,15 +220,17 @@ class MotionModel(ABC):
         if model_type.lower() not in valid_models:
             raise ValueError(f'Invalid model type: {model_type}. Valid options are: {valid_models.keys()}')
         else:
-            return valid_models[model_type.lower()](num_dims=num_dims, process_covar=process_covar)
+            return valid_models[model_type.lower()](num_dims=num_dims, process_covar=process_covar,
+                                                    ineq_constraints=ineq_constraints)
 
 class ConstantVelocityMotionModel(MotionModel):
     """
     Position and Velocity are tracked states. There is no tracking of acceleration.
     Velocity is assumed to have non-zero-mean Gaussian distribution.
     """
-    def __init__(self, num_dims: int, process_covar: npt.ArrayLike=None, time_delta: float=None):
-        super().__init__()
+    def __init__(self, num_dims: int, process_covar: npt.ArrayLike=None, time_delta: float=None,
+                 ineq_constraints: list | None = None):
+        super().__init__(ineq_constraints=ineq_constraints)
 
         self.state_space = CartesianStateSpace(num_dims=num_dims, has_vel=True, has_accel=False)
 
@@ -267,8 +270,9 @@ class ConstantAccelerationMotionModel(MotionModel):
     Position, Velocity, and Acceleration are tracked states.
     Acceleration is assumed to have non-zero-mean Gaussian distribution.
     """
-    def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: float = None):
-        super().__init__()
+    def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: float = None,
+                 ineq_constraints: list | None = None):
+        super().__init__(ineq_constraints=ineq_constraints)
 
         # State model is: [px, py, pz, vx, vy, vz, ax, ay, az]
         self.state_space = CartesianStateSpace(num_dims=num_dims, has_vel=True, has_accel=True)
@@ -313,8 +317,9 @@ class ConstantJerkMotionModel(MotionModel):
     Position, Velocity, Acceleration, and Jerk are tracked states.
     Jerk is assumed to have a non-zero-mean Gaussian distribution.
     """
-    def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: float = None):
-        super().__init__()
+    def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None, time_delta: float = None,
+                 ineq_constraints: list | None = None):
+        super().__init__(ineq_constraints=ineq_constraints)
 
         # State model is: [px, py, pz, vx, vy, vz, ax, ay, az, jx, jy, jz]
         self.state_space = CartesianStateSpace(num_dims=num_dims, has_vel=True,
@@ -394,8 +399,9 @@ class ConstantTurnMotionModel(MotionModel):
     state_space: PolarKinematicStateSpace
 
     def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None,
-                 process_covar_omega: float = None, time_delta: float = None):
-        super().__init__()
+                 process_covar_omega: float = None, time_delta: float = None,
+                 ineq_constraints: list | None = None):
+        super().__init__(ineq_constraints=ineq_constraints)
 
         if num_dims not in (2, 3):
             raise ValueError("ConstantTurnMotionModel requires num_dims in {2, 3}")
@@ -566,8 +572,9 @@ class BallisticMotionModel(MotionModel):
 
     def __init__(self, num_dims: int = 3, process_covar: npt.ArrayLike = None,
                  gravity: npt.ArrayLike = -9.80665,
-                 time_delta: float = None):
-        super().__init__()
+                 time_delta: float = None,
+                 ineq_constraints: list | None = None):
+        super().__init__(ineq_constraints=ineq_constraints)
 
         if num_dims != 3:
             raise ValueError("BallisticMotionModel requires num_dims=3")
@@ -651,8 +658,9 @@ class ConstantTurnRateAccelerationMotionModel(MotionModel):
     """
 
     def __init__(self, num_dims: int, process_covar: npt.ArrayLike = None,
-                 process_covar_omega: float = None, time_delta: float = None):
-        super().__init__()
+                 process_covar_omega: float = None, time_delta: float = None,
+                 ineq_constraints: list | None = None):
+        super().__init__(ineq_constraints=ineq_constraints)
 
         if num_dims not in (2, 3):
             raise ValueError("ConstantTurnRateAccelerationMotionModel requires num_dims in {2, 3}")
