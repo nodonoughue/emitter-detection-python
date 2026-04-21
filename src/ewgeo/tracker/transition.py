@@ -254,7 +254,7 @@ class ConstantVelocityMotionModel(MotionModel):
         Implement the process noise covariance Q for a constant velocity motion model.
 
         Process noise is an acceleration disturbance.
-        :param process_covar: Variance term, in units of m^2/s^3
+        :param process_covar: Variance term, in units of m^2/s^4
         """
         process_covar = self.validate_process_covar_input(process_covar)
         if time_delta is None:
@@ -355,22 +355,22 @@ class ConstantJerkMotionModel(MotionModel):
         if time_delta is None:
             time_delta = self.time_delta
 
-        q_mat = np.block([[time_delta ** 7 / 252 * process_covar,
-                           time_delta ** 6 / 72 * process_covar,
-                           time_delta ** 5 / 30 * process_covar,
-                           time_delta ** 4 / 24 * process_covar],
-                          [time_delta ** 6 / 72 * process_covar,
-                           time_delta ** 5 / 20 * process_covar,
-                           time_delta ** 4 / 8 * process_covar,
-                           time_delta ** 3 / 6 * process_covar],
-                          [time_delta ** 5 / 30 * process_covar,
-                           time_delta ** 4 / 8 * process_covar,
-                           time_delta ** 3 / 3 * process_covar,
-                           time_delta ** 2 / 2 * process_covar],
-                          [time_delta ** 4 / 24 * process_covar,
-                           time_delta ** 3 / 6 * process_covar,
-                           time_delta ** 2 / 2 * process_covar,
-                           time_delta * process_covar]])
+        q_mat = np.block([[time_delta ** 6 / 36 * process_covar,
+                           time_delta ** 5 / 12 * process_covar,
+                           time_delta ** 4 / 6  * process_covar,
+                           time_delta ** 3 / 6  * process_covar],
+                          [time_delta ** 5 / 12 * process_covar,
+                           time_delta ** 4 / 4  * process_covar,
+                           time_delta ** 3 / 2  * process_covar,
+                           time_delta ** 2 / 2  * process_covar],
+                          [time_delta ** 4 / 6  * process_covar,
+                           time_delta ** 3 / 2  * process_covar,
+                           time_delta ** 2       * process_covar,
+                           time_delta            * process_covar],
+                          [time_delta ** 3 / 6  * process_covar,
+                           time_delta ** 2 / 2  * process_covar,
+                           time_delta            * process_covar,
+                           process_covar]])
         return CovarianceMatrix(q_mat)
 
 

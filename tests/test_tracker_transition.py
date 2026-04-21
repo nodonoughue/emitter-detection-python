@@ -122,10 +122,10 @@ def test_cj_transition_matrix_1d_dt1():
 def test_cj_process_noise_1d_dt1():
     model = ConstantJerkMotionModel(num_dims=1, process_covar=1.0)
     Q = model.make_process_covariance_matrix(process_covar=1.0, time_delta=1.0)
-    expected = np.array([[1/252, 1/72, 1/30, 1/24],
-                         [1/72,  1/20, 1/8,  1/6 ],
-                         [1/30,  1/8,  1/3,  1/2 ],
-                         [1/24,  1/6,  1/2,  1.0 ]])
+    expected = np.array([[1/36,  1/12, 1/6,  1/6 ],
+                         [1/12,  1/4,  1/2,  1/2 ],
+                         [1/6,   1/2,  1.0,  1.0 ],
+                         [1/6,   1/2,  1.0,  1.0 ]])
     assert equal_to_tolerance(Q.cov, expected)
 
 

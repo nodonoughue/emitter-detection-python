@@ -199,7 +199,8 @@ class TwoPointInitiator(Initiator):
                     m, self.state_space,
                     target_max_velocity=self.target_max_velocity,
                     target_max_acceleration=self.target_max_acceleration)
-                self._buffer_tracks.append(Track(initial_state=s, track_id=next_track_id))
+                self._buffer_tracks.append(Track(initial_state=s, track_id=next_track_id,
+                                                 motion_model=self.motion_model))
                 next_track_id += 1
         else:
             # Nothing buffered yet — buffer all measurements
@@ -208,7 +209,8 @@ class TwoPointInitiator(Initiator):
                     m, self.state_space,
                     target_max_velocity=self.target_max_velocity,
                     target_max_acceleration=self.target_max_acceleration)
-                self._buffer_tracks.append(Track(initial_state=s, track_id=next_track_id))
+                self._buffer_tracks.append(Track(initial_state=s, track_id=next_track_id,
+                                                 motion_model=self.motion_model))
                 next_track_id += 1
 
         self.next_track_id = next_track_id
@@ -388,7 +390,8 @@ class ThreePointInitiator(Initiator):
             s = self.msmt_model.state_from_measurement(m, self.state_space,
                 target_max_velocity=self.target_max_velocity,
                 target_max_acceleration=self.target_max_acceleration)
-            self._stage1_tracks.append(Track(initial_state=s, track_id=next_track_id))
+            self._stage1_tracks.append(Track(initial_state=s, track_id=next_track_id,
+                                             motion_model=self.motion_model))
             next_track_id += 1
 
         self.next_track_id = next_track_id

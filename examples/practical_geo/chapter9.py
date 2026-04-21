@@ -458,7 +458,7 @@ def example4():
 
     # Associators
     associator_cv = GNNAssociator(gate_probability=0.95)
-    associator_ca = GNNAssociator(gate_probability=0.999)
+    associator_ca = GNNAssociator(gate_probability=0.95)
 
     # Promoter and Deleter -- common to both trackers
     deleter = MissedDetectionDeleter(num_missed_detections=3)
