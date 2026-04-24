@@ -393,7 +393,7 @@ def make_figure_8(prefix=None):
     time = np.arange(len(state_vecs)) * time_step
     states = [State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
     states[-1].covar = CovarianceMatrix(np.diag([2.0, 0.75, 0.4, 0.4]) * 1e4)
-    track = Track(states=states, track_id='0')
+    track = Track(states=states, track_id='0', motion_model=transition)
 
     num_missed_detections = 3
 
@@ -409,7 +409,6 @@ def make_figure_8(prefix=None):
         h = MissedDetectionHypothesis(track=track,
                                       distance=1.0,
                                       sensor=None,
-                                      motion_model=transition,
                                       time = track.curr_time + time_step)
         h.update_track()
         ax.plot(*zip((last_state.position, track.curr_state.position)),linestyle='--',label=None,color=default_colors[idx+1])
@@ -449,7 +448,7 @@ def make_figure_9(prefix=None):
 
     # Output to file
     if prefix is not None:
-        labels = ['fig9a', 'fig9b', 'fig9c']
+        labels = ['fig9a', 'fig9b']
         if len(labels) != len(figs):
             print('**Error saving figure 9.9; unexpected number of figures generated.')
         else:

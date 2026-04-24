@@ -58,7 +58,7 @@ def make_track(x, vx, t=0.0, track_id='T0'):
     state = State(model.state_space, time=t,
                   state=np.array([x, vx], dtype=float),
                   covar=CovarianceMatrix(np.eye(2)))
-    return Track(initial_state=state, track_id=track_id)
+    return Track(initial_state=state, track_id=track_id, motion_model=model)
 
 
 def make_measurement(x, t=1.0):
@@ -91,11 +91,9 @@ DIST_FAR     = (40.0 - PREDICTED_X)**2 / INNOV_COVAR   # measurement at x=40
 def test_hypothesis_stores_track_and_measurement():
     track = make_track(10, 5)
     msmt = make_measurement(14)
-    model = make_cv_model()
-    h = Hypothesis(track=track, measurement=msmt, motion_model=model)
+    h = Hypothesis(track=track, measurement=msmt)
     assert h.track is track
     assert h.measurement is msmt
-    assert h.motion_model is model
 
 
 def test_hypothesis_is_valid_initially():
@@ -140,7 +138,7 @@ def test_hypothesis_innovation():
     """innovation = zeta - predicted_measurement."""
     track = make_track(10, 5)
     msmt = make_measurement(14)
-    h = Hypothesis(track=track, measurement=msmt, motion_model=make_cv_model())
+    h = Hypothesis(track=track, measurement=msmt)
     # predicted position = 15; innovation = 14 - 15 = -1
     assert equal_to_tolerance(h.innovation, [-1.0])
 
@@ -149,20 +147,20 @@ def test_hypothesis_innovation_covar():
     """S = H P_pred H^T + R = 2.25 + 1.0 = 3.25."""
     track = make_track(10, 5)
     msmt = make_measurement(14)
-    h = Hypothesis(track=track, measurement=msmt, motion_model=make_cv_model())
+    h = Hypothesis(track=track, measurement=msmt)
     assert equal_to_tolerance(h.innovation_covar.cov, [[INNOV_COVAR]])
 
 
 def test_hypothesis_distance_near_measurement():
     """Distance = innovation^T S^{-1} innovation / n_meas."""
     track = make_track(10, 5)
-    h = Hypothesis(track=track, measurement=make_measurement(14), motion_model=make_cv_model())
+    h = Hypothesis(track=track, measurement=make_measurement(14))
     assert equal_to_tolerance(h.distance, DIST_NEAR)
 
 
 def test_hypothesis_distance_far_measurement():
     track = make_track(10, 5)
-    h = Hypothesis(track=track, measurement=make_measurement(40), motion_model=make_cv_model())
+    h = Hypothesis(track=track, measurement=make_measurement(40))
     assert equal_to_tolerance(h.distance, DIST_FAR)
 
 
@@ -177,14 +175,14 @@ def test_hypothesis_distance_null_measurement_is_inf():
 
 def test_apply_gate_passes_for_near_measurement():
     h = Hypothesis(track=make_track(10, 5), measurement=make_measurement(14),
-                   motion_model=make_cv_model())
+)
     h.apply_distance_gate(0.99)
     assert h.is_valid
 
 
 def test_apply_gate_fails_for_far_measurement():
     h = Hypothesis(track=make_track(10, 5), measurement=make_measurement(40),
-                   motion_model=make_cv_model())
+)
     h.apply_distance_gate(0.99)
     assert not h.is_valid
 
@@ -195,7 +193,7 @@ def test_apply_gate_fails_for_far_measurement():
 
 def test_hypothesis_likelihood_is_positive():
     h = Hypothesis(track=make_track(10, 5), measurement=make_measurement(14),
-                   motion_model=make_cv_model())
+)
     assert 0 < h.likelihood < 1
 
 
@@ -204,15 +202,15 @@ def test_hypothesis_likelihood_decreases_with_distance():
     track_near = make_track(10, 5)
     track_far  = make_track(10, 5)
     h_near = Hypothesis(track=track_near, measurement=make_measurement(14),
-                        motion_model=make_cv_model())
+     )
     h_far  = Hypothesis(track=track_far,  measurement=make_measurement(40),
-                        motion_model=make_cv_model())
+     )
     assert h_near.likelihood > h_far.likelihood
 
 
 def test_hypothesis_log_likelihood_consistent():
     h = Hypothesis(track=make_track(10, 5), measurement=make_measurement(14),
-                   motion_model=make_cv_model())
+)
     assert equal_to_tolerance(np.exp(h.log_likelihood), h.likelihood)
 
 
@@ -233,7 +231,7 @@ def test_override_likelihood():
 
 def test_clear_dependent_parameters_resets_cache():
     h = Hypothesis(track=make_track(10, 5), measurement=make_measurement(14),
-                   motion_model=make_cv_model())
+)
     _ = h.distance   # populate cache
     h.clear_dependent_parameters()
     assert h._distance is None
@@ -248,22 +246,20 @@ def test_clear_dependent_parameters_resets_cache():
 
 def test_missed_detection_distance_is_fixed():
     track = make_track(10, 5)
-    model = make_cv_model()
-    h = MissedDetectionHypothesis(track=track, motion_model=model,
-                                  sensor=_MockSensor(), distance=0.05, time=1.0)
+    h = MissedDetectionHypothesis(track=track, sensor=_MockSensor(), distance=0.05, time=1.0)
     assert h.distance == 0.05
 
 
 def test_missed_detection_likelihood_is_fixed():
     track = make_track(10, 5)
-    h = MissedDetectionHypothesis(track=track, motion_model=make_cv_model(),
+    h = MissedDetectionHypothesis(track=track,
                                   sensor=_MockSensor(), distance=0.05, time=1.0)
     assert h.likelihood == 0.05
 
 
 def test_missed_detection_innovation_is_zeros():
     track = make_track(10, 5)
-    h = MissedDetectionHypothesis(track=track, motion_model=make_cv_model(),
+    h = MissedDetectionHypothesis(track=track,
                                   sensor=_MockSensor(), distance=0.05, time=1.0)
     assert np.all(h.innovation == 0)
 
@@ -492,7 +488,7 @@ def test_gmm_update_track_single_missed_detection_appends_state():
     and increments the missed-detection counter.
     """
     track = make_track(10, 5, t=0.0, track_id='T0')
-    mdh = MissedDetectionHypothesis(track=track, motion_model=make_cv_model(),
+    mdh = MissedDetectionHypothesis(track=track,
                                     sensor=None, distance=0.1, time=1.0)
     gmm = GMMHypothesis(hypotheses=[mdh])
     updated = gmm.update_track(spawn_new_track=False)
