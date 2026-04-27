@@ -82,7 +82,7 @@ def make_figure_2(prefix=None):
     time = np.arange(len(state_vecs), dtype=float)*time_step
     states = [State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
     states[-1].covar = CovarianceMatrix(np.diag([2.0, 0.75, 0.4, 0.4])*1e4)
-    track = Track(states=states)
+    track = Track(states=states, motion_model=transition)
 
     new_time: float = time[-1].item() + time_step  # use the .item() command to force the output to be a scalar float
     prediction = transition.predict(s=track, new_time=new_time) # predict state for the next measurement
@@ -113,7 +113,7 @@ def make_figure_2(prefix=None):
     msmt_to_state_dict = dict(zip(truth_msmts, truth_states))
 
     # Make hypotheses
-    hypotheses = [Hypothesis(track=track, measurement=m, motion_model=transition) for m in truth_msmts]
+    hypotheses = [Hypothesis(track=track, measurement=m) for m in truth_msmts]
 
     # Apply the distance gate
     [h.apply_distance_gate(gate_probability) for h in hypotheses]
@@ -211,7 +211,7 @@ def make_figure_3(prefix=None):
     states = [State(state_space=state_space, time=0, state=s, covar=c) for (s, c) in zip(state_vecs, state_covars)]
 
     # Initialize a Track with each one and predict forward to the next measurement
-    tracks = [Track(track_id=i, initial_state=s) for (i, s) in zip(ids, states)]
+    tracks = [Track(track_id=i, initial_state=s, motion_model=transition) for (i, s) in zip(ids, states)]
     new_time = 5
     predicted_states = [transition.predict(t.curr_state, new_time=new_time) for t in tracks]
 

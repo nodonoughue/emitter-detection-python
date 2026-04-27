@@ -470,7 +470,7 @@ def example4():
     promoter = MofNPromoter(num_hits=3, num_chances=5)
 
     # Initialize CV tracker
-    transition_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=6**2,ineq_constraints=bnds)
+    transition_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=3**2,ineq_constraints=bnds)
     initiator_cv  = TwoPointInitiator(msmt_model=msmt_model,
                                       associator=associator_cv,
                                       motion_model=transition_cv,
@@ -480,7 +480,7 @@ def example4():
                          do_plotting=False, keep_all_tracks=True, print_status=False)
 
     # Initialize CA tracker
-    transition_ca = ConstantAccelerationMotionModel(num_dims=3, process_covar=.3**2,ineq_constraints=bnds)
+    transition_ca = ConstantAccelerationMotionModel(num_dims=3, process_covar=.1**2,ineq_constraints=bnds)
     initiator_ca  = TwoPointInitiator(msmt_model=msmt_model,
                                       associator=associator_ca,
                                       motion_model=transition_ca,
