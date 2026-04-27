@@ -207,6 +207,13 @@ class CovarianceMatrix:
         # Error-prevention -- this loop will fail if self._cov is an integer type, let's force it to be a float
         self._cov = np.asarray(self._cov, dtype=float)
 
+        # Symmetrize to counteract floating-point asymmetry.
+        # np.linalg.eigh assumes symmetry (uses only the lower triangle), so if self._cov is
+        # slightly non-symmetric, eigh gives eigenvalues for the implied symmetric form while
+        # cholesky() operates on the actual stored matrix -- causing spurious "not positive definite"
+        # failures even when _ensure_invertible reports all eigenvalues are positive.
+        self._cov = (self._cov + self._cov.T) / 2
+
         # Eigen-decomposition
         lam, v = np.linalg.eigh(self.cov)
 
