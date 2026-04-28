@@ -82,7 +82,7 @@ def make_figure_2(prefix=None):
     time = np.arange(len(state_vecs), dtype=float)*time_step
     states = [State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
     states[-1].covar = CovarianceMatrix(np.diag([2.0, 0.75, 0.4, 0.4])*1e4)
-    track = Track(states=states)
+    track = Track(states=states, motion_model=transition)
 
     new_time: float = time[-1].item() + time_step  # use the .item() command to force the output to be a scalar float
     prediction = transition.predict(s=track, new_time=new_time) # predict state for the next measurement
@@ -93,7 +93,7 @@ def make_figure_2(prefix=None):
                                         cov=CovarianceMatrix(np.diag([1.0, 1.0, 1.0])*1e2),
                                         variance_is_toa=False,
                                         ref_idx=0)
-    msmt_model = MeasurementModel(pss=pss, state_space=transition.state_space)
+    msmt_model = MeasurementModel(pss=pss)
 
     # Find the predicted measurement and measurement error covariance (for drawing an ellipse)
     prediction_msmt = msmt_model.measurement(state=prediction, noise=False)
@@ -113,7 +113,7 @@ def make_figure_2(prefix=None):
     msmt_to_state_dict = dict(zip(truth_msmts, truth_states))
 
     # Make hypotheses
-    hypotheses = [Hypothesis(track=track, measurement=m, motion_model=transition) for m in truth_msmts]
+    hypotheses = [Hypothesis(track=track, measurement=m) for m in truth_msmts]
 
     # Apply the distance gate
     [h.apply_distance_gate(gate_probability) for h in hypotheses]
@@ -211,7 +211,7 @@ def make_figure_3(prefix=None):
     states = [State(state_space=state_space, time=0, state=s, covar=c) for (s, c) in zip(state_vecs, state_covars)]
 
     # Initialize a Track with each one and predict forward to the next measurement
-    tracks = [Track(track_id=i, initial_state=s) for (i, s) in zip(ids, states)]
+    tracks = [Track(track_id=i, initial_state=s, motion_model=transition) for (i, s) in zip(ids, states)]
     new_time = 5
     predicted_states = [transition.predict(t.curr_state, new_time=new_time) for t in tracks]
 
@@ -220,7 +220,7 @@ def make_figure_3(prefix=None):
                       [200, 800]])
     c_zeta = CovarianceMatrix(np.power(np.diag([3, 3])*_deg2rad,2))
     pss = DirectionFinder(x=x_aoa, cov=c_zeta, do_2d_aoa=False)
-    msmt_model = MeasurementModel(pss=pss, state_space=state_space)
+    msmt_model = MeasurementModel(pss=pss)
 
     # Let's make some new random states based on the predicted states for each track, and a few clutter-type states
     new_states = []
@@ -237,7 +237,7 @@ def make_figure_3(prefix=None):
 
     # x/y plot
     figs = []
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6.4, 3.6))
     figs.append(fig)
     [t.plot(ax=ax, predicted_state=p) for (t, p) in zip(tracks, predicted_states)]
     pss.plot_sensors(ax=ax, label='DF System')
@@ -248,7 +248,7 @@ def make_figure_3(prefix=None):
     plt.ylabel('y [m]')
 
     # Measurement Plot
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6.4, 3.6))
     figs.append(fig)
     plt.scatter([m.zeta[0] for m in measurements],
                 [m.zeta[1] for m in measurements],
@@ -257,7 +257,7 @@ def make_figure_3(prefix=None):
     # Set up the Nearest Neighbor Association Scheme
     gate_probability=.75
     associator = NNAssociator(motion_model=transition, gate_probability=gate_probability)
-    hypotheses, _ = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
+    hypotheses, _, _ = associator.associate(tracks=tracks, measurements=measurements)
 
     trk_label = 'Predicted Track Measurement'
     gate_label = 'Association Gate'
@@ -393,7 +393,7 @@ def make_figure_8(prefix=None):
     time = np.arange(len(state_vecs)) * time_step
     states = [State(state_space=transition.state_space, time=t, state=s) for t, s in zip(time, state_vecs)]
     states[-1].covar = CovarianceMatrix(np.diag([2.0, 0.75, 0.4, 0.4]) * 1e4)
-    track = Track(states=states, track_id='0')
+    track = Track(states=states, track_id='0', motion_model=transition)
 
     num_missed_detections = 3
 
@@ -409,7 +409,6 @@ def make_figure_8(prefix=None):
         h = MissedDetectionHypothesis(track=track,
                                       distance=1.0,
                                       sensor=None,
-                                      motion_model=transition,
                                       time = track.curr_time + time_step)
         h.update_track()
         ax.plot(*zip((last_state.position, track.curr_state.position)),linestyle='--',label=None,color=default_colors[idx+1])
@@ -449,7 +448,7 @@ def make_figure_9(prefix=None):
 
     # Output to file
     if prefix is not None:
-        labels = ['fig9a', 'fig9b', 'fig9c']
+        labels = ['fig9a', 'fig9b']
         if len(labels) != len(figs):
             print('**Error saving figure 9.9; unexpected number of figures generated.')
         else:

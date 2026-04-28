@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from matplotlib import pyplot as plt
 import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.quiver import Quiver
 
 from .states import State, StateSpace
+
+if TYPE_CHECKING:
+    from .transition import MotionModel
 
 
 class Track:
@@ -16,6 +23,9 @@ class Track:
     track_id: str = ""
     num_missed_detections: int = 0
     num_updates: int = 0
+    max_velocity: float | None = None
+    max_acceleration: float | None = None
+    motion_model: MotionModel | None = None
 
     def __init__(self, **kwargs):
         """
@@ -23,6 +33,14 @@ class Track:
 
         :param initial_state: (keyword) Initial State object; sets states=[initial_state] and num_updates=1
         :param track_id: (keyword) Optional identifier string for the track (default: "")
+        :param max_velocity: (keyword) Optional maximum speed [m/s]; when set, the tracker clips
+                             the estimated velocity to this magnitude after each EKF update (default: None)
+        :param max_acceleration: (keyword) Optional maximum acceleration [m/s²]; when set, the tracker
+                                 clips the estimated acceleration to this magnitude after each EKF update.
+                                 Only applies when the track's state space has an acceleration component
+                                 (default: None)
+        :param motion_model: (keyword) MotionModel associated with this track; used by associators
+                             to predict the track without needing an external model (default: None)
         """
         for key, value in kwargs.items():
             if key == 'initial_state':

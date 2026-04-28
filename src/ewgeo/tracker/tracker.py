@@ -149,7 +149,7 @@ class Tracker:
             return measurements
 
         # Generate hypotheses
-        hypothesis_dict, unassoc_msmts = self.associator.associate(tracks=self.tracks, measurements=measurements, curr_time=curr_time)
+        hypothesis_dict, unassoc_msmts, _ = self.associator.associate(tracks=self.tracks, measurements=measurements, curr_time=curr_time)
 
         num_coasted_tracks = np.sum([1 for h in hypothesis_dict.values() if isinstance(h,MissedDetectionHypothesis)])
         if num_coasted_tracks > 0:
@@ -158,6 +158,13 @@ class Tracker:
         # Update the hypotheses
         hypotheses = hypothesis_dict.values()
         [h.update_track() for h in hypotheses]
+
+        # Apply per-track motion constraints to the freshly updated states
+        for h in hypotheses:
+            if not isinstance(h, MissedDetectionHypothesis):
+                t = h.track
+                if t.max_velocity is not None or t.max_acceleration is not None:
+                    t.curr_state.constrain_motion(t.max_velocity, t.max_acceleration)
 
         if self.print_status:
             print(f"...{len(hypothesis_dict)-num_coasted_tracks} tracks updated, {num_coasted_tracks} tracks coasted...")
@@ -183,13 +190,21 @@ class Tracker:
         #     print(f"  Track {t.track_id}: P_trace={np.trace(t.curr_state.covar.cov):.4e}")
 
         # Generate hypotheses to match measurements to the tentative tracks
-        hypothesis_dict, unassoc_msmt = self.associator.associate(tracks=self._tentative_tracks,
-                                                                  measurements=measurements,
-                                                                  curr_time=curr_time)
+        hypothesis_dict, unassoc_msmt, _ = self.associator.associate(tracks=self._tentative_tracks,
+                                                                    measurements=measurements,
+                                                                    curr_time=curr_time)
 
         # Update the tracks associated with these hypotheses
         tentative_hypotheses = hypothesis_dict.values()
         [h.update_track() for h in tentative_hypotheses]
+
+        # Apply per-track motion constraints to the freshly updated tentative states
+        for h in tentative_hypotheses:
+            if not isinstance(h, MissedDetectionHypothesis):
+                t = h.track
+                if t.max_velocity is not None or t.max_acceleration is not None:
+                    t.curr_state.constrain_motion(t.max_velocity, t.max_acceleration)
+
         num_updated_tracks = len([h for h in tentative_hypotheses if not isinstance(h, MissedDetectionHypothesis)])
 
         # Any hypotheses that are not a MissedDetectionHypothesis can be passed to

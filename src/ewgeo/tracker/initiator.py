@@ -5,6 +5,7 @@ from .association import Associator, MissedDetectionHypothesis
 from .measurement import Measurement, MeasurementModel
 from .track import Track, State, StateSpace
 from .states import adapt_cartesian_state
+from .transition import MotionModel
 from ..utils.covariance import CovarianceMatrix
 
 class Initiator(ABC):
@@ -15,7 +16,7 @@ class Initiator(ABC):
     def initiate(self, measurements: list[Measurement]) -> list[Track]:
         pass
 
-class SinglePointMeasurementInitiator(Initiator):
+class SinglePointInitiator(Initiator):
     """
     This initiator type accepts a list of measurements and instantiates a track for each one.
 
@@ -28,14 +29,29 @@ class SinglePointMeasurementInitiator(Initiator):
     """
     msmt_model: MeasurementModel
 
-    def __init__(self, msmt_model: MeasurementModel, target_state_space: StateSpace = None):
+    def __init__(self, msmt_model: MeasurementModel, motion_model: MotionModel = None,
+                 target_state_space: StateSpace = None,
+                 target_max_velocity: float | None = None,
+                 target_max_acceleration: float | None = None):
         """
-        :param msmt_model:         MeasurementModel used to convert each measurement into an initial State
-        :param target_state_space: If provided, each newly created State is adapted to this StateSpace
-                                   via adapt_cartesian_state before the Track is created.
+        :param msmt_model:              MeasurementModel used to convert each measurement into an initial State
+        :param motion_model:            MotionModel for this tracker; its state_space drives the initial State
+                                        layout and each confirmed Track carries it for use by associators.
+                                        Required when initiate() is called.
+        :param target_state_space:      If provided, each newly created State is adapted to this StateSpace
+                                        via adapt_cartesian_state before the Track is created.
+        :param target_max_velocity:     Optional upper bound on target speed [m/s].  Stored on each created
+                                        Track so the Tracker can clip the estimated velocity after each update.
+        :param target_max_acceleration: Optional upper bound on target acceleration [m/s²].  Stored on each
+                                        created Track so the Tracker can clip the estimated acceleration after
+                                        each update.
         """
         self.msmt_model = msmt_model
+        self.motion_model = motion_model
+        self.state_space = motion_model.state_space if motion_model is not None else None
         self.target_state_space = target_state_space
+        self.target_max_velocity = target_max_velocity
+        self.target_max_acceleration = target_max_acceleration
 
     def initiate(self, measurements: list[Measurement], next_track_id: int=None) -> tuple[list[Track], int]:
         """
@@ -51,12 +67,20 @@ class SinglePointMeasurementInitiator(Initiator):
 
         for m in measurements:
             # Determine a position and/or velocity for this measurement
-            s = self.msmt_model.state_from_measurement(m)
+            s = self.msmt_model.state_from_measurement(
+                m, self.state_space,
+                target_max_velocity=self.target_max_velocity,
+                target_max_acceleration=self.target_max_acceleration)
             if self.target_state_space is not None:
+                # Convert from whatever the measurement's state space was to
+                # the desired state space
                 s = adapt_cartesian_state(s, self.target_state_space)
 
             # Initialize a track object
-            t = Track(initial_state=s, track_id=next_track_id)
+            t = Track(initial_state=s, track_id=next_track_id,
+                      max_velocity=self.target_max_velocity,
+                      max_acceleration=self.target_max_acceleration,
+                      motion_model=self.motion_model)
             next_track_id += 1
             tracks.append(t)
 
@@ -75,16 +99,36 @@ class TwoPointInitiator(Initiator):
     _buffer_tracks: list          # single-point tentative tracks for association
 
     def __init__(self, msmt_model: MeasurementModel, associator: Associator,
-                 target_state_space: StateSpace = None):
+                 motion_model: MotionModel = None,
+                 target_state_space: StateSpace = None,
+                 target_max_velocity: float | None = None,
+                 target_max_acceleration: float | None = None):
         """
-        :param msmt_model:         MeasurementModel used to convert each measurement into a State
-        :param associator:         Associator used to pair new measurements with buffered single-point tracks
-        :param target_state_space: If provided, each confirmed Track's initial State is adapted to this
-                                   StateSpace via adapt_cartesian_state before the Track is created.
+        :param msmt_model:              MeasurementModel used to convert each measurement into a State
+        :param associator:              Associator used to pair new measurements with buffered single-point tracks
+        :param motion_model:            MotionModel for this tracker; its state_space drives the initial State
+                                        layout and each confirmed Track carries it for use by associators.
+                                        Required when initiate() is called.
+        :param target_state_space:      If provided, each confirmed Track's initial State is adapted to this
+                                        StateSpace via adapt_cartesian_state before the Track is created.
+        :param target_max_velocity:     Optional upper bound on target speed [m/s].  When provided, the
+                                        velocity block of the initial covariance is scaled so that its
+                                        largest diagonal element does not exceed target_max_velocity².
+                                        If None, the CRLB-derived estimate (pos_var / dt²) is used as-is.
+        :param target_max_acceleration: Optional upper bound on target acceleration [m/s²].  When provided,
+                                        the acceleration block of buffer-track covariances is scaled so
+                                        that its largest diagonal element does not exceed
+                                        target_max_acceleration².  Only has effect when the state space
+                                        includes an acceleration component.  If None, the default 1e6 m²/s⁴
+                                        sentinel is used as-is.
         """
         self.msmt_model = msmt_model
         self.associator = associator
+        self.motion_model = motion_model
+        self.state_space = motion_model.state_space if motion_model is not None else None
         self.target_state_space = target_state_space
+        self.target_max_velocity = target_max_velocity
+        self.target_max_acceleration = target_max_acceleration
         self._buffered_measurements = {}
         self._buffer_tracks = []
 
@@ -103,42 +147,70 @@ class TwoPointInitiator(Initiator):
 
         # Step 1: Associate new measurements with buffered single-point tracks
         if self._buffer_tracks:
-            hypothesis_dict, unmatched = self.associator.associate(
+            hypothesis_dict, unmatched, _ = self.associator.associate(
                 tracks=self._buffer_tracks,
                 measurements=measurements
             )
             for track, hyp in hypothesis_dict.items():
                 if not isinstance(hyp, MissedDetectionHypothesis):
-                    # We have two points — estimate velocity
-                    s1 = track.curr_state            # first point
-                    s2 = hyp.state_from_measurement  # second point
+                    # We have two points — estimate velocity.
+                    # Use a nested structure (no `continue`) so that the
+                    # unconditional buffer removal at the end always executes,
+                    # even when s1 or s2 LS failed.
+                    s1 = track.curr_state  # first point
+                    # If the buffer LS failed (position at origin), skip this pair —
+                    # a zero first-point would produce a wild velocity estimate.
+                    if np.linalg.norm(s1.position) >= 1.0:
+                        # Seed the second-point LS from s1's position so the solver
+                        # starts close to the true location rather than at the origin.
+                        # This is especially important for z (altitude): if the sensor
+                        # array is near-coplanar with z≈0, an LS started from the
+                        # origin often converges to the mirror-image z<0 solution.
+                        # Starting from s1.position (which already has z>0 after the
+                        # z-retry fix in state_from_measurement) eliminates that
+                        # ambiguity for s2.
+                        s2 = self.msmt_model.state_from_measurement(hyp.measurement, self.state_space,
+                                                                    x_init=s1.position)
+                        if np.linalg.norm(s2.position) >= 1.0:
+                            dt = s2.time - s1.time
+                            if dt > 0:
+                                vel_est = (s2.position - s1.position) / dt
 
-                    dt = s2.time - s1.time
-                    if dt > 0:
-                        vel_est = (s2.position - s1.position) / dt
-
-                        # Build a proper initial state with velocity estimate
-                        init_state = State(s2.state_space, s2.time,
-                                           self._build_state_with_velocity(s2, vel_est),
-                                           self._build_initial_covariance(s2, dt))
-                        if self.target_state_space is not None:
-                            init_state = adapt_cartesian_state(init_state, self.target_state_space)
-                        confirmed_tracks.append(
-                            Track(initial_state=init_state, track_id=track.track_id)
-                        )
-                # Either way, remove from buffer
+                                # Build a proper initial state with velocity estimate
+                                init_state = State(s2.state_space, s2.time,
+                                                   self._build_state_with_velocity(s2, vel_est),
+                                                   self._build_initial_covariance(s2, dt,
+                                                       self.target_max_velocity))
+                                if self.target_state_space is not None:
+                                    # Make sure the state is in the proper state space
+                                    init_state = adapt_cartesian_state(init_state, self.target_state_space)
+                                confirmed_tracks.append(
+                                    Track(initial_state=init_state, track_id=track.track_id,
+                                          max_velocity=self.target_max_velocity,
+                                          max_acceleration=self.target_max_acceleration,
+                                          motion_model=self.motion_model)
+                                )
+                # Always remove from buffer — whether matched, rejected, or missed
                 self._buffer_tracks.remove(track)
 
             # Buffer any unmatched new measurements as new single-point tracks
             for m in unmatched:
-                s = self.msmt_model.state_from_measurement(m)
-                self._buffer_tracks.append(Track(initial_state=s, track_id=next_track_id))
+                s = self.msmt_model.state_from_measurement(
+                    m, self.state_space,
+                    target_max_velocity=self.target_max_velocity,
+                    target_max_acceleration=self.target_max_acceleration)
+                self._buffer_tracks.append(Track(initial_state=s, track_id=next_track_id,
+                                                 motion_model=self.motion_model))
                 next_track_id += 1
         else:
             # Nothing buffered yet — buffer all measurements
             for m in measurements:
-                s = self.msmt_model.state_from_measurement(m)
-                self._buffer_tracks.append(Track(initial_state=s, track_id=next_track_id))
+                s = self.msmt_model.state_from_measurement(
+                    m, self.state_space,
+                    target_max_velocity=self.target_max_velocity,
+                    target_max_acceleration=self.target_max_acceleration)
+                self._buffer_tracks.append(Track(initial_state=s, track_id=next_track_id,
+                                                 motion_model=self.motion_model))
                 next_track_id += 1
 
         self.next_track_id = next_track_id
@@ -152,7 +224,8 @@ class TwoPointInitiator(Initiator):
         return new_state_vec
 
     @staticmethod
-    def _build_initial_covariance(state: State, dt: float) -> CovarianceMatrix:
+    def _build_initial_covariance(state: State, dt: float,
+                                  target_max_velocity: float | None = None) -> CovarianceMatrix:
         # Start from the CRLB-based covariance but use a
         # conservative (larger) value
         n = state.state_space.num_states
@@ -171,6 +244,12 @@ class TwoPointInitiator(Initiator):
         if state.state_space.has_vel:
             vel_slice = state.state_space.vel_slice
             crlb_vel = crlb_pos / (dt**2)
+            if target_max_velocity is not None:
+                # Scale down the velocity covariance so that no diagonal element exceeds
+                # target_max_velocity², while preserving the correlation structure.
+                max_diag = np.max(np.diag(crlb_vel))
+                if max_diag > target_max_velocity**2:
+                    crlb_vel = crlb_vel * (target_max_velocity**2 / max_diag)
             init_covar[vel_slice, vel_slice] = crlb_vel
 
         # There isn't enough information to initialize acceleration; scale by another 1/dt²
@@ -196,16 +275,36 @@ class ThreePointInitiator(Initiator):
     _stage2_tracks: list[Track]   # two-point buffer (t1, t2)
 
     def __init__(self, msmt_model: MeasurementModel, associator: Associator,
-                 target_state_space: StateSpace = None):
+                 motion_model: MotionModel = None,
+                 target_state_space: StateSpace = None,
+                 target_max_velocity: float | None = None,
+                 target_max_acceleration: float | None = None):
         """
-        :param msmt_model:         MeasurementModel used to convert measurements into States
-        :param associator:         Associator used to link measurements across the three buffered stages
-        :param target_state_space: If provided, each confirmed Track's initial State is adapted to this
-                                   StateSpace via adapt_cartesian_state before the Track is created.
+        :param msmt_model:               MeasurementModel used to convert measurements into States
+        :param associator:               Associator used to link measurements across the three buffered stages
+        :param motion_model:             MotionModel for this tracker; its state_space drives the initial State
+                                         layout and each confirmed Track carries it for use by associators.
+                                         Required when initiate() is called.
+        :param target_state_space:       If provided, each confirmed Track's initial State is adapted to this
+                                         StateSpace via adapt_cartesian_state before the Track is created.
+        :param target_max_velocity:      Optional upper bound on target speed [m/s].  When provided, the
+                                         velocity block of the initial covariance is scaled so that its
+                                         largest diagonal element does not exceed target_max_velocity².
+                                         If None, the finite-difference propagation (pos_var / (2·dt²))
+                                         is used as-is.
+        :param target_max_acceleration:  Optional upper bound on target acceleration magnitude [m/s²].
+                                         When provided, the acceleration block is scaled so that its
+                                         largest diagonal element does not exceed target_max_acceleration².
+                                         If None, the finite-difference propagation (6·pos_var / dt⁴)
+                                         is used as-is.
         """
         self.msmt_model = msmt_model
         self.associator = associator
+        self.motion_model = motion_model
+        self.state_space = motion_model.state_space if motion_model is not None else None
         self.target_state_space = target_state_space
+        self.target_max_velocity = target_max_velocity
+        self.target_max_acceleration = target_max_acceleration
         self._stage1_tracks = []
         self._stage2_tracks = []
 
@@ -225,7 +324,7 @@ class ThreePointInitiator(Initiator):
         # Step 1: Try to advance stage-2 tracks (t1, t2) to full tracks
         # Any measurements not used in step 1 are contained in the list unmatched_2
         if self._stage2_tracks:
-            hyp_dict, unmatched_2 = self.associator.associate(
+            hyp_dict, unmatched_2, _ = self.associator.associate(
                 tracks=self._stage2_tracks,
                 measurements=measurements
             )
@@ -235,15 +334,23 @@ class ThreePointInitiator(Initiator):
                     # We have all three points; build a full track
                     s1 = track.states[0]    # geolocated position at t1
                     s2 = track.curr_state   # geolocated position at t2
-                    s3 = hyp.state_from_measurement # t3
+                    s3 = self.msmt_model.state_from_measurement(hyp.measurement, self.state_space,
+                                                                x_init=s2.position)  # t3
+                    if np.linalg.norm(s3.position) < 1.0:
+                        matched_stage2.append(track)
+                        continue
 
                     full_track = self._build_track(s1, s2, s3)
                     if full_track is not None:
                         if self.target_state_space is not None:
+                            # Ensure that the generated state is in the desired state space
                             adapted = adapt_cartesian_state(
                                 full_track.curr_state, self.target_state_space)
                             full_track = Track(initial_state=adapted,
                                                track_id=full_track.track_id)
+                        full_track.max_velocity = self.target_max_velocity
+                        full_track.max_acceleration = self.target_max_acceleration
+                        full_track.motion_model = self.motion_model
                         confirmed_tracks.append(full_track)
                     matched_stage2.append(track)
                 # Unconditionally retire stage-2 tracks (matched or not)
@@ -257,14 +364,18 @@ class ThreePointInitiator(Initiator):
         # Step 2: Try to advance stage-1 tracks (t1) to stage-2 tracks
         # Any unused measurements will be stored in the list unmatched_2
         if self._stage1_tracks:
-            hyp_dict_1, unmatched_1 = self.associator.associate(
+            hyp_dict_1, unmatched_1, _ = self.associator.associate(
                 tracks=self._stage1_tracks,
                 measurements=unmatched_2
             )
             for track, hyp in hyp_dict_1.items():
                 if not isinstance(hyp, MissedDetectionHypothesis):
-                    # Associate the second point and promote to stage 2
-                    s2 = hyp.state_from_measurement
+                    # Associate the second point and promote to stage 2; warm-start
+                    # the LS from the stage-1 position to avoid mirror-image ambiguity.
+                    s2 = self.msmt_model.state_from_measurement(hyp.measurement, self.state_space,
+                                                                x_init=track.curr_state.position)
+                    if np.linalg.norm(s2.position) < 1.0:
+                        continue
                     track.append(s2)
                     self._stage2_tracks.append(track)
                 # Drop stage-1 tracks regardless of match — they either
@@ -276,8 +387,11 @@ class ThreePointInitiator(Initiator):
 
         # Step 3: Buffer all remaining measurements as stage_1 tracks
         for m in unmatched_1:
-            s = self.msmt_model.state_from_measurement(m)
-            self._stage1_tracks.append(Track(initial_state=s, track_id=next_track_id))
+            s = self.msmt_model.state_from_measurement(m, self.state_space,
+                target_max_velocity=self.target_max_velocity,
+                target_max_acceleration=self.target_max_acceleration)
+            self._stage1_tracks.append(Track(initial_state=s, track_id=next_track_id,
+                                             motion_model=self.motion_model))
             next_track_id += 1
 
         self.next_track_id = next_track_id
@@ -342,12 +456,26 @@ class ThreePointInitiator(Initiator):
 
         Var(v) = pos_var / (2 * dt²)      [central difference]
         Var(a) = 6 * pos_var / dt⁴        [second difference]
+
+        If target_max_velocity or target_max_acceleration were supplied at construction,
+        each block is scaled down so that its largest diagonal element does not exceed
+        the corresponding squared bound, while preserving the correlation structure.
         """
         n = state_space.num_states
         covar = np.eye(n)
 
         vel_var = pos_var / (2.0 * dt ** 2)
         acc_var = 6.0 * pos_var / (dt ** 4)
+
+        if self.target_max_velocity is not None:
+            max_diag = np.max(np.diag(vel_var))
+            if max_diag > self.target_max_velocity ** 2:
+                vel_var = vel_var * (self.target_max_velocity ** 2 / max_diag)
+
+        if self.target_max_acceleration is not None:
+            max_diag = np.max(np.diag(acc_var))
+            if max_diag > self.target_max_acceleration ** 2:
+                acc_var = acc_var * (self.target_max_acceleration ** 2 / max_diag)
 
         covar[state_space.pos_slice, state_space.pos_slice] *= pos_var
         if state_space.has_vel:

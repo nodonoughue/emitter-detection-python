@@ -64,6 +64,10 @@ class _MockPSSWithVel:
         return self._jac
 
 
+_SS_1 = CartesianStateSpace(num_dims=1, has_vel=False)   # 1-state: [px]
+_SS_2 = CartesianStateSpace(num_dims=2, has_vel=False)   # 2-state: [px, py]
+
+
 def make_cv_state_space():
     """2D CV state space: [px, py, vx, vy]"""
     return CartesianStateSpace(num_dims=2, has_vel=True, has_accel=False)
@@ -103,9 +107,9 @@ def test_kf_update_1d_state_updated():
     R = CovarianceMatrix(np.array([[1.0]]))
     zeta = np.array([12.0])
 
-    x_new, _ = kf_update(x, P, zeta, R, H)
+    result = kf_update(State(_SS_1, 0., x, P), zeta, R, H)
     # K = 4/5 = 0.8;  x = 10 + 0.8*2 = 11.6
-    assert equal_to_tolerance(x_new, [11.6])
+    assert equal_to_tolerance(result.state, [11.6])
 
 
 def test_kf_update_1d_covariance_reduced():
@@ -116,9 +120,9 @@ def test_kf_update_1d_covariance_reduced():
     R = CovarianceMatrix(np.array([[1.0]]))
     zeta = np.array([12.0])
 
-    _, P_new = kf_update(x, P, zeta, R, H)
+    result = kf_update(State(_SS_1, 0., x, P), zeta, R, H)
     # P = (1 - K*H)*P = (1 - 0.8)*4 = 0.8
-    assert equal_to_tolerance(P_new.cov, [[0.8]])
+    assert equal_to_tolerance(result.covar.cov, [[0.8]])
 
 
 def test_kf_update_perfect_measurement_collapses_covariance():
@@ -129,9 +133,9 @@ def test_kf_update_perfect_measurement_collapses_covariance():
     R = CovarianceMatrix(np.array([[1e-12]]))
     zeta = np.array([5.0])
 
-    x_new, P_new = kf_update(x, P, zeta, R, H)
-    assert equal_to_tolerance(x_new, [5.0], tol=1e-6)
-    assert P_new.cov[0, 0] < 1e-9
+    result = kf_update(State(_SS_1, 0., x, P), zeta, R, H)
+    assert equal_to_tolerance(result.state, [5.0], tol=1e-6)
+    assert result.covar.cov[0, 0] < 1e-9
 
 
 # ---------------------------------------------------------------------------
@@ -146,9 +150,9 @@ def test_kf_update_2d_state_position_only():
     R = CovarianceMatrix(np.array([[1.0]]))
     zeta = np.array([12.0])
 
-    x_new, P_new = kf_update(x, P, zeta, R, H)
+    result = kf_update(State(_SS_2, 0., x, P), zeta, R, H)
     # K = [4, 0]^T / 5;  x = [10+0.8*2, 5+0*2] = [11.6, 5.0]
-    assert equal_to_tolerance(x_new, [11.6, 5.0])
+    assert equal_to_tolerance(result.state, [11.6, 5.0])
 
 
 def test_kf_update_2d_covariance_structure():
@@ -159,9 +163,9 @@ def test_kf_update_2d_covariance_structure():
     R = CovarianceMatrix(np.array([[1.0]]))
     zeta = np.array([12.0])
 
-    _, P_new = kf_update(x, P, zeta, R, H)
+    result = kf_update(State(_SS_2, 0., x, P), zeta, R, H)
     # (I - K@H) @ P = diag([0.8, 1.0])
-    assert equal_to_tolerance(P_new.cov, np.diag([0.8, 1.0]))
+    assert equal_to_tolerance(result.covar.cov, np.diag([0.8, 1.0]))
 
 
 def test_kf_update_returns_covariance_matrix_instance():
@@ -169,8 +173,8 @@ def test_kf_update_returns_covariance_matrix_instance():
     P = CovarianceMatrix(np.eye(1))
     R = CovarianceMatrix(np.eye(1))
     H = np.eye(1)
-    _, P_new = kf_update(x, P, np.array([1.0]), R, H)
-    assert isinstance(P_new, CovarianceMatrix)
+    result = kf_update(State(_SS_1, 0., x, P), np.array([1.0]), R, H)
+    assert isinstance(result.covar, CovarianceMatrix)
 
 
 # ---------------------------------------------------------------------------
@@ -185,13 +189,14 @@ def test_ekf_update_linear_matches_kf_update():
     R = CovarianceMatrix(np.array([[1.0]]))
     zeta = np.array([12.0])
 
-    x_kf, P_kf = kf_update(x, P, zeta, R, H)
-    x_ekf, P_ekf = ekf_update(x, P, zeta, R,
-                               z_fun=lambda s: H @ s,
-                               h_fun=lambda s: H)
+    s_prev = State(_SS_2, 0., x, P)
+    result_kf  = kf_update(s_prev, zeta, R, H)
+    result_ekf = ekf_update(s_prev, zeta, R,
+                            msmt_fun=lambda s: Measurement(time=s.time, sensor=None, zeta=H @ s.state),
+                            jacobian_fun=lambda s: H)
 
-    assert equal_to_tolerance(x_ekf, x_kf)
-    assert equal_to_tolerance(P_ekf.cov, P_kf.cov)
+    assert equal_to_tolerance(result_ekf.state, result_kf.state)
+    assert equal_to_tolerance(result_ekf.covar.cov, result_kf.covar.cov)
 
 
 def test_ekf_update_returns_covariance_matrix_instance():
@@ -199,10 +204,10 @@ def test_ekf_update_returns_covariance_matrix_instance():
     x = np.array([0.0])
     P = CovarianceMatrix(np.eye(1))
     R = CovarianceMatrix(np.eye(1))
-    _, P_new = ekf_update(x, P, np.array([1.0]), R,
-                          z_fun=lambda s: H @ s,
-                          h_fun=lambda s: H)
-    assert isinstance(P_new, CovarianceMatrix)
+    result = ekf_update(State(_SS_1, 0., x, P), np.array([1.0]), R,
+                        msmt_fun=lambda s: Measurement(time=s.time, sensor=None, zeta=H @ s.state),
+                        jacobian_fun=lambda s: H)
+    assert isinstance(result.covar, CovarianceMatrix)
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +220,7 @@ def test_measurement_model_jacobian_position_only():
     Expected H = [[1,0,0,0],[0,1,0,0]]: measurements map to positions, zeros for velocity.
     """
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSS())
+    mm = MeasurementModel(pss=_MockPSS())
     s = State(ss, time=0.0, state=np.array([1., 2., 0., 0.]))
 
     H = mm.jacobian(s)
@@ -236,7 +241,7 @@ def test_measurement_model_jacobian_with_vel_rows():
       h[:, 2:] = [[0.5,0],[0,0.5]] (vel)
     """
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSWithVel())
+    mm = MeasurementModel(pss=_MockPSSWithVel())
     s = State(ss, time=0.0, state=np.array([1., 2., 0.5, 0.5]))
 
     H = mm.jacobian(s)
@@ -252,7 +257,7 @@ def test_measurement_model_jacobian_pos_only_state_space():
     Position-only state space: H should be just the pos block (2x2 identity).
     """
     ss = make_pos_only_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSS())
+    mm = MeasurementModel(pss=_MockPSS())
     s = State(ss, time=0.0, state=np.array([3., 4.]))
 
     H = mm.jacobian(s)
@@ -262,21 +267,13 @@ def test_measurement_model_jacobian_pos_only_state_space():
 
 
 # ---------------------------------------------------------------------------
-# MeasurementModel.num_measurement_dimensions / num_state_dimensions
+# MeasurementModel.num_measurement_dimensions
 # ---------------------------------------------------------------------------
 
 def test_measurement_model_num_measurement_dimensions():
     """num_measurement_dimensions matches pss.num_measurements."""
-    ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     assert mm.num_measurement_dimensions == 2
-
-
-def test_measurement_model_num_state_dimensions():
-    """num_state_dimensions matches state_space.num_states."""
-    ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
-    assert mm.num_state_dimensions == 4
 
 
 # ---------------------------------------------------------------------------
@@ -285,7 +282,7 @@ def test_measurement_model_num_state_dimensions():
 
 def test_measurement_model_measurement_returns_measurement_instance():
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     s = State(ss, time=2.0, state=np.array([3., 4., 0.5, 0.5]))
     m = mm.measurement(s, noise=False)
     assert isinstance(m, Measurement)
@@ -294,7 +291,7 @@ def test_measurement_model_measurement_returns_measurement_instance():
 def test_measurement_model_measurement_noiseless_zeta():
     """Noiseless measurement returns zeta equal to the state's position."""
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     s = State(ss, time=2.0, state=np.array([3., 4., 0.5, 0.5]))
     m = mm.measurement(s, noise=False)
     assert equal_to_tolerance(m.zeta, [3., 4.])
@@ -303,7 +300,7 @@ def test_measurement_model_measurement_noiseless_zeta():
 def test_measurement_model_measurement_time_matches_state():
     """Returned Measurement carries the state's timestamp."""
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     s = State(ss, time=7.5, state=np.array([1., 2., 0., 0.]))
     m = mm.measurement(s, noise=False)
     assert m.time == 7.5
@@ -316,7 +313,7 @@ def test_measurement_model_measurement_time_matches_state():
 def test_measurement_model_log_likelihood_higher_at_truth():
     """LL must be higher when candidate state matches the observation state."""
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     s_true   = State(ss, time=0., state=np.array([3., 4., 0., 0.]))
     s_offset = State(ss, time=0., state=np.array([6., 8., 0., 0.]))
     ll_true   = mm.log_likelihood(s_true, s_true)
@@ -327,7 +324,7 @@ def test_measurement_model_log_likelihood_higher_at_truth():
 def test_measurement_model_log_likelihood_from_measurement_higher_at_match():
     """log_likelihood_from_measurement scores higher for a matching state."""
     ss = make_cv_state_space()
-    mm = MeasurementModel(state_space=ss, pss=_MockPSSFull())
+    mm = MeasurementModel(pss=_MockPSSFull())
     s_true   = State(ss, time=0., state=np.array([3., 4., 0., 0.]))
     s_offset = State(ss, time=0., state=np.array([6., 8., 0., 0.]))
     m = mm.measurement(s_true, noise=False)

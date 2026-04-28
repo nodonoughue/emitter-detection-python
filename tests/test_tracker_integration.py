@@ -11,7 +11,7 @@ import pytest
 
 from ewgeo.tracker.tracker import Tracker
 from ewgeo.tracker.association import NNAssociator
-from ewgeo.tracker.initiator import SinglePointMeasurementInitiator
+from ewgeo.tracker.initiator import SinglePointInitiator
 from ewgeo.tracker.promoter import MofNPromoter
 from ewgeo.tracker.deleter import MissedDetectionDeleter
 from ewgeo.tracker.measurement import Measurement, MeasurementModel
@@ -52,16 +52,17 @@ def make_tracker(num_hits=2, num_chances=3, max_misses=2):
     """
     Build a Tracker wired with:
       - NNAssociator (gate_probability=0.99)
-      - SinglePointMeasurementInitiator
+      - SinglePointInitiator
       - MofNPromoter(num_hits, num_chances)
       - MissedDetectionDeleter(max_misses)   — deletes when misses > max_misses
     """
     model = ConstantVelocityMotionModel(num_dims=1, process_covar=1.0)
     sensor = _MockSensor1D()
-    msmt_model = MeasurementModel(state_space=model.state_space, pss=sensor)
+    msmt_model = MeasurementModel(pss=sensor)
 
     associator = NNAssociator(motion_model=model, gate_probability=0.99)
-    initiator  = SinglePointMeasurementInitiator(msmt_model=msmt_model)
+    initiator  = SinglePointInitiator(msmt_model=msmt_model,
+                                                 motion_model=model)
     promoter   = MofNPromoter(num_hits=num_hits, num_chances=num_chances)
     deleter    = MissedDetectionDeleter(num_missed_detections=max_misses)
 

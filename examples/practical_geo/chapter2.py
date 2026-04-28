@@ -357,7 +357,7 @@ def example3(colors=None):
     # ML Search Parameters
     ml_args = SearchSpace(x_ctr=np.array([2.5, 2.5]) * 1e3,
                max_offset=np.array([5, 5]) * 1e3,
-               epsilon=20)  # meters, grid resolution
+               epsilon=25)  # meters, grid resolution
 
     # GD and LS Search Parameters
     gd_ls_args = {'x_init': np.array([1, 1]) * 1e3,

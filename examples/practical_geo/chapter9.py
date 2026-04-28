@@ -1,19 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from prettytable import PrettyTable
 from random import shuffle
 import time
 
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.tracker import StateSpace, State, Track, Tracker
-from ewgeo.tracker.association import NNAssociator, GNNAssociator, PDAAssociator
+from ewgeo.tracker.association import NNAssociator, GNNAssociator, PDAAssociator, MissedDetectionHypothesis
 from ewgeo.tracker.deleter import MissedDetectionDeleter
-from ewgeo.tracker.initiator import SinglePointMeasurementInitiator, TwoPointInitiator, ThreePointInitiator
+from ewgeo.tracker.initiator import TwoPointInitiator
 from ewgeo.tracker.measurement import Measurement, MeasurementModel
 from ewgeo.tracker.promoter import MofNPromoter
 from ewgeo.tracker.transition import MotionModel, ConstantVelocityMotionModel, ConstantAccelerationMotionModel
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils import print_progress, print_elapsed
-from ewgeo.utils.constants import speed_of_light
+from ewgeo.utils.constraints import bounded_alt
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import PassiveSurveillanceSystem
 from ewgeo.utils.unit_conversions import convert
@@ -67,7 +68,7 @@ def __init_example1():
     states = [State(state_space=state_space, time=0, state=s, covar=c) for (s, c) in zip(state_vecs, state_covars)]
 
     # Initialize a Track with each one
-    tracks = [Track(track_id=i, initial_state=s) for (i, s) in zip(ids, states)]
+    tracks = [Track(track_id=i, initial_state=s, motion_model=transition) for (i, s) in zip(ids, states)]
 
     # Define Measurement System
     x_aoa = np.array([[750, 300],
@@ -131,8 +132,8 @@ def example1():
     plot_args = {'marker': 'v'}
     [t.plot(ax=ax, predicted_state=p, **plot_args) for (t, p) in zip(tracks, predicted_states)]
     pss.plot_sensors(ax=ax, label='DF System')
-    [s.plot(ax=ax, color='k', do_pos=False, do_vel=False, do_cov=True, label=None) for s in new_states]
-    plt.scatter(*coords, s=15, marker='^', color='k', label='New States (truth)')
+    [s.plot(ax=ax, color=[0.5, 0.5, 0.5], linewidth=.5, linestyle='--', do_pos=False, do_vel=False, do_cov=True, label=None) for s in new_states]
+    plt.scatter(*coords, s=15, marker='^', color=[0.5, 0.5, 0.5], label='Measurements')
     plt.title('Predicted Track States with new Measurements')
     plt.legend()
     plt.xlim([-500,2000])
@@ -141,18 +142,42 @@ def example1():
     plt.ylabel('y [km]')
 
     # Set up the Nearest Neighbor Association Scheme
-    associator = NNAssociator(motion_model=transition, gate_probability=.75)
-    hypotheses, _ = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
+    associator = NNAssociator(gate_probability=.75)
+    hypotheses, _, dist_table = associator.associate(tracks=tracks, measurements=measurements)
+
+    # Make a track-msmt mapping
+    selected = {t: measurements.index(h.measurement) if h.measurement is not None else None
+                for t, h in hypotheses.items()}
+
+    # Print NN distance table
+    if dist_table is not None:
+        num_msmts = len(measurements)
+        pt = PrettyTable(['Track'] + [f'Msmt {chr(ord("A") + j)}' for j in range(num_msmts)])
+        for t, row in zip(tracks, dist_table):
+            sel = selected.get(t)
+            cells = [f'{d:.2f}' + (' *' if j == sel else '') for j, d in enumerate(row)]
+            pt.add_row([t.track_id] + cells)
+        total = sum(row[sel] for t, row in zip(tracks, dist_table)
+                    if (sel := selected.get(t)) is not None)
+        print('\nNN Association Distances (normalised Mahalanobis², * = selected):')
+        print(pt)
+        print(f'  Total assignment cost: {total:.2f}')
 
     # Make a plot for the hypothesis assignments
     fig, ax = plt.subplots()
     figs.append(fig)
-    [h.update_track(ax=ax) for h in hypotheses.values()]
-    plt.scatter(*coords, s=25, color='k', label='New States (truth)')
+    plot_args = {'marker': 'v'}
+    [t.plot(ax=ax, predicted_state=p, **plot_args) for (t, p) in zip(tracks, predicted_states)]
+    [plt.plot(*zip(p.position[:2], new_states[selected.get(t)].position[:2]), color=[0.5, 0.5, 0.5], linewidth=.5, linestyle='--', label='Associations') for (t, p) in zip(tracks, predicted_states)]
+    plt.scatter(*coords, s=15, marker='^', color=[0.5, 0.5, 0.5], label='Measurements')
     plt.legend()
-    plt.title('Predicted and Updated Track States after NN Association')
+    plt.title('Predicted Track States and NN Associations')
+    plt.xlim([-500, 2000])
+    plt.ylim([-500, 3000])
     plt.xlabel('x [km]')
     plt.ylabel('y [km]')
+
+    [h.update_track() for h in hypotheses.values()]
 
     fig, ax = plt.subplots()
     figs.append(fig)
@@ -183,13 +208,31 @@ def example2():
     # Initialize and unpack the example scenario
     scenario = __init_example1()
     tracks = scenario['tracks']
-    transition = scenario['transition']
     pss = scenario['pss']
     measurements = scenario['measurements']
 
     # Set up the Global Nearest Neighbor Association Scheme
-    associator = GNNAssociator(motion_model=transition, gate_probability=.75)
-    hypotheses, _ = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
+    associator = GNNAssociator(gate_probability=.75)
+    hypotheses, _, dist_matrix = associator.associate(tracks=tracks, measurements=measurements)
+
+    # Print GNN distance matrix
+    if dist_matrix is not None:
+        num_msmts = dist_matrix.shape[1]
+        selected = {t: measurements.index(h.measurement) if h.measurement is not None else None
+                    for t, h in hypotheses.items()}
+        pt = PrettyTable(['Track'] + [f'Msmt {chr(ord("A") + j)}' for j in range(num_msmts)])
+        for i, t in enumerate(tracks):
+            sel = selected.get(t)
+            row = [('inf' if np.isinf(dist_matrix[i, j]) else f'{dist_matrix[i, j]:.2f}')
+                   + (' *' if j == sel else '')
+                   for j in range(num_msmts)]
+            pt.add_row([t.track_id] + row)
+        total = sum(dist_matrix[i, sel] for i, t in enumerate(tracks)
+                    if (sel := selected.get(t)) is not None)
+        print('\nGNN Association Distances (inf = outside gate, * = selected):')
+        print(pt)
+        print(f'  Total assignment cost: {total:.2f}')
+
     [h.update_track() for h in hypotheses.values()]
 
     # Make a plot for the hypothesis assignments
@@ -226,9 +269,19 @@ def example3():
     pss = scenario['pss']
     measurements = scenario['measurements']
 
-    # Set up the Global Nearest Neighbor Association Scheme
-    associator = PDAAssociator(motion_model=transition, gate_probability=.75)
-    hypotheses, _ = associator.associate(tracks=tracks, measurements=measurements, print_table=True)
+    # Set up the PDAF Association Scheme
+    associator = PDAAssociator(gate_probability=.75)
+    hypotheses, _, likelihood_table = associator.associate(tracks=tracks, measurements=measurements)
+
+    # Print PDA likelihood table
+    if likelihood_table is not None:
+        num_msmts = len(measurements)
+        pt = PrettyTable(['Track', 'Miss'] + [f'Msmt {chr(ord("A") + j)}' for j in range(num_msmts)])
+        for t, row in zip(tracks, likelihood_table):
+            pt.add_row([t.track_id] + [f'{v:.2f}' for v in row])
+        print('\nPDA Association Likelihoods (Miss = missed detection):')
+        print(pt)
+
     [h.update_track() for h in hypotheses.values()]
 
     # Make a plot for the hypothesis assignments
@@ -246,17 +299,15 @@ def example3():
 
     return figs
 
-def _make_tgt_1(max_time: float = 600):
+def _make_tgt_1(max_time: float = 600, t_inc: float = 10):
     # ===  Define target trajectory
-    x_tgt_init = np.array([-50e3, 50e3, 20e3 * _ft2m])
+    x_tgt_init = np.array([-50e3, 80e3, 20e3 * _ft2m])
     vel = 200
 
     t_e_leg = 3 * 60  # turn at 3 min
     turn_rad = 50e3
     t_turn = np.pi / 2 * turn_rad / vel
     t_s_leg = max_time
-
-    t_inc = 10  # 10 seconds between track updates
 
     # Due East
     t_e_vec = np.arange(start=0, stop=t_e_leg + t_inc, step=t_inc)
@@ -283,7 +334,7 @@ def _make_tgt_1(max_time: float = 600):
 
     return t_vec, x_tgt_full
 
-def _make_tgt_2(max_time: float = 600):
+def _make_tgt_2(max_time: float = 600, t_inc: float = 10):
     # ===  Define target trajectory
     x_tgt_init = np.array([-50e3, 75e3, 20e3 * _ft2m])
     vel = 210
@@ -292,8 +343,6 @@ def _make_tgt_2(max_time: float = 600):
     turn_rad = 50e3
     t_turn = np.pi * turn_rad / vel
     t_sw_leg = max_time
-
-    t_inc = 10  # 10 seconds between track updates
 
     # Due North-East
     t_ne_vec = np.arange(start=0, stop=t_ne_leg + t_inc, step=t_inc)
@@ -322,13 +371,12 @@ def _make_tgt_2(max_time: float = 600):
 
     return t_vec, x_tgt_full
 
-def _make_tgt_3(max_time: float = 600):
+def _make_tgt_3(max_time: float = 600, t_inc: float = 10):
     # ===  Define target trajectory
     x_tgt_init = np.array([-50e3, 125e3, 20e3 * _ft2m])
     vel = 170
 
     t_se_leg = max_time  # turn at 3 min
-    t_inc = 10  # 10 seconds between track updates
 
     # Due South-East
     t_se_vec = np.arange(start=0, stop=t_se_leg + t_inc, step=t_inc)
@@ -340,9 +388,10 @@ def _make_tgt_3(max_time: float = 600):
 def example4():
     # Make the targets
     max_time = 900 # seconds
-    tgt_1 = _make_tgt_1(max_time)
-    tgt_2 = _make_tgt_2(max_time)
-    tgt_3 = _make_tgt_3(max_time)
+    t_inc = 10
+    tgt_1 = _make_tgt_1(max_time, t_inc)
+    tgt_2 = _make_tgt_2(max_time, t_inc)
+    tgt_3 = _make_tgt_3(max_time, t_inc)
     tgts = [tgt_1, tgt_2, tgt_3] # each one has a tuple of time, pos
 
     # Make figure handles
@@ -354,16 +403,23 @@ def example4():
     tgt_hdls = [axs[0, 0].plot(t[1][0]/scale, t[1][1]/scale, label=l)[0] for t, l in zip([tgt_1, tgt_2, tgt_3],labels)]
     tgt_colors = [h.get_color() for h in tgt_hdls]
 
+    # Direction-of-travel arrows at the trajectory midpoints
+    for (_, x_tgt), color in zip([tgt_1, tgt_2, tgt_3], tgt_colors):
+        mid = x_tgt.shape[1] // 2
+        axs[0, 0].annotate('',
+            xy=(x_tgt[0, mid+1]/scale, x_tgt[1, mid+1]/scale),
+            xytext=(x_tgt[0, mid]/scale, x_tgt[1, mid]/scale),
+            arrowprops=dict(arrowstyle='->', color=color, lw=1.5))
+
     # Initialize the PSS
-    x_tdoa = np.array([[5e3, 0, 0, -5e3],
-                       [0, 5e3, 0, 0],
-                       [30, 60, 30, 60]])
+    x_tdoa = np.array([[ 0,  10.6e3,    0, -10.6e3],
+                       [ 0, -10.6e3, 15e3, -10.6e3],
+                       [60,      30,   30,      30]])
     num_dims, n_tdoa = np.shape(x_tdoa)
     ref_idx = 0
-    sigma_toa = 1e-7
+    sigma_toa = 5e-8
     cov_toa = (sigma_toa ** 2) * np.eye(n_tdoa)
-    cov_roa = CovarianceMatrix(speed_of_light ** 2 * cov_toa)
-    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_roa, ref_idx=ref_idx, variance_is_toa=False)
+    tdoa = TDOAPassiveSurveillanceSystem(x=x_tdoa, cov=cov_toa, ref_idx=ref_idx, variance_is_toa=True)
 
     # Truth measurements
     for tgt, color in zip(tgts, tgt_colors):
@@ -388,31 +444,50 @@ def example4():
     axs[0, 0].set_xlabel('East [km]', fontsize=8)
     [ax.set_xlabel('Time [s]', fontsize=8) for ax in axs.flatten()[1:]]
     axs[0, 0].set_ylabel('North [km]', fontsize=8)
-    axs[0, 1].set_ylabel('$\\tau_{0,1}$ [km]', fontsize=8)
-    axs[1, 0].set_ylabel('$\\tau_{0,2}$ [km]', fontsize=8)
-    axs[1, 1].set_ylabel('$\\tau_{0,3}$ [km]', fontsize=8)
+    axs[0, 1].set_ylabel('$R_{0,1}$ [km]', fontsize=8)
+    axs[1, 0].set_ylabel('$R_{0,2}$ [km]', fontsize=8)
+    axs[1, 1].set_ylabel('$R_{0,3}$ [km]', fontsize=8)
 
     [ax.tick_params(labelsize=8) for ax in axs.flatten()]
     plt.tight_layout()
 
+    # Target Assumptions
+    target_max_vel = 350  # m/s — conservative upper bound for subsonic aircraft
+    target_max_accel = 10  # m/s^2 — generous bound for a maneuvering aircraft
+    min_alt = 300 # meters; 1 kft
+    max_alt = 40000 # meters; 100 kft
+    bnds = bounded_alt(geo_type='flat', alt_min=min_alt, alt_max=max_alt)
+
+    # Measurement Models
+    msmt_model = MeasurementModel(pss=tdoa, ineq_constraints=bnds)
+
+    # Associators
+    associator_cv = GNNAssociator(gate_probability=0.95)
+    associator_ca = GNNAssociator(gate_probability=0.95)
+
+    # Promoter and Deleter -- common to both trackers
+    deleter = MissedDetectionDeleter(num_missed_detections=3)
+    promoter = MofNPromoter(num_hits=3, num_chances=5)
+
     # Initialize CV tracker
-    transition_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=1**2)
-    msmt_model_cv = MeasurementModel(state_space=transition_cv.state_space, pss=tdoa)
-    associator_cv = GNNAssociator(motion_model=transition_cv, gate_probability=.7)
-    initiator_cv  = TwoPointInitiator(msmt_model=msmt_model_cv, associator=associator_cv)
+    transition_cv = ConstantVelocityMotionModel(num_dims=3, process_covar=3**2,ineq_constraints=bnds)
+    initiator_cv  = TwoPointInitiator(msmt_model=msmt_model,
+                                      associator=associator_cv,
+                                      motion_model=transition_cv,
+                                      target_max_velocity=target_max_vel)
     tracker_cv = Tracker(initiator=initiator_cv, associator=associator_cv,
-                         deleter=MissedDetectionDeleter(num_missed_detections=3),
-                         promoter=MofNPromoter(num_hits=3, num_chances=5),
+                         deleter=deleter,promoter=promoter,
                          do_plotting=False, keep_all_tracks=True, print_status=False)
 
-    # Initialize CA tracker (independent — separate motion model, associator, initiator)
-    transition_ca = ConstantAccelerationMotionModel(num_dims=3, process_covar=1**2)
-    msmt_model_ca = MeasurementModel(state_space=transition_ca.state_space, pss=tdoa)
-    associator_ca = GNNAssociator(motion_model=transition_ca, gate_probability=.7)
-    initiator_ca  = TwoPointInitiator(msmt_model=msmt_model_ca, associator=associator_ca)
+    # Initialize CA tracker
+    transition_ca = ConstantAccelerationMotionModel(num_dims=3, process_covar=.1**2,ineq_constraints=bnds)
+    initiator_ca  = TwoPointInitiator(msmt_model=msmt_model,
+                                      associator=associator_ca,
+                                      motion_model=transition_ca,
+                                      target_max_velocity=target_max_vel,
+                                      target_max_acceleration=target_max_accel)
     tracker_ca = Tracker(initiator=initiator_ca, associator=associator_ca,
-                         deleter=MissedDetectionDeleter(num_missed_detections=3),
-                         promoter=MofNPromoter(num_hits=3, num_chances=5),
+                         deleter=deleter,promoter=promoter,
                          do_plotting=False, keep_all_tracks=True, print_status=False)
 
     # Truth states use the CV state space (pos_slice is identical for both models)
@@ -423,7 +498,8 @@ def example4():
     time_vec = tgts[0][0]
     truth_label = 'Noisy Truth Measurements'
     fa_label = 'False Alarm Measurements'
-    num_fa_per_step = 20
+    num_fa_per_step = 10
+    fa_max_rdoa = 15e3
 
     iterations_per_marker = 1
     iterations_per_row = 40 * iterations_per_marker
@@ -439,19 +515,20 @@ def example4():
         [setattr(s, 'time', time_vec[idx]) for s in truth_states]
 
         # Generate noisy measurements and add to the TDOA panels
-        truth_msmts = [msmt_model_cv.measurement(s, noise=False) for s in truth_states]
+        truth_msmts = [msmt_model.measurement(s, noise=False) for s in truth_states]
         [ax.scatter(time_vec[idx]*np.ones(len(truth_msmts)), [m.zeta[ii]/scale for m in truth_msmts], 3,
                     marker='v', color='b', alpha=0.5, label=truth_label)
          for ii, ax in enumerate(axs.flatten()[1:])]
+        noisy_msmts = [msmt_model.measurement(s, noise=True) for s in truth_states]
 
         # Generate false alarm measurements and add to the TDOA panels
-        fa_msmt = msmt_model_cv.false_alarm(max_val=8e3, num=num_fa_per_step, time=time_vec[idx].item())
+        fa_msmt = msmt_model.false_alarm(max_val=fa_max_rdoa, num=num_fa_per_step, time=time_vec[idx].item())
         [ax.scatter(time_vec[idx]*np.ones(num_fa_per_step), [m.zeta[ii]/scale for m in fa_msmt], 3,
                     marker='^', color='gray', alpha=0.1, label=fa_label)
          for ii, ax in enumerate(axs.flatten()[1:])]
 
         # Feed the same shuffled measurements to both trackers
-        measurements = truth_msmts[:] + fa_msmt[:]
+        measurements = noisy_msmts[:] + fa_msmt[:]
         shuffle(measurements)
         tracker_cv.update(measurements=measurements)
         tracker_ca.update(measurements=measurements)
@@ -494,54 +571,16 @@ def example4():
                label=ca_label, scale=scale, plot_dims=np.s_[:2])
         ca_label = None
 
-    tdoa.plot_sensors(scale=scale, ax=ax2, marker='s', color='k', label='TDOA Sensors')
-    ax2.set_xlim([-75, 125])
-    ax2.set_ylim([-50, 200])
+    tdoa.plot_sensors(scale=scale, ax=ax2, marker='o', color='k', label='TDOA Sensors')
+    ax2.set_xlim([-75, 75])
+    ax2.set_ylim([-50, 150])
     ax2.set_xlabel('East [km]')
     ax2.set_ylabel('North [km]')
     ax2.set_title('Truth Trajectories and Tracker Output (CV vs CA)')
     ax2.legend(fontsize=8)
     ax2.grid(True)
 
-    # --- Figure 3: position error vs time ---
-    # Build time → [positions] lookup for each tracker's confirmed tracks
-    def _build_lookup(tracks):
-        lookup = {}
-        for trk in tracks:
-            for s in trk.states:
-                lookup.setdefault(s.time, []).append(s.position)
-        return lookup
-
-    cv_lookup = _build_lookup(tracker_cv.all_tracks)
-    ca_lookup = _build_lookup(tracker_ca.all_tracks)
-
-    fig3, ax3 = plt.subplots()
-    for tgt_idx, ((t_vec_tgt, x_tgt), color) in enumerate(zip(tgts, tgt_colors)):
-        cv_err, ca_err = [], []
-        for time_idx, t in enumerate(time_vec):
-            truth_pos = x_tgt[:, time_idx]
-
-            cv_pos = cv_lookup.get(t, [])
-            cv_err.append(min((np.linalg.norm(truth_pos - p) for p in cv_pos),
-                              default=np.nan) / scale)
-
-            ca_pos = ca_lookup.get(t, [])
-            ca_err.append(min((np.linalg.norm(truth_pos - p) for p in ca_pos),
-                              default=np.nan) / scale)
-
-        label = f'Target {tgt_idx + 1}'
-        ax3.plot(time_vec, cv_err, color=color, linestyle='--',  label=f'{label} CV')
-        ax3.plot(time_vec, ca_err, color=color, linestyle='-.', label=f'{label} CA')
-
-    ax3.set_title('Position Error vs Time (CV solid, CA dashed)', fontsize=10)
-    ax3.set_xlabel('Time [s]', fontsize=8)
-    ax3.set_ylabel('Error [km]', fontsize=8)
-    ax3.legend(fontsize=8)
-    ax3.grid(True)
-    ax3.tick_params(labelsize=8)
-    plt.tight_layout()
-
-    return [fig, fig2, fig3]
+    return [fig, fig2]
 
 if __name__ == '__main__':
     run_all_examples()

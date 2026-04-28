@@ -328,11 +328,11 @@ def make_figure_10(prefix=None):
 
     # Since we can't do geolocation with the first measurement, let's
     # initialize the track manually
+    _ss_pos = tracker.CartesianStateSpace(num_dims=2, has_vel=False)
     x_prev = np.array([0, 1e3])
     p_prev = CovarianceMatrix(np.diag([1e3, 10e3])**2)
-
-    z_fun = aoa.measurement
-    h_fun = aoa.measurement_gradient
+    prev_state = tracker.State(state_space=_ss_pos, time=0., state=x_prev, covar=p_prev)
+    _mm = tracker.MeasurementModel(pss=aoa)
 
     cep_vec = np.zeros_like(t_vec)
     for idx in np.arange(t_vec.size):
@@ -341,11 +341,9 @@ def make_figure_10(prefix=None):
 
         this_psi = aoa.noisy_measurement(x_tgt)
 
-        this_x, this_p = tracker.ekf_update(x_prev, p_prev, this_psi, aoa.cov, z_fun, h_fun)
-        cep_vec[idx] = compute_cep50(CovarianceMatrix(this_p))
-
-        x_prev = this_x
-        p_prev = this_p
+        this_state = tracker.ekf_update(prev_state, this_psi, aoa.cov, _mm.measurement, _mm.jacobian)
+        cep_vec[idx] = compute_cep50(this_state.covar)
+        prev_state = this_state
 
     fig10b=plt.figure()
     plt.semilogy(t_vec, cep_vec/1e3)

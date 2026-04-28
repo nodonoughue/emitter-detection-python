@@ -386,3 +386,141 @@ def test_polar_kinematic_invalid_num_turn_dims_raises():
 def test_polar_kinematic_yaw_pitch_requires_3d():
     with pytest.raises(ValueError):
         PolarKinematicStateSpace(num_dims=2, num_turn_dims=2)
+
+
+# ---------------------------------------------------------------------------
+# State.constrain_motion
+# ---------------------------------------------------------------------------
+
+def test_constrain_motion_velocity_below_limit_unchanged():
+    """Velocity well within limit — state vector must not change."""
+    ss = make_cv_state_space()
+    s = State(ss, 0.0, CV_VEC.copy())
+    original = s.state.copy()
+    s.constrain_motion(max_velocity=100.0)
+    np.testing.assert_array_equal(s.state, original)
+
+
+def test_constrain_motion_velocity_clipped_to_limit():
+    """Velocity exceeds limit — magnitude is scaled to max_velocity, direction preserved."""
+    ss = make_cv_state_space()
+    # velocity = [3, 4] → speed = 5
+    s = State(ss, 0.0, np.array([0., 0., 3., 4.]))
+    s.constrain_motion(max_velocity=2.5)
+    v = s.state[ss.vel_slice]
+    assert abs(np.linalg.norm(v) - 2.5) < 1e-10
+    # Direction unchanged: (3,4)/5 * 2.5 = (1.5, 2.0)
+    np.testing.assert_allclose(v, [1.5, 2.0], atol=1e-10)
+
+
+def test_constrain_motion_acceleration_clipped():
+    """Acceleration exceeds limit — magnitude is scaled down, direction preserved."""
+    ss = make_ca_state_space()
+    # accel = [0, 10] → mag = 10
+    s = State(ss, 0.0, np.array([0., 0., 1., 1., 0., 10.]))
+    s.constrain_motion(max_acceleration=5.0)
+    a = s.state[ss.accel_slice]
+    assert abs(np.linalg.norm(a) - 5.0) < 1e-10
+    np.testing.assert_allclose(a, [0., 5.], atol=1e-10)
+
+
+def test_constrain_motion_both_limits_applied():
+    """Both velocity and acceleration are clipped independently."""
+    ss = make_ca_state_space()
+    # vel=[3,4] speed=5, accel=[0,10] mag=10
+    s = State(ss, 0.0, np.array([0., 0., 3., 4., 0., 10.]))
+    s.constrain_motion(max_velocity=2.5, max_acceleration=5.0)
+    assert abs(np.linalg.norm(s.state[ss.vel_slice]) - 2.5) < 1e-10
+    assert abs(np.linalg.norm(s.state[ss.accel_slice]) - 5.0) < 1e-10
+
+
+def test_constrain_motion_no_vel_state_space_ignored():
+    """max_velocity is silently ignored when the state space has no velocity."""
+    ss = make_pos_only_state_space()
+    s = State(ss, 0.0, np.array([99.]))
+    s.constrain_motion(max_velocity=1.0)  # must not raise
+    assert s.state[0] == 99.
+
+
+def test_constrain_motion_none_limits_are_noop():
+    """Passing None for both limits leaves the state unchanged."""
+    ss = make_ca_state_space()
+    s = State(ss, 0.0, CA_VEC.copy())
+    original = s.state.copy()
+    s.constrain_motion(max_velocity=None, max_acceleration=None)
+    np.testing.assert_array_equal(s.state, original)
+
+
+def test_constrain_motion_position_untouched():
+    """Position block is never modified regardless of limits."""
+    ss = make_cv_state_space()
+    s = State(ss, 0.0, np.array([10., 20., 300., 400.]))
+    s.constrain_motion(max_velocity=1.0)
+    np.testing.assert_array_equal(s.position, [10., 20.])
+
+
+# ---------------------------------------------------------------------------
+# StateSpace.is_equal
+# ---------------------------------------------------------------------------
+
+def test_is_equal_reflexive():
+    """A state space must equal itself."""
+    ss = make_cv_state_space()
+    assert ss.is_equal(ss)
+
+
+def test_is_equal_identical_cartesian_cv():
+    """Two independently constructed identical CV spaces are equal."""
+    assert make_cv_state_space().is_equal(make_cv_state_space())
+
+
+def test_is_equal_identical_cartesian_ca():
+    """Two independently constructed identical CA spaces are equal."""
+    assert make_ca_state_space().is_equal(make_ca_state_space())
+
+
+def test_is_equal_different_num_dims():
+    """Different num_dims → not equal (fails on first check)."""
+    ss2 = CartesianStateSpace(num_dims=2, has_vel=True)
+    ss3 = CartesianStateSpace(num_dims=3, has_vel=True)
+    assert not ss2.is_equal(ss3)
+
+
+def test_is_equal_different_has_vel():
+    """CV (has_vel=True) vs position-only (has_vel=False) → not equal."""
+    assert not make_cv_state_space().is_equal(make_pos_only_state_space())
+
+
+def test_is_equal_different_has_accel():
+    """CV (no accel) vs CA (with accel) with same num_dims → not equal."""
+    assert not make_cv_state_space().is_equal(make_ca_state_space())
+
+
+def test_is_equal_cartesian_vs_polar():
+    """CartesianStateSpace and PolarKinematicStateSpace are never equal
+    (has_turn_rate differs)."""
+    cartesian = CartesianStateSpace(num_dims=2, has_vel=True)
+    polar = PolarKinematicStateSpace(num_dims=2, has_vel=True, num_turn_dims=1)
+    assert not cartesian.is_equal(polar)
+
+
+def test_is_equal_identical_polar():
+    """Two independently constructed identical PolarKinematic spaces are equal."""
+    ss_a = PolarKinematicStateSpace(num_dims=3, has_vel=True, has_accel=False, num_turn_dims=1)
+    ss_b = PolarKinematicStateSpace(num_dims=3, has_vel=True, has_accel=False, num_turn_dims=1)
+    assert ss_a.is_equal(ss_b)
+
+
+def test_is_equal_different_num_turn_dims():
+    """PolarKinematic with 1 vs 2 turn dims are not equal."""
+    ss1 = PolarKinematicStateSpace(num_dims=3, has_vel=True, num_turn_dims=1)
+    ss2 = PolarKinematicStateSpace(num_dims=3, has_vel=True, num_turn_dims=2)
+    assert not ss1.is_equal(ss2)
+
+
+def test_is_equal_non_statespace_returns_false():
+    """Passing a non-StateSpace object always returns False."""
+    ss = make_cv_state_space()
+    assert not ss.is_equal(None)
+    assert not ss.is_equal("cv")
+    assert not ss.is_equal(42)
