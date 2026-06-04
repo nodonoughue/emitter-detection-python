@@ -292,10 +292,12 @@ def ecef_to_lla(x, y, z, angle_units='deg', dist_units='m'):
     n = a / np.sqrt(1 - e1_sq * np.sin(lat_rad)**2)
     cos_lat = np.cos(lat_rad)
     sin_lat = np.sin(lat_rad)
+    cos_lat_safe = np.where(np.abs(cos_lat) > 0, cos_lat, np.ones_like(cos_lat))
+    sin_lat_safe = np.where(np.abs(sin_lat) > 0, sin_lat, np.ones_like(sin_lat))
     alt_m = np.where(
         np.abs(cos_lat) > np.abs(sin_lat),
-        p / cos_lat - n,
-        z / sin_lat - n * (1 - e1_sq)
+        p / cos_lat_safe - n,
+        z / sin_lat_safe - n * (1 - e1_sq)
     )
 
     # Format Outputs
