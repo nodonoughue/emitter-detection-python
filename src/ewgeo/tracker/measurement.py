@@ -42,6 +42,7 @@ class MeasurementModel:
 
     def __init__(self, pss: PassiveSurveillanceSystem,
                  ineq_constraints: list | None = None,
+                 eq_constraints: list | None = None,
                  solver_fun: Callable | None = None,
                  crlb_fun: Callable | None = None):
         """
@@ -54,6 +55,9 @@ class MeasurementModel:
                                  x_valid: ndarray (num_dims, n)). Applied as a post-solve position
                                  snap (the LS solver operates on pos+vel and cannot apply
                                  position-only constraints mid-iteration).
+        :param eq_constraints:   Optional list of equality constraint callables applied alongside
+                                 ineq_constraints. Same signature as ineq_constraints callables.
+                                 Applied as a post-solve position snap.
         :param solver_fun:       Optional callable for track initiation.  Signature::
 
                                      pos_est = solver_fun(zeta, x_init)
@@ -81,6 +85,7 @@ class MeasurementModel:
         """
         self.pss = pss
         self.ineq_constraints = ineq_constraints
+        self.eq_constraints = eq_constraints
         self._solver_fun = solver_fun
         self._crlb_fun = crlb_fun
 
@@ -242,12 +247,15 @@ class MeasurementModel:
         if np.linalg.norm(pos_vel_est[:n]) > 5e6:
             pos_vel_est = np.zeros((2*n, ))
 
-        # Snap position to inequality constraints (e.g. altitude bounds), in case the LS
-        # solver converged to a point that still marginally violates one.
-        if self.ineq_constraints is not None:
+        # Snap position to inequality/equality constraints, in case the LS solver
+        # converged to a point that still marginally violates one.
+        if self.ineq_constraints is not None or self.eq_constraints is not None:
             pos = pos_vel_est[:n].reshape(n, 1)
-            pos_vel_est[:n] = snap_to_constraints(pos, ineq_constraints=self.ineq_constraints).ravel()
-        # TODO: Also add support for equality constraints, once this is verified.
+            pos_vel_est[:n] = snap_to_constraints(
+                pos,
+                ineq_constraints=self.ineq_constraints,
+                eq_constraints=self.eq_constraints
+            ).ravel()
 
         # Convert to a state vector
         init_state_vec = np.zeros((state_space.num_states, ))
