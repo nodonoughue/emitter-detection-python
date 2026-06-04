@@ -2,13 +2,13 @@ import make_figures
 
 close_figs = True
 
-do_book_1 = False
+do_book_1 = True
 do_book_2 = True
 
 # Parameters used to control execution
-mc_params = {'force_recalc': True,
-             'monte_carlo_decimation': 1000,
-             'min_num_monte_carlo': int(10)}
+mc_params = {'force_recalc': True,           # Set to False to skip slow examples/figures
+             'monte_carlo_decimation': 100,  # Used to force long examples/figures to run more quickly
+             'min_num_monte_carlo': int(10)} # Set a minimum number of reps (limits decimation)
 
 if do_book_1:
     print('************************************************************************************************')
