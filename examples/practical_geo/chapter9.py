@@ -134,6 +134,9 @@ def example1():
     pss.plot_sensors(ax=ax, label='DF System')
     [s.plot(ax=ax, color=[0.5, 0.5, 0.5], linewidth=.5, linestyle='--', do_pos=False, do_vel=False, do_cov=True, label=None) for s in new_states]
     plt.scatter(*coords, s=15, marker='^', color=[0.5, 0.5, 0.5], label='Measurements')
+    for j, (x, y) in enumerate(zip(coords[0], coords[1])):
+        ax.annotate(chr(ord('A') + j), (x, y), xytext=(10, 0), textcoords='offset points',
+                    color=[0.5, 0.5, 0.5], fontsize=9, va='center')
     plt.title('Predicted Track States with new Measurements')
     plt.legend()
     plt.xlim([-500,2000])
@@ -170,6 +173,9 @@ def example1():
     [t.plot(ax=ax, predicted_state=p, **plot_args) for (t, p) in zip(tracks, predicted_states)]
     [plt.plot(*zip(p.position[:2], new_states[selected.get(t)].position[:2]), color=[0.5, 0.5, 0.5], linewidth=.5, linestyle='--', label='Associations') for (t, p) in zip(tracks, predicted_states)]
     plt.scatter(*coords, s=15, marker='^', color=[0.5, 0.5, 0.5], label='Measurements')
+    for j, (x, y) in enumerate(zip(coords[0], coords[1])):
+        ax.annotate(chr(ord('A') + j), (x, y), xytext=(10, 0), textcoords='offset points',
+                    color=[0.5, 0.5, 0.5], fontsize=9, va='center')
     plt.legend()
     plt.title('Predicted Track States and NN Associations')
     plt.xlim([-500, 2000])
