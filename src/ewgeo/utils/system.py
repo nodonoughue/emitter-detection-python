@@ -506,8 +506,9 @@ class PassiveSurveillanceSystem(ABC):
 
         return x_est, likelihood, th_grid, th_est
 
-    def gd_ls_solver(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, do_gd: bool, cal_data: dict=None, **kwargs)->\
-        tuple[npt.NDArray, npt.NDArray] | tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]:
+    def gd_ls_solver(self, zeta: npt.ArrayLike, x_init: npt.ArrayLike, do_gd: bool, cal_data: dict=None,
+                     x_sensor: npt.ArrayLike | None=None, v_sensor: npt.ArrayLike | None=None,
+                     bias: npt.ArrayLike | None=None,**kwargs)-> (tuple[npt.NDArray, npt.NDArray] | tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray]):
 
         # Perform sensor calibration
         if cal_data is not None:
@@ -516,7 +517,9 @@ class PassiveSurveillanceSystem(ABC):
                 else: cal_data['solver_type'] = 'ls'
             x_sensor, v_sensor, bias = self.sensor_calibration(**cal_data)
         else:
-            x_sensor, v_sensor, bias = self.pos, None, self.bias
+            x_sensor = self.pos if x_sensor is None else x_sensor
+            # v_sensor's default is None
+            bias = self.bias if bias is None else bias
 
         # Make a function handle for the measurement difference (y)
         def y(pos_vel: npt.ArrayLike):
@@ -1020,9 +1023,7 @@ class PassiveSurveillanceSystem(ABC):
 
         # ==================== Sensor Position and Velocity Search ========================
         if do_pos_cal or do_vel_cal:
-            x_shp = np.shape(x_sensor)
             x_shp_rev = np.shape(x_sensor.T)
-            v_shp = np.shape(v_sensor)
             v_shp_rev = np.shape(v_sensor.T)
             num_pos = np.size(x_sensor)
             num_vel = np.size(v_sensor)
