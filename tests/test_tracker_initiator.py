@@ -94,33 +94,32 @@ def test_single_point_creates_one_track_per_measurement():
     initiator = SinglePointInitiator(msmt_model=make_cv_measurement_model(),
                                                 motion_model=make_cv_model())
     measurements = [make_measurement(5), make_measurement(10)]
-    tracks, _ = initiator.initiate(measurements, next_track_id=0)
+    tracks = initiator.initiate(measurements)
     assert len(tracks) == 2
 
 
-def test_single_point_track_ids_are_sequential():
+def test_single_point_tracks_have_no_id():
+    """Tentative tracks from SinglePointInitiator have track_id=None until promoted."""
     initiator = SinglePointInitiator(msmt_model=make_cv_measurement_model(),
                                                 motion_model=make_cv_model())
     measurements = [make_measurement(5), make_measurement(10)]
-    tracks, next_id = initiator.initiate(measurements, next_track_id=7)
-    assert tracks[0].track_id == 7
-    assert tracks[1].track_id == 8
-    assert next_id == 9
+    tracks = initiator.initiate(measurements)
+    assert tracks[0].track_id is None
+    assert tracks[1].track_id is None
 
 
 def test_single_point_track_position_matches_measurement():
     initiator = SinglePointInitiator(msmt_model=make_cv_measurement_model(),
                                                 motion_model=make_cv_model())
-    tracks, _ = initiator.initiate([make_measurement(5.0)], next_track_id=0)
+    tracks = initiator.initiate([make_measurement(5.0)])
     assert equal_to_tolerance(tracks[0].curr_state.position, [5.0])
 
 
 def test_single_point_empty_measurements_returns_empty():
     initiator = SinglePointInitiator(msmt_model=make_cv_measurement_model(),
                                                 motion_model=make_cv_model())
-    tracks, next_id = initiator.initiate([], next_track_id=3)
+    tracks = initiator.initiate([])
     assert tracks == []
-    assert next_id == 3
 
 
 # ---------------------------------------------------------------------------
@@ -178,9 +177,20 @@ def test_two_point_first_call_returns_no_tracks():
     initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
                                    motion_model=make_cv_model())
 
-    tracks, _ = initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
+    tracks = initiator.initiate([make_measurement(10, t=0)])
     assert tracks == []
     assert len(initiator._buffer_tracks) == 1
+
+
+def test_two_point_buffer_tracks_have_no_id():
+    """Buffer (single-point) tracks have track_id=None pending promotion."""
+    mm = make_cv_measurement_model()
+    assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
+    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                   motion_model=make_cv_model())
+
+    initiator.initiate([make_measurement(10, t=0)])
+    assert initiator._buffer_tracks[0].track_id is None
 
 
 def test_two_point_second_call_returns_track_with_velocity():
@@ -194,12 +204,26 @@ def test_two_point_second_call_returns_track_with_velocity():
     initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
                                    motion_model=make_cv_model())
 
-    initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
-    tracks, _ = initiator.initiate([make_measurement(12, t=1)], next_track_id=1)
+    initiator.initiate([make_measurement(10, t=0)])
+    tracks = initiator.initiate([make_measurement(12, t=1)])
 
     assert len(tracks) == 1
     assert equal_to_tolerance(tracks[0].curr_state.position, [12.0])
     assert equal_to_tolerance(tracks[0].curr_state.velocity, [2.0])
+
+
+def test_two_point_confirmed_track_has_no_id():
+    """Confirmed two-point tracks have track_id=None; IDs are assigned by Tracker.promote()."""
+    mm = make_cv_measurement_model()
+    assoc = NNAssociator(motion_model=make_cv_model(), gate_probability=0.99)
+    initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
+                                   motion_model=make_cv_model())
+
+    initiator.initiate([make_measurement(10, t=0)])
+    tracks = initiator.initiate([make_measurement(12, t=1)])
+
+    assert len(tracks) == 1
+    assert tracks[0].track_id is None
 
 
 def test_two_point_unmatched_second_call_goes_to_new_buffer():
@@ -212,9 +236,9 @@ def test_two_point_unmatched_second_call_goes_to_new_buffer():
     initiator = TwoPointInitiator(msmt_model=mm, associator=assoc,
                                    motion_model=make_cv_model())
 
-    initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
+    initiator.initiate([make_measurement(10, t=0)])
     # x=9000 is very far — will fail the gate against the buffered track at x=10
-    tracks, _ = initiator.initiate([make_measurement(9000, t=1)], next_track_id=1)
+    tracks = initiator.initiate([make_measurement(9000, t=1)])
 
     assert tracks == []
 
@@ -378,7 +402,7 @@ def test_single_point_with_target_ss_produces_ct_state():
         motion_model=make_cv_model(),
         target_state_space=ct_ss,
     )
-    tracks, _ = initiator.initiate([make_measurement(5.0)], next_track_id=0)
+    tracks = initiator.initiate([make_measurement(5.0)])
     assert len(tracks) == 1
     assert tracks[0].curr_state.size == ct_ss.num_states
 
@@ -391,7 +415,7 @@ def test_single_point_with_target_ss_has_zero_turn_rate():
         motion_model=make_cv_model(),
         target_state_space=ct_ss,
     )
-    tracks, _ = initiator.initiate([make_measurement(5.0)], next_track_id=0)
+    tracks = initiator.initiate([make_measurement(5.0)])
     tr = ct_ss.turn_rate_component(tracks[0].curr_state.state)
     assert equal_to_tolerance(tr, [0.0])
 
@@ -409,8 +433,8 @@ def test_two_point_with_target_ss_produces_ct_state():
                                   motion_model=make_cv_model(),
                                   target_state_space=ct_ss)
 
-    initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
-    tracks, _ = initiator.initiate([make_measurement(12, t=1)], next_track_id=1)
+    initiator.initiate([make_measurement(10, t=0)])
+    tracks = initiator.initiate([make_measurement(12, t=1)])
 
     assert len(tracks) == 1
     assert tracks[0].curr_state.size == ct_ss.num_states
@@ -425,8 +449,8 @@ def test_two_point_with_target_ss_velocity_preserved():
                                   motion_model=make_cv_model(),
                                   target_state_space=ct_ss)
 
-    initiator.initiate([make_measurement(10, t=0)], next_track_id=0)
-    tracks, _ = initiator.initiate([make_measurement(12, t=1)], next_track_id=1)
+    initiator.initiate([make_measurement(10, t=0)])
+    tracks = initiator.initiate([make_measurement(12, t=1)])
 
     assert equal_to_tolerance(tracks[0].curr_state.velocity, [2.0])
 

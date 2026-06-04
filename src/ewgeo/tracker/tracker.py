@@ -29,6 +29,7 @@ class Tracker:
     _tentative_tracks: list[Track]  # not visible outside this class
     _failed_tracks: list[Track]     # tentative tracks that failed to get promoted
     _latest_measurements: list[Measurement]
+    _next_track_id: int = 0
 
     # Printing properties
     print_status: bool = False
@@ -69,6 +70,7 @@ class Tracker:
         self._tentative_tracks = []
         self._failed_tracks = []
         self._latest_measurements = []
+        self._next_track_id = 0
 
         # Plotting variables
         self.track_handles = {}
@@ -77,6 +79,12 @@ class Tracker:
 
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+    def request_new_track_id(self) -> int:
+        """Return the next available integer track ID and advance the internal counter."""
+        tid = self._next_track_id
+        self._next_track_id += 1
+        return tid
 
     @property
     def all_tracks(self):
@@ -212,8 +220,10 @@ class Tracker:
         tracks_to_test = [h.track for h in tentative_hypotheses]
         tracks_to_promote, tracks_to_remove = self.promoter.promote(tracks=tracks_to_test)
 
-        # Add the promoted tracks to the track list and remove them from the tentative tracks list
+        # Add the promoted tracks to the track list and remove them from the tentative tracks list.
+        # Assign a unique integer ID now — this is the single point of ID assignment for all initiators.
         for t in tracks_to_promote:
+            t.track_id = self.request_new_track_id()
             self.tracks.append(t)
             self._tentative_tracks.remove(t)
 
@@ -238,7 +248,7 @@ class Tracker:
             # Nothing to do
             return
 
-        new_tracks, _ = self.initiator.initiate(measurements=measurements)
+        new_tracks = self.initiator.initiate(measurements=measurements)
         self._tentative_tracks.extend(new_tracks)
         if self.print_status:
             print(f"...{len(new_tracks)} new tentative tracks created...")

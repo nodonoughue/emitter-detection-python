@@ -21,7 +21,7 @@ def make_state(x, vx=0.0, t=0.0):
                  covar=CovarianceMatrix(np.eye(2)))
 
 
-def make_track(x=0.0, vx=0.0, t=0.0, track_id='T0'):
+def make_track(x=0.0, vx=0.0, t=0.0, track_id=0):
     return Track(initial_state=make_state(x, vx, t), track_id=track_id)
 
 
@@ -121,18 +121,25 @@ def test_track_append_updates_curr_state():
 # copy
 # ===========================================================================
 
-def test_track_copy_default_id_gets_suffix():
-    """copy() appends '_0' to the track_id by default."""
-    track = make_track(track_id='T1')
+def test_track_copy_default_id_increments():
+    """copy() increments an integer track_id by 1 by default."""
+    track = make_track(track_id=5)
     copy = track.copy()
-    assert copy.track_id == 'T1_0'
+    assert copy.track_id == 6
+
+
+def test_track_copy_none_id_stays_none():
+    """copy() of a track with track_id=None leaves the copy's id as None."""
+    track = make_track(track_id=None)
+    copy = track.copy()
+    assert copy.track_id is None
 
 
 def test_track_copy_custom_id():
-    """copy(track_id=...) overrides the default suffix."""
-    track = make_track(track_id='T1')
-    copy = track.copy(track_id='T1_copy')
-    assert copy.track_id == 'T1_copy'
+    """copy(track_id=...) overrides the default increment."""
+    track = make_track(track_id=5)
+    copy = track.copy(track_id=42)
+    assert copy.track_id == 42
 
 
 def test_track_copy_shares_state_objects():

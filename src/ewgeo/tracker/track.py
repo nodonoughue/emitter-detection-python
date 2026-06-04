@@ -20,7 +20,7 @@ class Track:
     # Parameters
     initial_state: State
     states: list[State]
-    track_id: str = ""
+    track_id: int | None = None
     num_missed_detections: int = 0
     num_updates: int = 0
     max_velocity: float | None = None
@@ -32,7 +32,7 @@ class Track:
         Initialize a Track. Pass ``initial_state`` as a keyword argument to seed the state list.
 
         :param initial_state: (keyword) Initial State object; sets states=[initial_state] and num_updates=1
-        :param track_id: (keyword) Optional identifier string for the track (default: "")
+        :param track_id: (keyword) Optional identifier integer for the track (default: None)
         :param max_velocity: (keyword) Optional maximum speed [m/s]; when set, the tracker clips
                              the estimated velocity to this magnitude after each EKF update (default: None)
         :param max_acceleration: (keyword) Optional maximum acceleration [m/s²]; when set, the tracker
@@ -90,11 +90,11 @@ class Track:
         """
         Return a shallow copy of this track, optionally overriding attributes via kwargs.
         The states list is shallow-copied so the original State objects are shared.
-        A '_0' suffix is appended to the track_id unless track_id is provided in kwargs.
+        Integer track_ids are incremented by 1; None track_ids remain None.
         """
         # Initialize a new track using all the current track's properties
         if 'track_id' not in kwargs:
-            kwargs['track_id'] = self.track_id + '_0'
+            kwargs['track_id'] = self.track_id + 1 if isinstance(self.track_id, int) else None
 
         new_track = object.__new__(Track)
         new_track.__dict__.update(self.__dict__) # copy all attributes

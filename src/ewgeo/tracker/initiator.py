@@ -10,7 +10,6 @@ from ..utils.covariance import CovarianceMatrix
 
 class Initiator(ABC):
     """Abstract base class for track initiation logic."""
-    next_track_id: int = 0
 
     @abstractmethod
     def initiate(self, measurements: list[Measurement]) -> list[Track]:
@@ -53,18 +52,15 @@ class SinglePointInitiator(Initiator):
         self.target_max_velocity = target_max_velocity
         self.target_max_acceleration = target_max_acceleration
 
-    def initiate(self, measurements: list[Measurement], next_track_id: int=None) -> tuple[list[Track], int]:
+    def initiate(self, measurements: list[Measurement]) -> list[Track]:
         """
-        Create one tentative track per measurement.
+        Create one tentative track per measurement. All tracks are created with track_id=None;
+        IDs are assigned by Tracker.promote() when the track is confirmed.
 
         :param measurements: New unassociated measurements from the current scan
-        :param next_track_id: Starting track ID counter; uses and updates self.next_track_id if None
-        :return: Tuple of (list of newly created Track objects, updated next_track_id)
+        :return: List of newly created tentative Track objects
         """
         tracks = []
-        if next_track_id is None:
-            next_track_id = self.next_track_id
-
         for m in measurements:
             # Determine a position and/or velocity for this measurement
             s = self.msmt_model.state_from_measurement(
@@ -76,16 +72,13 @@ class SinglePointInitiator(Initiator):
                 # the desired state space
                 s = adapt_cartesian_state(s, self.target_state_space)
 
-            # Initialize a track object
-            t = Track(initial_state=s, track_id=next_track_id,
+            t = Track(initial_state=s, track_id=None,
                       max_velocity=self.target_max_velocity,
                       max_acceleration=self.target_max_acceleration,
                       motion_model=self.motion_model)
-            next_track_id += 1
             tracks.append(t)
 
-        self.next_track_id = next_track_id
-        return tracks, next_track_id
+        return tracks
 
 class TwoPointInitiator(Initiator):
     """
@@ -132,18 +125,16 @@ class TwoPointInitiator(Initiator):
         self._buffered_measurements = {}
         self._buffer_tracks = []
 
-    def initiate(self, measurements: list[Measurement], next_track_id: int=None) -> tuple[list[Track], int]:
+    def initiate(self, measurements: list[Measurement]) -> list[Track]:
         """
         Process one scan of measurements. Pairs new measurements with buffered single-point tracks to
         produce velocity estimates; unmatched new measurements are buffered for the next scan.
+        All returned tracks have track_id=None; IDs are assigned by Tracker.promote().
 
         :param measurements: New unassociated measurements from the current scan
-        :param next_track_id: Starting track ID counter; uses and updates self.next_track_id if None
-        :return: Tuple of (list of newly confirmed Track objects with velocity estimates, updated next_track_id)
+        :return: List of newly confirmed Track objects with velocity estimates
         """
         confirmed_tracks = []
-        if next_track_id is None:
-            next_track_id = self.next_track_id
 
         # Step 1: Associate new measurements with buffered single-point tracks
         if self._buffer_tracks:
@@ -199,9 +190,8 @@ class TwoPointInitiator(Initiator):
                     m, self.state_space,
                     target_max_velocity=self.target_max_velocity,
                     target_max_acceleration=self.target_max_acceleration)
-                self._buffer_tracks.append(Track(initial_state=s, track_id=next_track_id,
+                self._buffer_tracks.append(Track(initial_state=s, track_id=None,
                                                  motion_model=self.motion_model))
-                next_track_id += 1
         else:
             # Nothing buffered yet — buffer all measurements
             for m in measurements:
@@ -209,12 +199,10 @@ class TwoPointInitiator(Initiator):
                     m, self.state_space,
                     target_max_velocity=self.target_max_velocity,
                     target_max_acceleration=self.target_max_acceleration)
-                self._buffer_tracks.append(Track(initial_state=s, track_id=next_track_id,
+                self._buffer_tracks.append(Track(initial_state=s, track_id=None,
                                                  motion_model=self.motion_model))
-                next_track_id += 1
 
-        self.next_track_id = next_track_id
-        return confirmed_tracks, next_track_id
+        return confirmed_tracks
 
     @staticmethod
     def _build_state_with_velocity(state: State, vel_est) -> np.ndarray:
@@ -252,12 +240,12 @@ class TwoPointInitiator(Initiator):
                     crlb_vel = crlb_vel * (target_max_velocity**2 / max_diag)
             init_covar[vel_slice, vel_slice] = crlb_vel
 
-        # There isn't enough information to initialize acceleration; scale by another 1/dt²
-        # (consistent with the velocity scaling above) to get a physically reasonable estimate.
-        if state.state_space.has_accel:
-            accel_slice = state.state_space.accel_slice
-            crlb_accel = crlb_vel / (dt**2)
-            init_covar[accel_slice, accel_slice] = crlb_accel
+            # There isn't enough information to initialize acceleration; scale by another 1/dt²
+            # (consistent with the velocity scaling above) to get a physically reasonable estimate.
+            if state.state_space.has_accel:
+                accel_slice = state.state_space.accel_slice
+                crlb_accel = crlb_vel / (dt**2)
+                init_covar[accel_slice, accel_slice] = crlb_accel
 
         return CovarianceMatrix(init_covar)
 
@@ -308,18 +296,16 @@ class ThreePointInitiator(Initiator):
         self._stage1_tracks = []
         self._stage2_tracks = []
 
-    def initiate(self, measurements: list[Measurement], next_track_id: int=None) -> tuple[list[Track], int]:
+    def initiate(self, measurements: list[Measurement]) -> list[Track]:
         """
         Process one scan. Attempts to advance stage-2 tracks to full confirmed tracks,
         then advances stage-1 tracks to stage-2, then buffers any remaining measurements.
+        All returned tracks have track_id=None; IDs are assigned by Tracker.promote().
 
         :param measurements: New unassociated measurements from the current scan
-        :param next_track_id: Starting track ID counter; uses and updates self.next_track_id if None
-        :return: Tuple of (list of newly confirmed Track objects, updated next_track_id)
+        :return: List of newly confirmed Track objects
         """
         confirmed_tracks = []
-        if next_track_id is None:
-            next_track_id = self.next_track_id
 
         # Step 1: Try to advance stage-2 tracks (t1, t2) to full tracks
         # Any measurements not used in step 1 are contained in the list unmatched_2
@@ -390,12 +376,10 @@ class ThreePointInitiator(Initiator):
             s = self.msmt_model.state_from_measurement(m, self.state_space,
                 target_max_velocity=self.target_max_velocity,
                 target_max_acceleration=self.target_max_acceleration)
-            self._stage1_tracks.append(Track(initial_state=s, track_id=next_track_id,
+            self._stage1_tracks.append(Track(initial_state=s, track_id=None,
                                              motion_model=self.motion_model))
-            next_track_id += 1
 
-        self.next_track_id = next_track_id
-        return confirmed_tracks, next_track_id
+        return confirmed_tracks
 
     def _build_track(self, s1: State, s2: State, s3: State) -> Track | None:
         """
@@ -438,7 +422,6 @@ class ThreePointInitiator(Initiator):
 
         # Use the average CRLB trace as the scalar position variance,
         # but apply a conservative floor to avoid collapse
-        crlb = s3.covar.cov
         pos_covar_multiplier = 10.0
         num_dim = s3.state_space.num_dims
         pos_var = np.mean([pos_covar_multiplier * s.covar.cov[:num_dim, :num_dim] for s in [s1, s2, s3]], axis=0)
