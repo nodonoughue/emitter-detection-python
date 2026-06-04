@@ -345,7 +345,7 @@ class Tracker:
             # Plot
             if self.msmt_handle is None:
                 # Need a new plot
-                self.msmt_handle = ax.scatter(msmt_coords)
+                self.msmt_handle = ax.scatter(*msmt_coords.T)
             else:
                 # Update the plot
                 self.msmt_handle.set_offsets(msmt_coords)

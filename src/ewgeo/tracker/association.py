@@ -200,10 +200,6 @@ class Hypothesis:
         else:
             t = self.track
 
-        # Plot the results
-        if ax is not None:
-            hdl = t.plot(ax=ax, do_vel=False, do_cov=True, predicted_state=self.predicted_state, marker='^')
-
         # Compute the Kalman Gain, which is the product of the predicted state covariance, the transpose of the
         # measurement Jacobian, and the inverse of the innovation covariance
         prediction_state_covar = self.predicted_state.covar.cov
@@ -228,7 +224,8 @@ class Hypothesis:
         # Make a new State object and add it to the track
         new_state = State(t.curr_state.state_space, self.measurement.time, new_state_vec, CovarianceMatrix(new_state_covar))
         if ax is not None:
-            # Plot a dashed line from the current state to the new one
+            # Plot the predicted track, then a dashed line from the predicted to updated state
+            hdl = t.plot(ax=ax, do_vel=False, do_cov=True, predicted_state=self.predicted_state, marker='^')
             plt.plot(*zip(t.curr_state.position[plot_dims], new_state.position[plot_dims]),
                      color=hdl[0].get_color(), linestyle=':', label=f'Updated State')
             new_state.plot(ax=ax, do_vel=False, do_cov=True, color=hdl[0].get_color(), linestyle=':')
@@ -324,15 +321,12 @@ class MissedDetectionHypothesis(Hypothesis):
         else:
             t = self.track
 
-        # Plot the results
-        if ax is not None:
-            hdl = t.plot(ax=ax, do_vel=False, do_cov=True, predicted_state=self.predicted_state, marker='^')
-
         # Add the predicted state to the track
         new_state = self.predicted_state
 
         if ax is not None:
-            # Plot a dashed line from the current state to the new one
+            # Plot the predicted track, then a dashed line from the predicted to updated state
+            hdl = t.plot(ax=ax, do_vel=False, do_cov=True, predicted_state=self.predicted_state, marker='^')
             plt.plot(*zip(t.curr_state.position[plot_dims], new_state.position[plot_dims]),
                      color=hdl[0].get_color(), linestyle=':', label=f'Track {self.track.track_id}, Updated State')
             new_state.plot(ax=ax, do_vel=False, do_cov=True, color=hdl[0].get_color(), linestyle=':')
