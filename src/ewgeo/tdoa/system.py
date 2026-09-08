@@ -16,7 +16,16 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
 
     def __init__(self,x: npt.ArrayLike,
                  cov: CovarianceMatrix | npt.ArrayLike | None=None,
-                 variance_is_toa=True, **kwargs):
+                 variance_is_toa=True,
+                 erp_dbw: float | None = None,
+                 mds_dbw: float | None = None,
+                 freq_hz: float | None = None,
+                 bandwidth_hz: float | None = None,
+                 pulse_len_s: float | None = None,
+                 bandwidth_rms_hz: float | None = None,
+                 coord_system: str | None = None,
+                 enu_ref_lla: tuple | None = None,
+                 **kwargs):
 
         # First, we need to convert from TOA to ROA
         if variance_is_toa and cov is not None:
@@ -27,6 +36,13 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
             cov = cov.multiply(speed_of_light ** 2, overwrite=False)
 
         super().__init__(x, cov, **kwargs)
+
+        # Store SNR parameters if supplied
+        if erp_dbw is not None:
+            self._snr_params = dict(erp_dbw=erp_dbw, mds_dbw=mds_dbw, freq_hz=freq_hz,
+                                    bandwidth_hz=bandwidth_hz, pulse_len_s=pulse_len_s,
+                                    bandwidth_rms_hz=bandwidth_rms_hz,
+                                    coord_system=coord_system, enu_ref_lla=enu_ref_lla)
 
         # Overwrite uncertainty search defaults
         self.default_bias_search_epsilon = self._default_tdoa_bias_search_epsilon
@@ -98,6 +114,13 @@ class TDOAPassiveSurveillanceSystem(DifferencePSS):
         num_source = shp[1] if len(shp) > 1 else 1
         if num_source > 1: out_shape.append(num_source)
         return np.zeros(shape=out_shape)
+
+    def compute_cov(self, x_source: npt.ArrayLike) -> CovarianceMatrix:
+        if self._snr_params is None:
+            return self.cov
+        cov_toa = model.tdoa_cov_from_snr(x_sensor=self.pos, x_source=x_source, **self._snr_params)
+        cov_roa = cov_toa.multiply(speed_of_light ** 2, overwrite=False)
+        return cov_roa.resample(ref_idx=self.ref_idx)
 
     ## ============================================================================================================== ##
     ## Solver Methods

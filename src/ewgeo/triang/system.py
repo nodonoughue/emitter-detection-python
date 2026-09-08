@@ -16,11 +16,23 @@ class DirectionFinder(PassiveSurveillanceSystem):
 
     def __init__(self,x: npt.ArrayLike,
                  cov: CovarianceMatrix | npt.ArrayLike | None=None,
-                 do_2d_aoa: bool=False, **kwargs):
+                 do_2d_aoa: bool=False,
+                 erp_dbw: float | None = None,
+                 mds_dbw: float | None = None,
+                 freq_hz: float | None = None,
+                 aperture_m: float | None = None,
+                 coord_system: str | None = None,
+                 enu_ref_lla: tuple | None = None,
+                 **kwargs):
 
         super().__init__(x, cov, **kwargs)
 
         self.do_2d_aoa = do_2d_aoa
+
+        if erp_dbw is not None:
+            self._snr_params = dict(erp_dbw=erp_dbw, mds_dbw=mds_dbw,
+                                    freq_hz=freq_hz, aperture_m=aperture_m,
+                                    coord_system=coord_system, enu_ref_lla=enu_ref_lla)
 
         # Overwrite uncertainty search defaults
         self.default_bias_search_epsilon = self._default_aoa_bias_search_epsilon
@@ -109,6 +121,11 @@ class DirectionFinder(PassiveSurveillanceSystem):
         num_source = shp[1] if len(shp) > 1 else 1
         if num_source > 1: out_shape.append(num_source)
         return np.zeros(shape=out_shape)
+
+    def compute_cov(self, x_source: npt.ArrayLike) -> CovarianceMatrix:
+        if self._snr_params is None:
+            return self.cov
+        return model.aoa_cov_from_snr(x_sensor=self.pos, x_source=x_source, **self._snr_params)
 
     ## ============================================================================================================== ##
     ## Solver Methods

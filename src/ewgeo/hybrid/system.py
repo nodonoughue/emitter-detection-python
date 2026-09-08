@@ -6,6 +6,7 @@ from ewgeo.fdoa import FDOAPassiveSurveillanceSystem
 from ewgeo.tdoa import TDOAPassiveSurveillanceSystem
 from ewgeo.triang import DirectionFinder
 from ewgeo.utils import SearchSpace
+from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.system import DifferencePSS
 
@@ -710,6 +711,65 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
             new_cov = CovarianceMatrix.block_diagonal(*to_concat)
 
         return new_cov
+
+    @property
+    def has_snr_cov(self) -> bool:
+        return any(
+            pss._snr_params is not None
+            for pss in [self.aoa, self.tdoa, self.fdoa] if pss is not None
+        )
+
+    def compute_cov(self, x_source: npt.ArrayLike) -> CovarianceMatrix:
+        if not self.has_snr_cov:
+            return self.cov
+
+        from ewgeo.tdoa import model as tdoa_model
+        from ewgeo.fdoa import model as fdoa_model
+
+        parts = []
+        if self.aoa is not None:
+            parts.append(self.aoa.compute_cov(x_source))  # N_aoa x N_aoa
+
+        if self.tdoa is not None:
+            if self.tdoa._snr_params is not None:
+                cov_toa = tdoa_model.tdoa_cov_from_snr(
+                    x_sensor=self.tdoa.pos, x_source=x_source, **self.tdoa._snr_params)
+                parts.append(cov_toa.multiply(speed_of_light ** 2, overwrite=False))
+            else:
+                parts.append(self.tdoa.cov_raw)
+
+        if self.fdoa is not None:
+            if self.fdoa._snr_params is not None:
+                parts.append(fdoa_model.fdoa_cov_from_snr(
+                    x_sensor=self.fdoa.pos, x_source=x_source, **self.fdoa._snr_params))
+            else:
+                parts.append(self.fdoa.cov_raw)
+
+        raw = CovarianceMatrix.block_diagonal(*parts)
+        return raw.resample(ref_idx_vec=self._ref_idx_vec, test_idx_vec=self._test_idx_vec)
+
+    def compute_snr(self, x_source: npt.ArrayLike) -> npt.NDArray[np.float64]:
+        """
+        Return per-sensor SNR [dB] for each sub-PSS, concatenated in measurement order
+        (AOA sensors, then TDOA sensors, then FDOA sensors).
+
+        Raises ValueError if no sub-PSS has SNR parameters.  Sub-PSSs without SNR
+        parameters contribute NaN entries for their sensors.
+        """
+        if not self.has_snr_cov:
+            raise ValueError(
+                "No sub-PSS has SNR parameters. Pass erp_dbw, mds_dbw, freq_hz (and "
+                "subclass-specific fields) to at least one component PSS at construction."
+            )
+        parts = []
+        for pss in [self.aoa, self.tdoa, self.fdoa]:
+            if pss is None:
+                continue
+            if pss.has_snr_cov:
+                parts.append(pss.compute_snr(x_source))
+            else:
+                parts.append(np.full(pss.num_sensors, np.nan))
+        return np.concatenate(parts)
 
     def update_covariance_matrix(self, cov: CovarianceMatrix | npt.ArrayLike | None=None, do_resample: bool=True):
         if cov is None:
