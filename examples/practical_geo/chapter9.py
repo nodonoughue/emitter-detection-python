@@ -162,7 +162,7 @@ def example1():
             pt.add_row([t.track_id] + cells)
         total = sum(row[sel] for t, row in zip(tracks, dist_table)
                     if (sel := selected.get(t)) is not None)
-        print('\nNN Association Distances (normalised Mahalanobis², * = selected):')
+        print('\nNN Association Distances (normalized Mahalanobis², * = selected):')
         print(pt)
         print(f'  Total assignment cost: {total:.2f}')
 

@@ -26,24 +26,18 @@ def get_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, include_atm_loss=True, atm
 
     # Find the fresnel zone distance
     fz = get_fresnel_zone(freq_hz, tx_ht_m, rx_ht_m)
-    
+
     # Compute free space path loss - w/out atmospherics
     loss_free_space = get_free_space_path_loss(range_m, freq_hz, False)
     loss_two_ray = get_two_ray_path_loss(range_m, freq_hz, tx_ht_m, rx_ht_m, False)
-    broadcast_out = np.broadcast(loss_free_space, loss_two_ray)
 
-    # Combine the free space and two ray path loss calculations, using binary singleton expansion to handle non-uniform
-    # parameter sizes, so long as all non-singleton dimension match, this will succeed.
-    free_space_mask = range_m < fz
-    two_ray_mask = np.logical_not(free_space_mask)
-
-    loss_path = np.zeros(shape=broadcast_out.shape)
-    loss_path[free_space_mask] = loss_free_space[free_space_mask]
-    loss_path[two_ray_mask] = loss_two_ray[two_ray_mask]
+    # Select free-space below Fresnel zone, two-ray above; np.where handles scalar and array range_m
+    loss_path = np.where(np.asarray(range_m) < np.asarray(fz), loss_free_space, loss_two_ray)
 
     if include_atm_loss:
         if atmosphere is None:
-            atmosphere = atm.reference.get_standard_atmosphere(np.sort(np.unique((tx_ht_m, rx_ht_m))))
+            ht_vals = np.unique(np.concatenate([np.ravel(tx_ht_m), np.ravel(rx_ht_m)]))
+            atmosphere = atm.reference.get_standard_atmosphere(np.sort(ht_vals))
 
         loss_atmosphere = atm.model.calc_atm_loss(freq_hz, gas_path_len_m=range_m, atmosphere=atmosphere)
     else:
