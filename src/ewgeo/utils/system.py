@@ -10,6 +10,69 @@ from .perf import compute_crlb_gaussian
 from .solvers import ml_solver, gd_solver, ls_solver, bestfix_solver
 
 class PassiveSurveillanceSystem(ABC):
+    """
+    Abstract base class for all passive surveillance systems (TDOA, FDOA, AOA, Hybrid).
+
+    ## SNR-based covariance
+
+    By default the measurement covariance is a fixed CovarianceMatrix supplied at
+    construction.  Alternatively, each subclass can derive a position-dependent
+    covariance from a link-budget (SNR) model by passing the required signal
+    parameters at construction.  The parameters needed, and their effect, are:
+
+    **Common to all subclasses** (always required when using SNR mode):
+      - ``erp_dbw``   — Effective radiated power [dBW]
+      - ``mds_dbw``   — Minimum detectable signal / noise floor [dBW]
+      - ``freq_hz``   — Carrier frequency [Hz]
+
+    **TDOA** (``TDOAPassiveSurveillanceSystem``):
+      - ``bandwidth_hz``      — Signal bandwidth [Hz]
+      - ``pulse_len_s``       — Pulse length [s]
+      - ``bandwidth_rms_hz``  — RMS bandwidth [Hz] (optional; defaults to
+                                ``bandwidth_hz / sqrt(12)``)
+
+    **FDOA** (``FDOAPassiveSurveillanceSystem``):
+      - ``bandwidth_hz``  — Signal bandwidth [Hz]
+      - ``pulse_len_s``   — Pulse length [s]
+      - ``t_rms_s``       — RMS time duration [s] (optional; defaults to
+                            ``pulse_len_s * sqrt(4/3)``)
+
+    **AOA / DirectionFinder**:
+      - ``aperture_m``  — Interferometer baseline length [m]
+
+    **Hybrid** (``HybridPassiveSurveillanceSystem``):
+      - Pass SNR-capable sub-PSS objects (AOA, TDOA, FDOA) at construction.
+        ``has_snr_cov`` is True when *any* sub-system carries SNR parameters.
+
+    **Optional propagation parameters** (all subclasses):
+      - ``coord_system``  — ``None`` | ``'enu'`` | ``'ecef'``.  When ``None``
+                            (or when positions are 2-D), free-space path loss is
+                            used with no atmospheric correction.  When ``'enu'``
+                            or ``'ecef'``, the more accurate ``get_path_loss()``
+                            model is used (free-space below the Fresnel zone,
+                            two-ray above).
+      - ``enu_ref_lla``   — ``(lat_deg, lon_deg, alt_m)`` of the ENU frame origin.
+                            Only used with ``coord_system='enu'``; enables MSL
+                            altitude via ``enu_to_lla()``.  If omitted, the Up
+                            component is used directly as height.
+
+    **When SNR parameters are absent** (default behaviour):
+      - ``has_snr_cov`` returns ``False``.
+      - ``compute_cov(x_source)`` returns the static ``self.cov`` regardless of
+        source position.
+      - ``compute_snr(x_source)`` raises ``ValueError``.
+      - ``compute_crlb`` uses the static covariance.
+
+    **When SNR parameters are present**:
+      - ``has_snr_cov`` returns ``True``.
+      - ``compute_cov(x_source)`` recomputes the covariance from the link budget
+        at the given source position.
+      - ``compute_snr(x_source)`` returns the per-sensor SNR [dB] array.
+      - ``compute_crlb`` passes ``compute_cov`` as a callable so the covariance
+        is refreshed at every candidate source position.
+      - A static ``cov`` is not required and may be omitted (``cov=None``).
+    """
+
     _cov: CovarianceMatrix | None = None
     _pos: npt.ArrayLike
     _num_sensors: int
@@ -22,6 +85,9 @@ class PassiveSurveillanceSystem(ABC):
     _cov_pos: CovarianceMatrix | None = None    # Assumed sensor position error covariance
     _cov_vel: CovarianceMatrix | None = None    # Assumed sensor velocity error covariance
     _cov_bias: CovarianceMatrix | None = None   # Assumed bias covariance
+
+    # SNR-based covariance params (None means static covariance is used)
+    _snr_params: dict | None = None
 
     # Default Values
     # --- No default sensor bias search resolution; let each PSS type overwrite this
@@ -1225,6 +1291,52 @@ class PassiveSurveillanceSystem(ABC):
 
     # ==================== Performance Methods ================
     # These methods define basic performance predictions
+    @property
+    def has_snr_cov(self) -> bool:
+        """True when this PSS has SNR-based (position-dependent) covariance."""
+        return self._snr_params is not None
+
+    def compute_cov(self, x_source: npt.ArrayLike) -> CovarianceMatrix:
+        """
+        Return the measurement covariance matrix for a given source position.
+
+        The base implementation returns the static covariance.  Subclasses that
+        support SNR-based errors override this to compute a position-dependent
+        covariance from link-budget parameters.
+
+        :param x_source: (n_dim,) source position [m]
+        :return: CovarianceMatrix in measurement units
+        """
+        return self.cov
+
+    def compute_snr(self, x_source: npt.ArrayLike) -> npt.NDArray[np.float64]:
+        """
+        Return the per-sensor SNR [dB] for a given source position.
+
+        Requires SNR parameters to have been supplied at construction (erp_dbw,
+        mds_dbw, freq_hz, and any subclass-specific fields).  Raises ValueError
+        if the PSS was constructed without SNR parameters.
+
+        :param x_source: (n_dim,) or (n_dim, 1) source position [m]
+        :return: (n_sensor,) array of SNR values [dB]
+        """
+        if not self.has_snr_cov:
+            raise ValueError(
+                "SNR parameters were not provided at construction. Pass erp_dbw, "
+                "mds_dbw, and freq_hz (plus any subclass-specific fields) to enable "
+                "SNR-based computations."
+            )
+        from ewgeo.utils.snr import compute_snr_per_sensor
+        return compute_snr_per_sensor(
+            x_sensor=self.pos,
+            x_source=x_source,
+            erp_dbw=self._snr_params['erp_dbw'],
+            mds_dbw=self._snr_params['mds_dbw'],
+            freq_hz=self._snr_params['freq_hz'],
+            coord_system=self._snr_params.get('coord_system'),
+            enu_ref_lla=self._snr_params.get('enu_ref_lla'),
+        )
+
     def compute_crlb(self, x_source,
                      x_sensor: npt.ArrayLike | None=None,
                      v_source: npt.ArrayLike | None=None,
@@ -1233,9 +1345,13 @@ class PassiveSurveillanceSystem(ABC):
             return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_source=v_source, v_sensor=v_sensor)
 
         if 'cov' not in kwargs.keys():
-            # If the user didn't manually specify a covariance matrix, use this object's current covariance matrix
-            # as the default.
-            kwargs['cov'] = self.cov
+            # If the user didn't manually specify a covariance matrix, use this object's covariance.
+            # When SNR params are set, pass the compute_cov method so perf.compute_crlb_gaussian
+            # evaluates a fresh covariance at each candidate source position.
+            if self.has_snr_cov:
+                kwargs['cov'] = self.compute_cov
+            else:
+                kwargs['cov'] = self.cov
 
         return compute_crlb_gaussian(x_source=x_source, jacobian=this_jacobian,
                                      **kwargs)

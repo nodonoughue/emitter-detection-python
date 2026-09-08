@@ -6,6 +6,7 @@ from ewgeo.utils import parse_reference_sensor, SearchSpace, broadcast_backwards
 from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
 from ewgeo.utils.geo import calc_doppler_diff
+from ewgeo.utils.unit_conversions import db_to_lin
 
 
 def measurement(x_sensor: npt.ArrayLike,
@@ -586,6 +587,70 @@ def grad_sensor_vel(x_sensor: npt.ArrayLike,
 
     squeeze_axes = tuple(i for i in range(2, grad_vel.ndim) if grad_vel.shape[i] == 1)
     return np.squeeze(grad_vel, axis=squeeze_axes) if squeeze_axes else grad_vel
+
+def foa_error_cross_corr(snr: npt.ArrayLike,
+                         bandwidth_hz: float,
+                         pulse_len_s: float,
+                         t_rms_s: float | None = None) -> npt.NDArray[np.float64]:
+    """
+    Compute the frequency-of-arrival (FOA) error variance from SNR.
+
+    Based on Stein (1981):
+        sigma²_fd = 1 / (4*pi² * T_rms² * T * B * SNR_lin)  [Hz²]
+
+    :param snr: Signal-to-noise ratio [dB]
+    :param bandwidth_hz: Signal bandwidth [Hz]
+    :param pulse_len_s: Pulse length / integration time T [s]
+    :param t_rms_s: RMS time duration [s]; defaults to pulse_len_s * sqrt(4/3)
+    :return: FOA variance [Hz²]
+    """
+    if t_rms_s is None:
+        t_rms_s = pulse_len_s * np.sqrt(4.0 / 3.0)
+
+    snr_lin = db_to_lin(snr)
+    return 1.0 / (4.0 * np.pi ** 2 * t_rms_s ** 2 * pulse_len_s * bandwidth_hz * snr_lin)
+
+
+def fdoa_cov_from_snr(x_sensor: npt.ArrayLike,
+                      x_source: npt.ArrayLike,
+                      erp_dbw: float,
+                      mds_dbw: float,
+                      freq_hz: float,
+                      bandwidth_hz: float,
+                      pulse_len_s: float,
+                      t_rms_s: float | None = None,
+                      coord_system: str | None = None,
+                      enu_ref_lla: tuple | None = None) -> CovarianceMatrix:
+    """
+    Compute a diagonal per-sensor range-rate covariance matrix from SNR-derived FOA errors.
+
+    For each sensor the SNR is computed from the link budget and converted to a FOA
+    variance via foa_error_cross_corr, then scaled to range-rate units [m²/s²].
+
+    :param x_sensor: (n_dim, n_sensor) array of sensor positions [m]
+    :param x_source: (n_dim,) source position [m]
+    :param erp_dbw: Effective radiated power [dBW]
+    :param mds_dbw: Minimum detectable signal / noise floor [dBW]
+    :param freq_hz: Carrier frequency [Hz]
+    :param bandwidth_hz: Signal bandwidth [Hz]
+    :param pulse_len_s: Pulse length [s]
+    :param t_rms_s: RMS time duration [s]; defaults to pulse_len_s * sqrt(4/3)
+    :return: N×N diagonal CovarianceMatrix in range-rate units [m²/s²]
+    """
+    from ewgeo.utils.snr import compute_snr_per_sensor
+
+    snr_db = compute_snr_per_sensor(x_sensor=x_sensor, x_source=x_source,
+                                    erp_dbw=erp_dbw, mds_dbw=mds_dbw, freq_hz=freq_hz,
+                                    coord_system=coord_system, enu_ref_lla=enu_ref_lla)
+
+    rr_scale = (speed_of_light / freq_hz) ** 2  # convert Hz² → (m/s)²
+    rr_variances = np.array([
+        foa_error_cross_corr(snr_db[i], bandwidth_hz, pulse_len_s, t_rms_s) * rr_scale
+        for i in range(len(snr_db))
+    ])
+
+    return CovarianceMatrix(np.diag(rr_variances))
+
 
 def _check_inputs(x_source: npt.NDArray[np.float64], v_source: npt.NDArray[np.float64] | None,
                   x_sensor: npt.NDArray[np.float64], v_sensor: npt.NDArray[np.float64] | None)\

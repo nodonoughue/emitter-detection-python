@@ -74,8 +74,11 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
         # Evaluate the Jacobian
         this_jacobian = jacobian(this_x)
 
+        # Resolve covariance matrix (may be position-dependent callable)
+        this_cov = cov(this_x) if callable(cov) else cov
+
         # Compute the Fisher Information Matrix
-        fisher_matrix = cov.solve_aca(this_jacobian, do_2d=True)
+        fisher_matrix = this_cov.solve_aca(this_jacobian, do_2d=True)
 
         # Compute Constraint Gradients, if any
         if do_eq_constraints:

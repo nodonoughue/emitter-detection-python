@@ -15,8 +15,23 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     _default_fdoa_vel_search_size: int = 11 # num elements per search dimensions
 
     def __init__(self,x: npt.ArrayLike,
-                 cov: CovarianceMatrix | npt.ArrayLike | None=None, **kwargs):
+                 cov: CovarianceMatrix | npt.ArrayLike | None=None,
+                 erp_dbw: float | None = None,
+                 mds_dbw: float | None = None,
+                 freq_hz: float | None = None,
+                 bandwidth_hz: float | None = None,
+                 pulse_len_s: float | None = None,
+                 t_rms_s: float | None = None,
+                 coord_system: str | None = None,
+                 enu_ref_lla: tuple | None = None,
+                 **kwargs):
         super().__init__(x=x, cov=cov, **kwargs)
+
+        if erp_dbw is not None:
+            self._snr_params = dict(erp_dbw=erp_dbw, mds_dbw=mds_dbw, freq_hz=freq_hz,
+                                    bandwidth_hz=bandwidth_hz, pulse_len_s=pulse_len_s,
+                                    t_rms_s=t_rms_s,
+                                    coord_system=coord_system, enu_ref_lla=enu_ref_lla)
 
         # Overwrite uncertainty search defaults
         self.default_bias_search_epsilon = self._default_fdoa_bias_search_epsilon
@@ -118,6 +133,12 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ##
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
+
+    def compute_cov(self, x_source: npt.ArrayLike) -> CovarianceMatrix:
+        if self._snr_params is None:
+            return self.cov
+        cov_rr = model.fdoa_cov_from_snr(x_sensor=self.pos, x_source=x_source, **self._snr_params)
+        return cov_rr.resample(ref_idx=self.ref_idx)
 
     ## ============================================================================================================== ##
     ## Helper Methods

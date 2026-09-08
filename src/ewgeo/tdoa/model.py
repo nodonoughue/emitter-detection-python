@@ -337,6 +337,50 @@ def toa_error_cross_corr(snr: npt.ArrayLike,
     return 1/(8*np.pi*a)
 
 
+def tdoa_cov_from_snr(x_sensor: npt.ArrayLike,
+                      x_source: npt.ArrayLike,
+                      erp_dbw: float,
+                      mds_dbw: float,
+                      freq_hz: float,
+                      bandwidth_hz: float,
+                      pulse_len_s: float,
+                      bandwidth_rms_hz: float | None = None,
+                      coord_system: str | None = None,
+                      enu_ref_lla: tuple | None = None) -> CovarianceMatrix:
+    """
+    Compute a diagonal per-sensor TOA covariance matrix from SNR-derived timing errors.
+
+    For each sensor, the SNR is computed from the link budget and converted to a TOA
+    variance via toa_error_cross_corr.  The result is an N×N diagonal CovarianceMatrix
+    in seconds squared (TOA units).
+
+    :param x_sensor: (n_dim, n_sensor) array of sensor positions [m]
+    :param x_source: (n_dim,) source position [m]
+    :param erp_dbw: Effective radiated power [dBW]
+    :param mds_dbw: Minimum detectable signal / noise floor [dBW]
+    :param freq_hz: Carrier frequency [Hz]
+    :param bandwidth_hz: Signal bandwidth [Hz]
+    :param pulse_len_s: Pulse length [s]
+    :param bandwidth_rms_hz: RMS bandwidth [Hz]; defaults to bandwidth_hz / sqrt(12)
+    :return: N×N diagonal CovarianceMatrix in TOA units [s²]
+    """
+    from ewgeo.utils.snr import compute_snr_per_sensor
+
+    if bandwidth_rms_hz is None:
+        bandwidth_rms_hz = bandwidth_hz / np.sqrt(12.0)
+
+    snr_db = compute_snr_per_sensor(x_sensor=x_sensor, x_source=x_source,
+                                    erp_dbw=erp_dbw, mds_dbw=mds_dbw, freq_hz=freq_hz,
+                                    coord_system=coord_system, enu_ref_lla=enu_ref_lla)
+
+    toa_variances = np.array([
+        toa_error_cross_corr(snr_db[i], bandwidth_hz, pulse_len_s, bandwidth_rms_hz)
+        for i in range(len(snr_db))
+    ])
+
+    return CovarianceMatrix(np.diag(toa_variances))
+
+
 def draw_isochrone(x_ref: npt.NDArray[np.float64],
                    x_test: npt.NDArray[np.float64],
                    range_diff: npt.NDArray[np.float64],

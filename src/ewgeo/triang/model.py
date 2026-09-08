@@ -2,7 +2,9 @@ import numpy as np
 import numpy.typing as npt
 
 import ewgeo.utils as utils
+from ewgeo.utils.constants import speed_of_light
 from ewgeo.utils.covariance import CovarianceMatrix
+from ewgeo.utils.unit_conversions import db_to_lin
 
 
 def measurement(x_sensor: npt.NDArray[np.float64], x_source: npt.NDArray[np.float64], do_2d_aoa: bool=False,
@@ -495,3 +497,51 @@ def grad_sensor_pos(x_sensor, x_source, do_2d_aoa=False):
 
     squeeze_axes = tuple(i for i in range(2, grad.ndim) if grad.shape[i] == 1)
     return np.squeeze(grad, axis=squeeze_axes) if squeeze_axes else grad
+
+
+def aoa_error_from_snr(snr_db: npt.ArrayLike,
+                       freq_hz: float,
+                       aperture_m: float) -> npt.NDArray[np.float64]:
+    """
+    Compute azimuth AOA error variance for a 2-element interferometer from SNR.
+
+        C_DF = (1 / (2 * SNR_lin)) * (c / (2*pi*f*d))²   [rad²]
+
+    :param snr_db: Signal-to-noise ratio [dB]
+    :param freq_hz: Carrier frequency [Hz]
+    :param aperture_m: Interferometer baseline length [m]
+    :return: AOA variance [rad²]
+    """
+    snr_lin = db_to_lin(snr_db)
+    phase_to_angle = speed_of_light / (2.0 * np.pi * freq_hz * aperture_m)
+    return (1.0 / (2.0 * snr_lin)) * phase_to_angle ** 2
+
+
+def aoa_cov_from_snr(x_sensor: npt.ArrayLike,
+                     x_source: npt.ArrayLike,
+                     erp_dbw: float,
+                     mds_dbw: float,
+                     freq_hz: float,
+                     aperture_m: float,
+                     coord_system: str | None = None,
+                     enu_ref_lla: tuple | None = None) -> CovarianceMatrix:
+    """
+    Compute a diagonal per-sensor AOA covariance matrix from SNR-derived interferometer errors.
+
+    :param x_sensor: (n_dim, n_sensor) array of sensor positions [m]
+    :param x_source: (n_dim,) source position [m]
+    :param erp_dbw: Effective radiated power [dBW]
+    :param mds_dbw: Minimum detectable signal / noise floor [dBW]
+    :param freq_hz: Carrier frequency [Hz]
+    :param aperture_m: Interferometer baseline length [m]
+    :return: N×N diagonal CovarianceMatrix in AOA units [rad²]
+    """
+    from ewgeo.utils.snr import compute_snr_per_sensor
+
+    snr_db = compute_snr_per_sensor(x_sensor=x_sensor, x_source=x_source,
+                                    erp_dbw=erp_dbw, mds_dbw=mds_dbw, freq_hz=freq_hz,
+                                    coord_system=coord_system, enu_ref_lla=enu_ref_lla)
+
+    aoa_variances = aoa_error_from_snr(snr_db, freq_hz, aperture_m)
+
+    return CovarianceMatrix(np.diag(np.atleast_1d(aoa_variances)))
