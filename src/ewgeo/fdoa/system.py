@@ -134,10 +134,11 @@ class FDOAPassiveSurveillanceSystem(DifferencePSS):
     ## These methods handle predictions of system performance
     ## ============================================================================================================== ##
 
-    def compute_cov(self, x_source: npt.ArrayLike) -> CovarianceMatrix:
-        if self._snr_params is None:
+    def compute_cov(self, x_source: npt.ArrayLike, **snr_overrides) -> CovarianceMatrix:
+        params = self._resolve_snr_params(snr_overrides)
+        if params is None:
             return self.cov
-        cov_rr = model.fdoa_cov_from_snr(x_sensor=self.pos, x_source=x_source, **self._snr_params)
+        cov_rr = model.fdoa_cov_from_snr(x_sensor=self.pos, x_source=x_source, **params)
         return cov_rr.resample(ref_idx=self.ref_idx)
 
     ## ============================================================================================================== ##
