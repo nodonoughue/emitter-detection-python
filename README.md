@@ -93,6 +93,11 @@ The necessary parameters are:
 + `erp_dbw`: Effective Radiated Power [dBW] for the source. Inclusive of all transmitter gain and loss terms.
 + `mds_dbw`: Minimum detectable signal for the PSS receivers. Must be scalar. At this power level, signals will have SNR=0 dB. Inclusive of all noise, gain, and loss terms.
 + `freq_hz`: Center frequency of the source [Hz]
++ `bandwidth_hz` : (TDOA and FDOA) Signal bandwidth [Hz]
++ `pulse_len_s` : (TDOA and FDOA) Signal pulse length [s]
++ `bandwidth_rms_hz`: (TDOA-only) Signal Root-Mean-Square bandwidth [Hz]
++ `t_rms_s` : (FDOA-only) Signal Root-Mean-Square pulse length [Hz]
++ `aperture_m` : (AOA-only) interferometer baseline length [m]
 + `coord_system`: Coordinate system in use for the PSS; must be either ECEF or ENU. Used to determine atmospheric loss (optional).
 + `enu_ref_lla`: LLA reference point for the local ENU coordinate system; used to determine atmospheric loss (optional).
 If only some of the SNR parameters are provided at creation, the rest will need to be provided when either `compute_cov`, `compute_crlb`, or `compute_snr` are called.
