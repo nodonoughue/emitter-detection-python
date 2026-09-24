@@ -748,7 +748,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         raw = CovarianceMatrix.block_diagonal(*parts)
         return raw.resample(ref_idx_vec=self._ref_idx_vec, test_idx_vec=self._test_idx_vec)
 
-    def compute_snr(self, x_source: npt.ArrayLike) -> npt.NDArray[np.float64]:
+    def compute_snr(self, x_source: npt.ArrayLike, **snr_overrides) -> npt.NDArray[np.float64]:
         """
         Return per-sensor SNR [dB] for each sub-PSS, concatenated in measurement order
         (AOA sensors, then TDOA sensors, then FDOA sensors).
@@ -756,7 +756,7 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         Raises ValueError if no sub-PSS has SNR parameters.  Sub-PSSs without SNR
         parameters contribute NaN entries for their sensors.
         """
-        if not self.has_snr_cov:
+        if not self.has_snr_cov and not snr_overrides:
             raise ValueError(
                 "No sub-PSS has SNR parameters. Pass erp_dbw, mds_dbw, freq_hz (and "
                 "subclass-specific fields) to at least one component PSS at construction."
@@ -765,8 +765,8 @@ class HybridPassiveSurveillanceSystem(DifferencePSS):
         for pss in [self.aoa, self.tdoa, self.fdoa]:
             if pss is None:
                 continue
-            if pss.has_snr_cov:
-                parts.append(pss.compute_snr(x_source))
+            if pss.has_snr_cov or snr_overrides:
+                parts.append(pss.compute_snr(x_source, **snr_overrides))
             else:
                 parts.append(np.full(pss.num_sensors, np.nan))
         return np.concatenate(parts)

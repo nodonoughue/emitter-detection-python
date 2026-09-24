@@ -1296,7 +1296,32 @@ class PassiveSurveillanceSystem(ABC):
         """True when this PSS has SNR-based (position-dependent) covariance."""
         return self._snr_params is not None
 
-    def compute_cov(self, x_source: npt.ArrayLike) -> CovarianceMatrix:
+    def _resolve_snr_params(self, overrides: dict) -> dict | None:
+        """
+        Merge construction-time SNR params with call-time overrides.
+
+        Returns None when neither stored params nor overrides are present (caller
+        should use the static covariance path).  When overrides are non-empty the
+        SNR path is forced regardless of whether params were supplied at construction;
+        in that case the three common required keys (erp_dbw, mds_dbw, freq_hz) must
+        all be non-None in the merged result.
+
+        :param overrides: dict of call-time SNR parameter overrides (may be empty)
+        :return: merged params dict, or None for the static-covariance path
+        :raises ValueError: if the SNR path is taken but a required common key is missing
+        """
+        if not overrides:
+            return self._snr_params  # None → static path; dict → SNR path as before
+        merged = {**(self._snr_params or {}), **overrides}
+        missing = [k for k in ('erp_dbw', 'mds_dbw', 'freq_hz') if merged.get(k) is None]
+        if missing:
+            raise ValueError(
+                f"SNR path requires erp_dbw, mds_dbw, and freq_hz to be non-None; "
+                f"missing or None: {missing}. Supply them at construction or as call-time overrides."
+            )
+        return merged
+
+    def compute_cov(self, x_source: npt.ArrayLike, **snr_overrides) -> CovarianceMatrix:
         """
         Return the measurement covariance matrix for a given source position.
 
@@ -1304,23 +1329,33 @@ class PassiveSurveillanceSystem(ABC):
         support SNR-based errors override this to compute a position-dependent
         covariance from link-budget parameters.
 
+        Call-time ``snr_overrides`` (e.g. ``erp_dbw=45.0``) are merged with any
+        params stored at construction.  If overrides are supplied on a PSS that was
+        constructed without SNR params the SNR path is forced, and all three common
+        required keys (erp_dbw, mds_dbw, freq_hz) must be provided between the two
+        sources.
+
         :param x_source: (n_dim,) source position [m]
+        :param snr_overrides: optional call-time SNR parameter overrides
         :return: CovarianceMatrix in measurement units
         """
         return self.cov
 
-    def compute_snr(self, x_source: npt.ArrayLike) -> npt.NDArray[np.float64]:
+    def compute_snr(self, x_source: npt.ArrayLike, **snr_overrides) -> npt.NDArray[np.float64]:
         """
         Return the per-sensor SNR [dB] for a given source position.
 
-        Requires SNR parameters to have been supplied at construction (erp_dbw,
-        mds_dbw, freq_hz, and any subclass-specific fields).  Raises ValueError
-        if the PSS was constructed without SNR parameters.
+        SNR parameters may be supplied at construction, as call-time keyword
+        overrides, or split between the two.  Call-time overrides take precedence.
+        Raises ValueError if the three common required keys (erp_dbw, mds_dbw,
+        freq_hz) cannot be resolved.
 
         :param x_source: (n_dim,) or (n_dim, 1) source position [m]
+        :param snr_overrides: optional call-time SNR parameter overrides
         :return: (n_sensor,) array of SNR values [dB]
         """
-        if not self.has_snr_cov:
+        params = self._resolve_snr_params(snr_overrides)
+        if params is None:
             raise ValueError(
                 "SNR parameters were not provided at construction. Pass erp_dbw, "
                 "mds_dbw, and freq_hz (plus any subclass-specific fields) to enable "
@@ -1330,26 +1365,30 @@ class PassiveSurveillanceSystem(ABC):
         return compute_snr_per_sensor(
             x_sensor=self.pos,
             x_source=x_source,
-            erp_dbw=self._snr_params['erp_dbw'],
-            mds_dbw=self._snr_params['mds_dbw'],
-            freq_hz=self._snr_params['freq_hz'],
-            coord_system=self._snr_params.get('coord_system'),
-            enu_ref_lla=self._snr_params.get('enu_ref_lla'),
+            erp_dbw=params['erp_dbw'],
+            mds_dbw=params['mds_dbw'],
+            freq_hz=params['freq_hz'],
+            coord_system=params.get('coord_system'),
+            enu_ref_lla=params.get('enu_ref_lla'),
         )
 
     def compute_crlb(self, x_source,
                      x_sensor: npt.ArrayLike | None=None,
                      v_source: npt.ArrayLike | None=None,
-                     v_sensor: npt.ArrayLike | None=None, **kwargs)-> CovarianceMatrix | list[CovarianceMatrix]:
+                     v_sensor: npt.ArrayLike | None=None,
+                     snr_overrides: dict | None=None,
+                     **kwargs)-> CovarianceMatrix | list[CovarianceMatrix]:
         def this_jacobian(pos_vel):
             return self.jacobian_from_posvel(pos_vel=pos_vel, x_sensor=x_sensor, v_source=v_source, v_sensor=v_sensor)
 
         if 'cov' not in kwargs.keys():
             # If the user didn't manually specify a covariance matrix, use this object's covariance.
-            # When SNR params are set, pass the compute_cov method so perf.compute_crlb_gaussian
-            # evaluates a fresh covariance at each candidate source position.
-            if self.has_snr_cov:
-                kwargs['cov'] = self.compute_cov
+            # When SNR params are set (or call-time overrides force the SNR path), pass a callable
+            # so perf.compute_crlb_gaussian re-evaluates covariance at each candidate position.
+            overrides = snr_overrides or {}
+            params = self._resolve_snr_params(overrides)
+            if params is not None:
+                kwargs['cov'] = lambda x: self.compute_cov(x, **overrides)
             else:
                 kwargs['cov'] = self.cov
 

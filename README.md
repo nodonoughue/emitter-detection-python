@@ -72,5 +72,39 @@ A number of utilities are provided in this repository, under the following modul
 + **ewgeo.tracker** Code to track emitter position over time using a Kalman filter, as discussed in Chapter 9.
 + **ewgeo.utils** Generic utilities, including numerical solvers used in geolocation algorithms.
 
+## Optional SNR-based Covariance Matrix Support
+New in v1.2 is the option to automatically adjust the covariance matrix of a PSS, based on the position of a source.
+This was implemented to supplement the default behavior of a single fixed covariance matrix in CRLB calculations, which fails to account for reductions in signal strength at long range.
+
+There is a new utility method, `ewgeo.utils.snr.compute_snr_per_sensor()` that will accept a number of arguments and return the SNR for each sensor in a PSS.
+This function is called internally; users may access it directly, or they can create a PSS object with SNR parameters, which will prompt that object to update its covariance matrix dynamically.
+```python
+pss = TDOAPassiveSurveillanceSystem(
+    x_sensor, cov,
+    has_snr_cov=True,
+    erp_dbw=..., 
+    mds_dbw=..., 
+    freq_hz=...,   # activates SNR mode
+    coord_system='enu', 
+    enu_ref_lla=(lat, lon, alt))
+```
+
+The necessary parameters are:
++ `erp_dbw`: Effective Radiated Power [dBW] for the source. Inclusive of all transmitter gain and loss terms.
++ `mds_dbw`: Minimum detectable signal for the PSS receivers. Must be scalar. At this power level, signals will have SNR=0 dB. Inclusive of all noise, gain, and loss terms.
++ `freq_hz`: Center frequency of the source [Hz]
++ `bandwidth_hz` : (TDOA and FDOA) Signal bandwidth [Hz]
++ `pulse_len_s` : (TDOA and FDOA) Signal pulse length [s]
++ `bandwidth_rms_hz`: (TDOA-only) Signal Root-Mean-Square bandwidth [Hz]
++ `t_rms_s` : (FDOA-only) Signal Root-Mean-Square pulse length [Hz]
++ `aperture_m` : (AOA-only) interferometer baseline length [m]
++ `coord_system`: Coordinate system in use for the PSS; must be either ECEF or ENU. Used to determine atmospheric loss (optional).
++ `enu_ref_lla`: LLA reference point for the local ENU coordinate system; used to determine atmospheric loss (optional).
+If only some of the SNR parameters are provided at creation, the rest will need to be provided when either `compute_cov`, `compute_crlb`, or `compute_snr` are called.
+
+```python
+snr_overrides = dict(...)
+pss.compute_cov(x_source, **snr_overrides)
+```
 ## Feedback
 Please submit any suggestions, bugs, or comments as issues in this git repository.
