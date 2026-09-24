@@ -378,3 +378,190 @@ def test_snr_pss_constructor_stores_coord_system():
     )
     assert pss._snr_params['coord_system'] == 'enu'
     assert pss._snr_params['enu_ref_lla'] == (40.0, -105.0, 1600.0)
+
+
+# ===========================================================================
+# Call-time SNR override tests
+# ===========================================================================
+
+# --- _resolve_snr_params ---
+
+def test_resolve_snr_params_no_overrides_no_stored():
+    """No overrides and no stored params returns None (static path)."""
+    pss = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    assert pss._resolve_snr_params({}) is None
+
+
+def test_resolve_snr_params_no_overrides_stored():
+    """No overrides with stored params returns stored params unchanged."""
+    pss = DirectionFinder(x=X_SENSOR, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW,
+                          freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    result = pss._resolve_snr_params({})
+    assert result is pss._snr_params
+
+
+def test_resolve_snr_params_override_wins():
+    """Call-time override takes precedence over the stored value."""
+    pss = DirectionFinder(x=X_SENSOR, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW,
+                          freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    result = pss._resolve_snr_params({'erp_dbw': 99.0})
+    assert result['erp_dbw'] == 99.0
+    assert result['mds_dbw'] == MDS_DBW  # unchanged stored param
+
+
+def test_resolve_snr_params_override_forces_snr_path():
+    """Overrides on a static PSS produce a valid merged dict (SNR path forced)."""
+    pss = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    result = pss._resolve_snr_params(
+        {'erp_dbw': ERP_DBW, 'mds_dbw': MDS_DBW, 'freq_hz': FREQ_HZ, 'aperture_m': APERTURE_M}
+    )
+    assert result['erp_dbw'] == ERP_DBW
+
+
+def test_resolve_snr_params_missing_required_raises():
+    """Overrides that leave a required key None must raise ValueError."""
+    pss = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    with pytest.raises(ValueError, match='erp_dbw'):
+        pss._resolve_snr_params({'mds_dbw': MDS_DBW, 'freq_hz': FREQ_HZ})
+
+
+def test_resolve_snr_params_partial_stored_partial_override():
+    """Stored partial params + call-time remainder satisfies required keys."""
+    # Construct with only mds_dbw and freq_hz stored (erp_dbw omitted → no SNR stored)
+    # Instead: construct with erp_dbw stored, supply remainder at call time.
+    pss = DirectionFinder(x=X_SENSOR, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW,
+                          freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    # Override just one field; the rest come from stored params
+    result = pss._resolve_snr_params({'aperture_m': 20.0})
+    assert result['aperture_m'] == 20.0
+    assert result['erp_dbw'] == ERP_DBW  # from stored
+
+
+# --- compute_snr overrides ---
+
+def test_compute_snr_override_on_static_pss():
+    """compute_snr with full overrides works even when PSS has no stored SNR params."""
+    pss = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    snr = pss.compute_snr(X_SOURCE, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW,
+                          freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    assert snr.shape == (3,)
+    assert np.all(np.isfinite(snr))
+
+
+def test_compute_snr_override_changes_result():
+    """Increasing ERP at call time raises SNR relative to the stored value."""
+    pss = DirectionFinder(x=X_SENSOR, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW,
+                          freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    snr_stored = pss.compute_snr(X_SOURCE)
+    snr_override = pss.compute_snr(X_SOURCE, erp_dbw=ERP_DBW + 10.0)
+    np.testing.assert_allclose(snr_override, snr_stored + 10.0, rtol=1e-9)
+
+
+def test_compute_snr_no_params_no_override_raises():
+    """compute_snr on a static PSS with no overrides must raise ValueError."""
+    pss = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    with pytest.raises(ValueError):
+        pss.compute_snr(X_SOURCE)
+
+
+# --- compute_cov overrides (one test per subclass) ---
+
+def test_tdoa_compute_cov_override_on_static_pss():
+    """TDOA compute_cov with full overrides on a static PSS returns SNR covariance."""
+    pss = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=np.eye(3), variance_is_toa=False)
+    result = pss.compute_cov(X_SOURCE, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW, freq_hz=FREQ_HZ,
+                              bandwidth_hz=BW_HZ, pulse_len_s=PULSE_LEN_S)
+    # Must differ from the stored static identity covariance
+    assert not np.allclose(result.cov, np.eye(2))  # resampled → 2×2
+
+
+def test_fdoa_compute_cov_override_on_static_pss():
+    """FDOA compute_cov with full overrides on a static PSS returns SNR covariance."""
+    pss = FDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=np.eye(3))
+    result = pss.compute_cov(X_SOURCE, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW, freq_hz=FREQ_HZ,
+                              bandwidth_hz=BW_HZ, pulse_len_s=PULSE_LEN_S)
+    assert not np.allclose(result.cov, np.eye(2))
+
+
+def test_aoa_compute_cov_override_on_static_pss():
+    """AOA compute_cov with full overrides on a static PSS returns SNR covariance."""
+    pss = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    result = pss.compute_cov(X_SOURCE, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW,
+                              freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    assert not np.allclose(result.cov, np.eye(3))
+
+
+def test_compute_cov_override_matches_direct_call():
+    """compute_cov with override produces the same result as calling the model directly."""
+    pss = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    result = pss.compute_cov(X_SOURCE, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW,
+                              freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    expected = triang_model.aoa_cov_from_snr(X_SENSOR, X_SOURCE, ERP_DBW, MDS_DBW,
+                                              FREQ_HZ, APERTURE_M)
+    np.testing.assert_allclose(result.cov, expected.cov, rtol=1e-10)
+
+
+def test_compute_cov_override_erp_changes_result():
+    """A higher ERP override reduces the covariance diagonal (better SNR → less error)."""
+    pss = DirectionFinder(x=X_SENSOR, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW,
+                          freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    cov_low = pss.compute_cov(X_SOURCE)
+    cov_high = pss.compute_cov(X_SOURCE, erp_dbw=ERP_DBW + 20.0)
+    assert np.all(np.diag(cov_high.cov) < np.diag(cov_low.cov))
+
+
+# --- compute_crlb with snr_overrides ---
+
+def test_compute_crlb_snr_overrides_on_static_pss():
+    """compute_crlb with snr_overrides runs the SNR path on an otherwise static PSS."""
+    pss = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    overrides = dict(erp_dbw=ERP_DBW, mds_dbw=MDS_DBW, freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    crlb = pss.compute_crlb(X_SOURCE, snr_overrides=overrides)
+    # Should return a CovarianceMatrix, not raise
+    assert isinstance(crlb, CovarianceMatrix)
+
+
+def test_compute_crlb_snr_overrides_vary_with_position():
+    """With snr_overrides the CRLB is position-dependent (callable covariance used)."""
+    pss = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    overrides = dict(erp_dbw=ERP_DBW, mds_dbw=MDS_DBW, freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    x_near = np.array([200., 100.])
+    x_far = np.array([5000., 3000.])
+    crlb_near = pss.compute_crlb(x_near, snr_overrides=overrides)
+    crlb_far = pss.compute_crlb(x_far, snr_overrides=overrides)
+    assert not np.allclose(crlb_near.cov, crlb_far.cov)
+
+
+def test_compute_crlb_snr_overrides_differ_from_static():
+    """CRLB from snr_overrides differs from CRLB with fixed covariance on same PSS."""
+    static_cov = np.eye(3)
+    pss = DirectionFinder(x=X_SENSOR, cov=static_cov)
+    overrides = dict(erp_dbw=ERP_DBW, mds_dbw=MDS_DBW, freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    crlb_snr = pss.compute_crlb(X_SOURCE, snr_overrides=overrides)
+    crlb_static = pss.compute_crlb(X_SOURCE)  # no overrides → uses eye(3)
+    assert not np.allclose(crlb_snr.cov, crlb_static.cov)
+
+
+def test_compute_crlb_explicit_cov_ignores_snr_overrides():
+    """Passing cov= directly takes precedence over snr_overrides."""
+    pss = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    fixed_cov = CovarianceMatrix(0.5 * np.eye(3))
+    overrides = dict(erp_dbw=ERP_DBW, mds_dbw=MDS_DBW, freq_hz=FREQ_HZ, aperture_m=APERTURE_M)
+    # cov= kwarg should win; snr_overrides should be ignored
+    crlb_explicit = pss.compute_crlb(X_SOURCE, cov=fixed_cov, snr_overrides=overrides)
+    crlb_direct = pss.compute_crlb(X_SOURCE, cov=fixed_cov)
+    np.testing.assert_allclose(crlb_explicit.cov, crlb_direct.cov, rtol=1e-10)
+
+
+# --- Hybrid compute_snr overrides ---
+
+def test_hybrid_compute_snr_override_on_static_pss():
+    """Hybrid compute_snr with overrides works when no sub-PSS has stored SNR params."""
+    aoa = DirectionFinder(x=X_SENSOR, cov=np.eye(3))
+    tdoa = TDOAPassiveSurveillanceSystem(x=X_SENSOR, cov=np.eye(3), variance_is_toa=False)
+    pss = HybridPassiveSurveillanceSystem(aoa=aoa, tdoa=tdoa)
+    snr = pss.compute_snr(X_SOURCE, erp_dbw=ERP_DBW, mds_dbw=MDS_DBW,
+                          freq_hz=FREQ_HZ, aperture_m=APERTURE_M,
+                          bandwidth_hz=BW_HZ, pulse_len_s=PULSE_LEN_S)
+    assert snr.shape == (6,)
+    assert np.all(np.isfinite(snr))
