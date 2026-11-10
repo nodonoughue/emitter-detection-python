@@ -1,5 +1,7 @@
+import warnings
+
 import numpy as np
-from scipy.linalg import pinvh, cholesky, solve_triangular
+from scipy.linalg import eigh, null_space
 import time
 
 from . import utils
@@ -8,7 +10,7 @@ from .covariance import CovarianceMatrix
 
 def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progress=False,
                           eq_constraints_grad:list = None, unobservable_dim_err: float = 1e99,
-                          precision: float = 1e-30) \
+                          precision: float = 1e-30, rcond: float = 1e-12) \
         -> CovarianceMatrix | list[CovarianceMatrix]:
     """
     Computes the CRLB for a Gaussian problem at one or more source positions. The CRLB for Gaussian problems takes the
@@ -27,9 +29,22 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
      :param cov: Covariance Matrix object
      :param print_progress: Boolean flag; if true then elapsed/remaining time estimates will be printed to the console
      :param eq_constraints_grad: list of constraint gradients for equality constraints to be applied
-     :param unobservable_dim_err: error value to assume for any unobservable dimensions
+     :param unobservable_dim_err: variance to assign along any unobservable direction (a large finite value is used
+                                  instead of inf so that downstream covariance algebra does not produce NaNs)
      :param precision: any numbers less than this amount will be rounded to zero.
+     :param rcond: relative tolerance for observability; eigenvalues of the (constrained) Fisher Information Matrix
+                   smaller than rcond times the largest eigenvalue are treated as zero
      :return crlb: n_dim x n_dim x n_source lower bound on the estimate covariance matrix
+
+    Equality constraints are applied by reduced parameterization (Stoica and Ng, 1998). With constraint gradients G
+    (n_dim x n_constraint) and U an orthonormal basis for the null space of G', the constrained bound is
+
+     C = U [U' F U]^{-1} U'
+
+    Dimensions that are fixed exactly by a constraint therefore have zero variance. Directions along which the
+    constrained Fisher Information Matrix is singular are unobservable; they are assigned variance
+    unobservable_dim_err (along the direction itself, which need not be aligned with a coordinate axis), and a
+    RuntimeWarning is issued.
     """
 
     # Parse inputs
@@ -47,6 +62,8 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
 
     # Initialize output variable
     crlb = []
+    num_unobservable_sources = 0
+    first_unobservable_idx = None
 
     # Print CRLB calculation progress, if desired
     markers_per_row = 40
@@ -95,29 +112,34 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
             np.fill_diagonal(dummy, np.nan)
             crlb.append(CovarianceMatrix(dummy))
         else:
-            fisher_inv = np.real(pinvh(fisher_matrix))
+            fisher = np.real(fisher_matrix)
+            fisher = 0.5 * (fisher + fisher.T)
+
+            # Reduce to the subspace that satisfies the (linearized) equality constraints
             if do_eq_constraints:
-                # Apply the impact of equality constraints
                 # noinspection PyUnboundLocalVariable
-                fg = fisher_inv @ this_gradient
-                gfg = this_gradient.T @ fg
-                lower = cholesky(gfg, lower=True)
+                basis = null_space(this_gradient.T)
+            else:
+                basis = np.eye(n_dim)
+            fisher_red = basis.T @ fisher @ basis
 
-                res = solve_triangular(lower, fg.T, lower=True)
-
-                fisher_const_inv = res.T @ res
-
-                # Subtract the Fisher inverse for the constraint from the unconstrained Fisher inverse to yield the
-                # constrained Fisher inverse
-                fisher_inv = fisher_inv - fisher_const_inv
-
-            # Apply precision
-            fisher_inv[np.fabs(fisher_inv) < precision] = 0.0
-
-            # Check for unobservable dimensions, represented by a zero along the diagonal
-            diag_mask = np.diag(fisher_inv) < precision
-            if np.any(diag_mask):
-                fisher_inv[diag_mask, diag_mask] = unobservable_dim_err
+            # Separate observable from unobservable directions, using a tolerance relative to the largest eigenvalue
+            fisher_inv = np.zeros((n_dim, n_dim))
+            if fisher_red.size > 0:
+                eig_val, eig_vec = eigh(fisher_red)
+                observable = eig_val > rcond * np.fmax(eig_val[-1], 0.0)
+                if np.any(observable):
+                    vec_obs = eig_vec[:, observable]
+                    red_inv = (vec_obs / eig_val[observable]) @ vec_obs.T
+                    red_inv[np.fabs(red_inv) < precision] = 0.0
+                    fisher_inv = basis @ red_inv @ basis.T
+                if not np.all(observable):
+                    # Assign the unobservable error along each unobservable direction
+                    vec_unobs = basis @ eig_vec[:, ~observable]
+                    fisher_inv = fisher_inv + unobservable_dim_err * (vec_unobs @ vec_unobs.T)
+                    num_unobservable_sources += 1
+                    if first_unobservable_idx is None:
+                        first_unobservable_idx = idx
 
             crlb.append(CovarianceMatrix(fisher_inv))
 
@@ -125,6 +147,12 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
         print('done')
         t_elapsed = time.perf_counter() - t_start
         utils.print_elapsed(t_elapsed)
+
+    if num_unobservable_sources > 0:
+        warnings.warn(f'CRLB has unobservable direction(s) at {num_unobservable_sources} of {n_source} source '
+                      f'position(s) (first at index {first_unobservable_idx}); variance along those directions is '
+                      f'set to unobservable_dim_err={unobservable_dim_err:g}. Equality constraints may restore '
+                      f'observability.', RuntimeWarning, stacklevel=2)
 
     if n_source == 1:
         # There's only one source, pull the CovarianceMatrix object out of the list it's in
