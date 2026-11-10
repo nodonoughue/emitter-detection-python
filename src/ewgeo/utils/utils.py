@@ -506,6 +506,10 @@ def print_predicted(t_elapsed: float, pct_elapsed: float, do_elapsed: bool=False
             secs_elapsed = t_elapsed - minutes_elapsed * 60
             print('Elapsed Time: {} min, {:.2f} sec. '.format(minutes_elapsed, secs_elapsed), end='')
 
+    if pct_elapsed <= 0:
+        print('Estimated Time Remaining: unknown')
+        return
+
     t_remaining = t_elapsed * (1 - pct_elapsed) / pct_elapsed
 
     hrs_remaining = np.floor(t_remaining / 3600)
