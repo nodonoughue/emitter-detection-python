@@ -30,7 +30,10 @@ def compute_crlb_gaussian(x_source, jacobian, cov: CovarianceMatrix, print_progr
      :param print_progress: Boolean flag; if true then elapsed/remaining time estimates will be printed to the console
      :param eq_constraints_grad: list of constraint gradients for equality constraints to be applied
      :param unobservable_dim_err: variance to assign along any unobservable direction (a large finite value is used
-                                  instead of inf so that downstream covariance algebra does not produce NaNs)
+                                  instead of inf so that downstream covariance algebra does not produce NaNs). Keep
+                                  this moderate (e.g. 1e6) if unobservable directions may not be axis-aligned; a
+                                  value like the 1e99 default swamps the observable part of the matrix in floating
+                                  point when the direction is rotated.
      :param precision: any numbers less than this amount will be rounded to zero.
      :param rcond: relative tolerance for observability; eigenvalues of the (constrained) Fisher Information Matrix
                    smaller than rcond times the largest eigenvalue are treated as zero

@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import warnings
 import numpy as np
 import numpy.typing as npt
 
@@ -270,7 +271,12 @@ class MeasurementModel:
                 crlb_raw = self._crlb_fun(s.pos_vel)
                 crlb = crlb_raw if isinstance(crlb_raw, CovarianceMatrix) else CovarianceMatrix(np.atleast_2d(crlb_raw))
             else:
-                crlb = self.pss.compute_crlb(x_source=s.pos_vel)
+                # Cap the variance assigned to unobservable directions at the default prior (1e6). The
+                # compute_crlb default (1e99) swamps the observable part of the matrix whenever the
+                # unobservable direction is not axis-aligned. The warning is expected at initialization.
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', message='CRLB has unobservable', category=RuntimeWarning)
+                    crlb = self.pss.compute_crlb(x_source=s.pos_vel, unobservable_dim_err=1e6)
             # Note: if the PSS system has no velocity information, the CRLB calculation
             # will return a matrix of zeros for those elements.
             init_covar = 1e6*np.eye(state_space.num_states)
